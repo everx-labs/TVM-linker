@@ -16,6 +16,9 @@ use regex::Regex;
 use contract_api::executor::prepare_methods;
 use contract_api::test_framework::{test_case_with_ref, Expects};
 
+mod real_ton;
+use real_ton::make_boc;
+
 use tvm::stack::{
         Stack,
         SliceData,
@@ -231,6 +234,7 @@ fn main() {
         (version: "0.1")
         (about: "Links TVM assembler file, loads and executes it in testing environment")
         (@arg PRINT_PARSED: --debug "Prints debug info: xref table and parsed assembler sources")
+        (@arg REAL_TON: --real-ton "Prints real TON debugging message")
         (@arg INPUT: +required +takes_value "TVM assembler source file")
         (@arg MAIN: +required +takes_value "Function name to call")
     ).get_matches();
@@ -239,6 +243,11 @@ fn main() {
     let mut xrefs: HashMap<String,i32> = HashMap::new();
     parse_code (&mut xrefs, &mut code, matches.value_of("INPUT").unwrap());
     parse_code (&mut xrefs, &mut code, matches.value_of("INPUT").unwrap());
+
+    if matches.is_present("REAL_TON") {
+        make_boc();
+        return
+    }
 
     if matches.is_present("PRINT_PARSED") {
         for (k,v) in &xrefs {
