@@ -1,0 +1,23 @@
+[package]
+name = "tvm_linker"
+version = "0.1.0"
+authors = ["tonlabs"]
+
+[dependencies]
+#base64 = "0.10.0"
+byteorder = "1.2.7"
+regex = "1"
+clap = "2.32"
+#crypto-hash = "0.3.1"
+#ed25519-dalek = "^0.8"
+#hex = "0.3.2"
+#lazy_static = "1.2.0"
+#log = "0.4.6"
+#rand = "0.6.4"
+#sha2 = "^0.7"
+#clap = "2.32.0"
+#jsonrpc-http-server = "10.0.1"
+
+tvm = { path = "../../sdk-emulator/tvm" }
+ton_block = { path = "../../sdk-emulator/ton_block" }
+contract_api = { path = "../../TON-Wallet-backend/contract_api" }
