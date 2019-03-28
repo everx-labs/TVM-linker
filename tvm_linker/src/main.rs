@@ -26,6 +26,7 @@ use tvm::stack::{
 };
 
 use tvm::stack::dictionary::HashmapE;
+use tvm::stack::dictionary::HashmapType;
 use tvm::bitstring::Bitstring;
 
 use ton_block::{
@@ -58,14 +59,17 @@ impl TestContractCode for TestABIContract {
     }
 
     fn new(raw_methods: &[(i32, String)]) -> Self {
-        let mut dict = prepare_methods(&[
+        let dict = prepare_methods(&[
             (-1i8,  INBOUND_EXTERNAL_PARSER.to_string()),
             // (0,     MAIN),
         ]);
 
         let methods = prepare_methods(raw_methods);
-        dict.set::<HashmapE>(8, Bitstring::from(1i8), methods);
-        TestABIContract { dict }
+
+        let key = 1i8.write_to_new_cell().unwrap();
+        let mut dict = HashmapE::with_data(8, dict);
+        dict.set(key.into(), methods).unwrap();
+        TestABIContract { dict: dict.get_data() }
     }
 }
 
