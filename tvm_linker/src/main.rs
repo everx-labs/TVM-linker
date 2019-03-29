@@ -30,7 +30,6 @@ use tvm::stack::{
 
 use tvm::stack::dictionary::HashmapE;
 use tvm::stack::dictionary::HashmapType;
-use tvm::bitstring::Bitstring;
 
 use ton_block::{
     Serializable,
@@ -273,7 +272,9 @@ fn main() {
         None => println! ("Cannot execute: main function {} not found in source file.", main),
         Some(main_id) => {
             if matches.is_present("COMPILE") {
-                compile_real_ton(code.get(main_id).unwrap());
+                let re = Regex::new(r"\.[^.]+$").unwrap();
+                let output_file = re.replace(matches.value_of("INPUT").unwrap(), ".boc");
+                compile_real_ton(code.get(main_id).unwrap(), &output_file);
                 return
             }
 
