@@ -8,6 +8,7 @@
 ;	}
 
 ; PUSHCONT {
+	.globl	main
 	DUP
 	IFNOTRET
 	INC 
