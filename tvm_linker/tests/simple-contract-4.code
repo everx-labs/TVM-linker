@@ -1,0 +1,43 @@
+;; stack: glam_balance, glam_balance_of_msg, message_as_cell, body_as_slice, function_selector 
+
+
+; PUSHCONT {
+	.globl	main
+	DUP
+	IFNOTRET
+	INC 
+	THROWIF 32
+	
+;; stack: glam_balance, glam_balance_of_msg, message_as_cell, body_as_slice,
+
+	LDU 16
+	LDU 16
+	DROP
+	SWAP
+	
+;; stack: glam_balance, glam_balance_of_msg, message_as_cell, second-msg-number, first-msg-number
+
+	POP s2
+	POP s2
+	POP s2
+	
+;; stack: second-msg-number, first-msg-number
+
+	PUSHROOT CTOS
+	LDU 16
+	DROP
+	
+;; stack: second-msg-number, first-msg-number, storage-number
+
+	EQUAL
+	IFNOTRET
+	
+;; stack: second-msg-number
+
+	ACCEPT
+
+	NEWC
+	STU 16
+	ENDC
+	POPROOT
+; }
