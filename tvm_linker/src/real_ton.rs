@@ -32,7 +32,7 @@ pub fn decode_boc(file_name: &str) {
     f.read_to_end(&mut orig_bytes).expect("Unable to read file");
 
     let mut cur = Cursor::new(orig_bytes.clone());
-    let (root_cells, _mode) = deserialize_cells_tree_ex(&mut cur).expect("Error deserialising BOC");
+    let (root_cells, _mode, _x, _y) = deserialize_cells_tree_ex(&mut cur).expect("Error deserialising BOC");
     let root_cells_vec : Vec<SliceData> = root_cells.iter().map(|c| SliceData::from(c)).collect();
     let root_cell = root_cells_vec[0].clone();
 
@@ -87,7 +87,7 @@ pub fn compile_real_ton (code: &str, output_file_name: &str) {
     let mut state_init = StateInit::default();
 
     let mut node = BuilderData::new();
-    let node_data = Bitstring::create(hex::decode("00000001").unwrap(),32);
+    let node_data = Bitstring::create(hex::decode("00000002").unwrap(),32);
     node.append_data (&node_data);
 
     let state_init_data = Arc::<CellData>::from(node);
