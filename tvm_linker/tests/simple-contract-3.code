@@ -30,3 +30,5 @@
 	ENDC
 	POPROOT
 ; }
+	.data
+	00001234

@@ -77,7 +77,7 @@ pub fn make_boc() {
 //  let address : AccountAddress = AccountAddress::from_str ("5d76362f95fb9187ad94967ecc7347f7fc85fdbbc23722323f82e68f66f9f963").unwrap();
 //  let address : AccountAddress = AccountAddress::from_str ("1b2fb433e2a10483b51540a314f8558aaf5e824c49abbbf27af0372f74829379").unwrap();
 
-pub fn compile_real_ton (code: &str, output_file_name: &str) {
+pub fn compile_real_ton (code: &str, data: &Bitstring, msg_data: &Option<&Bitstring>, output_file_name: &str, pack_code: bool) {
     let code_cell = assembler::Engine::<assembler::CodePage0>::new()
         .compile(code)
         .unwrap()
@@ -87,12 +87,11 @@ pub fn compile_real_ton (code: &str, output_file_name: &str) {
     let mut state_init = StateInit::default();
 
     let mut node = BuilderData::new();
-    let node_data = Bitstring::create(hex::decode("00000002").unwrap(),32);
-    node.append_data (&node_data);
+    node.append_data (data);
 
     let state_init_data = Arc::<CellData>::from(node);
     state_init.set_data (state_init_data);
-    state_init.set_code(code_cell);
+    state_init.set_code (code_cell);
 
     let address = state_init.hash().unwrap();
     println!("Address: {}", hex::encode(address.as_slice()));
@@ -100,7 +99,21 @@ pub fn compile_real_ton (code: &str, output_file_name: &str) {
     let mut msg_hdr = ExternalInboundMessageHeader::default();
     msg_hdr.dst = MsgAddressInt::AddrStd (MsgAddrStd::with_address(None, -1, address));
     let mut msg = Message::with_ext_in_header (msg_hdr);
-    msg.init = Some(state_init.clone());
+
+    if pack_code {
+        msg.init = Some(state_init.clone());
+    }
+
+    let msg_data_init;
+    match msg_data {
+        None => msg_data_init = Arc::<CellData>::default(),
+        Some(d) => {
+            let mut dd = BuilderData::new();
+            dd.append_data (d);
+            msg_data_init = Arc::<CellData>::from(dd);
+            msg.body = Some (msg_data_init);
+        }
+    }
 
     let root_cell = SliceData::from(Arc::<CellData>::from(msg.write_to_new_cell().unwrap()));
     let boc = BagOfCells::with_root(root_cell);

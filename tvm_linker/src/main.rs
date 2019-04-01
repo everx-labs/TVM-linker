@@ -19,6 +19,9 @@ use contract_api::test_framework::{test_case_with_ref, Expects};
 mod real_ton;
 use real_ton::{ make_boc, decode_boc, compile_real_ton };
 
+mod program;
+use program::Program;
+
 use tvm::stack::{
         Stack,
         SliceData,
@@ -30,6 +33,7 @@ use tvm::stack::{
 
 use tvm::stack::dictionary::HashmapE;
 use tvm::stack::dictionary::HashmapType;
+use tvm::bitstring::Bitstring;
 
 use ton_block::{
     Serializable,
@@ -155,11 +159,14 @@ fn perform_contract_call(raw_methods: &[(i32,String)], func_id: i32, a: i32, b: 
         .with_stack(stack).expect_success().expect_print_stack();
 }
 
-fn update_code_dict (xrefs: &mut HashMap<String,i32>, code: &mut HashMap<i32,String>,
-                     func_name: &String, func_body: &String, func_id: &mut i32) {
-    if func_name != "" {
-        xrefs.insert (func_name.clone(), *func_id);
-        code.insert (*func_id, func_body.clone());
+fn update_code_dict (prog: &mut Program, func_name: &String, func_body: &String, func_id: &mut i32) {
+    if func_name == ".data" {
+        let value = func_body.trim();
+        prog.data = Bitstring::create(hex::decode (value).unwrap(), value.len()*4);
+    }
+    else if func_name != "" {
+        prog.xrefs.insert (func_name.clone(), *func_id);
+        prog.code.insert (*func_id, func_body.clone());
         *func_id = *func_id + 1;
     }
 }
@@ -190,11 +197,12 @@ fn replace_labels (l: &String, xrefs: &mut HashMap<String,i32>) -> String {
     }
 }
 
-fn parse_code (xrefs: &mut HashMap<String,i32>, code: &mut HashMap<i32,String>, file_name: &str) {
+fn parse_code (prog: &mut Program, file_name: &str) {
     let f = File::open(file_name).unwrap();
     let file = BufReader::new(&f);
 
-    let globl_regex = Regex::new(r"^\t.globl\t([a-zA-Z0-9_]+)").unwrap();
+    let globl_regex = Regex::new(r"^\t\.globl\t([a-zA-Z0-9_]+)").unwrap();
+    let data_regex = Regex::new(r"^\t\.data").unwrap();
     let label_regex = Regex::new(r"^[.a-zA-Z0-9_]+:").unwrap();
     let dotted_regex = Regex::new(r"^\t*[.]").unwrap();
 
@@ -205,27 +213,33 @@ fn parse_code (xrefs: &mut HashMap<String,i32>, code: &mut HashMap<i32,String>, 
     for line in file.lines() {
         let l = line.unwrap();
         if globl_regex.is_match(&l) { 
-            update_code_dict (xrefs, code, &func_name, &func_body, &mut func_id);
+            update_code_dict (prog, &func_name, &func_body, &mut func_id);
             func_name = "".to_owned();
             func_body = "".to_owned(); 
 
             for cap in globl_regex.captures_iter (&l) {
                 func_name = cap[1].to_owned();
             }
+            continue;
+        }
 
-            continue; 
+        if data_regex.is_match(&l) {
+            update_code_dict (prog, &func_name, &func_body, &mut func_id);
+            func_name = ".data".to_owned();
+            func_body = "".to_owned();
+            continue;
         }
 
         if label_regex.is_match(&l) { continue; }
         if dotted_regex.is_match(&l) { continue; }
 
-        let l_with_numbers = replace_labels (&l, xrefs);
+        let l_with_numbers = replace_labels (&l, &mut prog.xrefs);
 
         func_body.push_str (&l_with_numbers);
         func_body.push_str ("\n");
     }
 
-    update_code_dict (xrefs, code, &func_name, &func_body, &mut func_id);
+    update_code_dict (prog, &func_name, &func_body, &mut func_id);
 }
 
 fn main() {
@@ -233,56 +247,73 @@ fn main() {
         (version: "0.1")
         (about: "Links TVM assembler file, loads and executes it in testing environment")
         (@arg PRINT_PARSED: --debug "Prints debug info: xref table and parsed assembler sources")
-        (@arg REAL_TON: --real "Prints real TON debugging message")
         (@arg DECODE: --decode "Decodes real TON message")
-        (@arg COMPILE: --compile "Packs compiled code into real TON message")
+        (@arg MESSAGE: --message "Builds TON message for the contract in INPUT")
+        (@arg INIT: --init "Packs code into TON State Init message")
+        (@arg DATA: --data +takes_value "Supplies data to contract in hex format (empty data by default)")
         (@arg INPUT: +required +takes_value "TVM assembler source file")
         (@arg MAIN: +required +takes_value "Function name to call")
     ).get_matches();
-
-    if matches.is_present("REAL_TON") {
-        make_boc();
-        return
-    }
 
     if matches.is_present("DECODE") {
         decode_boc(matches.value_of("INPUT").unwrap());
         return
     }
 
-    let mut code: HashMap<i32,String> = HashMap::new();
-    let mut xrefs: HashMap<String,i32> = HashMap::new();
-    parse_code (&mut xrefs, &mut code, matches.value_of("INPUT").unwrap());
-    parse_code (&mut xrefs, &mut code, matches.value_of("INPUT").unwrap());
+    let mut prog: Program = Program { xrefs: HashMap::new(), code: HashMap::new(), data: Bitstring::default() };
+    if matches.is_present("INPUT") {
+        parse_code (&mut prog, matches.value_of("INPUT").unwrap());
+        parse_code (&mut prog, matches.value_of("INPUT").unwrap());
+    }
 
     if matches.is_present("PRINT_PARSED") {
-        for (k,v) in &xrefs {
+        for (k,v) in &prog.xrefs {
             println! ("Function {}: id={}", k, v);
         }
 
-        for (k,v) in &code {
+        for (k,v) in &prog.code {
             println! ("Function {}\n-----------------\n{}\n-----------------", k, v);
         }
 
         println! ("");
     }
 
-    let main = matches.value_of("MAIN").unwrap();
-    match xrefs.get (main) {
-        None => println! ("Cannot execute: main function {} not found in source file.", main),
-        Some(main_id) => {
-            if matches.is_present("COMPILE") {
-                let re = Regex::new(r"\.[^.]+$").unwrap();
-                let output_file = re.replace(matches.value_of("INPUT").unwrap(), ".boc");
-                compile_real_ton(code.get(main_id).unwrap(), &output_file);
+    let mut main_id = None;
+    if matches.is_present("MAIN") {
+        let main_name = matches.value_of("MAIN").unwrap();
+        match prog.xrefs.get (main_name) {
+            None => {
+                println! ("Main method {} is not found in source code", main_name);
                 return
             }
-
-            let mut serialized_code: Vec<(i32,String)> = [].to_vec();
-            for (k,v) in &code {
-                serialized_code.push ((*k,v.to_string()));
-            }
-            perform_contract_call(&serialized_code, *main_id, 0, 0)
+            Some(v) => main_id = Some(*v)
         }
+    }
+
+    let mut node_data_option;
+    let mut node_data = None;
+    if matches.is_present("DATA") {
+        let data = matches.value_of("DATA").unwrap();
+        node_data_option = Bitstring::create(hex::decode(data).unwrap(),data.len()*4);
+        node_data = Some (&node_data_option);
+    }
+
+    if matches.is_present("MESSAGE") {
+        let re = Regex::new(r"\.[^.]+$").unwrap();
+        let output_file = re.replace(matches.value_of("INPUT").unwrap(), ".boc");
+        let main_code;
+        match main_id {
+            None => main_code = "???",
+            Some(id) => main_code = prog.code.get(&id).unwrap().as_str()
+        }
+        compile_real_ton(main_code, &prog.data, &node_data, &output_file, matches.is_present("INIT"));
+        return
+    }
+    else if matches.is_present("INPUT") && matches.is_present("MAIN") {
+        let mut serialized_code: Vec<(i32,String)> = [].to_vec();
+        for (k,v) in &prog.code {
+            serialized_code.push ((*k,v.to_string()));
+        }
+        perform_contract_call(&serialized_code, main_id.unwrap(), 0, 0)
     }
 }
