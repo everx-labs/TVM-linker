@@ -37,7 +37,7 @@ to compute address of the contract.
 
 3) Emulate execution of some code:
 
-```tvm-linker <source-code-name> <main-method-name>
+```tvm-linker <source-code-name> <main-method-name>```
 
 You may also use --data key to supply additional data to the emulator.
 
