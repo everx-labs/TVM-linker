@@ -91,9 +91,11 @@ pub fn compile_real_ton (code: &str, data: &Bitstring, msg_data: &Option<&Bitstr
 
     let state_init_data = Arc::<CellData>::from(node);
     state_init.set_data (state_init_data);
-    state_init.set_code (code_cell);
+    state_init.set_code (code_cell.clone());
 
     let address = state_init.hash().unwrap();
+    let code_cell_data = code_cell;
+    println!("Code: {}", hex::encode(code_cell_data.data()));
     println!("Address: {}", hex::encode(address.as_slice()));
 
     let mut msg_hdr = ExternalInboundMessageHeader::default();
