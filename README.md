@@ -54,3 +54,10 @@ The source code should consist of functions, started by .globl keyword:
 At the end of the file a .data section may be specified.
 The data from this .data section are bundled together with the code
 into the init message.
+
+```
+	.globl	x
+	<code here>
+	.data
+	00000001
+```
