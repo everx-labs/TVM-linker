@@ -17,7 +17,7 @@ use contract_api::executor::prepare_methods;
 use contract_api::test_framework::{test_case_with_ref, Expects};
 
 mod real_ton;
-use real_ton::{ make_boc, decode_boc, compile_real_ton };
+use real_ton::{ decode_boc, compile_real_ton };
 
 mod program;
 use program::Program;
@@ -290,7 +290,7 @@ fn main() {
         }
     }
 
-    let mut node_data_option;
+    let node_data_option;
     let mut node_data = None;
     if matches.is_present("DATA") {
         let data = matches.value_of("DATA").unwrap();
