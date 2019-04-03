@@ -137,9 +137,9 @@ fn create_external_inbound_msg(dst_addr: &AccountId, body: Arc<CellData>) -> Mes
     msg
 }
 
-fn perform_contract_call(raw_methods: &[(i32,String)], func_id: i32, a: i32, b: i32) {
+fn perform_contract_call(raw_methods: &[(i32,String)], func_id: i32, data: &Option<&Bitstring>) {
     let mut stack = Stack::new();
-    let body_cell = create_inbound_body(a, b, func_id);
+    let body_cell = create_inbound_body(0, 0, func_id);
     let msg_cell = StackItem::Cell(
         create_external_inbound_msg(
             &AccountId::from([0x11; 32]), 
@@ -314,6 +314,6 @@ fn main() {
         for (k,v) in &prog.code {
             serialized_code.push ((*k,v.to_string()));
         }
-        perform_contract_call(&serialized_code, main_id.unwrap(), 0, 0)
+        perform_contract_call(&serialized_code, main_id.unwrap(), &node_data)
     }
 }
