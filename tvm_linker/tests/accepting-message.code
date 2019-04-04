@@ -75,6 +75,6 @@
 	ENDC
 	POPROOT
 
-	.data
 	; Essential for initial message
+	.data
 	00000000
