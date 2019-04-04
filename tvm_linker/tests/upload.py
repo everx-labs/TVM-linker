@@ -7,6 +7,8 @@ import sys
 
 TMP_FN = "upload.tmp"
 LITE_CLIENT_DIR = "../../../build-tlc"
+if not os.path.exists(LITE_CLIENT_DIR):
+	LITE_CLIENT_DIR = "../../../lite-client-build"
 CLIENT_CMD = "{0}/test-lite-client -C {0}/ton-lite-client-test1.config.json".format(LITE_CLIENT_DIR)
 TVM_LINKER_EXE = "../../../TVM-linker/tvm_linker/target/debug/tvm_linker"
 TESTGIVER_ADDR = "538fa7cc24ff8eaa101d84a5f1ab7e832fe1d84b309cdfef4ee94373aac80f7d"
