@@ -299,8 +299,16 @@ fn main() {
     }
 
     if matches.is_present("MESSAGE") {
+        let mut suffix = "".to_owned();
+        if matches.is_present("DATA") {
+            suffix.push_str("-");
+            suffix.push_str(matches.value_of("DATA").unwrap());
+        }
+        suffix.push_str(".boc");
+
         let re = Regex::new(r"\.[^.]+$").unwrap();
-        let output_file = re.replace(matches.value_of("INPUT").unwrap(), ".boc");
+        let output_file = re.replace(matches.value_of("INPUT").unwrap(), suffix.as_str());
+
         let main_code;
         match main_id {
             None => main_code = "???",
