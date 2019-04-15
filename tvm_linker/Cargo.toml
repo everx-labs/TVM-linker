@@ -20,4 +20,3 @@ hex = "0.3.2"
 
 tvm = { path = "../../sdk-emulator/tvm" }
 ton_block = { path = "../../sdk-emulator/ton_block" }
-contract_api = { path = "../../TON-Wallet-backend/contract_api" }
