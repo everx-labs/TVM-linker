@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate tvm;
 extern crate ton_block;
-extern crate contract_api;
 extern crate regex;
 
 #[macro_use]
@@ -13,8 +12,9 @@ use std::io::{BufRead, BufReader};
 use std::collections::HashMap;
 use regex::Regex;
 
-use contract_api::executor::prepare_methods;
-use contract_api::test_framework::{test_case_with_ref, Expects};
+use tvm::assembler::compile_code;
+mod test_framework;
+use test_framework::{test_case_with_ref, Expects};
 
 mod real_ton;
 use real_ton::{ decode_boc, compile_real_ton };
@@ -78,6 +78,20 @@ impl TestContractCode for TestABIContract {
         TestABIContract { dict: dict.get_data() }
     }
 }
+
+fn prepare_methods<T>(methods: &[(T, String)]) -> SliceData
+where T: Default + Serializable {
+    let bit_len = SliceData::from(T::default().write_to_new_cell().unwrap()).remaining_bits();
+    let mut dict = HashmapE::with_bit_len(bit_len);
+    for i in 0..methods.len() {
+        let key = methods[i].0.write_to_new_cell().unwrap();
+        let method = compile_code(methods[i].1.as_str()).unwrap();
+        dict.set(key.into(), method).unwrap();
+    }
+    dict.get_data()
+}
+
+
 
 pub const MAIN_ID: i32 = 0x6D61696E;
 
