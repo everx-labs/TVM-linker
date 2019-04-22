@@ -13,8 +13,7 @@ use std::collections::HashMap;
 use regex::Regex;
 
 use tvm::assembler::compile_code;
-mod test_framework;
-use test_framework::{test_case_with_ref, Expects};
+use tvm::test_framework::{test_case_with_ref, Expects};
 
 mod real_ton;
 use real_ton::{ decode_boc, compile_real_ton };
@@ -170,7 +169,7 @@ fn perform_contract_call(raw_methods: &[(i32,String)], func_id: i32, data: &Opti
     let contract = TestABIContract::new(raw_methods);
 
     test_case_with_ref(&contract.get_contract_code(), contract.get_methods())
-        .with_stack(stack).expect_success().expect_print_stack();
+        .with_stack(stack).expect_success();
 }
 
 fn update_code_dict (prog: &mut Program, func_name: &String, func_body: &String, func_id: &mut i32) {
