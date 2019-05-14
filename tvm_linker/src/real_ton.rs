@@ -12,8 +12,7 @@ use tvm::cells_serialization::{ BocSerialiseMode, BagOfCells, deserialize_cells_
 use tvm::stack::BuilderData;
 use tvm::stack::SliceData;
 use tvm::stack::CellData;
-use tvm::assembler;
-use tvm::assembler::Writer;
+use tvm::assembler::compile_code;
 use tvm::bitstring::Bitstring;
 
 use ton_block::{ Message, ExternalInboundMessageHeader, MsgAddrStd, MsgAddressInt, 
@@ -43,6 +42,7 @@ pub fn decode_boc(file_name: &str) {
     println!("Decoded: {:?}", msg);
 }
 
+#[allow(dead_code)]
 pub fn make_boc() {
     println! ("Making real TON");
     let address : AccountAddress = AccountAddress::from_str ("4e5756321b532011c422382c5478569d21bd15ef33d5ede4e7fc250408a926d2").unwrap();
@@ -78,12 +78,7 @@ pub fn make_boc() {
 //  let address : AccountAddress = AccountAddress::from_str ("1b2fb433e2a10483b51540a314f8558aaf5e824c49abbbf27af0372f74829379").unwrap();
 
 pub fn compile_real_ton (code: &str, data: &Bitstring, msg_data: &Option<&Bitstring>, output_file_name: &str, pack_code: bool) {
-    let code_cell = assembler::Engine::<assembler::CodePage0>::new()
-        .compile(code)
-        .unwrap()
-        .finalize()
-        .cell();
-
+    let code_cell = compile_code(code).expect("Compilation failed").cell();
     let mut state_init = StateInit::default();
 
     let mut node = BuilderData::new();
@@ -106,14 +101,12 @@ pub fn compile_real_ton (code: &str, data: &Bitstring, msg_data: &Option<&Bitstr
         msg.init = Some(state_init.clone());
     }
 
-    let msg_data_init;
     match msg_data {
-        None => msg_data_init = Arc::<CellData>::default(),
+        None => (),
         Some(d) => {
             let mut dd = BuilderData::new();
-            dd.append_data (d);
-            msg_data_init = Arc::<CellData>::from(dd);
-            msg.body = Some (msg_data_init);
+            dd.append_data(d);
+            msg.body = Some(dd.into());
         }
     }
 
