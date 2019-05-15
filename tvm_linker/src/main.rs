@@ -9,8 +9,7 @@ extern crate tvm;
 extern crate ton_block;
 
 use regex::Regex;
-use tvm::assembler::compile_code;
-use tvm::test_framework::{test_case_with_ref, Expects};
+
 
 mod real_ton;
 use real_ton::{ decode_boc, compile_real_ton };
@@ -23,111 +22,12 @@ use std::collections::HashMap;
 mod program;
 use program::Program;
 
-use tvm::stack::*;
-use tvm::stack::dictionary::{HashmapE, HashmapType};
 use tvm::bitstring::Bitstring;
-
-use ton_block::{
-    Serializable,
-    ExternalInboundMessageHeader,
-    MsgAddressInt,
-    Message
-};
-use tvm::types::AccountId;
-use std::sync::Arc;
 mod stdlib;
 use stdlib::*;
 
-pub struct TestABIContract {
-    dict: SliceData,        // dictionary of methods
-}
-
-/// Constructs test contract to implement dictionary of methods
-pub trait TestContractCode {
-    fn new(&[(i32,String)]) -> Self;
-    fn get_contract_code(&self) -> &str;
-    fn get_methods(&self) -> SliceData;
-}
-
-impl TestContractCode for TestABIContract {
-    fn get_contract_code(&self) -> &str {
-        _SELECTOR
-    }    
-
-    fn get_methods(&self) -> SliceData {
-        self.dict.clone()
-    }
-
-    fn new(raw_methods: &[(i32, String)]) -> Self {
-        let dict = prepare_methods(&[
-            (-1i8,  INBOUND_EXTERNAL_PARSER.to_string()),
-            // (0,     MAIN),
-        ]);
-
-        let methods = prepare_methods(raw_methods);
-
-        let key = 1i8.write_to_new_cell().unwrap();
-        let mut dict = HashmapE::with_data(8, dict);
-        dict.set(key.into(), methods).unwrap();
-        TestABIContract { dict: dict.get_data() }
-    }
-}
-
-fn prepare_methods<T>(methods: &[(T, String)]) -> SliceData
-where T: Default + Serializable {
-    let bit_len = SliceData::from(T::default().write_to_new_cell().unwrap()).remaining_bits();
-    let mut dict = HashmapE::with_bit_len(bit_len);
-    for i in 0..methods.len() {
-        let key = methods[i].0.write_to_new_cell().unwrap();
-        let method = compile_code(methods[i].1.as_str()).unwrap();
-        dict.set(key.into(), method).unwrap();
-    }
-    dict.get_data()
-}
-
-
-pub const MAIN_ID: i32 = 0x6D61696E;
-
-
-fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Arc<CellData> {
-    let mut builder = BuilderData::new();
-    let version: u8 = 0;
-    version.write_to(&mut builder).unwrap();
-    func_id.write_to(&mut builder).unwrap();
-    a.write_to(&mut builder).unwrap();
-    b.write_to(&mut builder).unwrap();
-    builder.into()
-}
-
-fn create_external_inbound_msg(dst_addr: &AccountId, body: Arc<CellData>) -> Message {
-    let mut hdr = ExternalInboundMessageHeader::default();
-    hdr.dst = MsgAddressInt::with_standart(None, -1, dst_addr.clone()).unwrap();
-    let mut msg = Message::with_ext_in_header(hdr);
-    msg.body = Some(body.into());
-    msg
-}
-
-fn perform_contract_call(raw_methods: &[(i32,String)], func_id: i32, _data: &Option<&Bitstring>) {
-    let mut stack = Stack::new();
-    let body_cell = create_inbound_body(0, 0, func_id);
-    let msg_cell = StackItem::Cell(
-        create_external_inbound_msg(
-            &AccountId::from([0x11; 32]), 
-            body_cell.clone()
-        ).write_to_new_cell().unwrap().into()
-    );
-    stack
-        .push(int!(0))
-        .push(int!(0))
-        .push(msg_cell.clone())
-        .push(StackItem::Slice(SliceData::from(body_cell))) 
-        .push(int!(-1));
-
-    let contract = TestABIContract::new(raw_methods);
-
-    test_case_with_ref(&contract.get_contract_code(), contract.get_methods())
-        .with_stack(stack).expect_success();
-}
+mod testcall;
+use testcall::perform_contract_call;
 
 fn update_code_dict (prog: &mut Program, func_name: &String, func_body: &String, func_id: &mut i32) {
     if func_name == ".data" {
