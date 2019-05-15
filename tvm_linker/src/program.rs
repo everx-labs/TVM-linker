@@ -6,3 +6,13 @@ pub struct Program {
     pub code: HashMap<i32,String>,
     pub data: Bitstring
 }
+
+impl Program {
+    pub fn new() -> Self {
+        Program { 
+            xrefs: HashMap::new(), 
+            code: HashMap::new(), 
+            data: Bitstring::default(), 
+        }
+    }
+}

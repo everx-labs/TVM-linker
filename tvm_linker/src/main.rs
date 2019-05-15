@@ -1,37 +1,30 @@
-#[macro_use]
-extern crate tvm;
-extern crate ton_block;
-extern crate regex;
 
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate lazy_static;
+extern crate regex;
+#[macro_use]
+extern crate tvm;
+extern crate ton_block;
 
-use std::str;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::collections::HashMap;
 use regex::Regex;
-
 use tvm::assembler::compile_code;
 use tvm::test_framework::{test_case_with_ref, Expects};
 
 mod real_ton;
 use real_ton::{ decode_boc, compile_real_ton };
 
+use std::str;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::collections::HashMap;
+
 mod program;
 use program::Program;
 
-use tvm::stack::{
-        Stack,
-        SliceData,
-        CellData,
-        BuilderData,
-        StackItem,
-        IntegerData,
-};
-
-use tvm::stack::dictionary::HashmapE;
-use tvm::stack::dictionary::HashmapType;
+use tvm::stack::*;
+use tvm::stack::dictionary::{HashmapE, HashmapType};
 use tvm::bitstring::Bitstring;
 
 use ton_block::{
@@ -42,6 +35,8 @@ use ton_block::{
 };
 use tvm::types::AccountId;
 use std::sync::Arc;
+mod stdlib;
+use stdlib::*;
 
 pub struct TestABIContract {
     dict: SliceData,        // dictionary of methods
@@ -56,7 +51,7 @@ pub trait TestContractCode {
 
 impl TestContractCode for TestABIContract {
     fn get_contract_code(&self) -> &str {
-        CODE_CONTRACT
+        _SELECTOR
     }    
 
     fn get_methods(&self) -> SliceData {
@@ -91,46 +86,8 @@ where T: Default + Serializable {
 }
 
 
-
 pub const MAIN_ID: i32 = 0x6D61696E;
 
-static INBOUND_EXTERNAL_PARSER: &str = "
-    ; s0 - msg body: slice
-    ; s1 - msg header: cell
-    ; s2 - gram balance of msg: int
-    ; s3 - gram balance of contract: int
-
-    ; parse body
-    LDU 8       ; load version
-    NIP         ; drop version
-    LDU 32      ; load func id
-    POP s4      ; drop gram balance of contract
-    POP s2      ; drop gram balance of msg
-    DROP        ; drop header
-    CALL 1
-";
-
-static CODE_CONTRACT: &str = "
-    ; s0 - func_id i8
-    ; s1.. - other data
-    PUSHREFSLICE        ; dictionary of methods in first reference (what if code more than 1023 bits: 0-ref - continue of code)
-    OVER
-    ISNEG
-    PUSHCONT {          ; if func_id negative - direct call to method
-        PUSHINT 8
-        DICTIGETJMP     ; execute method and return
-        THROW 51
-    }
-    PUSHCONT {          ; get dictionary with methods
-        PUSHINT 8
-        DICTIGET
-        THROWIFNOT 52   ; no dictionary of methods
-        PUSHINT 32
-        DICTUGETJMP     ; execute method and return
-        THROW 51
-    }
-    IFELSE
-";
 
 fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Arc<CellData> {
     let mut builder = BuilderData::new();
@@ -273,7 +230,7 @@ fn main() {
         return
     }
 
-    let mut prog: Program = Program { xrefs: HashMap::new(), code: HashMap::new(), data: Bitstring::default() };
+    let mut prog = Program::new();
     if matches.is_present("INPUT") {
         parse_code (&mut prog, matches.value_of("INPUT").unwrap());
         parse_code (&mut prog, matches.value_of("INPUT").unwrap());
