@@ -76,16 +76,10 @@ pub fn make_boc() {
 
 //  let address : AccountAddress = AccountAddress::from_str ("5d76362f95fb9187ad94967ecc7347f7fc85fdbbc23722323f82e68f66f9f963").unwrap();
 //  let address : AccountAddress = AccountAddress::from_str ("1b2fb433e2a10483b51540a314f8558aaf5e824c49abbbf27af0372f74829379").unwrap();
-
-pub fn compile_real_ton (code: &str, data: &Bitstring, msg_data: &Option<&Bitstring>, output_file_name: &str, pack_code: bool) {
+pub fn compile_real_ton (code: &str, data: &BuilderData, msg_data: Option<BuilderData>, output_file_name: &str, pack_code: bool) {
     let code_cell = compile_code(code).expect("Compilation failed").cell();
     let mut state_init = StateInit::default();
-
-    let mut node = BuilderData::new();
-    node.append_data (data);
-
-    let state_init_data = Arc::<CellData>::from(node);
-    state_init.set_data (state_init_data);
+    state_init.set_data (data.clone().into());
     state_init.set_code (code_cell.clone());
 
     let address = state_init.hash().unwrap();
@@ -103,10 +97,8 @@ pub fn compile_real_ton (code: &str, data: &Bitstring, msg_data: &Option<&Bitstr
 
     match msg_data {
         None => (),
-        Some(d) => {
-            let mut dd = BuilderData::new();
-            dd.append_data(d);
-            msg.body = Some(dd.into());
+        Some(cell) => {
+            msg.body = Some(cell.into());
         }
     }
 

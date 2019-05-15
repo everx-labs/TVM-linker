@@ -4,6 +4,16 @@ pub const ACCESS_DENIED_EXCEPTION:   usize = 40;
 pub const NOT_FOUND_EXCEPTION:       usize = 41;
 pub const UNSUPPORTED_ABI_EXCEPTION: isize = 55;
 
+pub fn build_default_dict() -> [(i32, String); 4] {
+    [
+        (-1i32, _MAIN_EXTERNAL.to_string()),
+        ( 0i32, _MAIN_INTERNAL.to_string()),
+        // key 1 is placeholder for dictionary of contract methods
+        ( 2i32, _PARSE_MESSAGE.to_string()),
+        ( 3i32, _AUTHENTICATE.to_string()),
+    ]
+}
+
 pub static _SELECTOR: &str = "
     ; s0 - func_id i8
     ; s1.. - other data
@@ -50,13 +60,11 @@ lazy_static! {
     ; s3 - gram balance of contract: int
 
         ;call signature checker (can throw exception if signature is invalid)
-        PUSHINT 0
-        CALL 1      ;assume that function returns nothing
+        CALL 3      ;assume that function returns nothing
         
         ;call msg parser
         PUSH s1     ;push msg cell on top
-        PUSHINT 1
-        CALL 1      ;assume thar parser returns slice - dictionary with msg fields
+        CALL 2      ;assume thar parser returns slice - dictionary with msg fields
         
         SWAP
         ;parse ABI version (1 byte) and load function id (4 bytes)
@@ -65,14 +73,21 @@ lazy_static! {
         THROWIF {unsupported_abi} ; only version 0 is supported now
         LDU 32      ;load func id
         SWAP
-        CALL 2      ;public method call
+        CALL 1      ;public method call
     ",
     unsupported_abi = UNSUPPORTED_ABI_EXCEPTION,
-    );
+    );    
 }
 
 //Default main for internal messages
 pub static _MAIN_INTERNAL: &str = "RET";
+
+//TODO: place a real msg parser
+pub static _PARSE_MESSAGE: &str = "
+    ;args: s0 - msg cell
+    ;ret: s0 - msg slice
+    CTOS
+";
 
 /// Signature validation function. Signature must be placed in ref0 of body slice.
 /// Function assumes that auth dictionary is located in ref0 of current continuation.

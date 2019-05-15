@@ -22,17 +22,17 @@ use std::collections::HashMap;
 mod program;
 use program::Program;
 
-use tvm::bitstring::Bitstring;
+use tvm::stack::BuilderData;
 mod stdlib;
-use stdlib::*;
 
 mod testcall;
 use testcall::perform_contract_call;
 
 fn update_code_dict (prog: &mut Program, func_name: &String, func_body: &String, func_id: &mut i32) {
     if func_name == ".data" {
-        let value = func_body.trim();
-        prog.data = Bitstring::create(hex::decode (value).unwrap(), value.len()*4);
+        let data_buf = hex::decode(func_body.trim()).unwrap();
+        let data_bits = data_buf.len() * 8;
+        prog.data = BuilderData::with_raw(data_buf, data_bits);
     }
     else if func_name != "" {
         prog.xrefs.insert (func_name.clone(), *func_id);
@@ -78,7 +78,7 @@ fn parse_code (prog: &mut Program, file_name: &str) {
 
     let mut func_body: String = "".to_owned();
     let mut func_name: String = "".to_owned();
-    let mut func_id: i32 = 0;
+    let mut func_id: i32 = 1;
 
     for line in file.lines() {
         let l = line.unwrap();
@@ -122,7 +122,13 @@ fn main() {
         (@arg INIT: --init "Packs code into TON State Init message")
         (@arg DATA: --data +takes_value "Supplies data to contract in hex format (empty data by default)")
         (@arg INPUT: +required +takes_value "TVM assembler source file")
-        (@arg MAIN: +required +takes_value "Function name to call")
+        (@arg ENTRY_POINT: +takes_value "Function name of the contract's entry point")
+        (@subcommand test =>
+            (about: "execute contract in test environment")
+            (version: "0.1")
+            (author: "tonlabs")
+            (@arg MSG: -msg "External inbound message for contract (hex string)")
+        )
     ).get_matches();
 
     if matches.is_present("DECODE") {
@@ -148,25 +154,12 @@ fn main() {
         println! ("");
     }
 
-    let mut main_id = None;
-    if matches.is_present("MAIN") {
-        let main_name = matches.value_of("MAIN").unwrap();
-        match prog.xrefs.get (main_name) {
-            None => {
-                println! ("Main method {} is not found in source code", main_name);
-                return
-            }
-            Some(v) => main_id = Some(*v)
-        }
-    }
-
-    let node_data_option;
-    let mut node_data = None;
-    if matches.is_present("DATA") {
-        let data = matches.value_of("DATA").unwrap();
-        node_data_option = Bitstring::create(hex::decode(data).unwrap(),data.len()*4);
-        node_data = Some (&node_data_option);
-    }
+    prog.set_entry(matches.value_of("ENTRY_POINT")).expect("Error");
+   
+    let node_data = match matches.value_of("DATA") {
+        Some(data) => Some(BuilderData::with_raw(hex::decode(data).unwrap(), data.len()*4)),
+        None => None,
+    };
 
     if matches.is_present("MESSAGE") {
         let mut suffix = "".to_owned();
@@ -178,20 +171,24 @@ fn main() {
 
         let re = Regex::new(r"\.[^.]+$").unwrap();
         let output_file = re.replace(matches.value_of("INPUT").unwrap(), suffix.as_str());
-
-        let main_code;
-        match main_id {
-            None => main_code = "???",
-            Some(id) => main_code = prog.code.get(&id).unwrap().as_str()
-        }
-        compile_real_ton(main_code, &prog.data, &node_data, &output_file, matches.is_present("INIT"));
-        return
+        
+        compile_real_ton(prog.get_entry(), &prog.data, node_data, &output_file, matches.is_present("INIT"));
+        return;
+    } else {
+        prog.compile_to_file().expect("Error");
     }
-    else if matches.is_present("INPUT") && matches.is_present("MAIN") {
+
+    if let Some(matches) = matches.subcommand_matches("test") {
+        if matches.is_present("MSG") {
+            println!("msg specified...");
+        } else {
+            println!("create default msg...");
+        }
         let mut serialized_code: Vec<(i32,String)> = [].to_vec();
         for (k,v) in &prog.code {
             serialized_code.push ((*k,v.to_string()));
         }
-        perform_contract_call(&serialized_code, main_id.unwrap(), &node_data)
+        perform_contract_call(&serialized_code, 0, node_data);
+        println!("Test completed");
     }
 }

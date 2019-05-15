@@ -1,4 +1,3 @@
-use tvm::bitstring::Bitstring;
 use tvm::stack::*;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
 use tvm::test_framework::{test_case_with_ref, Expects};
@@ -66,7 +65,7 @@ fn create_external_inbound_msg(dst_addr: &AccountId, body: Arc<CellData>) -> Mes
     msg
 }
 
-pub fn perform_contract_call(raw_methods: &[(i32,String)], func_id: i32, _data: &Option<&Bitstring>) {
+pub fn perform_contract_call(raw_methods: &[(i32,String)], func_id: i32, _data: Option<BuilderData>) {
     let mut stack = Stack::new();
     let body_cell = create_inbound_body(0, 0, func_id);
     let msg_cell = StackItem::Cell(
