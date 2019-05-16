@@ -9,37 +9,45 @@ execute it after preparation for debugging purposes.
 
 The linker has several modes of work:
 
-1) Decoding of boc messages, prepared somewhere else.
-To use this method, call
-```tvm-linker <source-code-name> x --decode```
-Here x is any string, it is a main method name placeholder.
+### 1) Generating ready-to-deploy contract
+> `tvm_linker source-code-name [entry-point]`
 
-2) Prepare messages in boc format.
+Here `source-code-name` - a name of tvm asm source file, `entry-point` - a name of the contract's entry point. It must be located in `source-code-name` file.
+Generates `address.tvc` file, where address is a hash from initial data and code of the contract.
+
+### 2) Decoding of boc messages, prepared somewhere else.
+To use this method, call
+> `tvm_linker source-code-name [entry-point] --decode`
+
+### 3) Preparing message in boc format.
 The message may be either an initialization message with code,
 or a message to an exisiting contract.
 
 The command format is the same, except for --init and --data additional
 agruments.
 
-```tvm-linker <source-code-name> <main-method-name> --message```
+> `tvm_linker source-code-name [entry-point] --message`
 
 If you are giving an init message, use --init option:
 
-```tvm-linker <source-code-name> <main-method-name> --message --init```
+> `tvm_linker source-code-name [entry-point] --message --init`
 
 If you are giving a message to an exisiting contract, use --data option:
 
-```tvm-linker <source-code-name> <main-method-name> --message --data 0000```
+> `tvm_linker source-code-name <main-method-name> --message --data 0000`
 
 Instead of 0000 in data option, specify the necessary message body in hex
 format. The code is not packed into the message, however, it is necessary
 to compute address of the contract.
 
-3) Emulate execution of some code:
+### 4) Emulating execution of the contract:
 
-```tvm-linker <source-code-name> <main-method-name>```
+> `tvm_linker source-code-name [entry-point] test --body XXXX...`
 
-You may also use --data key to supply additional data to the emulator.
+Generates contract and emulates contract call sending external inbound message with body defined after `--body` parameter to the contract.
+
+### More Help
+Use `tvm_linker --help` for detailed description about all options, flags and subcommands.
 
 ## Input format
 
