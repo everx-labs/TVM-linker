@@ -1,4 +1,5 @@
 use ed25519_dalek::Keypair;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::Write;
 use stdlib::methdict::*;
@@ -10,11 +11,11 @@ use tvm::stack::*;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
 
 pub struct Program {
-    pub xrefs: HashMap<String,i32>,
-    pub code: HashMap<i32,String>,
+    pub xrefs: HashMap<String, u32>,
+    pub code: HashMap<u32, String>,
     pub data: BuilderData,
+    pub signed: HashMap<u32, bool>,
     entry_point: String,
-    is_default: bool,
     keypair: Option<Keypair>,
 }
 
@@ -24,8 +25,8 @@ impl Program {
             xrefs: HashMap::new(), 
             code: HashMap::new(), 
             data: BuilderData::new(), 
-            entry_point: _SELECTOR.to_owned(),
-            is_default: true,
+            signed: HashMap::new(),
+            entry_point: String::new(),
             keypair: None,
         }
     }
@@ -36,8 +37,8 @@ impl Program {
 
     pub fn get_method_dict(&self) -> SliceData {
         let mut method_dict = HashmapE::with_bit_len(32);
-        if self.is_default {
-            method_dict = HashmapE::with_data(32, build_default_dict(HashMap::new()));            
+        if self.entry_point.is_empty() {
+            method_dict = HashmapE::with_data(32, build_default_dict(&self.signed));            
         }
 
         let methods: Vec<_> = self.code.iter().map(|entry| (entry.0.clone(), entry.1.clone())).collect();        
@@ -48,7 +49,11 @@ impl Program {
     }
 
     pub fn get_entry(&self) -> &str {
-        &self.entry_point
+        if self.entry_point.is_empty() {
+            _SELECTOR
+        } else {
+            &self.entry_point
+        }
     }
 
     pub fn set_entry(&mut self, entry: Option<&str>) -> Result<(), String> {
@@ -88,3 +93,11 @@ impl Program {
         Ok(bytecode)
     }
 }
+
+pub fn calc_func_id(func_interface: &str) -> u32 {
+    let mut hasher = Sha256::new();
+    hasher.input(func_interface.as_bytes());
+    let mut id_bytes = [0u8; 4];
+    id_bytes.copy_from_slice(&hasher.result()[..4]);
+    u32::from_be_bytes(id_bytes)
+} 

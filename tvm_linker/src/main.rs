@@ -17,7 +17,7 @@ mod stdlib;
 mod testcall;
 
 use ed25519_dalek::Keypair;
-use program::Program;
+use program::{Program, calc_func_id};
 use rand::rngs::OsRng;
 use regex::Regex;
 use real_ton::{ decode_boc, compile_real_ton };
@@ -29,13 +29,24 @@ use std::collections::HashMap;
 use testcall::perform_contract_call;
 use tvm::stack::BuilderData;
 
+const FUNC_SUFFIX_AUTH: &str = "_authorized";
+
 fn update_code_dict(prog: &mut Program, func_name: &String, func_body: &String, func_id: &mut i32) {
     if func_name == ".data" {
         prog.data = parse_data(func_body.as_str());       
     }
     else if func_name != "" {
-        prog.xrefs.insert (func_name.clone(), *func_id);
-        prog.code.insert (*func_id, func_body.clone());
+        let name = func_name.to_owned();
+        let mut signed = false;
+        if let Some(index) = name.find(FUNC_SUFFIX_AUTH) {
+            if (index + FUNC_SUFFIX_AUTH.len()) == name.len() {
+                signed = true;
+            }
+        }
+        let id = calc_func_id(name.as_str());
+        assert_eq!(prog.code.insert(id, func_body.clone()), None);
+        assert_eq!(prog.xrefs.insert(name, id), None);
+        prog.signed.insert(id, signed);
         *func_id = *func_id + 1;
     }
 }
@@ -48,7 +59,7 @@ fn parse_data(section: &str) -> BuilderData {
     data
 }
 
-fn replace_labels (l: &String, xrefs: &mut HashMap<String,i32>) -> String {
+fn replace_labels (l: &String, xrefs: &mut HashMap<String, u32>) -> String {
     let mut result = "".to_owned();
     let mut ll = l.to_owned();
 
@@ -74,7 +85,7 @@ fn replace_labels (l: &String, xrefs: &mut HashMap<String,i32>) -> String {
     }
 }
 
-fn parse_code (prog: &mut Program, file_name: &str) {
+fn parse_code(prog: &mut Program, file_name: &str) {
     let f = File::open(file_name).expect("error: cannot load source file");
     let file = BufReader::new(&f);
 
