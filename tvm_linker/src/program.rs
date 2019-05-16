@@ -1,3 +1,4 @@
+use ed25519_dalek::Keypair;
 use std::collections::HashMap;
 use std::io::Write;
 use stdlib::methdict::*;
@@ -14,6 +15,7 @@ pub struct Program {
     pub data: BuilderData,
     entry_point: String,
     is_default: bool,
+    keypair: Option<Keypair>,
 }
 
 impl Program {
@@ -24,7 +26,12 @@ impl Program {
             data: BuilderData::new(), 
             entry_point: _SELECTOR.to_owned(),
             is_default: true,
+            keypair: None,
         }
+    }
+
+    pub fn set_keypair(&mut self, pair: Keypair) {
+        self.keypair = Some(pair);        
     }
 
     pub fn get_method_dict(&self) -> SliceData {
@@ -53,9 +60,15 @@ impl Program {
     }
 
     pub fn compile_to_file(&self) -> Result<(), String> {
+        let mut data = self.data.clone();
+        if let Some(ref pair) = self.keypair {
+            data.append_bitstring(&pair.public.to_bytes())
+                .map_err(|e| format!("{}", e))?;
+        }
+        
         let mut state = StateInit::default();
         state.set_code(self.compile_asm()?.cell());
-        state.set_data(self.data.clone().into());
+        state.set_data(data.into());
 
         let root_slice = SliceData::from(
             state.write_to_new_cell().map_err(|e| format!("Serialization failed: {}", e))?

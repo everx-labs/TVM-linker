@@ -1,44 +1,51 @@
 
 #[macro_use]
 extern crate clap;
+extern crate ed25519_dalek;
 #[macro_use]
 extern crate lazy_static;
+extern crate rand;
 extern crate regex;
+extern crate sha2;
+extern crate ton_block;
 #[macro_use]
 extern crate tvm;
-extern crate ton_block;
-
-use regex::Regex;
-
-
-mod real_ton;
-use real_ton::{ decode_boc, compile_real_ton };
-
-use std::str;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::collections::HashMap;
 
 mod program;
-use program::Program;
-
-use tvm::stack::BuilderData;
+mod real_ton;
 mod stdlib;
-
 mod testcall;
-use testcall::perform_contract_call;
 
-fn update_code_dict (prog: &mut Program, func_name: &String, func_body: &String, func_id: &mut i32) {
+use ed25519_dalek::Keypair;
+use program::Program;
+use rand::rngs::OsRng;
+use regex::Regex;
+use real_ton::{ decode_boc, compile_real_ton };
+use sha2::Sha512;
+use std::str;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Read, Write};
+use std::collections::HashMap;
+use testcall::perform_contract_call;
+use tvm::stack::BuilderData;
+
+fn update_code_dict(prog: &mut Program, func_name: &String, func_body: &String, func_id: &mut i32) {
     if func_name == ".data" {
-        let data_buf = hex::decode(func_body.trim()).unwrap();
-        let data_bits = data_buf.len() * 8;
-        prog.data = BuilderData::with_raw(data_buf, data_bits);
+        prog.data = parse_data(func_body.as_str());       
     }
     else if func_name != "" {
         prog.xrefs.insert (func_name.clone(), *func_id);
         prog.code.insert (*func_id, func_body.clone());
         *func_id = *func_id + 1;
     }
+}
+
+fn parse_data(section: &str) -> BuilderData {
+    let mut data = BuilderData::new();
+    let data_buf = hex::decode(section.trim()).unwrap();
+    let data_bits = data_buf.len() * 8;
+    data.append_reference(BuilderData::with_raw(data_buf, data_bits));
+    data
 }
 
 fn replace_labels (l: &String, xrefs: &mut HashMap<String,i32>) -> String {
@@ -68,7 +75,7 @@ fn replace_labels (l: &String, xrefs: &mut HashMap<String,i32>) -> String {
 }
 
 fn parse_code (prog: &mut Program, file_name: &str) {
-    let f = File::open(file_name).unwrap();
+    let f = File::open(file_name).expect("error: cannot load source file");
     let file = BufReader::new(&f);
 
     let globl_regex = Regex::new(r"^\t\.globl\t([a-zA-Z0-9_]+)").unwrap();
@@ -124,6 +131,10 @@ fn debug_print_program(prog: &Program) {
     println! ("Dictionary of methods:\n-----------------\n{}", prog.get_method_dict());
 }
 
+fn generate_keypair() -> Keypair {
+    Keypair::generate::<Sha512, _>(&mut OsRng::new().unwrap())
+}
+
 fn main() {
     let matches = clap_app! (tvm_loader =>
         (version: "0.1")
@@ -135,6 +146,8 @@ fn main() {
         (@arg DATA: --data +takes_value "Supplies data to contract in hex format (empty data by default)")
         (@arg INPUT: +required +takes_value "TVM assembler source file")
         (@arg ENTRY_POINT: +takes_value "Function name of the contract's entry point")
+        (@arg GEN_KEYPAIR: --("gen-keypair") +takes_value conflicts_with[SET_KEYPAIR] "Generates new keypair for the contract and saves it to the file")
+        (@arg SET_KEYPAIR: --("set-keypair") +takes_value conflicts_with[GEN_KEYPAIR] "Loads existing keypair from the file")
         (@subcommand test =>
             (about: "execute contract in test environment")
             (version: "0.1")
@@ -155,6 +168,25 @@ fn main() {
     }
 
     prog.set_entry(matches.value_of("ENTRY_POINT")).expect("Error");
+
+    match matches.value_of("GEN_KEYPAIR") {
+        Some(file) => {
+            let keys = generate_keypair();
+            let bytes = keys.to_bytes();
+            prog.set_keypair(keys);
+            let mut file = File::create(file.to_string()).expect("error: cannot create key file");
+            file.write_all(&bytes).unwrap();
+        },
+        None => match matches.value_of("SET_KEYPAIR") {
+            Some(file) => {
+                let mut file = File::open(file.to_string()).expect("error: cannot create key file");
+                let mut keys_buf = vec![];
+                file.read_to_end(&mut keys_buf).unwrap();
+                prog.set_keypair(Keypair::from_bytes(&keys_buf).expect("error: cannot read key file"));
+            },
+            None => (),
+        },
+   };
    
     if matches.is_present("PRINT_PARSED") {
         debug_print_program(&prog);        
