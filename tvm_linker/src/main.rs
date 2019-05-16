@@ -1,181 +1,38 @@
-#[macro_use]
-extern crate tvm;
-extern crate ton_block;
-extern crate regex;
 
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate lazy_static;
+extern crate regex;
+#[macro_use]
+extern crate tvm;
+extern crate ton_block;
+
+use regex::Regex;
+
+
+mod real_ton;
+use real_ton::{ decode_boc, compile_real_ton };
 
 use std::str;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::collections::HashMap;
-use regex::Regex;
-
-use tvm::assembler::compile_code;
-use tvm::test_framework::{test_case_with_ref, Expects};
-
-mod real_ton;
-use real_ton::{ decode_boc, compile_real_ton };
 
 mod program;
 use program::Program;
 
-use tvm::stack::{
-        Stack,
-        SliceData,
-        CellData,
-        BuilderData,
-        StackItem,
-        IntegerData,
-};
+use tvm::stack::BuilderData;
+mod stdlib;
 
-use tvm::stack::dictionary::HashmapE;
-use tvm::stack::dictionary::HashmapType;
-use tvm::bitstring::Bitstring;
-
-use ton_block::{
-    Serializable,
-    ExternalInboundMessageHeader,
-    MsgAddressInt,
-    Message
-};
-use tvm::types::AccountId;
-use std::sync::Arc;
-
-pub struct TestABIContract {
-    dict: SliceData,        // dictionary of methods
-}
-
-/// Constructs test contract to implement dictionary of methods
-pub trait TestContractCode {
-    fn new(&[(i32,String)]) -> Self;
-    fn get_contract_code(&self) -> &str;
-    fn get_methods(&self) -> SliceData;
-}
-
-impl TestContractCode for TestABIContract {
-    fn get_contract_code(&self) -> &str {
-        CODE_CONTRACT
-    }    
-
-    fn get_methods(&self) -> SliceData {
-        self.dict.clone()
-    }
-
-    fn new(raw_methods: &[(i32, String)]) -> Self {
-        let dict = prepare_methods(&[
-            (-1i8,  INBOUND_EXTERNAL_PARSER.to_string()),
-            // (0,     MAIN),
-        ]);
-
-        let methods = prepare_methods(raw_methods);
-
-        let key = 1i8.write_to_new_cell().unwrap();
-        let mut dict = HashmapE::with_data(8, dict);
-        dict.set(key.into(), methods).unwrap();
-        TestABIContract { dict: dict.get_data() }
-    }
-}
-
-fn prepare_methods<T>(methods: &[(T, String)]) -> SliceData
-where T: Default + Serializable {
-    let bit_len = SliceData::from(T::default().write_to_new_cell().unwrap()).remaining_bits();
-    let mut dict = HashmapE::with_bit_len(bit_len);
-    for i in 0..methods.len() {
-        let key = methods[i].0.write_to_new_cell().unwrap();
-        let method = compile_code(methods[i].1.as_str()).unwrap();
-        dict.set(key.into(), method).unwrap();
-    }
-    dict.get_data()
-}
-
-
-
-pub const MAIN_ID: i32 = 0x6D61696E;
-
-static INBOUND_EXTERNAL_PARSER: &str = "
-    ; s0 - msg body: slice
-    ; s1 - msg header: cell
-    ; s2 - gram balance of msg: int
-    ; s3 - gram balance of contract: int
-
-    ; parse body
-    LDU 8       ; load version
-    NIP         ; drop version
-    LDU 32      ; load func id
-    POP s4      ; drop gram balance of contract
-    POP s2      ; drop gram balance of msg
-    DROP        ; drop header
-    CALL 1
-";
-
-static CODE_CONTRACT: &str = "
-    ; s0 - func_id i8
-    ; s1.. - other data
-    PUSHREFSLICE        ; dictionary of methods in first reference (what if code more than 1023 bits: 0-ref - continue of code)
-    OVER
-    ISNEG
-    PUSHCONT {          ; if func_id negative - direct call to method
-        PUSHINT 8
-        DICTIGETJMP     ; execute method and return
-        THROW 51
-    }
-    PUSHCONT {          ; get dictionary with methods
-        PUSHINT 8
-        DICTIGET
-        THROWIFNOT 52   ; no dictionary of methods
-        PUSHINT 32
-        DICTUGETJMP     ; execute method and return
-        THROW 51
-    }
-    IFELSE
-";
-
-fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Arc<CellData> {
-    let mut builder = BuilderData::new();
-    let version: u8 = 0;
-    version.write_to(&mut builder).unwrap();
-    func_id.write_to(&mut builder).unwrap();
-    a.write_to(&mut builder).unwrap();
-    b.write_to(&mut builder).unwrap();
-    builder.into()
-}
-
-fn create_external_inbound_msg(dst_addr: &AccountId, body: Arc<CellData>) -> Message {
-    let mut hdr = ExternalInboundMessageHeader::default();
-    hdr.dst = MsgAddressInt::with_standart(None, -1, dst_addr.clone()).unwrap();
-    let mut msg = Message::with_ext_in_header(hdr);
-    msg.body = Some(body.into());
-    msg
-}
-
-fn perform_contract_call(raw_methods: &[(i32,String)], func_id: i32, _data: &Option<&Bitstring>) {
-    let mut stack = Stack::new();
-    let body_cell = create_inbound_body(0, 0, func_id);
-    let msg_cell = StackItem::Cell(
-        create_external_inbound_msg(
-            &AccountId::from([0x11; 32]), 
-            body_cell.clone()
-        ).write_to_new_cell().unwrap().into()
-    );
-    stack
-        .push(int!(0))
-        .push(int!(0))
-        .push(msg_cell.clone())
-        .push(StackItem::Slice(SliceData::from(body_cell))) 
-        .push(int!(-1));
-
-    let contract = TestABIContract::new(raw_methods);
-
-    test_case_with_ref(&contract.get_contract_code(), contract.get_methods())
-        .with_stack(stack).expect_success();
-}
+mod testcall;
+use testcall::perform_contract_call;
 
 fn update_code_dict (prog: &mut Program, func_name: &String, func_body: &String, func_id: &mut i32) {
     if func_name == ".data" {
-        let value = func_body.trim();
-        prog.data = Bitstring::create(hex::decode (value).unwrap(), value.len()*4);
+        let data_buf = hex::decode(func_body.trim()).unwrap();
+        let data_bits = data_buf.len() * 8;
+        prog.data = BuilderData::with_raw(data_buf, data_bits);
     }
     else if func_name != "" {
         prog.xrefs.insert (func_name.clone(), *func_id);
@@ -221,7 +78,7 @@ fn parse_code (prog: &mut Program, file_name: &str) {
 
     let mut func_body: String = "".to_owned();
     let mut func_name: String = "".to_owned();
-    let mut func_id: i32 = 0;
+    let mut func_id: i32 = 1;
 
     for line in file.lines() {
         let l = line.unwrap();
@@ -255,6 +112,18 @@ fn parse_code (prog: &mut Program, file_name: &str) {
     update_code_dict (prog, &func_name, &func_body, &mut func_id);
 }
 
+fn debug_print_program(prog: &Program) {
+    println!("Entry point:\n-----------------\n{}\n-----------------", prog.get_entry());
+    println!("Contract functions:\n-----------------");
+    for (k,v) in &prog.xrefs {
+        println! ("Function {:10}: id={}", k, v);
+    }
+    for (k,v) in &prog.code {
+        println! ("Function {}\n-----------------\n{}\n-----------------", k, v);
+    }    
+    println! ("Dictionary of methods:\n-----------------\n{}", prog.get_method_dict());
+}
+
 fn main() {
     let matches = clap_app! (tvm_loader =>
         (version: "0.1")
@@ -265,7 +134,13 @@ fn main() {
         (@arg INIT: --init "Packs code into TON State Init message")
         (@arg DATA: --data +takes_value "Supplies data to contract in hex format (empty data by default)")
         (@arg INPUT: +required +takes_value "TVM assembler source file")
-        (@arg MAIN: +required +takes_value "Function name to call")
+        (@arg ENTRY_POINT: +takes_value "Function name of the contract's entry point")
+        (@subcommand test =>
+            (about: "execute contract in test environment")
+            (version: "0.1")
+            (author: "tonlabs")
+            (@arg BODY: --body +takes_value "Body for external inbound message (hex string)")
+        )
     ).get_matches();
 
     if matches.is_present("DECODE") {
@@ -273,43 +148,22 @@ fn main() {
         return
     }
 
-    let mut prog: Program = Program { xrefs: HashMap::new(), code: HashMap::new(), data: Bitstring::default() };
+    let mut prog = Program::new();
     if matches.is_present("INPUT") {
         parse_code (&mut prog, matches.value_of("INPUT").unwrap());
         parse_code (&mut prog, matches.value_of("INPUT").unwrap());
     }
 
+    prog.set_entry(matches.value_of("ENTRY_POINT")).expect("Error");
+   
     if matches.is_present("PRINT_PARSED") {
-        for (k,v) in &prog.xrefs {
-            println! ("Function {}: id={}", k, v);
-        }
-
-        for (k,v) in &prog.code {
-            println! ("Function {}\n-----------------\n{}\n-----------------", k, v);
-        }
-
-        println! ("");
+        debug_print_program(&prog);        
     }
 
-    let mut main_id = None;
-    if matches.is_present("MAIN") {
-        let main_name = matches.value_of("MAIN").unwrap();
-        match prog.xrefs.get (main_name) {
-            None => {
-                println! ("Main method {} is not found in source code", main_name);
-                return
-            }
-            Some(v) => main_id = Some(*v)
-        }
-    }
-
-    let node_data_option;
-    let mut node_data = None;
-    if matches.is_present("DATA") {
-        let data = matches.value_of("DATA").unwrap();
-        node_data_option = Bitstring::create(hex::decode(data).unwrap(),data.len()*4);
-        node_data = Some (&node_data_option);
-    }
+    let node_data = match matches.value_of("DATA") {
+        Some(data) => Some(BuilderData::with_raw(hex::decode(data).unwrap(), data.len()*4)),
+        None => None,
+    };
 
     if matches.is_present("MESSAGE") {
         let mut suffix = "".to_owned();
@@ -321,20 +175,24 @@ fn main() {
 
         let re = Regex::new(r"\.[^.]+$").unwrap();
         let output_file = re.replace(matches.value_of("INPUT").unwrap(), suffix.as_str());
-
-        let main_code;
-        match main_id {
-            None => main_code = "???",
-            Some(id) => main_code = prog.code.get(&id).unwrap().as_str()
-        }
-        compile_real_ton(main_code, &prog.data, &node_data, &output_file, matches.is_present("INIT"));
-        return
+        
+        compile_real_ton(prog.get_entry(), &prog.data, node_data, &output_file, matches.is_present("INIT"));
+        return;
+    } else {
+        prog.compile_to_file().expect("Error");
     }
-    else if matches.is_present("INPUT") && matches.is_present("MAIN") {
-        let mut serialized_code: Vec<(i32,String)> = [].to_vec();
-        for (k,v) in &prog.code {
-            serialized_code.push ((*k,v.to_string()));
-        }
-        perform_contract_call(&serialized_code, main_id.unwrap(), &node_data)
+
+    if let Some(matches) = matches.subcommand_matches("test") {
+        let body = match matches.value_of("BODY") {
+            Some(hex_str) => {
+                let buf = hex::decode(hex_str).expect("error: invalid hex string");
+                let buf_bits = buf.len() * 8;
+                Some(BuilderData::with_raw(buf, buf_bits).into())
+            },
+            None => None,
+        };
+        println!("test started: body = {:?}", body);
+        perform_contract_call(&prog, body);
+        println!("Test completed");
     }
 }
