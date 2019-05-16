@@ -30,13 +30,12 @@ impl Program {
     pub fn get_method_dict(&self) -> SliceData {
         let mut method_dict = HashmapE::with_bit_len(32);
         if self.is_default {
-            method_dict = HashmapE::with_data(32, prepare_methods(&build_default_dict()));
+            method_dict = HashmapE::with_data(32, build_default_dict(HashMap::new()));            
         }
 
-        let methods: Vec<_> = self.code.iter().map(|entry| (entry.0.clone(), entry.1.clone())).collect();
+        let methods: Vec<_> = self.code.iter().map(|entry| (entry.0.clone(), entry.1.clone())).collect();        
         let methods = prepare_methods(&methods);
-
-        let key = 1i8.write_to_new_cell().unwrap();
+        let key = 1i32.write_to_new_cell().unwrap();
         method_dict.set(key.into(), methods).unwrap();
         method_dict.get_data()
     }

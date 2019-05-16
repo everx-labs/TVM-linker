@@ -112,6 +112,18 @@ fn parse_code (prog: &mut Program, file_name: &str) {
     update_code_dict (prog, &func_name, &func_body, &mut func_id);
 }
 
+fn debug_print_program(prog: &Program) {
+    println!("Entry point:\n-----------------\n{}\n-----------------", prog.get_entry());
+    println!("Contract functions:\n-----------------");
+    for (k,v) in &prog.xrefs {
+        println! ("Function {:10}: id={}", k, v);
+    }
+    for (k,v) in &prog.code {
+        println! ("Function {}\n-----------------\n{}\n-----------------", k, v);
+    }    
+    println! ("Dictionary of methods:\n-----------------\n{}", prog.get_method_dict());
+}
+
 fn main() {
     let matches = clap_app! (tvm_loader =>
         (version: "0.1")
@@ -127,7 +139,7 @@ fn main() {
             (about: "execute contract in test environment")
             (version: "0.1")
             (author: "tonlabs")
-            (@arg MSG: -msg "External inbound message for contract (hex string)")
+            (@arg BODY: --body +takes_value "Body for external inbound message (hex string)")
         )
     ).get_matches();
 
@@ -142,20 +154,12 @@ fn main() {
         parse_code (&mut prog, matches.value_of("INPUT").unwrap());
     }
 
-    if matches.is_present("PRINT_PARSED") {
-        for (k,v) in &prog.xrefs {
-            println! ("Function {}: id={}", k, v);
-        }
-
-        for (k,v) in &prog.code {
-            println! ("Function {}\n-----------------\n{}\n-----------------", k, v);
-        }
-
-        println! ("");
-    }
-
     prog.set_entry(matches.value_of("ENTRY_POINT")).expect("Error");
    
+    if matches.is_present("PRINT_PARSED") {
+        debug_print_program(&prog);        
+    }
+
     let node_data = match matches.value_of("DATA") {
         Some(data) => Some(BuilderData::with_raw(hex::decode(data).unwrap(), data.len()*4)),
         None => None,
@@ -179,16 +183,16 @@ fn main() {
     }
 
     if let Some(matches) = matches.subcommand_matches("test") {
-        if matches.is_present("MSG") {
-            println!("msg specified...");
-        } else {
-            println!("create default msg...");
-        }
-        let mut serialized_code: Vec<(i32,String)> = [].to_vec();
-        for (k,v) in &prog.code {
-            serialized_code.push ((*k,v.to_string()));
-        }
-        perform_contract_call(&serialized_code, 0, node_data);
+        let body = match matches.value_of("BODY") {
+            Some(hex_str) => {
+                let buf = hex::decode(hex_str).expect("error: invalid hex string");
+                let buf_bits = buf.len() * 8;
+                Some(BuilderData::with_raw(buf, buf_bits).into())
+            },
+            None => None,
+        };
+        println!("test started: body = {:?}", body);
+        perform_contract_call(&prog, body);
         println!("Test completed");
     }
 }

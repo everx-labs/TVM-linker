@@ -1,32 +1,47 @@
+use ton_block::Serializable;
+use tvm::stack::SliceData;
+use tvm::stack::dictionary::{HashmapE, HashmapType};
+use self::methdict::{prepare_methods, prepare_auth_method, attach_method};
+use std::collections::HashMap;
 
 // exception codes thrown by contract's code
 pub const ACCESS_DENIED_EXCEPTION:   usize = 40;
 pub const NOT_FOUND_EXCEPTION:       usize = 41;
 pub const UNSUPPORTED_ABI_EXCEPTION: isize = 55;
 
-pub fn build_default_dict() -> [(i32, String); 4] {
-    [
+pub fn build_default_dict(auth_map: HashMap<u32, bool>) -> SliceData {
+    let auth_method = prepare_auth_method(&_AUTHENTICATE, auth_map);
+    let mut std_internal_dict = prepare_methods(&[
+        (1u32, _PARSE_MESSAGE.to_string()),
+    ]);
+    std_internal_dict = attach_method(std_internal_dict, (0, auth_method));
+
+    let std_dict = prepare_methods(&[
         (-1i32, _MAIN_EXTERNAL.to_string()),
         ( 0i32, _MAIN_INTERNAL.to_string()),
-        // key 1 is placeholder for dictionary of contract methods
-        ( 2i32, _PARSE_MESSAGE.to_string()),
-        ( 3i32, _AUTHENTICATE.to_string()),
-    ]
+        // key 1 is a placeholder for dictionary of contract methods
+        // key 2 is a placeholder for internal std methods
+    ]);
+
+    let key = 2i32.write_to_new_cell().unwrap();
+    let mut std_dict = HashmapE::with_data(32, std_dict);
+    std_dict.set(key.into(), std_internal_dict).unwrap();
+    std_dict.get_data()
 }
 
 pub static _SELECTOR: &str = "
-    ; s0 - func_id i8
+    ; s0 - func_id
     ; s1.. - other data
-    PUSHREFSLICE        ; dictionary of methods in first reference (what if code more than 1023 bits: 0-ref - continue of code)
+    SETCP0
+    PUSHREFSLICE        ; dictionary of methods in first reference
     OVER
-    ISNEG
-    PUSHCONT {          ; if func_id negative - direct call to method
-        PUSHINT 8
+    ISNPOS
+    PUSHCONT {          ; if func_id negative or zero - direct call to method
+        PUSHINT 32
         DICTIGETJMP     ; execute method and return
-        THROW 51
     }
     PUSHCONT {          ; get dictionary with methods
-        PUSHINT 8
+        PUSHINT 32
         DICTIGET
         THROWIFNOT 52   ; no dictionary of methods
         PUSHINT 32
@@ -34,22 +49,6 @@ pub static _SELECTOR: &str = "
         THROW 51
     }
     IFELSE
-";
-
-pub static INBOUND_EXTERNAL_PARSER: &str = "
-    ; s0 - msg body: slice
-    ; s1 - msg header: cell
-    ; s2 - gram balance of msg: int
-    ; s3 - gram balance of contract: int
-
-    ; parse body
-    LDU 8       ; load version
-    NIP         ; drop version
-    LDU 32      ; load func id
-    POP s4      ; drop gram balance of contract
-    POP s2      ; drop gram balance of msg
-    DROP        ; drop header
-    CALL 1
 ";
 
 lazy_static! {
@@ -60,10 +59,12 @@ lazy_static! {
     ; s3 - gram balance of contract: int
 
         ;call signature checker (can throw exception if signature is invalid)
-        CALL 3      ;assume that function returns nothing
+        PUSHINT 0 
+        CALL 2      ;assume that function returns nothing
         
         ;call msg parser
         PUSH s1     ;push msg cell on top
+        PUSHINT 1
         CALL 2      ;assume thar parser returns slice - dictionary with msg fields
         
         SWAP
@@ -111,6 +112,9 @@ lazy_static! {
     SWAP
     THROWIF {unsupported_abi_ver}
     PUSHREFSLICE
+    DUP
+    SEMPTY
+    IFRET
     PUSHINT 32  ;key len in auth dictionary
     DICTUGET    ;load method's flag 
     THROWIFNOT {not_found}
@@ -139,10 +143,11 @@ lazy_static! {
 }
 
 pub mod methdict {
+    use std::collections::HashMap;
     use ton_block::Serializable;
     use tvm::assembler::compile_code;
     use tvm::stack::dictionary::{HashmapE, HashmapType};
-    use tvm::stack::SliceData;
+    use tvm::stack::{BuilderData, SliceData};
 
     pub fn build_hashmap<K>(pairs: &[(K, SliceData)]) -> SliceData 
     where 
@@ -175,4 +180,22 @@ pub mod methdict {
         dict.get_data()
     }
 
+    /// Compiles authentication function to slice and builds and 
+    /// attaches auth dictionary as ref0
+    pub fn prepare_auth_method<K>(method: &str, map: HashMap<K, bool>) -> SliceData 
+    where 
+        K: Clone + Default + Eq + Serializable + std::hash::Hash {
+        let mut method = BuilderData::from(&compile_code(method).unwrap().cell());
+        let key_val_vec: Vec<_> = map
+            .iter()
+            .map(|pair| (pair.0.clone(), pair.1.clone().write_to_new_cell().unwrap().into()))
+            .collect(); 
+        if key_val_vec.len() == 0 {
+            BuilderData::new().into()
+        } else {
+            let auth_dict = build_hashmap(&key_val_vec);
+            method.checked_append_reference(auth_dict.cell()).unwrap();
+            method.into()
+        }
+    }
 }
