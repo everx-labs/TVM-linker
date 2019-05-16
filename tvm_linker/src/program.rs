@@ -2,6 +2,7 @@ use ed25519_dalek::Keypair;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::Write;
+use std::sync::Arc;
 use stdlib::methdict::*;
 use stdlib::{_SELECTOR, build_default_dict};
 use ton_block::*;
@@ -35,7 +36,17 @@ impl Program {
         self.keypair = Some(pair);        
     }
 
-    pub fn get_method_dict(&self) -> SliceData {
+    pub fn data(&self) -> Result<Arc<CellData>, String> {
+        let mut data = self.data.clone();
+        if let Some(ref pair) = self.keypair {
+            let bytes = pair.public.to_bytes();
+            data.append_raw(&bytes, bytes.len() * 8)
+                .map_err(|e| format!("{}", e))?;
+        }
+        Ok(data.into())
+    }
+
+    pub fn method_dict(&self) -> SliceData {
         let mut method_dict = HashmapE::with_bit_len(32);
         if self.entry_point.is_empty() {
             method_dict = HashmapE::with_data(32, build_default_dict(&self.signed));            
@@ -48,7 +59,7 @@ impl Program {
         method_dict.get_data()
     }
 
-    pub fn get_entry(&self) -> &str {
+    pub fn entry(&self) -> &str {
         if self.entry_point.is_empty() {
             _SELECTOR
         } else {
@@ -65,15 +76,9 @@ impl Program {
     }
 
     pub fn compile_to_file(&self) -> Result<(), String> {
-        let mut data = self.data.clone();
-        if let Some(ref pair) = self.keypair {
-            data.append_bitstring(&pair.public.to_bytes())
-                .map_err(|e| format!("{}", e))?;
-        }
-        
         let mut state = StateInit::default();
         state.set_code(self.compile_asm()?.cell());
-        state.set_data(data.into());
+        state.set_data(self.data()?.into());
 
         let root_slice = SliceData::from(
             state.write_to_new_cell().map_err(|e| format!("Serialization failed: {}", e))?
@@ -89,7 +94,7 @@ impl Program {
 
     fn compile_asm(&self) -> Result<SliceData, String> {
         let mut bytecode = compile_code(&self.entry_point).map_err(|e| format!("Compilation failed: {}", e))?;
-        bytecode.append_reference(self.get_method_dict());
+        bytecode.append_reference(self.method_dict());
         Ok(bytecode)
     }
 }
@@ -101,3 +106,17 @@ pub fn calc_func_id(func_interface: &str) -> u32 {
     id_bytes.copy_from_slice(&hasher.result()[..4]);
     u32::from_be_bytes(id_bytes)
 } 
+
+pub fn debug_print_program(prog: &Program) {
+    let line = "--------------------------";
+    println!("Entry point:\n{}\n{}\n{}", line, prog.entry(), line);
+    println!("Contract functions:\n{}", line);
+    for (k,v) in &prog.xrefs {
+        println! ("Function {:15}: id={:08X}, sign-check={:?}", k, v, prog.signed.get(v).unwrap());
+    }
+    for (k,v) in &prog.code {
+        println! ("Function {:08X}\n{}\n{}\n{}", k, line, v, line);
+    }    
+    println! ("Dictionary of methods:\n{}\n{}", line, prog.method_dict());
+}
+
