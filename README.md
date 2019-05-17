@@ -15,6 +15,16 @@ The linker has several modes of work:
 Here `source-code-name` - a name of tvm asm source file, `entry-point` - a name of the contract's entry point. It must be located in `source-code-name` file.
 Generates `address.tvc` file, where address is a hash from initial data and code of the contract.
 
+To generate a new keypair and put the public key to the contract, call:
+
+	tvm_linker source-code-name --genkey key_file
+
+where `key_file` - a name of the file to store public and private keys. The linker will generate 2 files: `key_file.pub` for public key and `key_file` for private key.
+
+To load existing keypair, call:
+
+	tvm_linker source-code-name --setkey key_file
+
 ### 2) Decoding of boc messages, prepared somewhere else.
 To use this method, call
 
@@ -43,9 +53,10 @@ to compute address of the contract.
 
 ### 4) Emulating execution of the contract:
 
-	tvm_linker source-code-name [entry-point] test --body XXXX...
+	tvm_linker source-code-name [entry-point] test --body XXXX... [--sign key_file]
 
 Generates contract and emulates contract call sending external inbound message with body defined after `--body` parameter to the contract.
+If `--sign` specified, the body will be signed with the private key from `key_file` file.
 
 ### More Help
 Use `tvm_linker --help` for detailed description about all options, flags and subcommands.
