@@ -1,47 +1,64 @@
 
 #[macro_use]
 extern crate clap;
+extern crate ed25519_dalek;
 #[macro_use]
 extern crate lazy_static;
+extern crate rand;
 extern crate regex;
+extern crate sha2;
+extern crate ton_block;
 #[macro_use]
 extern crate tvm;
-extern crate ton_block;
 
-use regex::Regex;
-
-
+mod keyman;
+mod program;
 mod real_ton;
-use real_ton::{ decode_boc, compile_real_ton };
+mod stdlib;
+mod testcall;
 
+use keyman::KeypairManager;
+use program::{Program, calc_func_id, debug_print_program};
+use regex::Regex;
+use real_ton::{ decode_boc, compile_real_ton };
 use std::str;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::collections::HashMap;
-
-mod program;
-use program::Program;
-
-use tvm::stack::BuilderData;
-mod stdlib;
-
-mod testcall;
 use testcall::perform_contract_call;
+use tvm::stack::BuilderData;
 
-fn update_code_dict (prog: &mut Program, func_name: &String, func_body: &String, func_id: &mut i32) {
+const FUNC_SUFFIX_AUTH: &str = "_authorized";
+
+fn update_code_dict(prog: &mut Program, func_name: &String, func_body: &String, func_id: &mut i32) {
     if func_name == ".data" {
-        let data_buf = hex::decode(func_body.trim()).unwrap();
-        let data_bits = data_buf.len() * 8;
-        prog.data = BuilderData::with_raw(data_buf, data_bits);
-    }
-    else if func_name != "" {
-        prog.xrefs.insert (func_name.clone(), *func_id);
-        prog.code.insert (*func_id, func_body.clone());
+        prog.data = parse_data(func_body.as_str());       
+    } else if func_name != "" {
+        let mut name = func_name.to_owned();
+        let mut signed = false;
+        if let Some(index) = name.find(FUNC_SUFFIX_AUTH) {
+            if (index + FUNC_SUFFIX_AUTH.len()) == name.len() {
+                signed = true;
+                name.truncate(index + 1);
+            }
+        }
+        let id = calc_func_id(name.as_str());
+        prog.code.insert(id, func_body.trim_end().to_string());
+        prog.xrefs.insert(func_name.to_owned(), id);
+        prog.signed.insert(id, signed);
         *func_id = *func_id + 1;
     }
 }
 
-fn replace_labels (l: &String, xrefs: &mut HashMap<String,i32>) -> String {
+fn parse_data(section: &str) -> BuilderData {
+    let mut data = BuilderData::new();
+    let data_buf = hex::decode(section.trim()).unwrap();
+    let data_bits = data_buf.len() * 8;
+    data.append_reference(BuilderData::with_raw(data_buf, data_bits));
+    data
+}
+
+fn replace_labels (l: &String, xrefs: &mut HashMap<String, u32>) -> String {
     let mut result = "".to_owned();
     let mut ll = l.to_owned();
 
@@ -67,8 +84,8 @@ fn replace_labels (l: &String, xrefs: &mut HashMap<String,i32>) -> String {
     }
 }
 
-fn parse_code (prog: &mut Program, file_name: &str) {
-    let f = File::open(file_name).unwrap();
+fn parse_code(prog: &mut Program, file_name: &str) {
+    let f = File::open(file_name).expect("error: cannot load source file");
     let file = BufReader::new(&f);
 
     let globl_regex = Regex::new(r"^\t\.globl\t([a-zA-Z0-9_]+)").unwrap();
@@ -112,18 +129,6 @@ fn parse_code (prog: &mut Program, file_name: &str) {
     update_code_dict (prog, &func_name, &func_body, &mut func_id);
 }
 
-fn debug_print_program(prog: &Program) {
-    println!("Entry point:\n-----------------\n{}\n-----------------", prog.get_entry());
-    println!("Contract functions:\n-----------------");
-    for (k,v) in &prog.xrefs {
-        println! ("Function {:10}: id={}", k, v);
-    }
-    for (k,v) in &prog.code {
-        println! ("Function {}\n-----------------\n{}\n-----------------", k, v);
-    }    
-    println! ("Dictionary of methods:\n-----------------\n{}", prog.get_method_dict());
-}
-
 fn main() {
     let matches = clap_app! (tvm_loader =>
         (version: "0.1")
@@ -135,11 +140,14 @@ fn main() {
         (@arg DATA: --data +takes_value "Supplies data to contract in hex format (empty data by default)")
         (@arg INPUT: +required +takes_value "TVM assembler source file")
         (@arg ENTRY_POINT: +takes_value "Function name of the contract's entry point")
+        (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file")
+        (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
         (@subcommand test =>
             (about: "execute contract in test environment")
             (version: "0.1")
             (author: "tonlabs")
             (@arg BODY: --body +takes_value "Body for external inbound message (hex string)")
+            (@arg SIGN: --sign +takes_value "Signs body with private key from defined file")
         )
     ).get_matches();
 
@@ -155,6 +163,22 @@ fn main() {
     }
 
     prog.set_entry(matches.value_of("ENTRY_POINT")).expect("Error");
+
+    match matches.value_of("GENKEY") {
+        Some(file) => {
+            let pair = KeypairManager::new();
+            pair.store_public(&(file.to_string() + ".pub"));
+            pair.store_secret(file);
+            prog.set_keypair(pair.drain());
+        },
+        None => match matches.value_of("SETKEY") {
+            Some(file) => {
+                let pair = KeypairManager::from_secret_file(file);
+                prog.set_keypair(pair.drain());
+            },
+            None => (),
+        },
+   };
    
     if matches.is_present("PRINT_PARSED") {
         debug_print_program(&prog);        
@@ -176,7 +200,7 @@ fn main() {
         let re = Regex::new(r"\.[^.]+$").unwrap();
         let output_file = re.replace(matches.value_of("INPUT").unwrap(), suffix.as_str());
         
-        compile_real_ton(prog.get_entry(), &prog.data, node_data, &output_file, matches.is_present("INIT"));
+        compile_real_ton(prog.entry(), &prog.data, node_data, &output_file, matches.is_present("INIT"));
         return;
     } else {
         prog.compile_to_file().expect("Error");
@@ -192,7 +216,7 @@ fn main() {
             None => None,
         };
         println!("test started: body = {:?}", body);
-        perform_contract_call(&prog, body);
+        perform_contract_call(&prog, body, matches.value_of("SIGN"));
         println!("Test completed");
     }
 }

@@ -9,7 +9,7 @@ pub const ACCESS_DENIED_EXCEPTION:   usize = 40;
 pub const NOT_FOUND_EXCEPTION:       usize = 41;
 pub const UNSUPPORTED_ABI_EXCEPTION: isize = 55;
 
-pub fn build_default_dict(auth_map: HashMap<u32, bool>) -> SliceData {
+pub fn build_default_dict(auth_map: &HashMap<u32, bool>) -> SliceData {
     let auth_method = prepare_auth_method(&_AUTHENTICATE, auth_map);
     let mut std_internal_dict = prepare_methods(&[
         (1u32, _PARSE_MESSAGE.to_string()),
@@ -182,7 +182,7 @@ pub mod methdict {
 
     /// Compiles authentication function to slice and builds and 
     /// attaches auth dictionary as ref0
-    pub fn prepare_auth_method<K>(method: &str, map: HashMap<K, bool>) -> SliceData 
+    pub fn prepare_auth_method<K>(method: &str, map: &HashMap<K, bool>) -> SliceData 
     where 
         K: Clone + Default + Eq + Serializable + std::hash::Hash {
         let mut method = BuilderData::from(&compile_code(method).unwrap().cell());

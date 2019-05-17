@@ -1,14 +1,12 @@
+use keyman::KeypairManager;
 use program::Program;
+use sha2::Sha512;
 use std::sync::Arc;
+use tvm::cells_serialization::BagOfCells;
 use tvm::stack::*;
 use tvm::test_framework::{test_case_with_ref, Expects};
 use tvm::types::AccountId;
-use ton_block::{
-    Serializable,
-    ExternalInboundMessageHeader,
-    MsgAddressInt,
-    Message
-};
+use ton_block::*;
 
 #[allow(dead_code)]
 fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Arc<CellData> {
@@ -29,7 +27,21 @@ fn create_external_inbound_msg(dst_addr: &AccountId, body: Option<Arc<CellData>>
     msg
 }
 
-pub fn perform_contract_call(prog: &Program, body: Option<Arc<CellData>>) {
+fn sign_body(body: &mut SliceData, key_file: &str) {
+    let pair = KeypairManager::from_secret_file(key_file);
+    let signature = 
+        pair.drain().sign::<Sha512>(
+            BagOfCells::with_root(body.clone()).get_repr_hash_by_index(0).unwrap().as_slice()
+        ).to_bytes();
+    let mut sign_builder = BuilderData::new();
+    sign_builder.checked_append_raw(&signature).unwrap();
+
+    let mut signed_body = BuilderData::from_slice(body);
+    signed_body.prepend_reference(sign_builder);
+    *body = signed_body.into();
+}
+
+pub fn perform_contract_call(prog: &Program, body: Option<Arc<CellData>>, key_file: Option<&str>) {
     let mut stack = Stack::new();
     let msg_cell = StackItem::Cell(
         create_external_inbound_msg(
@@ -38,10 +50,20 @@ pub fn perform_contract_call(prog: &Program, body: Option<Arc<CellData>>) {
         ).write_to_new_cell().unwrap().into()
     );
 
-    let body: SliceData = match body {
+    let mut body: SliceData = match body {
         Some(b) => b.into(),
         None => BuilderData::new().into(),
     };
+
+    if key_file.is_some() {
+        sign_body(&mut body, key_file.unwrap());
+    }
+
+    let mut info = SmartContractInfo::default();
+    info.set_myself(MsgAddressInt::with_standart(None, 0, AccountId::from([0u8; 32])).unwrap());
+    info.set_balance_remaining(CurrencyCollection::with_grams(10000));
+    let mut builder = BuilderData::new();
+    builder.append_reference(info.write_to_new_cell().unwrap());
 
     stack
         .push(int!(0))
@@ -50,12 +72,13 @@ pub fn perform_contract_call(prog: &Program, body: Option<Arc<CellData>>) {
         .push(StackItem::Slice(body)) 
         .push(int!(-1));
 
-
     test_case_with_ref(
-        &prog.get_entry(), 
-        prog.get_method_dict(),
+        &prog.entry(), 
+        prog.method_dict(),
     )
-    .with_root_data(prog.data.clone().into())
+    .with_root_data(prog.data().unwrap())
     .with_stack(stack)
+    .with_ctrl(5, StackItem::Cell(builder.into()))
+    .with_ctrl(6, StackItem::Cell(BuilderData::new().into()))
     .expect_success();
 }
