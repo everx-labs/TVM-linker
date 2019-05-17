@@ -140,8 +140,8 @@ fn main() {
         (@arg DATA: --data +takes_value "Supplies data to contract in hex format (empty data by default)")
         (@arg INPUT: +required +takes_value "TVM assembler source file")
         (@arg ENTRY_POINT: +takes_value "Function name of the contract's entry point")
-        (@arg GEN_KEYPAIR: --genkey +takes_value conflicts_with[SET_KEYPAIR] "Generates new keypair for the contract and saves it to the file")
-        (@arg SET_KEYPAIR: --setkey +takes_value conflicts_with[GEN_KEYPAIR] "Loads existing keypair from the file")
+        (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file")
+        (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
         (@subcommand test =>
             (about: "execute contract in test environment")
             (version: "0.1")
@@ -164,14 +164,14 @@ fn main() {
 
     prog.set_entry(matches.value_of("ENTRY_POINT")).expect("Error");
 
-    match matches.value_of("GEN_KEYPAIR") {
+    match matches.value_of("GENKEY") {
         Some(file) => {
             let pair = KeypairManager::new();
             pair.store_public(&(file.to_string() + ".pub"));
             pair.store_secret(file);
             prog.set_keypair(pair.drain());
         },
-        None => match matches.value_of("SET_KEYPAIR") {
+        None => match matches.value_of("SETKEY") {
             Some(file) => {
                 let pair = KeypairManager::from_secret_file(file);
                 prog.set_keypair(pair.drain());

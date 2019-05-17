@@ -112,7 +112,7 @@ pub fn debug_print_program(prog: &Program) {
     println!("Entry point:\n{}\n{}\n{}", line, prog.entry(), line);
     println!("Contract functions:\n{}", line);
     for (k,v) in &prog.xrefs {
-        println! ("Function {:15}: id={:08X}, sign-check={:?}", k, v, prog.signed.get(v).unwrap());
+        println! ("Function {:30}: id={:08X}, sign-check={:?}", k, v, prog.signed.get(v).unwrap());
     }
     for (k,v) in &prog.code {
         println! ("Function {:08X}\n{}\n{}\n{}", k, line, v, line);
