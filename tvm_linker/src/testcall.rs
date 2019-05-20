@@ -34,7 +34,7 @@ fn sign_body(body: &mut SliceData, key_file: &str) {
             BagOfCells::with_root(body.clone()).get_repr_hash_by_index(0).unwrap().as_slice()
         ).to_bytes();
     let mut sign_builder = BuilderData::new();
-    sign_builder.checked_append_raw(&signature).unwrap();
+    sign_builder.append_raw(&signature, signature.len() * 8).unwrap();
 
     let mut signed_body = BuilderData::from_slice(body);
     signed_body.prepend_reference(sign_builder);

@@ -7,6 +7,7 @@ extern crate lazy_static;
 extern crate rand;
 extern crate regex;
 extern crate sha2;
+extern crate simplelog;
 extern crate ton_block;
 #[macro_use]
 extern crate tvm;
@@ -21,6 +22,7 @@ use keyman::KeypairManager;
 use program::{Program, calc_func_id, debug_print_program};
 use regex::Regex;
 use real_ton::{ decode_boc, compile_real_ton };
+use simplelog::{SimpleLogger, Config, LevelFilter};
 use std::str;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -129,6 +131,10 @@ fn parse_code(prog: &mut Program, file_name: &str) {
     update_code_dict (prog, &func_name, &func_body, &mut func_id);
 }
 
+fn init_logger() {
+    SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
+}
+
 fn main() {
     let matches = clap_app! (tvm_loader =>
         (version: "0.1")
@@ -150,6 +156,8 @@ fn main() {
             (@arg SIGN: --sign +takes_value "Signs body with private key from defined file")
         )
     ).get_matches();
+
+    init_logger();
 
     if matches.is_present("DECODE") {
         decode_boc(matches.value_of("INPUT").unwrap());
