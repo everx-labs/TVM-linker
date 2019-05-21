@@ -11,6 +11,7 @@ extern crate simplelog;
 extern crate ton_block;
 #[macro_use]
 extern crate tvm;
+extern crate log;
 
 mod keyman;
 mod program;
@@ -22,7 +23,6 @@ use keyman::KeypairManager;
 use program::{Program, calc_func_id, debug_print_program};
 use regex::Regex;
 use real_ton::{ decode_boc, compile_real_ton };
-use simplelog::{SimpleLogger, Config, LevelFilter};
 use std::str;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -131,10 +131,6 @@ fn parse_code(prog: &mut Program, file_name: &str) {
     update_code_dict (prog, &func_name, &func_body, &mut func_id);
 }
 
-fn init_logger() {
-    SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
-}
-
 fn main() {
     let matches = clap_app! (tvm_loader =>
         (version: "0.1")
@@ -154,10 +150,9 @@ fn main() {
             (author: "tonlabs")
             (@arg BODY: --body +takes_value "Body for external inbound message (hex string)")
             (@arg SIGN: --sign +takes_value "Signs body with private key from defined file")
+            (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
         )
     ).get_matches();
-
-    init_logger();
 
     if matches.is_present("DECODE") {
         decode_boc(matches.value_of("INPUT").unwrap());
@@ -223,8 +218,9 @@ fn main() {
             },
             None => None,
         };
+        
         println!("test started: body = {:?}", body);
-        perform_contract_call(&prog, body, matches.value_of("SIGN"));
+        perform_contract_call(&prog, body, matches.value_of("SIGN"), matches.is_present("TRACE"));
         println!("Test completed");
     }
 }

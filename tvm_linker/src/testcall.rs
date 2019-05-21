@@ -1,10 +1,11 @@
 use keyman::KeypairManager;
 use program::Program;
+use simplelog::{SimpleLogger, Config, LevelFilter};
 use sha2::Sha512;
 use std::sync::Arc;
 use tvm::cells_serialization::BagOfCells;
+use tvm::executor::Engine;
 use tvm::stack::*;
-use tvm::test_framework::{test_case_with_ref, Expects};
 use tvm::types::AccountId;
 use ton_block::*;
 
@@ -41,7 +42,34 @@ fn sign_body(body: &mut SliceData, key_file: &str) {
     *body = signed_body.into();
 }
 
-pub fn perform_contract_call(prog: &Program, body: Option<Arc<CellData>>, key_file: Option<&str>) {
+fn initialize_registers(code: SliceData, data: SliceData) -> SaveList {
+    let mut ctrls = SaveList::new();
+    let empty_cont = StackItem::Continuation(ContinuationData::new_empty());
+    let empty_cell = StackItem::Cell(SliceData::new_empty().cell());
+
+    let mut info = SmartContractInfo::default();
+    info.set_myself(MsgAddressInt::with_standart(None, 0, AccountId::from([0u8; 32])).unwrap());
+    info.set_balance_remaining(CurrencyCollection::with_grams(10000));
+    let mut c5_builder = BuilderData::new();
+    c5_builder.append_reference(info.write_to_new_cell().unwrap());
+
+    ctrls.put(0, &mut empty_cont.clone()).unwrap();
+    ctrls.put(1, &mut empty_cont.clone()).unwrap();
+    ctrls.put(3, &mut StackItem::Continuation(ContinuationData::with_code(code))).unwrap();
+    ctrls.put(4, &mut StackItem::Cell(data.into_cell())).unwrap();
+    ctrls.put(5, &mut StackItem::Cell(c5_builder.into())).unwrap();
+    ctrls.put(6, &mut empty_cell.clone()).unwrap();
+    ctrls
+}
+
+fn init_logger(debug: bool) {
+    SimpleLogger::init(
+        if debug {LevelFilter::Debug } else { LevelFilter::Info }, 
+        Config { time: None, level: None, target: None, location: None, time_format: None },
+    ).unwrap();
+}
+
+pub fn perform_contract_call(prog: &Program, body: Option<Arc<CellData>>, key_file: Option<&str>, debug: bool) {
     let mut stack = Stack::new();
     let msg_cell = StackItem::Cell(
         create_external_inbound_msg(
@@ -59,12 +87,11 @@ pub fn perform_contract_call(prog: &Program, body: Option<Arc<CellData>>, key_fi
         sign_body(&mut body, key_file.unwrap());
     }
 
-    let mut info = SmartContractInfo::default();
-    info.set_myself(MsgAddressInt::with_standart(None, 0, AccountId::from([0u8; 32])).unwrap());
-    info.set_balance_remaining(CurrencyCollection::with_grams(10000));
-    let mut builder = BuilderData::new();
-    builder.append_reference(info.write_to_new_cell().unwrap());
-
+    init_logger(debug);
+    
+    let code = prog.compile_asm().unwrap();
+    let data = prog.data().unwrap();
+    let registers = initialize_registers(code.clone(), data.into());
     stack
         .push(int!(0))
         .push(int!(0))
@@ -72,13 +99,18 @@ pub fn perform_contract_call(prog: &Program, body: Option<Arc<CellData>>, key_fi
         .push(StackItem::Slice(body)) 
         .push(int!(-1));
 
-    test_case_with_ref(
-        &prog.entry(), 
-        prog.method_dict(),
-    )
-    .with_root_data(prog.data().unwrap())
-    .with_stack(stack)
-    .with_ctrl(5, StackItem::Cell(builder.into()))
-    .with_ctrl(6, StackItem::Cell(BuilderData::new().into()))
-    .expect_success();
+    let mut engine = Engine::new().setup(code, registers, stack)
+        .unwrap_or_else(|e| panic!("Cannot setup engine, error {}", e));
+    if debug { 
+        engine.set_trace(Engine::TRACE_CODE);
+    }
+    let exit_code = match engine.execute() {
+        Some(exc) => {
+            println!("Unhandled exception: {}", exc); 
+            exc.number
+        },
+        None => 0,
+    };
+    println!("TVM terminated with exit code {}", exit_code);
+    engine.print_info_stack("Post-execution stack state");
 }
