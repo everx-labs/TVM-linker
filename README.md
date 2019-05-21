@@ -53,10 +53,12 @@ to compute address of the contract.
 
 ### 4) Emulating execution of the contract:
 
-	tvm_linker source-code-name [entry-point] test --body XXXX... [--sign key_file]
+	tvm_linker source-code-name [entry-point] test --body XXXX... [--sign key_file] [--trace]
 
 Generates contract and emulates contract call sending external inbound message with body defined after `--body` parameter to the contract.
 If `--sign` specified, the body will be signed with the private key from `key_file` file.
+
+Use `--trace` flag to trace VM execution, stack and registers will be printed after each executed VM command.
 
 ### More Help
 Use `tvm_linker --help` for detailed description about all options, flags and subcommands.

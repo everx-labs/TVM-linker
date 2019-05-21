@@ -92,8 +92,8 @@ impl Program {
         ok!()
     }
 
-    fn compile_asm(&self) -> Result<SliceData, String> {
-        let mut bytecode = compile_code(&self.entry_point).map_err(|e| format!("Compilation failed: {}", e))?;
+    pub fn compile_asm(&self) -> Result<SliceData, String> {
+        let mut bytecode = compile_code(&self.entry()).map_err(|e| format!("Compilation failed: {}", e))?;
         bytecode.append_reference(self.method_dict());
         Ok(bytecode)
     }

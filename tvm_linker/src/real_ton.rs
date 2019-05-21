@@ -13,7 +13,6 @@ use tvm::stack::BuilderData;
 use tvm::stack::SliceData;
 use tvm::stack::CellData;
 use tvm::assembler::compile_code;
-use tvm::bitstring::Bitstring;
 
 use ton_block::{ Message, ExternalInboundMessageHeader, MsgAddrStd, MsgAddressInt, 
     Serializable, Deserializable, StateInit, GetRepresentationHash };
@@ -55,9 +54,7 @@ pub fn make_boc() {
     let mut node = BuilderData::new();
     node.append_reference (left);
     node.append_reference (right);
-
-    let node_data = Bitstring::create([0,0,1,35].to_vec(),32);
-    node.append_data (&node_data);
+    node.append_raw(&[0,0,1,35], 32).unwrap();
 
     msg.body = Some(Arc::<CellData>::from(node));
 

@@ -7,9 +7,11 @@ extern crate lazy_static;
 extern crate rand;
 extern crate regex;
 extern crate sha2;
+extern crate simplelog;
 extern crate ton_block;
 #[macro_use]
 extern crate tvm;
+extern crate log;
 
 mod keyman;
 mod program;
@@ -148,6 +150,7 @@ fn main() {
             (author: "tonlabs")
             (@arg BODY: --body +takes_value "Body for external inbound message (hex string)")
             (@arg SIGN: --sign +takes_value "Signs body with private key from defined file")
+            (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
         )
     ).get_matches();
 
@@ -215,8 +218,9 @@ fn main() {
             },
             None => None,
         };
+        
         println!("test started: body = {:?}", body);
-        perform_contract_call(&prog, body, matches.value_of("SIGN"));
+        perform_contract_call(&prog, body, matches.value_of("SIGN"), matches.is_present("TRACE"));
         println!("Test completed");
     }
 }
