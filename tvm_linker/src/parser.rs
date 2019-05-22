@@ -16,7 +16,7 @@ pub struct ParseEngine {
     entry_point: String,
 }
 
-const PATTERN_GLOBL:    &'static str = r"^\t\.globl\t([a-zA-Z0-9_]+)";
+const PATTERN_GLOBL:    &'static str = r"^[\t\s]*\.globl[\t\s]+([a-zA-Z0-9_]+)";
 const PATTERN_DATA:     &'static str = r"^[\t\s]*\.data";
 const PATTERN_INTERNAL: &'static str = r"^[\t\s]*\.internal[\t\s]+(:[a-zA-Z0-9_]+)";
 const PATTERN_SELECTOR: &'static str = r"^[\t\s]*\.selector";
@@ -147,7 +147,7 @@ impl ParseEngine {
             DATA => self.parse_data(body),
             SELECTOR => {
                 if self.entry_point.is_empty() {
-                    self.entry_point = body.to_string();
+                    self.entry_point = body.trim_end().to_string();
                 } else {
                     return Err("Another selector found".to_string());
                 }
@@ -195,7 +195,7 @@ impl ParseEngine {
                 }
                 Some(mt) => {
                     let parts: Vec<&str> = re.split(line).collect();
-                    result.push_str(parts[0]);
+                    result.push_str(parts.get(0).unwrap_or(&""));
                     let pointer = line.get(mt.start()+1..mt.end()-1).expect("failed to extract label from line");
                     let id_name = {
                         if pointer.starts_with(":") {
@@ -205,7 +205,7 @@ impl ParseEngine {
                         }
                     }.unwrap_or("???".to_string());
                     result.push_str(&id_name);
-                    parts[1]
+                    parts.get(1).unwrap_or(&"")
                 }
             };
         }
@@ -214,11 +214,21 @@ impl ParseEngine {
     pub fn debug_print(&self) {
         let line = "--------------------------";
         println!("Entry point:\n{}\n{}\n{}", line, self.entry(), line);
-        println!("Contract functions:\n{}", line);
+        println!("General-purpose functions:\n{}", line);
         for (k, v) in &self.xrefs {
             println! ("Function {:30}: id={:08X}, sign-check={:?}", k, v, self.signed.get(&v).unwrap());
         }
         for (k, v) in &self.generals {
+            println! ("Function {:08X}\n{}\n{}\n{}", k, line, v, line);
+        }
+        for (k, v) in &self.xrefs {
+            println! ("Function {:30}: id={:08X}, sign-check={:?}", k, v, self.signed.get(&v).unwrap());
+        }
+        println!("{}\nInternal functions:\n{}", line, line);
+        for (k, v) in &self.intrefs {
+            println! ("Function {:30}: id={:08X}", k, v);
+        }
+        for (k, v) in &self.internals {
             println! ("Function {:08X}\n{}\n{}\n{}", k, line, v, line);
         }
     }
@@ -238,10 +248,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parser() {
+    fn test_parser_testlib() {
         let mut parser = ParseEngine::new();
-        //assert_eq!(std::env::current_dir().unwrap().as_path(), std::path::Path::new("./std"));
-
         assert_eq!(parser.parse("./tests/pbank.s", vec!["./test.tvm"]), ok!());
+    }
+
+    #[test]
+    fn test_parser_stdlib() {
+        let mut parser = ParseEngine::new();
+        assert_eq!(parser.parse("./tests/pbank.s", vec!["./stdlib.tvm"]), ok!());
     }
 }
