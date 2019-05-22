@@ -75,13 +75,11 @@
     ; s3 - gram balance of contract: int
 
     ;call signature checker (can throw exception if signature is invalid)
-    PUSHINT 0 
-    CALL 2      ;assume that function returns nothing
+    CALL $:authenticate$ ;assume that function returns nothing
     
     ;call msg parser
     PUSH s1     ;push msg cell on top
-    PUSHINT 1
-    CALL 2      ;assume thar parser returns slice - dictionary with msg fields
+    CALL $:parse_msg$    ;assume thar parser returns slice - dictionary with msg fields
     
     SWAP
     ;parse ABI version (1 byte) and load function id (4 bytes)

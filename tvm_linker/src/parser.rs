@@ -17,15 +17,15 @@ pub struct ParseEngine {
 }
 
 const PATTERN_GLOBL:    &'static str = r"^\t\.globl\t([a-zA-Z0-9_]+)";
-const PATTERN_DATA:     &'static str = r"^\t\.data";
-const PATTERN_INTERNAL: &'static str = r"^\t\.internal\t:([a-zA-Z0-9_]+)";
-const PATTERN_SELECTOR: &'static str = r"^\t\.selector";
-const PATTERN_ALIAS:    &'static str = r"^\t\.internal-alias :([a-zA-Z0-9_]+),[\t\s]+(-?\d+)";
+const PATTERN_DATA:     &'static str = r"^[\t\s]*\.data";
+const PATTERN_INTERNAL: &'static str = r"^[\t\s]*\.internal[\t\s]+(:[a-zA-Z0-9_]+)";
+const PATTERN_SELECTOR: &'static str = r"^[\t\s]*\.selector";
+const PATTERN_ALIAS:    &'static str = r"^[\t\s]*\.internal-alias (:[a-zA-Z0-9_]+),[\t\s]+(-?\d+)";
 const PATTERN_LABEL:    &'static str = r"^[.a-zA-Z0-9_]+:";
-const PATTERN_PARAM:    &'static str = r"^\t*[.]";
+const PATTERN_PARAM:    &'static str = r"^\t\t+[.]";
 
-//const GLOBL:    &'static str = ".globl";
-//const INTERNAL: &'static str = ".internal";
+const GLOBL:    &'static str = ".globl";
+const INTERNAL: &'static str = ".internal";
 const DATA:     &'static str = ".data";
 const SELECTOR: &'static str = ".selector";
 
@@ -48,12 +48,14 @@ impl ParseEngine {
 
     pub fn parse(&mut self, source_file: &str, lib_files: Vec<&str>) -> Result<(), String> {
         for file in lib_files {
-            self.parse_code(file)?;
-            self.parse_code(file)?;
+            self.parse_code(file, false)?;
+            self.parse_code(file, true)?;
         }
 
-        self.parse_code(source_file)?;
-        self.parse_code(source_file)?;
+        self.debug_print();
+
+        self.parse_code(source_file, false)?;
+        self.parse_code(source_file, true)?;
         ok!()
     }
 
@@ -77,7 +79,7 @@ impl ParseEngine {
         &self.signed
     }
 
-    fn parse_code(&mut self, file: &str) -> Result<(), String> {
+    fn parse_code(&mut self, file: &str, parse_selector: bool) -> Result<(), String> {
         let globl_regex = Regex::new(PATTERN_GLOBL).unwrap();
         let internal_regex = Regex::new(PATTERN_INTERNAL).unwrap();
         let selector_regex = Regex::new(PATTERN_SELECTOR).unwrap();
@@ -86,6 +88,7 @@ impl ParseEngine {
         let dotted_regex = Regex::new(PATTERN_PARAM).unwrap();
         let alias_regex = Regex::new(PATTERN_ALIAS).unwrap();
 
+        let mut section_name: String = String::new();
         let mut func_body: String = "".to_owned();
         let mut func_name: String = "".to_owned();
         let mut func_id: i32 = 1;
@@ -95,60 +98,81 @@ impl ParseEngine {
 
         for line in reader.lines() {
             let l = line.unwrap();
+            //println!("{}", l);
             if globl_regex.is_match(&l) { 
-                self.update(&func_name, &func_body, &mut func_id);
-                func_name = "".to_owned();
+                self.update(&section_name, &func_name, &func_body, &mut func_id)?;
+                section_name = GLOBL.to_owned();
                 func_body = "".to_owned(); 
-
-                for cap in globl_regex.captures_iter(&l) {
-                    func_name = cap[1].to_owned();
-                }
+                func_name = globl_regex.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
             } else if data_regex.is_match(&l) {
-                self.update(&func_name, &func_body, &mut func_id);
-                func_name = DATA.to_owned();
+                self.update(&section_name, &func_name, &func_body, &mut func_id)?;
+                section_name = DATA.to_owned();
+                func_name = "".to_owned();
                 func_body = "".to_owned();
             } else if selector_regex.is_match(&l) {
-                func_name = SELECTOR.to_owned();
-                func_body = "".to_owned();
-            } else if internal_regex.is_match(&l) {
+                if !parse_selector { continue; }
+                self.update(&section_name, &func_name, &func_body, &mut func_id)?;
+                section_name = SELECTOR.to_owned();
                 func_name = "".to_owned();
                 func_body = "".to_owned();
+            } else if internal_regex.is_match(&l) {
+                self.update(&section_name, &func_name, &func_body, &mut func_id)?;
+                section_name = INTERNAL.to_owned();
+                func_body = "".to_owned();
+                func_name = internal_regex.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
             } else if label_regex.is_match(&l) { 
-                continue; 
-            } else if dotted_regex.is_match(&l) { 
-                continue; 
+                continue;             
             } else if alias_regex.is_match(&l) {
-
+                let cap = alias_regex.captures(&l).unwrap();
+                self.aliases.insert(
+                    cap.get(1).unwrap().as_str().to_owned(), 
+                    i32::from_str_radix(cap.get(2).unwrap().as_str(), 10)
+                        .map_err(|_| format!("line: '{}': failed to parse id", l))?, 
+                );
+            } else if dotted_regex.is_match(&l) { 
+                 
+            } else {
+                let l_with_numbers = self.replace_labels(&l);
+                func_body.push_str(&l_with_numbers);
+                func_body.push_str("\n");
             }
-
-            let l_with_numbers = self.replace_labels(&l);
-
-            func_body.push_str(&l_with_numbers);
-            func_body.push_str("\n");
         }
 
-        self.update(&func_name, &func_body, &mut func_id);
+        self.update(&section_name, &func_name, &func_body, &mut func_id)?;
         ok!()
     }
 
-    fn update(&mut self, func_name: &String, func_body: &String, func_id: &mut i32) {
-        if func_name == DATA {
-            self.parse_data(func_body.as_str());
-        } else if func_name != "" {
-            let mut name = func_name.to_owned();
-            let mut signed = false;
-            if let Some(index) = name.find(FUNC_SUFFIX_AUTH) {
-                if (index + FUNC_SUFFIX_AUTH.len()) == name.len() {
-                    signed = true;
-                    name.truncate(index + 1);
+    fn update(&mut self, section: &str, func: &str, body: &str, id: &mut i32) -> Result<(), String> {
+        match section {
+            DATA => self.parse_data(body),
+            SELECTOR => {
+                if self.entry_point.is_empty() {
+                    self.entry_point = body.to_string();
+                } else {
+                    return Err("Another selector found".to_string());
                 }
-            }
-            let id = calc_func_id(name.as_str());
-            self.generals.insert(id, func_body.trim_end().to_string());
-            self.xrefs.insert(func_name.to_owned(), id);
-            self.signed.insert(id, signed);
-            *func_id = *func_id + 1;
+            },
+            GLOBL => {
+                let mut signed = false;
+                if let Some(index) = func.find(FUNC_SUFFIX_AUTH) {
+                    if (index + FUNC_SUFFIX_AUTH.len()) == func.len() {
+                        signed = true;
+                    }
+                }
+                let func_id = calc_func_id(func);
+                self.generals.insert(func_id, body.trim_end().to_string());
+                self.xrefs.insert(func.to_string(), func_id);
+                self.signed.insert(func_id, signed);
+            },
+            INTERNAL => {
+                let f_id = self.aliases.get(func).unwrap_or(id);
+                self.internals.insert(*f_id, body.trim_end().to_string());
+                self.intrefs.insert(func.to_string(), *f_id);
+            },
+            _ => (),
         }
+        *id = *id + 1;
+        ok!()
     }
 
     fn parse_data(&mut self, section: &str) {
@@ -159,29 +183,31 @@ impl ParseEngine {
         self.data = data;
     }
 
-    fn replace_labels(&mut self, l: &str) -> String {
-        let mut result = "".to_owned();
-        let mut ll = l.to_owned();
-
-        let re = Regex::new(r"\$[A-Za-z0-9_]+\$").unwrap();
+    fn replace_labels(&mut self, line: &str) -> String {
+        let mut result = String::new();
+        let mut line = line;
+        let re = Regex::new(r"\$:?[A-Za-z0-9_]+\$").unwrap();
         loop {
-            ll = match re.find(&ll) {
+            line = match re.find(line) {
                 None => {
-                    result.push_str(&ll);
+                    result.push_str(line);
                     break result;
                 }
                 Some(mt) => {
-                    result.push_str(ll.get(0..mt.start()).unwrap());
-                    match self.xrefs.get(ll.get(mt.start()+1..mt.end()-1).unwrap()) {
-                        Some(num) => {
-                            let num_str = num.to_string();
-                            result.push_str (&num_str);
+                    let parts: Vec<&str> = re.split(line).collect();
+                    result.push_str(parts[0]);
+                    let pointer = line.get(mt.start()+1..mt.end()-1).expect("failed to extract label from line");
+                    let id_name = {
+                        if pointer.starts_with(":") {
+                            self.intrefs.get(pointer).map(|id| id.to_string())
+                        } else {
+                            self.xrefs.get(pointer).map(|id| id.to_string())
                         }
-                        None => { result.push_str ("???"); }
-                    }
-                    ll.get(mt.end()..).unwrap().to_owned()
+                    }.unwrap_or("???".to_string());
+                    result.push_str(&id_name);
+                    parts[1]
                 }
-            }
+            };
         }
     }
 
@@ -205,3 +231,17 @@ pub fn calc_func_id(func_interface: &str) -> u32 {
     id_bytes.copy_from_slice(&hasher.result()[..4]);
     u32::from_be_bytes(id_bytes)
 } 
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parser() {
+        let mut parser = ParseEngine::new();
+        //assert_eq!(std::env::current_dir().unwrap().as_path(), std::path::Path::new("./std"));
+
+        assert_eq!(parser.parse("./tests/pbank.s", vec!["./test.tvm"]), ok!());
+    }
+}

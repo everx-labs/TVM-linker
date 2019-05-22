@@ -1,0 +1,20 @@
+	.internal-alias :main_external,     -1
+
+    .selector
+    SETCP0
+
+    .internal   :authenticate
+    DUP
+
+    .internal   :main_external
+    CALL $:authenticate$ ;assume that function returns nothing
+    DROP
+
+    .internal   :main_internal
+    RET         ;contract ignores internal msgs by default 
+
+    .internal   :parse_msg
+    CTOS        ;TODO: use parser from contract_api library
+
+    .globl      func1
+    PUSHINT 1
