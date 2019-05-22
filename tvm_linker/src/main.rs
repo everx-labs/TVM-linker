@@ -2,7 +2,6 @@
 #[macro_use]
 extern crate clap;
 extern crate ed25519_dalek;
-#[macro_use]
 extern crate lazy_static;
 extern crate rand;
 extern crate regex;
@@ -25,6 +24,7 @@ use parser::ParseEngine;
 use program::Program;
 use real_ton::{ decode_boc, compile_real_ton };
 use regex::Regex;
+use std::fs::File;
 use testcall::perform_contract_call;
 use tvm::stack::BuilderData;
 
@@ -58,8 +58,13 @@ fn main() {
 
     let mut parser = ParseEngine::new();
     parser.parse(
-        matches.value_of("INPUT").unwrap(), 
-        matches.value_of("LIB").map(|val| vec![val]).unwrap_or(vec![]),
+        File::open(matches.value_of("INPUT").unwrap())
+            .expect("error opening source file"), 
+        matches.value_of("LIB")
+            .map(|val| vec![val])
+            .unwrap_or(vec![])
+            .iter().map(|lib| File::open(lib).expect("error opening lib file"))
+            .collect(),
     ).expect("error");
 
     let mut prog = Program::new(parser);

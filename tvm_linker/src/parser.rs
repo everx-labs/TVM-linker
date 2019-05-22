@@ -1,8 +1,7 @@
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use tvm::stack::BuilderData;
 
 pub struct ParseEngine {
@@ -46,14 +45,23 @@ impl ParseEngine {
         }
     }
 
-    pub fn parse(&mut self, source_file: &str, lib_files: Vec<&str>) -> Result<(), String> {
-        for file in lib_files {
-            self.parse_code(file, false)?;
-            self.parse_code(file, true)?;
+    pub fn parse<T: Read + Seek>(&mut self, source: T, libs: Vec<T>) -> Result<(), String> {
+        for lib_buf in libs {
+            let mut reader = BufReader::new(lib_buf);
+            self.parse_code(&mut reader, true)?;
+            reader.seek(SeekFrom::Start(0))
+                .map_err(|e| format!("error while seeking lib file: {}", e))?;
+            self.parse_code(&mut reader, false)?;
         }
+        let mut reader = BufReader::new(source);
+        self.parse_code(&mut reader, true)?;
+        reader.seek(SeekFrom::Start(0))
+            .map_err(|e| format!("error while seeking source file: {}", e))?;
+        self.parse_code(&mut reader, false)?;
 
-        self.parse_code(source_file, false)?;
-        self.parse_code(source_file, true)?;
+        if self.entry_point.is_empty() {
+            return Err("Selector not found".to_string());
+        }
         ok!()
     }
 
@@ -77,7 +85,7 @@ impl ParseEngine {
         &self.signed
     }
 
-    fn parse_code(&mut self, file: &str, parse_selector: bool) -> Result<(), String> {
+    fn parse_code<R: BufRead>(&mut self, reader: &mut R, first_pass: bool) -> Result<(), String> {
         let globl_regex = Regex::new(PATTERN_GLOBL).unwrap();
         let internal_regex = Regex::new(PATTERN_INTERNAL).unwrap();
         let selector_regex = Regex::new(PATTERN_SELECTOR).unwrap();
@@ -89,58 +97,57 @@ impl ParseEngine {
         let mut section_name: String = String::new();
         let mut func_body: String = "".to_owned();
         let mut func_name: String = "".to_owned();
-        let mut func_id: i32 = 1;
 
-        let file = File::open(file).map_err(|e| format!("cannot read source file: {}", e))?;
-        let reader = BufReader::new(file);
-
-        for line in reader.lines() {
-            let l = line.unwrap();
-            //println!("{}", l);
+        let mut l = String::new();
+        while reader.read_line(&mut l)
+            .map_err(|_| "error while reading line")? != 0 {
             if globl_regex.is_match(&l) { 
-                self.update(&section_name, &func_name, &func_body, &mut func_id)?;
+                self.update(&section_name, &func_name, &func_body, first_pass)?;
                 section_name = GLOBL.to_owned();
                 func_body = "".to_owned(); 
                 func_name = globl_regex.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
             } else if data_regex.is_match(&l) {
-                self.update(&section_name, &func_name, &func_body, &mut func_id)?;
+                self.update(&section_name, &func_name, &func_body, first_pass)?;
                 section_name = DATA.to_owned();
                 func_name = "".to_owned();
                 func_body = "".to_owned();
-            } else if selector_regex.is_match(&l) {
-                if !parse_selector { continue; }
-                self.update(&section_name, &func_name, &func_body, &mut func_id)?;
-                section_name = SELECTOR.to_owned();
+            } else if selector_regex.is_match(&l) {                
+                self.update(&section_name, &func_name, &func_body, first_pass)?;
+                if first_pass { 
+                    section_name.clear();
+                } else {
+                    section_name = SELECTOR.to_owned();
+                }
                 func_name = "".to_owned();
                 func_body = "".to_owned();
             } else if internal_regex.is_match(&l) {
-                self.update(&section_name, &func_name, &func_body, &mut func_id)?;
+                self.update(&section_name, &func_name, &func_body, first_pass)?;
                 section_name = INTERNAL.to_owned();
                 func_body = "".to_owned();
                 func_name = internal_regex.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
             } else if label_regex.is_match(&l) { 
-                continue;             
+                            
             } else if alias_regex.is_match(&l) {
                 let cap = alias_regex.captures(&l).unwrap();
                 self.aliases.insert(
                     cap.get(1).unwrap().as_str().to_owned(), 
                     i32::from_str_radix(cap.get(2).unwrap().as_str(), 10)
                         .map_err(|_| format!("line: '{}': failed to parse id", l))?, 
-                );
+                );                
             } else if dotted_regex.is_match(&l) { 
                  
             } else {
-                let l_with_numbers = self.replace_labels(&l);
+                let l_with_numbers = if first_pass { l.to_owned() } else { self.replace_labels(&l) };
                 func_body.push_str(&l_with_numbers);
-                func_body.push_str("\n");
             }
+            l.clear();
         }
 
-        self.update(&section_name, &func_name, &func_body, &mut func_id)?;
+        self.update(&section_name, &func_name, &func_body, first_pass)?;
         ok!()
     }
 
-    fn update(&mut self, section: &str, func: &str, body: &str, id: &mut i32) -> Result<(), String> {
+    fn update(&mut self, section: &str, func: &str, body: &str, first_pass: bool) -> Result<(), String> {
         match section {
             DATA => self.parse_data(body),
             SELECTOR => {
@@ -158,18 +165,23 @@ impl ParseEngine {
                     }
                 }
                 let func_id = calc_func_id(func);
-                self.generals.insert(func_id, body.trim_end().to_string());
+                let prev = self.generals.insert(func_id, body.trim_end().to_string());
+                if first_pass && prev.is_some() {
+                    Err(format!("global function with id = {} already exist", func_id))?;
+                }
                 self.xrefs.insert(func.to_string(), func_id);
                 self.signed.insert(func_id, signed);
             },
             INTERNAL => {
-                let f_id = self.aliases.get(func).unwrap_or(id);
-                self.internals.insert(*f_id, body.trim_end().to_string());
+                let f_id = self.aliases.get(func).ok_or(format!("id for '{}' not found", func))?;
+                let prev = self.internals.insert(*f_id, body.trim_end().to_string());
+                if first_pass && prev.is_some() {
+                    Err(format!("internal function with id = {} already exist", *f_id))?;
+                }
                 self.intrefs.insert(func.to_string(), *f_id);
             },
             _ => (),
         }
-        *id = *id + 1;
         ok!()
     }
 
@@ -218,10 +230,7 @@ impl ParseEngine {
         }
         for (k, v) in &self.generals {
             println! ("Function {:08X}\n{}\n{}\n{}", k, line, v, line);
-        }
-        for (k, v) in &self.xrefs {
-            println! ("Function {:30}: id={:08X}, sign-check={:?}", k, v, self.signed.get(&v).unwrap());
-        }
+        }        
         println!("{}\nInternal functions:\n{}", line, line);
         for (k, v) in &self.intrefs {
             println! ("Function {:30}: id={:08X}", k, v);
@@ -244,16 +253,22 @@ pub fn calc_func_id(func_interface: &str) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
 
     #[test]
     fn test_parser_testlib() {
         let mut parser = ParseEngine::new();
-        assert_eq!(parser.parse("./tests/pbank.s", vec!["./test.tvm"]), ok!());
+        let pbank_file = File::open("./tests/pbank.s").unwrap();
+        let test_file = File::open("./tests/test.tvm").unwrap();
+        assert_eq!(parser.parse(pbank_file, vec![test_file]), ok!());
+        parser.debug_print();
     }
 
     #[test]
     fn test_parser_stdlib() {
         let mut parser = ParseEngine::new();
-        assert_eq!(parser.parse("./tests/pbank.s", vec!["./stdlib.tvm"]), ok!());
+        let pbank_file = File::open("./tests/pbank.s").unwrap();
+        let test_file = File::open("./stdlib.tvm").unwrap();
+        assert_eq!(parser.parse(pbank_file, vec![test_file]), ok!());
     }
 }
