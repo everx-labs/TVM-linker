@@ -38,7 +38,7 @@ fn main() {
         (@arg INIT: --init "Packs code into TON State Init message")
         (@arg DATA: --data +takes_value "Supplies data to contract in hex format (empty data by default)")
         (@arg INPUT: +required +takes_value "TVM assembler source file")
-        (@arg LIB: +takes_value "Standard library source file")
+        (@arg LIB: --lib +takes_value "Standard library source file")
         (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file")
         (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
         (@subcommand test =>

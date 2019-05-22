@@ -1,4 +1,4 @@
-use ed25519_dalek::Keypair;
+use ed25519_dalek::{Keypair, PUBLIC_KEY_LENGTH};
 use std::io::Write;
 use std::sync::Arc;
 use methdict::*;
@@ -28,11 +28,14 @@ impl Program {
 
     pub fn data(&self) -> Result<Arc<CellData>, String> {
         let mut data = self.engine.data().clone();
-        if let Some(ref pair) = self.keypair {
-            let bytes = pair.public.to_bytes();
-            data.append_raw(&bytes, bytes.len() * 8)
+        let bytes = 
+            if let Some(ref pair) = self.keypair {
+                pair.public.to_bytes()
+            } else {
+                [0u8; PUBLIC_KEY_LENGTH]
+            };
+        data.append_raw(&bytes, bytes.len() * 8)
                 .map_err(|e| format!("{}", e))?;
-        }
         Ok(data.into())
     }
 

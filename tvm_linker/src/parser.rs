@@ -22,7 +22,7 @@ const PATTERN_INTERNAL: &'static str = r"^[\t\s]*\.internal[\t\s]+(:[a-zA-Z0-9_]
 const PATTERN_SELECTOR: &'static str = r"^[\t\s]*\.selector";
 const PATTERN_ALIAS:    &'static str = r"^[\t\s]*\.internal-alias (:[a-zA-Z0-9_]+),[\t\s]+(-?\d+)";
 const PATTERN_LABEL:    &'static str = r"^[.a-zA-Z0-9_]+:";
-const PATTERN_PARAM:    &'static str = r"^\t\t+[.]";
+const PATTERN_PARAM:    &'static str = r"^\t+[.]";
 
 const GLOBL:    &'static str = ".globl";
 const INTERNAL: &'static str = ".internal";
@@ -51,8 +51,6 @@ impl ParseEngine {
             self.parse_code(file, false)?;
             self.parse_code(file, true)?;
         }
-
-        self.debug_print();
 
         self.parse_code(source_file, false)?;
         self.parse_code(source_file, true)?;

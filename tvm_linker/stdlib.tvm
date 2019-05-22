@@ -10,7 +10,7 @@
     SETCP0
     PUSHREFSLICE        ; dictionary of methods in first reference
     OVER
-    ISNPOS
+    NEQINT 1
     PUSHCONT {          ; if func_id negative or zero - direct call to method
         PUSHINT 32
         DICTIGETJMP     ; execute method and return
