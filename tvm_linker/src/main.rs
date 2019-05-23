@@ -48,6 +48,7 @@ fn main() {
             (@arg BODY: --body +takes_value "Body for external inbound message (hex string)")
             (@arg SIGN: --sign +takes_value "Signs body with private key from defined file")
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
+            (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
         )
     ).get_matches();
 
@@ -122,7 +123,7 @@ fn main() {
         };
         
         println!("test started: body = {:?}", body);
-        perform_contract_call(&prog, body, matches.value_of("SIGN"), matches.is_present("TRACE"));
+        perform_contract_call(&prog, body, matches.value_of("SIGN"), matches.is_present("TRACE"), matches.is_present("DECODEC6"));
         println!("Test completed");
     }
 }
