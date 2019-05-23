@@ -2,7 +2,31 @@ use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
-use tvm::stack::BuilderData;
+use tvm::stack::{BuilderData, IntegerData, SliceData};
+
+enum DataValue {
+    Number(IntegerData),
+}
+
+//const DATA_OBJECT: &'static str = "@object";
+
+struct DataItem {
+    pub name: String,
+    pub size: u32,
+    pub align: u32,
+    pub value: Vec<DataValue>,
+}
+
+impl DataItem {
+    pub fn new(name: String) -> Self {
+        DataItem {
+            name,
+            size: 0,
+            align: 0,
+            value: vec![],
+        }
+    }
+}
 
 pub struct ParseEngine {
     xrefs: HashMap<String, u32>,
@@ -10,7 +34,8 @@ pub struct ParseEngine {
     aliases: HashMap<String, i32>,
     generals: HashMap<u32, String>,
     internals: HashMap<i32, String>,
-    data: BuilderData,
+    data: SliceData,
+    data_items: Vec<DataItem>,
     signed: HashMap<u32, bool>,
     entry_point: String,
 }
@@ -20,8 +45,8 @@ const PATTERN_DATA:     &'static str = r"^[\t\s]*\.data";
 const PATTERN_INTERNAL: &'static str = r"^[\t\s]*\.internal[\t\s]+(:[a-zA-Z0-9_]+)";
 const PATTERN_SELECTOR: &'static str = r"^[\t\s]*\.selector";
 const PATTERN_ALIAS:    &'static str = r"^[\t\s]*\.internal-alias (:[a-zA-Z0-9_]+),[\t\s]+(-?\d+)";
-const PATTERN_LABEL:    &'static str = r"^[.a-zA-Z0-9_]+:";
-const PATTERN_PARAM:    &'static str = r"^\t+[.]";
+const PATTERN_LABEL:    &'static str = r"^.[a-zA-Z0-9_]+:";
+const PATTERN_PARAM:    &'static str = r"^[\t\s]+\.([a-zA-Z0-9_]+)";
 
 const GLOBL:    &'static str = ".globl";
 const INTERNAL: &'static str = ".internal";
@@ -39,7 +64,8 @@ impl ParseEngine {
             aliases:    HashMap::new(),
             generals:   HashMap::new(), 
             internals:  HashMap::new(),
-            data:       BuilderData::new(), 
+            data:       BuilderData::new().into(), 
+            data_items: vec![],
             signed:     HashMap::new(),
             entry_point: String::new(),
         }
@@ -65,8 +91,10 @@ impl ParseEngine {
         ok!()
     }
 
-    pub fn data(&self) -> &BuilderData {
-        &self.data
+    pub fn data(&self) -> BuilderData {
+        let mut data = BuilderData::new();
+        data.append_reference(BuilderData::from_slice(&self.data));
+        data
     }
 
     pub fn entry(&self) -> &str {
@@ -132,7 +160,9 @@ impl ParseEngine {
                 func_body = "".to_owned();
                 func_name = internal_regex.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
             } else if label_regex.is_match(&l) { 
-                            
+                if section_name == DATA {
+
+                }
             } else if alias_regex.is_match(&l) {
                 let cap = alias_regex.captures(&l).unwrap();
                 self.aliases.insert(
@@ -140,8 +170,14 @@ impl ParseEngine {
                     i32::from_str_radix(cap.get(2).unwrap().as_str(), 10)
                         .map_err(|_| format!("line: '{}': failed to parse id", l))?, 
                 );                
-            } else if dotted_regex.is_match(&l) { 
-                 
+            } else if dotted_regex.is_match(&l) {
+                let cap = dotted_regex.captures(&l).unwrap();
+                let param_match = cap.get(1).unwrap();
+                self.parse_param(
+                    param_match.as_str(),
+                    l.get(param_match.end()..).unwrap(),
+                    &section_name,
+                )?;
             } else {
                 let l_with_numbers = if first_pass { l.to_owned() } else { self.replace_labels(&l) };
                 func_body.push_str(&l_with_numbers);
@@ -155,7 +191,7 @@ impl ParseEngine {
 
     fn update(&mut self, section: &str, func: &str, body: &str, first_pass: bool) -> Result<(), String> {
         match section {
-            DATA => self.parse_data(body),
+            DATA => self.build_data(),
             SELECTOR => {
                 if self.entry_point.is_empty() {
                     self.entry_point = body.trim_end().to_string();
@@ -191,12 +227,58 @@ impl ParseEngine {
         ok!()
     }
 
-    fn parse_data(&mut self, section: &str) {
-        let mut data = BuilderData::new();
-        let data_buf = hex::decode(section.trim()).unwrap();
-        let data_bits = data_buf.len() * 8;
-        data.append_reference(BuilderData::with_raw(data_buf, data_bits));
-        self.data = data;
+
+    fn parse_param(&mut self, param: &str, value: &str, section: &str) -> Result<(), String> {
+        match section {
+            DATA => self.update_data(param, value)?,
+            _ => (),
+        };
+        ok!()
+    }
+
+    fn update_data(&mut self, param: &str, value: &str) -> Result<(), String> {
+        lazy_static! {
+            static ref type_re: Regex = Regex::new(r"^[\t\s]*([a-zA-Z0-9_]+),[\t\s]*@object").unwrap();
+            static ref size_re: Regex = Regex::new(r"^[\t\s]*([a-zA-Z0-9_]+),[\t\s]*([0-9]+)").unwrap();
+        }
+        match param {
+            ".align" => {
+                if let Some(item) = self.data_items.last_mut() {
+                    item.align = u32::from_str_radix(value.trim(), 10)
+                        .map_err(|_| ".align option is invalid".to_string())?;
+                }
+            },
+            ".type"  => {
+                let cap = type_re.captures(value).ok_or(".type option is invalid".to_string())?;
+                let mut item = DataItem::new(cap.get(1).unwrap().as_str().to_owned());
+                self.data_items.push(item);
+            },
+            ".size"  => {
+                if let Some(item) = self.data_items.last_mut() {
+                    let cap = size_re.captures(value).ok_or(".size option is invalid".to_string())?;
+                    let var_name = cap.get(1).unwrap().as_str();
+                    if item.name != var_name {
+                        Err(format!("variable {} is not declared before", var_name))?;
+                    }
+                    item.size = u32::from_str_radix(cap.get(2).unwrap().as_str(), 10)
+                        .map_err(|_| ".size value is invalid".to_string())?;
+                }
+            },
+            ".byte" | ".long" | ".short" | ".quad" => {
+                if let Some(item) = self.data_items.last_mut() {
+                    item.value.push(DataValue::Number(
+                        IntegerData::from_str_radix(value.trim(), 10).map_err(|_| ".align option is invalid".to_string())?
+                    ));
+                }
+            },
+            _ => unimplemented!(),
+        };
+        ok!()
+    }
+
+    fn build_data(&mut self) {
+       
+        
     }
 
     fn replace_labels(&mut self, line: &str) -> String {
