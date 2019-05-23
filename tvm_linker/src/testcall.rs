@@ -2,11 +2,13 @@ use keyman::KeypairManager;
 use program::Program;
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use sha2::Sha512;
+use std::fmt;
 use std::sync::Arc;
 use tvm::cells_serialization::BagOfCells;
 use tvm::executor::Engine;
 use tvm::stack::*;
 use tvm::types::AccountId;
+use tvm::bitstring::Bitstring;
 use ton_block::*;
 
 #[allow(dead_code)]
@@ -23,6 +25,8 @@ fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Arc<CellData> {
 fn create_external_inbound_msg(dst_addr: &AccountId, body: Option<Arc<CellData>>) -> Message {
     let mut hdr = ExternalInboundMessageHeader::default();
     hdr.dst = MsgAddressInt::with_standart(None, -1, dst_addr.clone()).unwrap();
+    hdr.src = MsgAddressExt::with_extern(&Bitstring::create(vec![0x55; 8], 64)).unwrap();
+    hdr.import_fee = Grams(0x1234u32.into());
     let mut msg = Message::with_ext_in_header(hdr);
     msg.body = body;
     msg
@@ -69,7 +73,13 @@ fn init_logger(debug: bool) {
     ).unwrap();
 }
 
-pub fn perform_contract_call(prog: &Program, body: Option<Arc<CellData>>, key_file: Option<&str>, debug: bool) {
+pub fn perform_contract_call(
+    prog: &Program, 
+    body: Option<Arc<CellData>>, 
+    key_file: Option<&str>, 
+    debug: bool, 
+    decode_actions: bool
+) {
     let mut stack = Stack::new();
     let msg_cell = StackItem::Cell(
         create_external_inbound_msg(
@@ -113,4 +123,102 @@ pub fn perform_contract_call(prog: &Program, body: Option<Arc<CellData>>, key_fi
     };
     println!("TVM terminated with exit code {}", exit_code);
     engine.print_info_stack("Post-execution stack state");
+    engine.print_info_ctrls();
+    
+    if decode_actions {
+        if let StackItem::Cell(cell) = engine.get_actions() {
+            let actions: OutActions = OutActions::construct_from(&mut cell.into()).expect("Failed to decode output actions");
+            println!("Output actions:\n----------------");
+            for act in actions {
+                match act {
+                    OutAction::SendMsg{mode: _, out_msg } => {
+                        println!("Action(SendMsg):\n{}", MsgPrinter{ msg: out_msg });
+                    },
+                    _ => (),
+                }
+            }
+        }
+    }
+    
+}
+
+struct MsgPrinter {
+    pub msg: Arc<Message>,
+}
+
+impl fmt::Display for MsgPrinter {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "message header\n{}init  : {:?}\nbody  : {:?}\n",
+            print_msg_header(&self.msg.header),
+            self.msg.init,
+            self.msg.body,
+        )
+    }    
+}
+
+fn print_msg_header(header: &CommonMsgInfo) -> String {
+    match header {
+        CommonMsgInfo::IntMsgInfo(header) => {
+            format!("   ihr_disabled: {}\n", header.ihr_disabled) +
+            &format!("   bounce      : {}\n", header.bounce) +
+            &format!("   bounced     : {}\n", header.bounced) +
+            &format!("   source      : {}\n", print_int_address(&header.src)) +
+            &format!("   destination : {}\n", print_int_address(&header.dst)) +
+            &format!("   value       : {}\n", header.value) +
+            &format!("   ihr_fee     : {}\n", header.ihr_fee) +
+            &format!("   fwd_fee     : {}\n", header.fwd_fee) +
+            &format!("   created_lt  : {}\n", header.created_lt) +
+            &format!("   created_at  : {}\n", header.created_at)
+        },
+        CommonMsgInfo::ExtInMsgInfo(header) => {
+            format!("   source      : {}\n", print_ext_address(&header.src)) +
+            &format!("   destination : {}\n", print_int_address(&header.dst)) +
+            &format!("   import_fee  : {}\n", header.import_fee)
+        },
+        CommonMsgInfo::ExtOutMsgInfo(header) => {
+            format!("   source      : {}\n", print_int_address(&header.src)) +
+            &format!("   destination : {}\n", print_ext_address(&header.dst)) +
+            &format!("   created_lt  : {}\n", header.created_lt) +
+            &format!("   created_at  : {}\n", header.created_at)
+        }
+    }
+}
+
+fn print_int_address(addr: &MsgAddressInt) -> String {
+    match addr {
+        MsgAddressInt::AddrStd(ref std) => format!("{}:{:X}", std.workchain_id, std.address),
+        MsgAddressInt::AddrVar(ref var) => format!("{}:{}", var.workchain_id, print_bitstring(&var.address)),
+    }
+}
+
+fn print_bitstring(bits: &Bitstring) -> String {
+    let mut res = String::new();
+    for byte in bits.data() {
+        res = res + &format!("{:02X}", byte);
+    }
+    res
+}
+fn print_ext_address(addr: &MsgAddressExt) -> String {
+    match addr {
+        MsgAddressExt::AddrNone => "AddrNone".to_string(),
+        MsgAddressExt::AddrExtern(x) => format!("{}", x)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_msg_print() {
+        let msg = create_external_inbound_msg(
+            &AccountId::from([0x11; 32]), 
+            Some(create_inbound_body(10, 20, 0x11223344)),
+        );
+
+        println!("SendMsg action:\n{}", MsgPrinter{ msg: Arc::new(msg) });
+    }
+
 }
