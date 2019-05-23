@@ -211,6 +211,24 @@ fn print_ext_address(addr: &MsgAddressExt) -> String {
 mod tests {
     use super::*;
 
+    fn create_internal_msg(src_addr: AccountId, dst_addr: AccountId) -> Message {
+        let mut anycast = AnycastInfo::default();
+        anycast.set_rewrite_pfx(Bitstring::create(vec![0x98,0x32,0x17], 24)).unwrap();
+        let mut balance = CurrencyCollection::new();
+        balance.grams = Grams::from(4000u64);
+        let mut hdr = InternalMessageHeader::with_addresses(
+            MsgAddressInt::with_standart(None, -1, src_addr).unwrap(),
+            MsgAddressInt::with_standart(Some(anycast), -1, dst_addr).unwrap(),
+            balance,
+        );
+        hdr.bounce = true;
+        hdr.ihr_fee = Grams::from(1000u32);
+        hdr.created_lt = 54321;
+        hdr.created_at = 123456789;
+        let msg = Message::with_int_header(hdr);
+        msg
+    }
+
     #[test]
     fn test_msg_print() {
         let msg = create_external_inbound_msg(
@@ -218,7 +236,13 @@ mod tests {
             Some(create_inbound_body(10, 20, 0x11223344)),
         );
 
+        let msg2 = create_internal_msg(
+            AccountId::from([0x11; 32]),
+            AccountId::from([0x22; 32]),
+        );
+
         println!("SendMsg action:\n{}", MsgPrinter{ msg: Arc::new(msg) });
+        println!("SendMsg action:\n{}", MsgPrinter{ msg: Arc::new(msg2) });
     }
 
 }
