@@ -140,6 +140,7 @@
 					STSLICECONST 0 ; int_msg_info$0
 					STU 1 ; ihr_disabled
 					STU 1 ; bounce
+					STSLICECONST 0 ; bounced
 					STSLICE
 					STSLICE
 					SWAP
@@ -237,4 +238,3 @@
 					CALLX
 					PUSHINT 0
 					SENDRAWMSG
-	
