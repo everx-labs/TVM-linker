@@ -4,7 +4,10 @@
 	.globl main
 	
 	PUSHINT 0 			;; next msg logical time
-	NEWC ENDC CTOS		;; body: slice
+	PUSHINT 123
+	NEWC 
+	STU 16
+	ENDC CTOS		;; body: slice
 	PUSHINT 127 		;; dst account address: integer
 	PUSHINT 1000		;; transfer grams value: integer
 	
