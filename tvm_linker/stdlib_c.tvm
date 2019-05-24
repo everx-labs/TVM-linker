@@ -12,10 +12,7 @@
 	.internal-alias :frameidx,          9
 
 	.internal-alias :load_bp,           10
-	.internal-alias :load_sp,           11
 	.internal-alias :store_bp,          12
-	.internal-alias :store_sp,          13
-        .internal-alias :internal_store,    14
 
     .selector
     ; s0 - func_id
@@ -32,9 +29,6 @@
         PUSHINT 32
         DICTIGET
         THROWIFNOT 52   ; no dictionary of methods
-        ; Initialize C stack
-        CALL $:init_fstack$
-
         PUSHINT 32
         DICTUGETJMP     ; execute method and return
         THROW 51
@@ -97,6 +91,9 @@
     PUSH s1     ;push msg cell on top
     CALL $:parse_msg$    ;assume thar parser returns slice - dictionary with msg fields
     
+    ; Initialize C stack
+    CALL $:init_fstack$
+
     SWAP
     ;parse ABI version (1 byte) and load function id (4 bytes)
     LDU 8       ;load ABI version
@@ -114,52 +111,34 @@
 
 
 ; Functions for C
-; -100000: SP pointer
-; -100001: BP pointer
-    .internal   :load_sp
-    PUSHINT -100000
-    CALL $:load$
-
+; -100000: BP pointer
     .internal   :load_bp
-    PUSHINT -100001
-    CALL $:load$
-
-    .internal   :store_sp
     PUSHINT -100000
-    XCHG s0, s1
-    CALL $:internal_store$
+    CALL $:load$
 
     .internal   :store_bp
-    PUSHINT -100001
+    PUSHINT -100000
     XCHG s0, s1
-    CALL $:internal_store$
+    CALL $:store$
 
-; 
     .internal   :init_fstack
     ; Initialize stack
     NEWDICT
     NEWC STSLICE ENDC
     POP c5
-
-    ; Initialize BP and SP
-    PUSHINT 0
+    PUSHINT 1000000000
     CALL $:store_bp$
-    PUSHINT 0
-    CALL $:store_sp$
+    RET
 
     .internal   :enter
-    CALL $:load_sp$
-    PUSH s0
     CALL $:load_bp$
-    CALL $:store$
+    SWAP
+    SUB
     CALL $:store_bp$
 
     .internal   :leave
     CALL $:load_bp$
-    PUSH s0
-    CALL $:store_sp$
-
-    CALL $:load$
+    ADD
     CALL $:store_bp$
 
     .internal   :load
@@ -172,19 +151,6 @@
     LDI 256 ENDS
 
     .internal   :store
-    ; (addr val -- )
-    ; adjust sp if it is smaller: sp shows current stack size
-    PUSH s1  ; copy address (... addr val addr)
-    CALL $:load_sp$  ; (addr val addr sp)
-    LEQ              ; (addr val addr<=sp)
-    PUSHCONT {
-        PUSH s1      ; (... addr val addr)
-        CALL $:store_sp$
-    }
-    IFNOT
-    call $:internal_store$
-
-    .internal   :internal_store
     ; (addr val -- )
     NEWC STI 256 ENDC
     CTOS     ; (addr val-slice)
@@ -199,6 +165,5 @@
 
     .internal   :frameidx
     CALL $:load_bp$
-    PUSHINT 10 ; arbitrary value
-    ADD
+    ;PUSHINT 10 ; arbitrary value
     ADD
