@@ -9,6 +9,8 @@ use tvm::stack::*;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
 use parser::ParseEngine;
 
+const AUTH_METHOD_NAME: &'static str = ":authenticate";
+
 pub struct Program {
     engine: ParseEngine,
     keypair: Option<Keypair>,
@@ -43,12 +45,12 @@ impl Program {
         self.engine.entry()
     }
 
-    pub fn method_dict(&self) -> SliceData {
-        let mut method_dict = HashmapE::with_data(32, self.build_toplevel_dict());
+    pub fn method_dict(&self) -> Result<SliceData, String> {
+        let mut method_dict = HashmapE::with_data(32, self.build_toplevel_dict()?);
         let methods = prepare_methods(self.engine.generals());
         let key = 1i32.write_to_new_cell().unwrap();
         method_dict.set(key.into(), methods).unwrap();
-        method_dict.get_data()
+        Ok(method_dict.get_data())
     }
    
     pub fn compile_to_file(&self) -> Result<(), String> {
@@ -70,20 +72,29 @@ impl Program {
 
     pub fn compile_asm(&self) -> Result<SliceData, String> {
         let mut bytecode = compile_code(self.engine.entry()).map_err(|e| format!("Compilation failed: {}", e))?;
-        bytecode.append_reference(self.method_dict());
+        bytecode.append_reference(self.method_dict()?);
         Ok(bytecode)
     }
 
-    fn build_toplevel_dict(&self) -> SliceData {
-        let auth_method = prepare_auth_method(&self.engine.internals().get(&2).unwrap(), self.engine.signed());
-        let dict = prepare_methods(self.engine.internals());
-        attach_method(dict, (2, auth_method))
+    fn build_toplevel_dict(&self) -> Result<SliceData, String> {
+        let mut dict = prepare_methods(self.engine.internals());
+        
+        if let Some(auth) = self.engine.internal_by_name(AUTH_METHOD_NAME) {
+            let auth_method = prepare_auth_method(
+                &auth.1,
+                self.engine.signed()
+            );
+            dict = attach_method(dict, (auth.0, auth_method));
+        }
+        Ok(dict)
     }
 
     pub fn debug_print(&self) {
         self.engine.debug_print();
         let line = "--------------------------";
-        println! ("Dictionary of methods:\n{}\n{}", line, self.method_dict());
+        if let Ok(slice) = self.method_dict() {
+            println! ("Dictionary of methods:\n{}\n{}", line, slice);
+        }
     }
 }
 

@@ -77,6 +77,12 @@ impl ParseEngine {
         &self.internals
     }
 
+    pub fn internal_by_name(&self, name: &str) -> Option<(i32, String)> {
+        let id = self.intrefs.get(name)?;
+        let body = self.internals.get(id).map(|v| v.to_owned())?;
+        Some((*id, body))
+    }
+
     pub fn generals(&self) -> &HashMap<u32, String> {
         &self.generals
     }

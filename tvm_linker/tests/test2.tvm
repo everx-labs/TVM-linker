@@ -1,0 +1,7 @@
+    .selector
+    PUSHINT 755
+
+    .internal-alias :main, 0
+    .internal :main
+    PUSHINT 644
+    
