@@ -33,13 +33,15 @@ fn create_external_inbound_msg(dst_addr: &AccountId, body: Option<Arc<CellData>>
 }
 
 fn sign_body(body: &mut SliceData, key_file: &str) {
-    let pair = KeypairManager::from_secret_file(key_file);
+    let pair = KeypairManager::from_secret_file(key_file).drain();
+    let pub_key = pair.public.to_bytes();
     let signature = 
-        pair.drain().sign::<Sha512>(
+        pair.sign::<Sha512>(
             BagOfCells::with_root(body.clone()).get_repr_hash_by_index(0).unwrap().as_slice()
         ).to_bytes();
     let mut sign_builder = BuilderData::new();
     sign_builder.append_raw(&signature, signature.len() * 8).unwrap();
+    sign_builder.append_raw(&pub_key, pub_key.len() * 8).unwrap();
 
     let mut signed_body = BuilderData::from_slice(body);
     signed_body.prepend_reference(sign_builder);
