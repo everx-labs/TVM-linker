@@ -8,6 +8,19 @@ use tvm::stack::serialization::Serializer;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
 use ton_block::*;
 
+enum ObjectType {
+    None,
+    Function((u32, String)),
+    Data(Vec<DataValue>),
+}
+impl From<&str> for ObjectType {
+    fn from(stype: &str) -> ObjectType {
+        match stype {
+            "function" => ObjectType::Function((0, String::new())),
+            "object" => ObjectType::Data(vec![]),
+        }
+    }
+}
 enum DataValue {
     Number(IntegerData),
 }
@@ -25,20 +38,20 @@ impl DataValue {
 
 //const DATA_OBJECT: &'static str = "@object";
 
-struct DataItem {
+struct Object {
     pub name: String,
     pub size: usize,
     pub align: usize,
-    pub value: Vec<DataValue>,
+    pub dtype: ObjectType,
 }
 
-impl DataItem {
-    pub fn new(name: String) -> Self {
-        DataItem {
+impl Object {
+    pub fn new(name: String, stype: &str) -> Option<Self> {
+        Object {
             name,
             size: 0,
             align: 0,
-            value: vec![],
+            dtype: ObjectType::from(stype),
         }
     }
 }
@@ -47,10 +60,10 @@ pub struct ParseEngine {
     xrefs: HashMap<String, u32>,
     intrefs: HashMap<String, i32>,
     aliases: HashMap<String, i32>,
-    generals: HashMap<u32, String>,
+    globals: HashMap<String, Object>,
     internals: HashMap<i32, String>,
     data: SliceData,
-    data_items: Vec<DataItem>,
+    //data_items: Vec<Object>,
     signed: HashMap<u32, bool>,
     entry_point: String,
 }
@@ -60,8 +73,9 @@ const PATTERN_DATA:     &'static str = r"^[\t\s]*\.data";
 const PATTERN_INTERNAL: &'static str = r"^[\t\s]*\.internal[\t\s]+(:[a-zA-Z0-9_]+)";
 const PATTERN_SELECTOR: &'static str = r"^[\t\s]*\.selector";
 const PATTERN_ALIAS:    &'static str = r"^[\t\s]*\.internal-alias (:[a-zA-Z0-9_]+),[\t\s]+(-?\d+)";
-const PATTERN_LABEL:    &'static str = r"^.[a-zA-Z0-9_]+:";
+const PATTERN_LABEL:    &'static str = r"^[a-zA-Z0-9_]+:";
 const PATTERN_PARAM:    &'static str = r"^[\t\s]+\.([a-zA-Z0-9_]+)";
+const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+([a-zA-Z0-9_]+),[\t\s]*@([a-zA-Z]+)";
 
 const GLOBL:    &'static str = ".globl";
 const INTERNAL: &'static str = ".internal";
@@ -77,10 +91,11 @@ impl ParseEngine {
             xrefs:      HashMap::new(), 
             intrefs:    HashMap::new(), 
             aliases:    HashMap::new(),
-            generals:   HashMap::new(), 
+            globals:   HashMap::new(), 
             internals:  HashMap::new(),
+            types:      HashMap::new(),
             data:       BuilderData::new().into(), 
-            data_items: vec![],
+            //data_items: vec![],
             signed:     HashMap::new(),
             entry_point: String::new(),
         }
@@ -126,8 +141,18 @@ impl ParseEngine {
         Some((*id, body))
     }
 
-    pub fn generals(&self) -> &HashMap<u32, String> {
-        &self.generals
+    pub fn globals(&self) -> HashMap<u32, String> {
+        let mut funcs = HashMap::new();
+        let iter = self.globals.iter().filter_map(|item| {
+            match item.dtype {
+                ObjectType::Function(func) => Some(func),
+                _ => None,
+            }
+        });
+        for i in iter {
+            funcs.insert(i.0, i.1);
+        }
+        funcs
     }
 
     pub fn signed(&self) -> &HashMap<u32, bool> {
@@ -142,38 +167,44 @@ impl ParseEngine {
         let label_regex = Regex::new(PATTERN_LABEL).unwrap();
         let dotted_regex = Regex::new(PATTERN_PARAM).unwrap();
         let alias_regex = Regex::new(PATTERN_ALIAS).unwrap();
+        let type_regex = Regex::new(PATTERN_TYPE).unwrap();
 
         let mut section_name: String = String::new();
-        let mut func_body: String = "".to_owned();
-        let mut func_name: String = "".to_owned();
+        let mut obj_body: String = "".to_owned();
+        let mut obj_name: String = "".to_owned();
 
         let mut l = String::new();
         while reader.read_line(&mut l)
             .map_err(|_| "error while reading line")? != 0 {
-            if globl_regex.is_match(&l) { 
-                self.update(&section_name, &func_name, &func_body, first_pass)?;
+            if type_regex.is_match(&l) {
+                let cap = type_regex.captures(&l).unwrap();
+                let name = cap.get(1).unwrap().as_str().to_owned();
+                let type_name = cap.get(2).unwrap().as_str().to_owned();
+                self.globals.entry(&name).or_insert(Object::new(&name, &type_name).unwrap());
+            } else if globl_regex.is_match(&l) { 
+                self.update(&section_name, &obj_name, &obj_body, first_pass)?;
                 section_name = GLOBL.to_owned();
-                func_body = "".to_owned(); 
-                func_name = globl_regex.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
+                obj_body = "".to_owned(); 
+                obj_name = globl_regex.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
             } else if data_regex.is_match(&l) {
-                self.update(&section_name, &func_name, &func_body, first_pass)?;
+                self.update(&section_name, &obj_name, &obj_body, first_pass)?;
                 section_name = DATA.to_owned();
-                func_name = "".to_owned();
-                func_body = "".to_owned();
+                obj_name = "".to_owned();
+                obj_body = "".to_owned();
             } else if selector_regex.is_match(&l) {                
-                self.update(&section_name, &func_name, &func_body, first_pass)?;
+                self.update(&section_name, &obj_name, &obj_body, first_pass)?;
                 if first_pass { 
                     section_name.clear();
                 } else {
                     section_name = SELECTOR.to_owned();
                 }
-                func_name = "".to_owned();
-                func_body = "".to_owned();
+                obj_name = "".to_owned();
+                obj_body = "".to_owned();
             } else if internal_regex.is_match(&l) {
-                self.update(&section_name, &func_name, &func_body, first_pass)?;
+                self.update(&section_name, &obj_name, &obj_body, first_pass)?;
                 section_name = INTERNAL.to_owned();
-                func_body = "".to_owned();
-                func_name = internal_regex.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
+                obj_body = "".to_owned();
+                obj_name = internal_regex.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
             } else if label_regex.is_match(&l) { 
                 if section_name == DATA {
 
@@ -195,18 +226,18 @@ impl ParseEngine {
                 )?;
             } else {
                 let l_with_numbers = if first_pass { l.to_owned() } else { self.replace_labels(&l) };
-                func_body.push_str(&l_with_numbers);
+                obj_body.push_str(&l_with_numbers);
             }
             l.clear();
         }
 
-        self.update(&section_name, &func_name, &func_body, first_pass)?;
+        self.update(&section_name, &obj_name, &obj_body, first_pass)?;
         ok!()
     }
 
     fn update(&mut self, section: &str, func: &str, body: &str, first_pass: bool) -> Result<(), String> {
         match section {
-            DATA => self.build_data(),
+            //DATA => self.build_data(),
             SELECTOR => {
                 if self.entry_point.is_empty() {
                     self.entry_point = body.trim_end().to_string();
@@ -215,6 +246,7 @@ impl ParseEngine {
                 }
             },
             GLOBL => {
+               
                 let mut signed = false;
                 if let Some(index) = func.find(FUNC_SUFFIX_AUTH) {
                     if (index + FUNC_SUFFIX_AUTH.len()) == func.len() {
@@ -222,12 +254,13 @@ impl ParseEngine {
                     }
                 }
                 let func_id = calc_func_id(func);
-                let prev = self.generals.insert(func_id, body.trim_end().to_string());
+                let prev = self.globals.insert(func_id, body.trim_end().to_string());
                 if first_pass && prev.is_some() {
                     Err(format!("global function with id = {} already exist", func_id))?;
                 }
-                self.xrefs.insert(func.to_string(), func_id);
                 self.signed.insert(func_id, signed);
+
+                self.xrefs.insert(func.to_string(), func_id);
             },
             INTERNAL => {
                 let f_id = self.aliases.get(func).ok_or(format!("id for '{}' not found", func))?;
@@ -245,7 +278,7 @@ impl ParseEngine {
 
     fn parse_param(&mut self, param: &str, value: &str, section: &str) -> Result<(), String> {
         match section {
-            DATA => self.update_data(param, value)?,
+            GLOBL => self.update_data(param, value)?,
             _ => (),
         };
         ok!()
@@ -265,7 +298,7 @@ impl ParseEngine {
             },
             ".type"  => {
                 let cap = TYPE_RE.captures(value).ok_or(".type option is invalid".to_string())?;
-                let mut item = DataItem::new(cap.get(1).unwrap().as_str().to_owned());
+                let mut item = Object::new(cap.get(1).unwrap().as_str().to_owned());
                 self.data_items.push(item);
             },
             ".size"  => {
@@ -341,7 +374,7 @@ impl ParseEngine {
         for (k, v) in &self.xrefs {
             println! ("Function {:30}: id={:08X}, sign-check={:?}", k, v, self.signed.get(&v).unwrap());
         }
-        for (k, v) in &self.generals {
+        for (k, v) in &self.globals {
             println! ("Function {:08X}\n{}\n{}\n{}", k, line, v, line);
         }        
         println!("{}\nInternal functions:\n{}", line, line);
