@@ -2,18 +2,33 @@ use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
-use tvm::stack::{BuilderData, IntegerData, SliceData};
+use tvm::stack::{BuilderData, IBitstring, IntegerData, SliceData};
+use tvm::stack::integer::serialization::{Encoding, SignedIntegerBigEndianEncoding};
+use tvm::stack::serialization::Serializer;
+use tvm::stack::dictionary::{HashmapE, HashmapType};
+use ton_block::*;
 
 enum DataValue {
     Number(IntegerData),
+}
+
+impl DataValue {
+    pub fn write(&self, builder: &mut BuilderData, size: usize) {
+        match self {
+            DataValue::Number(ref intgr) => {
+                let encoding = SignedIntegerBigEndianEncoding::new(size);
+                builder.append_bitstring(&encoding.try_serialize(intgr).unwrap().data()[..]).unwrap();
+            },
+        }
+    }
 }
 
 //const DATA_OBJECT: &'static str = "@object";
 
 struct DataItem {
     pub name: String,
-    pub size: u32,
-    pub align: u32,
+    pub size: usize,
+    pub align: usize,
     pub value: Vec<DataValue>,
 }
 
@@ -238,29 +253,29 @@ impl ParseEngine {
 
     fn update_data(&mut self, param: &str, value: &str) -> Result<(), String> {
         lazy_static! {
-            static ref type_re: Regex = Regex::new(r"^[\t\s]*([a-zA-Z0-9_]+),[\t\s]*@object").unwrap();
-            static ref size_re: Regex = Regex::new(r"^[\t\s]*([a-zA-Z0-9_]+),[\t\s]*([0-9]+)").unwrap();
+            static ref TYPE_RE: Regex = Regex::new(r"^[\t\s]*([a-zA-Z0-9_]+),[\t\s]*@object").unwrap();
+            static ref SIZE_RE: Regex = Regex::new(r"^[\t\s]*([a-zA-Z0-9_]+),[\t\s]*([0-9]+)").unwrap();
         }
         match param {
             ".align" => {
                 if let Some(item) = self.data_items.last_mut() {
-                    item.align = u32::from_str_radix(value.trim(), 10)
+                    item.align = usize::from_str_radix(value.trim(), 10)
                         .map_err(|_| ".align option is invalid".to_string())?;
                 }
             },
             ".type"  => {
-                let cap = type_re.captures(value).ok_or(".type option is invalid".to_string())?;
+                let cap = TYPE_RE.captures(value).ok_or(".type option is invalid".to_string())?;
                 let mut item = DataItem::new(cap.get(1).unwrap().as_str().to_owned());
                 self.data_items.push(item);
             },
             ".size"  => {
                 if let Some(item) = self.data_items.last_mut() {
-                    let cap = size_re.captures(value).ok_or(".size option is invalid".to_string())?;
+                    let cap = SIZE_RE.captures(value).ok_or(".size option is invalid".to_string())?;
                     let var_name = cap.get(1).unwrap().as_str();
                     if item.name != var_name {
                         Err(format!("variable {} is not declared before", var_name))?;
                     }
-                    item.size = u32::from_str_radix(cap.get(2).unwrap().as_str(), 10)
+                    item.size = usize::from_str_radix(cap.get(2).unwrap().as_str(), 10)
                         .map_err(|_| ".size value is invalid".to_string())?;
                 }
             },
@@ -277,8 +292,18 @@ impl ParseEngine {
     }
 
     fn build_data(&mut self) {
-       
-        
+        let mut index = 0;
+        let mut dict = HashmapE::with_bit_len(64); 
+        for item in &self.data_items {
+            let mut value = BuilderData::new();
+            for subitem in &item.value {
+                subitem.write(&mut value, item.size);
+                index += 1;
+            }
+            let key: SliceData = (index as u64).write_to_new_cell().unwrap().into();
+            dict.set(key, value.into()).unwrap();
+        }
+        self.data = dict.get_data();
     }
 
     fn replace_labels(&mut self, line: &str) -> String {
