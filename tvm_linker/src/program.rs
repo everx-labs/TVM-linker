@@ -98,5 +98,26 @@ impl Program {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use testcall::perform_contract_call;
 
+    #[test]
+    fn test_pbank_call() {
+        let mut parser = ParseEngine::new();
+        let pbank_file = File::open("./tests/pbank.s").unwrap();
+        let test_file = File::open("./stdlib.tvm").unwrap();
+        parser.parse(pbank_file, vec![test_file]).unwrap();
+        let prog = Program::new(parser);
+        let body = {
+            let buf = hex::decode("002E695F78").unwrap();
+            let buf_bits = buf.len() * 8;
+            Some(BuilderData::with_raw(buf, buf_bits).into())
+        };
 
+        assert_eq!(perform_contract_call(&prog, body, None, false, false), 0);
+    }
+
+}

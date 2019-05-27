@@ -81,7 +81,7 @@ pub fn perform_contract_call(
     key_file: Option<&str>, 
     debug: bool, 
     decode_actions: bool
-) {
+) -> usize {
     let mut stack = Stack::new();
     let msg_cell = StackItem::Cell(
         create_external_inbound_msg(
@@ -141,7 +141,7 @@ pub fn perform_contract_call(
             }
         }
     }
-    
+    exit_code
 }
 
 struct MsgPrinter {
