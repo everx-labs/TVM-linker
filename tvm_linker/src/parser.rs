@@ -31,8 +31,10 @@ impl DataValue {
         let mut b = BuilderData::new();
         match self {
             DataValue::Number(ref intgr) => {
-                let encoding = SignedIntegerBigEndianEncoding::new(intgr.1);
-                b.append_bitstring(&encoding.try_serialize(&intgr.0).unwrap().data()[..]).unwrap();
+                let encoding = SignedIntegerBigEndianEncoding::new(intgr.1 * 8);
+                let mut dest_vec = vec![];
+                encoding.try_serialize(&intgr.0).unwrap().into_bitstring_with_completion_tag(&mut dest_vec);
+                b.append_bitstring(&dest_vec[..]).unwrap();
                 b
             },
         }
@@ -42,7 +44,7 @@ impl DataValue {
 struct Object {
     pub name: String,
     pub size: usize,
-    pub align: usize,
+    pub index: usize,
     pub dtype: ObjectType,
 }
 
@@ -51,7 +53,7 @@ impl Object {
         Object {
             name,
             size: 0,
-            align: 0,
+            index: 0,
             dtype: ObjectType::from(stype),
         }
     }
@@ -71,6 +73,7 @@ pub struct ParseEngine {
     internals: HashMap<i32, String>,
     signed: HashMap<u32, bool>,
     entry_point: String,
+    next_obj: usize,
 }
 
 const PATTERN_GLOBL:    &'static str = r"^[\t\s]*\.globl[\t\s]+([a-zA-Z0-9_]+)";
@@ -97,10 +100,11 @@ impl ParseEngine {
             xrefs:      HashMap::new(), 
             intrefs:    HashMap::new(), 
             aliases:    HashMap::new(),
-            globals:   HashMap::new(), 
+            globals:    HashMap::new(), 
             internals:  HashMap::new(),
             signed:     HashMap::new(),
             entry_point: String::new(),
+            next_obj:   0,
         }
     }
 
@@ -126,7 +130,8 @@ impl ParseEngine {
 
     pub fn data(&self) -> BuilderData {
         let mut data = BuilderData::new();
-        data.append_reference(BuilderData::from_slice(&self.build_data()));
+        let cell = self.build_data().cell();
+        data.append_reference(BuilderData::from(&cell));
         data
     }
 
@@ -184,23 +189,25 @@ impl ParseEngine {
             if type_regex.is_match(&l) {
                 let cap = type_regex.captures(&l).unwrap();
                 let name = cap.get(1).unwrap().as_str().to_owned();
-                let type_name = cap.get(2).unwrap().as_str().to_owned();
+                let type_name = cap.get(2).ok_or(format!("line:{}: .type option is invalid", lnum))?.as_str();
                 let obj = self.globals.entry(name.clone()).or_insert(Object::new(name, &type_name));
-                obj.dtype = ObjectType::from(type_name.as_str());
+                obj.dtype = ObjectType::from(type_name);
             } else if size_regex.is_match(&l) {
                 let cap = size_regex.captures(&l).unwrap();
                 let name = cap.get(1).unwrap().as_str().to_owned();
-                let size_str = cap.get(2).ok_or(format!("line:{}: .size option is invalid", lnum))?.as_str().to_owned();
+                let size_str = cap.get(2).ok_or(format!("line:{}: .size option is invalid", lnum))?.as_str();
                 let item_ref = self.globals.entry(name.clone()).or_insert(Object::new(name, ""));
-                item_ref.size = usize::from_str_radix(&size_str, 10).unwrap_or(0);
+                item_ref.size = usize::from_str_radix(size_str, 10).unwrap_or(0);
             } else if globl_regex.is_match(&l) { 
-                self.update(&section_name, &obj_name, &obj_body, first_pass)?;
+                self.update(&section_name, &obj_name, &obj_body, first_pass)
+                    .map_err(|e| format!("line {}: {}", lnum, e))?;
                 section_name = GLOBL.to_owned();
                 obj_body = "".to_owned(); 
                 obj_name = globl_regex.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
                 self.globals.entry(obj_name.clone()).or_insert(Object::new(obj_name.clone(), ""));
             } else if data_regex.is_match(&l) {
-                self.update(&section_name, &obj_name, &obj_body, first_pass)?;
+                self.update(&section_name, &obj_name, &obj_body, first_pass)
+                    .map_err(|e| format!("line {}: {}", lnum, e))?;
                 section_name = DATA.to_owned();
                 obj_name = "".to_owned();
                 obj_body = "".to_owned();
@@ -214,7 +221,8 @@ impl ParseEngine {
                 obj_name = "".to_owned();
                 obj_body = "".to_owned();
             } else if internal_regex.is_match(&l) {
-                self.update(&section_name, &obj_name, &obj_body, first_pass)?;
+                self.update(&section_name, &obj_name, &obj_body, first_pass)
+                    .map_err(|e| format!("line {}: {}", lnum, e))?;
                 section_name = INTERNAL.to_owned();
                 obj_body = "".to_owned();
                 obj_name = internal_regex.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
@@ -223,12 +231,17 @@ impl ParseEngine {
                 self.aliases.insert(
                     cap.get(1).unwrap().as_str().to_owned(), 
                     i32::from_str_radix(cap.get(2).unwrap().as_str(), 10)
-                        .map_err(|_| format!("line: '{}': failed to parse id", l))?, 
+                        .map_err(|_| format!("line: '{}': failed to parse id", lnum))?, 
                 );                
             } else if label_regex.is_match(&l) { 
                 
             } else if dotted_regex.is_match(&l) {
-               obj_body.push_str(&l);
+                let cap = dotted_regex.captures(&l).unwrap();
+                let param = cap.get(1).unwrap().as_str();
+                match param {
+                    "byte" | "long" | "short" | "quad" => obj_body.push_str(&l),
+                    _ => (),
+                };
             } else {
                 let l_with_numbers = if first_pass { l.to_owned() } else { self.replace_labels(&l) };
                 obj_body.push_str(&l_with_numbers);
@@ -250,7 +263,9 @@ impl ParseEngine {
                 }
             },
             GLOBL => {
-               let item = self.globals.entry(func.to_owned()).or_default();
+               let item = self.globals.get_mut(func).unwrap();
+               item.index = self.next_obj;
+               self.next_obj += 1;
                 match item.dtype {
                     ObjectType::Function(ref mut fparams) => {
                         let mut signed = false;
@@ -269,7 +284,7 @@ impl ParseEngine {
                         }
                     },
                     ObjectType::Data(ref mut dparams) => {                        
-                        Self::update_data(body, &mut item.size, dparams)?;
+                        Self::update_data(body, func, &mut item.size, dparams)?;
                     },
                     ObjectType::None => Err(format!("The type of global object {} is unknown. Use: .type {}, xxx", func, func))?,
                 };
@@ -287,24 +302,24 @@ impl ParseEngine {
         ok!()
     }
 
-    fn update_data(body: &str, item_size: &mut usize, values: &mut Vec<DataValue>) -> Result<(), String> {
+    fn update_data(body: &str, name: &str, item_size: &mut usize, values: &mut Vec<DataValue>) -> Result<(), String> {
         lazy_static! {
             static ref PARAM_RE: Regex = Regex::new(PATTERN_PARAM).unwrap();
         }
         for param in body.lines() {
             if let Some(cap) = PARAM_RE.captures(param) {
                 let value_len = match cap.get(1).unwrap().as_str() {
-                    ".byte"  => 1,
-                    ".long"  => 4,
-                    ".short" => 2,
-                    ".quad"  => 8,
+                    "byte"  => 1,
+                    "long"  => 4,
+                    "short" => 2,
+                    "quad"  => 8,
                     _ => Err(format!("Unsupported parameter {}", cap.get(1).unwrap().as_str()))?,
                 };
                 if *item_size < value_len {
-                    Err(format!("global object has invalid .size parameter: too small)"))?;
+                    Err(format!("global object {} has invalid .size parameter: too small)", name))?;
                 }
                 *item_size -= value_len;
-                let value = param.get(cap.get(1).unwrap().start()..).unwrap().trim_start_matches(',').trim();
+                let value = param.get(cap.get(1).unwrap().end()..).unwrap().trim_start_matches(',').trim();
                 values.push(DataValue::Number((
                     IntegerData::from_str_radix(value, 10).map_err(|_| "value is invalid number".to_string())?,
                     value_len,
@@ -312,7 +327,7 @@ impl ParseEngine {
             }
         }
         if *item_size > 0 {
-            Err(format!("global object has invalid .size parameter: bigger than defined values"))?;
+            Err(format!("global object {} has invalid .size parameter: bigger than defined values", *item_size))?;
         }
         ok!()
     }
@@ -320,15 +335,18 @@ impl ParseEngine {
     fn build_data(&self) -> SliceData {
         let mut index = 0;
         let mut dict = HashmapE::with_bit_len(64);
-        let iter = self.globals.iter().filter_map(|item| {
-            match &item.1.dtype {
-                ObjectType::Data(ref values) => Some(values),
-                _ => None,
-            }
-        });
+        let mut data_vec: Vec<(usize, &Vec<DataValue>)> = 
+            self.globals.iter().filter_map(|item| {
+                match &item.1.dtype {
+                    ObjectType::Data(ref values) => Some((item.1.index, values)),
+                    _ => None,
+                }
+            })
+            .collect();
+        data_vec.sort_by_key(|e| e.0);
 
-        for item in iter {
-            for subitem in item {
+        for item in data_vec {
+            for subitem in item.1 {
                 dict.set(
                     (index as u64).write_to_new_cell().unwrap().into(),
                     subitem.write().into()
@@ -400,14 +418,81 @@ pub fn calc_func_id(func_interface: &str) -> u32 {
 mod tests {
     use super::*;
     use std::fs::File;
+    use tvm::test_framework::*;
+    use tvm::stack::*;
 
     #[test]
     fn test_parser_testlib() {
         let mut parser = ParseEngine::new();
         let pbank_file = File::open("./tests/pbank.s").unwrap();
         let test_file = File::open("./tests/test.tvm").unwrap();
-        assert_eq!(parser.parse(pbank_file, vec![test_file]), ok!());
+        assert_eq!(parser.parse(pbank_file, vec![test_file]), ok!());  
         parser.debug_print();
+
+        test_case("
+            LDREFRTOS
+            NIP
+
+            PUSHINT 0
+            OVER
+            PUSHINT 64
+            DICTUGET
+            THROWIFNOT 100
+            LDI 8
+            ENDS
+            SWAP            
+     
+            PUSHINT 1
+            OVER
+            PUSHINT 64
+            DICTUGET
+            THROWIFNOT 100
+            LDI 32
+            ENDS
+            SWAP    
+
+            PUSHINT 2
+            OVER
+            PUSHINT 64
+            DICTUGET
+            THROWIFNOT 100
+            LDI 32
+            ENDS
+            SWAP    
+
+            PUSHINT 3
+            OVER
+            PUSHINT 64
+            DICTUGET
+            THROWIFNOT 100
+            LDI 32
+            ENDS
+            SWAP    
+
+            PUSHINT 4
+            OVER
+            PUSHINT 64
+            DICTUGET
+            THROWIFNOT 100
+            LDI 32
+            ENDS
+            SWAP    
+
+            DROP
+        ")
+        .with_stack(
+            Stack::new()
+                .push(StackItem::Slice(parser.data().into()))
+                .clone()
+        )
+        .expect_stack(
+            Stack::new()
+                .push(int!(127))
+                .push(int!(1))
+                .push(int!(2))
+                .push(int!(3))
+                .push(int!(4))
+        );
     }
 
     //#[test]

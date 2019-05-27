@@ -19,13 +19,21 @@ x:
     .data
     .globl  y
     .type   y,    @object
-    .size   y,    4
+    .size   y,    1
 y:
-    .long   12345
+    .byte   127
 
     .globl  z
-x:
+z:
     CTOS
     .type   z,  @function
 
-
+    .globl  a
+    .align  16
+    .type   a, @object
+    .size   a, 16
+a:
+    .long   1
+    .long   2
+    .long   3
+    .long   4
