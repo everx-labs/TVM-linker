@@ -47,7 +47,7 @@ impl Program {
 
     pub fn method_dict(&self) -> Result<SliceData, String> {
         let mut method_dict = HashmapE::with_data(32, self.build_toplevel_dict()?);
-        let methods = prepare_methods(self.engine.generals());
+        let methods = prepare_methods(&self.engine.globals());
         let key = 1i32.write_to_new_cell().unwrap();
         method_dict.set(key.into(), methods).unwrap();
         Ok(method_dict.get_data())
