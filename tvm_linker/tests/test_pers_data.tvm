@@ -1,3 +1,20 @@
+;;;;;;;;;;;;;;
+;;
+;;  ./target/debug/tvm_linker --lib stdlib.tvm ./tests/test_pers_data.tvm [--debug]
+;;
+;;			Function get                           : id=2998B323, sign-check=false
+;;			Function increment                     : id=F6792302, sign-check=false
+;;			Function ctor                          : id=11864627, sign-check=false
+;;
+;;	Get:
+;;	./target/debug/tvm_linker 9d14b4fdf187a79f651da36f7c0f30b33d49c3d329ea766d20659ed5ea88683a test --body 002998B323 --trace
+;;	Increment:
+;;	./target/debug/tvm_linker 9d14b4fdf187a79f651da36f7c0f30b33d49c3d329ea766d20659ed5ea88683a test --body 00F6792302 --trace
+;;	Ctor:
+;;	./target/debug/tvm_linker 9d14b4fdf187a79f651da36f7c0f30b33d49c3d329ea766d20659ed5ea88683a test --body 0011864627 --trace
+;;
+
+
     .globl ctor
     
     PUSHSLICE x00000001
