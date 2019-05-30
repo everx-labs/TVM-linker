@@ -31,13 +31,14 @@ use tvm::stack::BuilderData;
 fn main() {
     let matches = clap_app! (tvm_loader =>
         (version: "0.1")
+        (author: "tonlabs")
         (about: "Links TVM assembler file, loads and executes it in testing environment")
         (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
         (@arg DECODE: --decode "Decodes real TON message")
         (@arg MESSAGE: --message "Builds TON message for the contract in INPUT")
         (@arg INIT: --init "Packs code into TON State Init message")
         (@arg DATA: --data +takes_value "Supplies data to contract in hex format (empty data by default)")
-        (@arg INPUT: +required +takes_value "TVM assembler source file")
+        (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
         (@arg LIB: --lib +takes_value "Standard library source file")
         (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file")
         (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
@@ -51,6 +52,28 @@ fn main() {
             (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
         )
     ).get_matches();
+
+    if let Some(test_matches) = matches.subcommand_matches("test") {
+        let body = match test_matches.value_of("BODY") {
+            Some(hex_str) => {
+                let buf = hex::decode(hex_str).expect("error: invalid hex string");
+                let buf_bits = buf.len() * 8;
+                Some(BuilderData::with_raw(buf, buf_bits).into())
+            },
+            None => None,
+        };
+        
+        println!("TEST STARTED\nbody = {:?}", body);
+        perform_contract_call(
+            matches.value_of("INPUT").unwrap(), 
+            body, 
+            test_matches.value_of("SIGN"), 
+            test_matches.is_present("TRACE"), 
+            test_matches.is_present("DECODEC6")
+        );
+        println!("TEST COMPLETED");
+        return;
+    }
 
     if matches.is_present("DECODE") {
         decode_boc(matches.value_of("INPUT").unwrap());
@@ -110,20 +133,5 @@ fn main() {
         return;
     } else {
         prog.compile_to_file().expect("Error");
-    }
-
-    if let Some(matches) = matches.subcommand_matches("test") {
-        let body = match matches.value_of("BODY") {
-            Some(hex_str) => {
-                let buf = hex::decode(hex_str).expect("error: invalid hex string");
-                let buf_bits = buf.len() * 8;
-                Some(BuilderData::with_raw(buf, buf_bits).into())
-            },
-            None => None,
-        };
-        
-        println!("test started: body = {:?}", body);
-        perform_contract_call(&prog, body, matches.value_of("SIGN"), matches.is_present("TRACE"), matches.is_present("DECODEC6"));
-        println!("Test completed");
-    }
+    }    
 }
