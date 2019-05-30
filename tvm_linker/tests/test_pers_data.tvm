@@ -1,0 +1,70 @@
+    .globl ctor
+    
+    PUSHSLICE x00000001
+    PUSHINT 0
+    NEWDICT
+    PUSHINT 64
+    DICTUSET
+
+    NEWC
+    STSLICE
+    ENDC
+
+    NEWC
+    STREF
+    PUSHROOT
+    CTOS
+    STSLICER
+    ENDC
+    POPROOT
+
+    .globl  increment
+    PUSHROOT
+    CTOS
+    LDREFRTOS
+    NIP
+
+    PUSHINT 0
+    OVER
+    PUSHINT 64
+    DICTUGET
+    THROWIFNOT 100
+    LDU 32
+    ENDS
+
+    INC
+    NEWC
+    STU 32
+    ENDC
+    CTOS
+
+    PUSHINT 0
+    ROT
+    PUSHINT 64
+    DICTUSET
+    
+    NEWC
+    STSLICE
+    ENDC
+
+    NEWC
+    STREF
+    PUSHROOT
+    CTOS
+    LDREF
+    NIP
+    STSLICER
+    ENDC
+    POPROOT
+    
+    .globl get
+    PUSHINT 0
+    PUSHROOT
+    CTOS
+    LDREFRTOS
+    NIP
+    PUSHINT 64
+    DICTUGET
+    THROWIFNOT 100
+    LDU 32
+    ENDS
