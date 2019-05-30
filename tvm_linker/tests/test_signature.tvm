@@ -5,6 +5,11 @@
 	
 	.selector
 	
+	PUSH c5
+	CTOS
+	LDREFRTOS
+	RET
+	
 	DROP 
 	NIP
 	NIP
