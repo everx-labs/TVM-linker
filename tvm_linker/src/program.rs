@@ -58,16 +58,7 @@ impl Program {
         state.set_code(self.compile_asm()?.cell());
         state.set_data(self.data()?.into());
 
-        let root_slice = SliceData::from(
-            state.write_to_new_cell().map_err(|e| format!("Serialization failed: {}", e))?
-        );
-        let mut buffer = vec![]; 
-        BagOfCells::with_root(root_slice).write_to(&mut buffer, false)
-            .map_err(|e| format!("BOC failed: {}", e))?;
-
-        let mut file = std::fs::File::create(&format!("{:x}.tvc", state.hash().unwrap())).unwrap();
-        file.write_all(&buffer).map_err(|e| format!("Write to file failed: {}", e))?;
-        ok!()
+        save_to_file(state, None)
     }
 
     pub fn compile_asm(&self) -> Result<SliceData, String> {
@@ -98,5 +89,22 @@ impl Program {
     }
 }
 
+pub fn save_to_file(state: StateInit, name: Option<&str>) -> Result<(), String> {
+    let root_slice = SliceData::from(
+        state.write_to_new_cell().map_err(|e| format!("Serialization failed: {}", e))?
+    );
+    let mut buffer = vec![]; 
+    BagOfCells::with_root(root_slice).write_to(&mut buffer, false)
+        .map_err(|e| format!("BOC failed: {}", e))?;
 
+    let file_name = if name.is_some() {
+        format!("{}.tvc", name.unwrap())
+    } else {
+        format!("{:x}.tvc", state.hash().unwrap())
+    };
+
+    let mut file = std::fs::File::create(&file_name).unwrap();
+    file.write_all(&buffer).map_err(|e| format!("Write to file failed: {}", e))?;
+    ok!()
+}
 
