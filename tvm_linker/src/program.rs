@@ -97,14 +97,19 @@ pub fn save_to_file(state: StateInit, name: Option<&str>) -> Result<(), String> 
     BagOfCells::with_root(root_slice).write_to(&mut buffer, false)
         .map_err(|e| format!("BOC failed: {}", e))?;
 
+    let mut print_filename = false;
     let file_name = if name.is_some() {
         format!("{}.tvc", name.unwrap())
     } else {
+        print_filename = true;
         format!("{:x}.tvc", state.hash().unwrap())
     };
 
     let mut file = std::fs::File::create(&file_name).unwrap();
     file.write_all(&buffer).map_err(|e| format!("Write to file failed: {}", e))?;
+    if print_filename {
+        println! ("Saved contract to file {}", file_name);
+    }
     ok!()
 }
 
