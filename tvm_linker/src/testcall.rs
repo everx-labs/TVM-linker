@@ -7,6 +7,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 use tvm::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use tvm::executor::Engine;
+use tvm::executor::gas::gas_state::Gas;
 use tvm::stack::*;
 use tvm::types::AccountId;
 use tvm::bitstring::Bitstring;
@@ -127,7 +128,7 @@ pub fn perform_contract_call(
         .push(StackItem::Slice(body)) 
         .push(int!(-1));
 
-    let mut engine = Engine::new().setup(code, registers, stack)
+    let mut engine = Engine::new().setup(code, registers, stack, Gas::test())
         .unwrap_or_else(|e| panic!("Cannot setup engine, error {}", e));
     if debug { 
         engine.set_trace(Engine::TRACE_CODE);
@@ -250,7 +251,7 @@ mod tests {
         hdr.bounce = true;
         hdr.ihr_fee = Grams::from(1000u32);
         hdr.created_lt = 54321;
-        hdr.created_at = 123456789;
+        hdr.created_at = UnixTime32(123456789);
         let msg = Message::with_int_header(hdr);
         msg
     }
