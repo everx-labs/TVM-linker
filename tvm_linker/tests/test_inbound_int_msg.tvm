@@ -296,7 +296,6 @@
     THROWIFNOT 100
     LDU 256
     ENDS
-    NIP
     THROWIF 103
 
     ; load dest address from dict
@@ -308,8 +307,7 @@
     THROWIFNOT 100
     LDU 256
     ENDS
-    NIP
-    THROWIF 104
+    THROWIFNOT 104
 
     ; load 'value' from dict
     DUP
@@ -355,9 +353,10 @@
     THROWIFNOT 100
     LDU 64
     ENDS
+    DEC
+    THROWIF 107
 
     ; load 'created_at' from dict
-    SWAP
     DUP
     PUSHINT 9
     SWAP
@@ -366,5 +365,15 @@
     THROWIFNOT 100
     LDU 32
     ENDS
+    DROP
+    DROP
 
-    NIP
+    PUSHINT 15000000000
+    EQUAL
+    THROWIFNOT 108
+
+    PUSHINT 100000000000
+    EQUAL
+    THROWIFNOT 109
+
+    PUSHINT -1

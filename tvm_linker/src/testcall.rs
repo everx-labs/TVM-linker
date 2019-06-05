@@ -184,13 +184,15 @@ pub fn perform_contract_call(
     engine.print_info_stack("Post-execution stack state");
     engine.print_info_ctrls();
 
-    match engine.get_root() {
-        StackItem::Cell(root_cell) => state_init.data = Some(root_cell),
-        _ => panic!("cannot get root data: c4 register is not a cell."),
-    };
-
-    save_to_file(state_init, Some(contract_file)).expect("error");
-    println!("Contract persistent data updated");
+    if exit_code == 0 || exit_code == 1 {
+            match engine.get_root() {
+            StackItem::Cell(root_cell) => state_init.data = Some(root_cell),
+            _ => panic!("cannot get root data: c4 register is not a cell."),
+        };
+        save_to_file(state_init, Some(contract_file)).expect("error");
+        println!("Contract persistent data updated");
+    }
+    
     
     if decode_actions {
         if let StackItem::Cell(cell) = engine.get_actions() {
@@ -291,29 +293,11 @@ mod tests {
             12345678,
             1,
             2,
+            None,
         );
 
         println!("SendMsg action:\n{}", MsgPrinter{ msg: Arc::new(msg) });
         println!("SendMsg action:\n{}", MsgPrinter{ msg: Arc::new(msg2) });
     }
 
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_send_internal_msg() {
-        let exit_code = perform_contract_call(
-            "./tests/test_internal_msg.tvc",
-            Some(BuilderData::with_raw(vec![0x00], 8).int0()),
-            None,
-            false,
-            false,
-            Some("15000000000"),
-        );
-
-        assert_eq!(exit_code, 0);
-    }   
 }

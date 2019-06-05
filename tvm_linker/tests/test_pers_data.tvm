@@ -2,9 +2,9 @@
 ;;
 ;;  ./target/debug/tvm_linker --lib stdlib.tvm ./tests/test_pers_data.tvm [--debug]
 ;;
-;;			Function get                           : id=2998B323, sign-check=false
-;;			Function increment                     : id=F6792302, sign-check=false
-;;			Function ctor                          : id=11864627, sign-check=false
+;;			Function get_external                           : id=2998B323, sign-check=false
+;;			Function increment_external                     : id=F6792302, sign-check=false
+;;			Function ctor_external                          : id=11864627, sign-check=false
 ;;
 ;;	Get:
 ;;	./target/debug/tvm_linker 9d14b4fdf187a79f651da36f7c0f30b33d49c3d329ea766d20659ed5ea88683a test --body 002998B323 --trace
@@ -15,8 +15,9 @@
 ;;
 
 
-    .globl ctor
-    
+    .globl ctor_external
+    BLKDROP 4
+
     PUSHSLICE x00000001
     PUSHINT 0
     NEWDICT
@@ -34,8 +35,9 @@
     STSLICER
     ENDC
     POPROOT
+    PUSHINT -1
 
-    .globl  increment
+    .globl  increment_external
     PUSHROOT
     CTOS
     LDREFRTOS
@@ -74,7 +76,7 @@
     ENDC
     POPROOT
     
-    .globl get
+    .globl get_external
     PUSHINT 0
     PUSHROOT
     CTOS
