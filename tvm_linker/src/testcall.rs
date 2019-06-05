@@ -251,7 +251,7 @@ mod tests {
         hdr.bounce = true;
         hdr.ihr_fee = Grams::from(1000u32);
         hdr.created_lt = 54321;
-        hdr.created_at = 123456789;
+        hdr.created_at = UnixTime32(123456789);
         let msg = Message::with_int_header(hdr);
         msg
     }
