@@ -46,10 +46,11 @@ fn main() {
             (about: "execute contract in test environment")
             (version: "0.1")
             (author: "tonlabs")
-            (@arg BODY: --body +takes_value "Body for external inbound message (hex string)")
+            (@arg BODY: --body +takes_value "Body for inbound message (hex string)")
             (@arg SIGN: --sign +takes_value "Signs body with private key from defined file")
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
             (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
+            (@arg INTERNAL: --internal +takes_value "Emulates inbound internal message with value instead of external message")
         )
     ).get_matches();
 
@@ -69,7 +70,8 @@ fn main() {
             body, 
             test_matches.value_of("SIGN"), 
             test_matches.is_present("TRACE"), 
-            test_matches.is_present("DECODEC6")
+            test_matches.is_present("DECODEC6"),
+            test_matches.value_of("INTERNAL"),
         );
         println!("TEST COMPLETED");
         return;
