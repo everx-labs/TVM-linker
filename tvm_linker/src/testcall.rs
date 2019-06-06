@@ -1,11 +1,13 @@
 use keyman::KeypairManager;
-use program::Program;
+use program::save_to_file;
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use sha2::Sha512;
 use std::fmt;
+use std::io::Cursor;
 use std::sync::Arc;
-use tvm::cells_serialization::BagOfCells;
+use tvm::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use tvm::executor::Engine;
+use tvm::executor::gas::gas_state::Gas;
 use tvm::stack::*;
 use tvm::types::AccountId;
 use tvm::bitstring::Bitstring;
@@ -75,13 +77,21 @@ fn init_logger(debug: bool) {
     ).unwrap();
 }
 
+fn load_from_file(contract_file: &str) -> StateInit {
+    let mut csor = Cursor::new(std::fs::read(contract_file).unwrap());
+    let cell = deserialize_cells_tree(&mut csor).unwrap().remove(0);
+    StateInit::construct_from(&mut cell.into()).unwrap()
+}
+
 pub fn perform_contract_call(
-    prog: &Program, 
+    contract_file: &str, 
     body: Option<Arc<CellData>>, 
     key_file: Option<&str>, 
     debug: bool, 
     decode_actions: bool
 ) -> usize {
+    let mut state_init = load_from_file(&format!("{}.tvc", contract_file));
+    
     let mut stack = Stack::new();
     let msg_cell = StackItem::Cell(
         create_external_inbound_msg(
@@ -100,10 +110,17 @@ pub fn perform_contract_call(
     }
 
     init_logger(debug);
-    
-    let code = prog.compile_asm().unwrap();
-    let data = prog.data().unwrap();
-    let registers = initialize_registers(code.clone(), data.into());
+
+    let code: SliceData = state_init.code
+            .clone()
+            .unwrap_or(BuilderData::new().into())
+            .into();
+    let data = state_init.data
+            .clone()
+            .unwrap_or(BuilderData::new().into())
+            .into();
+
+    let registers = initialize_registers(code.clone(), data);
     stack
         .push(int!(0))
         .push(int!(0))
@@ -111,7 +128,7 @@ pub fn perform_contract_call(
         .push(StackItem::Slice(body)) 
         .push(int!(-1));
 
-    let mut engine = Engine::new().setup(code, registers, stack)
+    let mut engine = Engine::new().setup(code, registers, stack, Gas::test())
         .unwrap_or_else(|e| panic!("Cannot setup engine, error {}", e));
     if debug { 
         engine.set_trace(Engine::TRACE_CODE);
@@ -126,6 +143,14 @@ pub fn perform_contract_call(
     println!("TVM terminated with exit code {}", exit_code);
     engine.print_info_stack("Post-execution stack state");
     engine.print_info_ctrls();
+
+    match engine.get_root() {
+        StackItem::Cell(root_cell) => state_init.data = Some(root_cell),
+        _ => panic!("cannot get root data: c4 register is not a cell."),
+    };
+
+    save_to_file(state_init, Some(contract_file)).expect("error");
+    println!("Contract persistent data updated");
     
     if decode_actions {
         if let StackItem::Cell(cell) = engine.get_actions() {
@@ -226,7 +251,7 @@ mod tests {
         hdr.bounce = true;
         hdr.ihr_fee = Grams::from(1000u32);
         hdr.created_lt = 54321;
-        hdr.created_at = 123456789;
+        hdr.created_at = UnixTime32(123456789);
         let msg = Message::with_int_header(hdr);
         msg
     }
