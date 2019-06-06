@@ -84,6 +84,12 @@ impl ParseEngine {
         Some((*id, body))
     }
 
+    pub fn general_by_name(&self, name: &str) -> Option<(u32, String)> {
+        let id = self.xrefs.get(name)?;
+        let body = self.generals.get(id).map(|v| v.to_owned())?;
+        Some((*id, body))
+    }
+
     pub fn generals(&self) -> &HashMap<u32, String> {
         &self.generals
     }
@@ -92,7 +98,7 @@ impl ParseEngine {
         &self.signed
     }
 
-    fn parse_code<R: BufRead>(&mut self, reader: &mut R, first_pass: bool) -> Result<(), String> {
+    pub fn parse_code<R: BufRead>(&mut self, reader: &mut R, first_pass: bool) -> Result<(), String> {
         let globl_regex = Regex::new(PATTERN_GLOBL).unwrap();
         let internal_regex = Regex::new(PATTERN_INTERNAL).unwrap();
         let selector_regex = Regex::new(PATTERN_SELECTOR).unwrap();

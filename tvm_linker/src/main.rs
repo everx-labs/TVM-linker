@@ -26,7 +26,9 @@ use parser::ParseEngine;
 use program::Program;
 use real_ton::{ decode_boc, compile_real_ton };
 use regex::Regex;
+use resolver::resolve_name;
 use std::fs::File;
+use std::io::{BufReader};
 use testcall::perform_contract_call;
 use tvm::stack::BuilderData;
 
@@ -48,6 +50,7 @@ fn main() {
             (about: "execute contract in test environment")
             (version: "0.1")
             (author: "tonlabs")
+            (@arg SOURCE: -s --source +takes_value "contract source file")
             (@arg BODY: --body +takes_value "Body for external inbound message (hex string)")
             (@arg SIGN: --sign +takes_value "Signs body with private key from defined file")
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
@@ -58,7 +61,20 @@ fn main() {
     if let Some(test_matches) = matches.subcommand_matches("test") {
         let body = match test_matches.value_of("BODY") {
             Some(hex_str) => {
-                let buf = hex::decode(hex_str).expect("error: invalid hex string");
+                let mut hex_str = hex_str.to_string();
+
+                if let Some(source) = test_matches.value_of("SOURCE") {
+                    let file = File::open(source).expect("error opening source file");
+                    let mut reader = BufReader::new(file);
+                    let mut parser = ParseEngine::new();
+                    parser.parse_code(&mut reader, true).expect("error");
+
+                    hex_str = resolve_name(&hex_str, |name| {
+                        parser.general_by_name(name).map(|id| id.0)
+                    }).expect("error: body has invalid format");
+                }
+
+                let buf = hex::decode(&hex_str).expect("error: invalid hex string");
                 let buf_bits = buf.len() * 8;
                 Some(BuilderData::with_raw(buf, buf_bits).into())
             },
