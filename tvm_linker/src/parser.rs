@@ -3,6 +3,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use tvm::stack::BuilderData;
+use resolver::resolve_name;
 
 pub struct ParseEngine {
     xrefs: HashMap<String, u32>,
@@ -200,31 +201,9 @@ impl ParseEngine {
     }
 
     fn replace_labels(&mut self, line: &str) -> String {
-        let mut result = String::new();
-        let mut line = line;
-        let re = Regex::new(r"\$:?[A-Za-z0-9_]+\$").unwrap();
-        loop {
-            line = match re.find(line) {
-                None => {
-                    result.push_str(line);
-                    break result;
-                }
-                Some(mt) => {
-                    let parts: Vec<&str> = re.split(line).collect();
-                    result.push_str(parts.get(0).unwrap_or(&""));
-                    let pointer = line.get(mt.start()+1..mt.end()-1).expect("failed to extract label from line");
-                    let id_name = {
-                        if pointer.starts_with(":") {
-                            self.intrefs.get(pointer).map(|id| id.to_string())
-                        } else {
-                            self.xrefs.get(pointer).map(|id| id.to_string())
-                        }
-                    }.unwrap_or("???".to_string());
-                    result.push_str(&id_name);
-                    parts.get(1).unwrap_or(&"")
-                }
-            };
-        }
+        resolve_name(line, |name| self.xrefs.get(name).map(|id| id.clone()))
+        .or_else(|| resolve_name(line, |name| self.intrefs.get(name).map(|id| id.clone())))
+        .unwrap()
     }
 
     pub fn debug_print(&self) {

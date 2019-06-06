@@ -2,6 +2,7 @@
 #[macro_use]
 extern crate clap;
 extern crate ed25519_dalek;
+#[macro_use]
 extern crate lazy_static;
 extern crate rand;
 extern crate regex;
@@ -16,6 +17,7 @@ mod keyman;
 mod parser;
 mod program;
 mod real_ton;
+mod resolver;
 mod methdict;
 mod testcall;
 
