@@ -208,8 +208,8 @@ impl ParseEngine {
 
     fn replace_labels(&mut self, line: &str) -> String {
         resolve_name(line, |name| self.xrefs.get(name).map(|id| id.clone()))
-        .or_else(|| resolve_name(line, |name| self.intrefs.get(name).map(|id| id.clone())))
-        .unwrap()
+            .or_else(|_| resolve_name(line, |name| self.intrefs.get(name).map(|id| id.clone())))
+            .unwrap_or(line.to_string())
     }
 
     pub fn debug_print(&self) {

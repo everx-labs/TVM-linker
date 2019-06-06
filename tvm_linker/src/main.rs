@@ -29,10 +29,22 @@ use regex::Regex;
 use resolver::resolve_name;
 use std::fs::File;
 use std::io::{BufReader};
+use std::panic;
 use testcall::perform_contract_call;
 use tvm::stack::BuilderData;
 
+
+
 fn main() {
+    panic::set_hook(Box::new(|panic_info| {
+        if let Some(s) = panic_info.payload().downcast_ref::<String>() {
+            println!("{}", s);
+        } else {
+            let loc = panic_info.location().unwrap();
+            println!("Fatal error {:?}: {}:{}:{}", panic_info.payload(), loc.file(), loc.line(), loc.column());
+        }
+    }));
+
     let matches = clap_app! (tvm_loader =>
         (version: "0.1")
         (author: "tonlabs")
@@ -62,19 +74,19 @@ fn main() {
         let body = match test_matches.value_of("BODY") {
             Some(hex_str) => {
                 let mut hex_str = hex_str.to_string();
+                let mut parser = ParseEngine::new();
 
                 if let Some(source) = test_matches.value_of("SOURCE") {
                     let file = File::open(source).expect("error opening source file");
                     let mut reader = BufReader::new(file);
-                    let mut parser = ParseEngine::new();
                     parser.parse_code(&mut reader, true).expect("error");
-
-                    hex_str = resolve_name(&hex_str, |name| {
-                        parser.general_by_name(name).map(|id| id.0)
-                    }).expect("error: body has invalid format");
                 }
 
-                let buf = hex::decode(&hex_str).expect("error: invalid hex string");
+                hex_str = resolve_name(&hex_str, |name| {
+                    parser.general_by_name(name).map(|id| id.0)
+                }).expect(&format!("error: failed to resolve body {}", hex_str));
+
+                let buf = hex::decode(&hex_str).map_err(|_| format!("body {} is invalid hex string", hex_str)).expect("error");
                 let buf_bits = buf.len() * 8;
                 Some(BuilderData::with_raw(buf, buf_bits).into())
             },
@@ -101,11 +113,12 @@ fn main() {
     let mut parser = ParseEngine::new();
     parser.parse(
         File::open(matches.value_of("INPUT").unwrap())
-            .expect("error opening source file"), 
+            .map_err(|e| format!("cannot open source file: {}", e))
+            .expect("error"), 
         matches.value_of("LIB")
             .map(|val| vec![val])
             .unwrap_or(vec![])
-            .iter().map(|lib| File::open(lib).expect("error opening lib file"))
+            .iter().map(|lib| File::open(lib).map_err(|e| format!("cannot open library file: {}", e)).expect("error"))
             .collect(),
     ).expect("error");
 
@@ -150,6 +163,6 @@ fn main() {
         compile_real_ton(prog.entry(), &BuilderData::from(&prog.data().unwrap()), node_data, &output_file, matches.is_present("INIT"));
         return;
     } else {
-        prog.compile_to_file().expect("Error");
+        prog.compile_to_file().expect("error");
     }    
 }
