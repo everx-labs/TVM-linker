@@ -46,14 +46,15 @@ def cleanup():
 
 CONTRACT_ADDRESS = None
 
-def compile(test_name):
+def compile_ex(source_file, lib_file):
 	global lines, functions, CONTRACT_ADDRESS
-	cleanup()
-	print "Compiling " + test_name + "..."
-	ec = os.system("./target/debug/tvm_linker --lib stdlib_sol.tvm ./tests/{} --debug >qqq".format(test_name))
+	print("Compiling " + source_file + "...")
+	lib = "--lib " + lib_file if lib_file else ""
+	ec = os.system("./target/debug/tvm_linker {} ./tests/{} --debug > log".format(lib, source_file))
 	assert ec == 0, ec
 
-	lines = [l.rstrip() for l in open("qqq").readlines()]
+	lines = [l.rstrip() for l in open("log").readlines()]
+	os.remove("log")
 
 	functions = dict()
 	getFunctions()
@@ -61,49 +62,61 @@ def compile(test_name):
 
 SIGN = None
 
-def exec_and_parse(method, params, expected_ec):
+def exec_and_parse(method, params, expected_ec, options):
 	global lines, SIGN
 	sign = ("--sign " + SIGN) if SIGN else "";
-	cmd = "./target/debug/tvm_linker {} test --body 00{}{} {} >qqqq".format(CONTRACT_ADDRESS, functions[method], params, sign)
+	id = functions[method] if method else ""
+	cmd = "./target/debug/tvm_linker {} test --body 00{}{} {} {}> log".format(CONTRACT_ADDRESS, id, params, sign, options)
 	ec = os.system(cmd)
 	assert ec == 0, ec
 
-	lines = [l.rstrip() for l in open("qqqq").readlines()]
+	lines = [l.rstrip() for l in open("log").readlines()]
+	os.remove("log")
 
 	ec = getExitCode()
 	assert ec == expected_ec, "ec = {}".format(ec)
 	
-def expect_failure(method, params, expected_ec):
-	exec_and_parse(method, params, expected_ec)
-	print "  {} {} {}".format(method, params, expected_ec)
+def expect_failure(method, params, expected_ec, options):
+	exec_and_parse(method, params, expected_ec, options)
+	print("OK:  {} {} {}".format(method, params, expected_ec))
 	
-def expect_success(method, params, expected):
-	exec_and_parse(method, params, 0)
+def expect_success(method, params, expected, options):
+	exec_and_parse(method, params, 0, options)
 	stack = getStack()
 	if stack != expected:
-		print "  {} {}".format(method, params)
-		print "EXP: ", expected
-		print "GOT: ", stack
+		print("Failed:  {} {}".format(method, params))
+		print("EXP: ", expected)
+		print("GOT: ", stack)
 		quit(1)
-	print "  {} {} {}".format(method, params, expected)
+	print("OK:  {} {} {}".format(method, params, expected))
 
-compile('test_factorial.code')
-expect_success('constructor', "", "")
-expect_success('main', "0003", "6")
-expect_success('main', "0006", "726")
+compile_ex('test_factorial.code', 'stdlib_sol.tvm')
+expect_success('constructor', "", "", "")
+expect_success('main', "0003", "6", "")
+expect_success('main', "0006", "726", "")
+cleanup()
 
-compile('test_signature.code')
-expect_failure('constructor', "", 100)
+compile_ex('test_signature.code', 'stdlib_sol.tvm')
+expect_failure('constructor', "", 100, "")
 SIGN = "key1"
-expect_success('constructor', "", "")
-expect_success('get_role', "", "1")
+expect_success('constructor', "", "", "")
+expect_success('get_role', "", "1", "")
 SIGN = None
-expect_failure('get_role', "", 100)
-expect_failure('set_role', "", 9)
-expect_failure('set_role', "01", 100)
+expect_failure('get_role', "", 100, "")
+expect_failure('set_role', "", 9, "")
+expect_failure('set_role', "01", 100, "")
 SIGN = "key2"
-expect_success('get_role', "", "0")
-expect_success('set_role', "02", "")
-expect_success('get_role', "", "2")
+expect_success('get_role', "", "0", "")
+expect_success('set_role', "02", "", "")
+expect_success('get_role', "", "2", "")
+cleanup()
 
+SIGN = None
+compile_ex('test_inbound_int_msg.tvm', None)
+expect_success(None, "", "-1", "--internal 15000000000")
+cleanup()
+
+SIGN = None
+compile_ex('test_pers_data.tvm', "stdlib.tvm")
+expect_success('ctor', "", "-1", "--internal 100")
 cleanup()
