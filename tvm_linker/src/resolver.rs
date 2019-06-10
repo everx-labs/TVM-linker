@@ -80,12 +80,12 @@ mod tests {
         assert_eq!(resolve_name("$ctor:x$", id_by_name), Ok("112233ff".to_string()));
         assert_eq!(resolve_name("$ctor:X$", id_by_name), Ok("112233FF".to_string()));
         assert_eq!(resolve_name("$:int:x$", id_by_name), Ok("a".to_string()));
-        assert_eq!(resolve_name("qwerty", id_by_name),   Ok("qwerty ".to_string()));
+        assert_eq!(resolve_name("qwerty", id_by_name),   Ok("qwerty".to_string()));
     }
 
     #[test]
     fn test_resolve_unknown() {
-        assert_eq!(resolve_name("00$unknown$", id_by_name), Err(_));
+        assert_eq!(resolve_name("00$unknown$", id_by_name).is_err(), true);
     }
 
     #[test]

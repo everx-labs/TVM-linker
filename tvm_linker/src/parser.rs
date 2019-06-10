@@ -165,9 +165,12 @@ impl ParseEngine {
     }
 
     pub fn global_by_name(&self, name: &str) -> Option<(u32, String)> {
-        let id = self.xrefs.get(name)?;
-        let body = self.globals.get(id).map(|v| v.to_owned())?;
-        Some((*id, body))
+        self.globals.get(name).and_then(|v| {
+            match v.dtype {
+                ObjectType::Function(ref func) => Some(func.clone()),
+                _ => None,
+            }
+        })
     }
 
     pub fn signed(&self) -> &HashMap<u32, bool> {
