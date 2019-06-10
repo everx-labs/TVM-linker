@@ -82,7 +82,7 @@ const PATTERN_INTERNAL: &'static str = r"^[\t\s]*\.internal[\t\s]+(:[a-zA-Z0-9_]
 const PATTERN_SELECTOR: &'static str = r"^[\t\s]*\.selector";
 const PATTERN_ALIAS:    &'static str = r"^[\t\s]*\.internal-alias (:[a-zA-Z0-9_]+),[\t\s]+(-?\d+)";
 const PATTERN_LABEL:    &'static str = r"^[\.a-zA-Z0-9_]+:";
-const PATTERN_PARAM:    &'static str = r"^[\t\s]+\.([a-zA-Z0-9_]+)";
+const PATTERN_PARAM:    &'static str = r"^[\t\s]+\.([a-zA-Z0-9_]+),?[\t\s]*([a-zA-Z0-9_]+)";
 const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+([a-zA-Z0-9_]+),[\t\s]*@([a-zA-Z]+)";
 const PATTERN_SIZE:     &'static str = r"^[\t\s]*\.size[\t\s]+([a-zA-Z0-9_]+),[\t\s]*([\.a-zA-Z0-9_]+)";
 
@@ -308,20 +308,21 @@ impl ParseEngine {
         }
         for param in body.lines() {
             if let Some(cap) = PARAM_RE.captures(param) {
-                let value_len = match cap.get(1).unwrap().as_str() {
+                let pname = cap.get(1).unwrap().as_str();
+                let value_len = match pname {
                     "byte"  => 1,
                     "long"  => 4,
                     "short" => 2,
                     "quad"  => 8,
-                    _ => Err(format!("Unsupported parameter {}", cap.get(1).unwrap().as_str()))?,
+                    _ => Err(format!("unsupported parameter ({})", pname))?,
                 };
                 if *item_size < value_len {
                     Err(format!("global object {} has invalid .size parameter: too small)", name))?;
                 }
                 *item_size -= value_len;
-                let value = param.get(cap.get(1).unwrap().end()..).unwrap().trim_start_matches(',').trim();
+                let value = cap.get(2).map_or("", |m| m.as_str()).trim();
                 values.push(DataValue::Number((
-                    IntegerData::from_str_radix(value, 10).map_err(|_| "value is invalid number".to_string())?,
+                    IntegerData::from_str_radix(value, 10).map_err(|_| format!("parameter ({}) has invalid value ({})", pname, value))?,
                     value_len,
                 )));
             }

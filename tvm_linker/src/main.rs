@@ -11,6 +11,7 @@ extern crate simplelog;
 extern crate ton_block;
 #[macro_use]
 extern crate tvm;
+#[macro_use]
 extern crate log;
 
 mod keyman;
