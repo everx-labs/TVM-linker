@@ -1,4 +1,5 @@
 use regex::Regex;
+use resolver::resolve_name;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
@@ -163,11 +164,17 @@ impl ParseEngine {
         funcs
     }
 
+    pub fn global_by_name(&self, name: &str) -> Option<(u32, String)> {
+        let id = self.xrefs.get(name)?;
+        let body = self.globals.get(id).map(|v| v.to_owned())?;
+        Some((*id, body))
+    }
+
     pub fn signed(&self) -> &HashMap<u32, bool> {
         &self.signed
     }
 
-    fn parse_code<R: BufRead>(&mut self, reader: &mut R, first_pass: bool) -> Result<(), String> {
+    pub fn parse_code<R: BufRead>(&mut self, reader: &mut R, first_pass: bool) -> Result<(), String> {
         let globl_regex = Regex::new(PATTERN_GLOBL).unwrap();
         let internal_regex = Regex::new(PATTERN_INTERNAL).unwrap();
         let selector_regex = Regex::new(PATTERN_SELECTOR).unwrap();
@@ -359,31 +366,9 @@ impl ParseEngine {
     }
 
     fn replace_labels(&mut self, line: &str) -> String {
-        let mut result = String::new();
-        let mut line = line;
-        let re = Regex::new(r"\$:?[A-Za-z0-9_]+\$").unwrap();
-        loop {
-            line = match re.find(line) {
-                None => {
-                    result.push_str(line);
-                    break result;
-                }
-                Some(mt) => {
-                    let parts: Vec<&str> = re.split(line).collect();
-                    result.push_str(parts.get(0).unwrap_or(&""));
-                    let pointer = line.get(mt.start()+1..mt.end()-1).expect("failed to extract label from line");
-                    let id_name = {
-                        if pointer.starts_with(":") {
-                            self.intrefs.get(pointer).map(|id| id.to_string())
-                        } else {
-                            self.xrefs.get(pointer).map(|id| id.to_string())
-                        }
-                    }.unwrap_or("???".to_string());
-                    result.push_str(&id_name);
-                    parts.get(1).unwrap_or(&"")
-                }
-            };
-        }
+        resolve_name(line, |name| self.xrefs.get(name).map(|id| id.clone()))
+            .or_else(|_| resolve_name(line, |name| self.intrefs.get(name).map(|id| id.clone())))
+            .unwrap_or(line.to_string())
     }
 
     pub fn debug_print(&self) {

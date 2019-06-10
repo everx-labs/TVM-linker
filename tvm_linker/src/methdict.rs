@@ -15,14 +15,14 @@ where
     dict.get_data()
 }
 
-pub fn prepare_methods<T>(methods: &HashMap<T, String>) -> SliceData
-where T: Clone + Default + Eq + Serializable + std::hash::Hash {
+pub fn prepare_methods<T>(methods: &HashMap<T, String>) -> Result<SliceData, String>
+where T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash {
     let method_vec: Vec<_> = 
         methods
             .iter()
-            .map(|pair| (pair.0.clone(), compile_code(&pair.1).unwrap()))
+            .map(|pair| (pair.0.clone(), compile_code(&pair.1).map_err(|e| format!("func {}: compilation failed: {}", &pair.0, e)).expect("error")))
             .collect(); 
-    build_hashmap(&method_vec[..])
+    Ok(build_hashmap(&method_vec[..]))
 }
 
 #[allow(dead_code)]
