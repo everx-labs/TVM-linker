@@ -6,6 +6,7 @@ use sha2::Sha512;
 use std::fmt;
 use std::io::Cursor;
 use std::sync::Arc;
+use std::time::SystemTime;
 use tvm::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use tvm::executor::Engine;
 use tvm::executor::gas::gas_state::Gas;
@@ -31,6 +32,22 @@ fn create_external_inbound_msg(dst_addr: &AccountId, body: Option<Arc<CellData>>
     hdr.src = MsgAddressExt::with_extern(&Bitstring::create(vec![0x55; 8], 64)).unwrap();
     hdr.import_fee = Grams(0x1234u32.into());
     let mut msg = Message::with_ext_in_header(hdr);
+    msg.body = body;
+    msg
+}
+
+fn create_internal_msg(src_addr: AccountId, dst_addr: AccountId, value: u64, lt: u64, at: u32, body: Option<Arc<CellData>>) -> Message {
+    let mut hdr = InternalMessageHeader::with_addresses(
+        MsgAddressInt::with_standart(None, 0, src_addr).unwrap(),
+        MsgAddressInt::with_standart(None, 0, dst_addr).unwrap(),
+        CurrencyCollection::with_grams(value),
+    );
+    hdr.bounce = true;
+    hdr.ihr_disabled = true;
+    hdr.ihr_fee = Grams::from(0u64);
+    hdr.created_lt = lt;
+    hdr.created_at = UnixTime32(at);
+    let mut msg = Message::with_int_header(hdr);
     msg.body = body;
     msg
 }
@@ -89,17 +106,39 @@ pub fn perform_contract_call(
     body: Option<Arc<CellData>>, 
     key_file: Option<&str>, 
     debug: bool, 
-    decode_actions: bool
-) -> usize {
+    decode_actions: bool,
+    msg_value: Option<&str>,
+) -> i32 {
     let mut state_init = load_from_file(&format!("{}.tvc", contract_file));
+    let contract_addr = AccountId::from(&[0x11u8; 32]);
     
     let mut stack = Stack::new();
-    let msg_cell = StackItem::Cell(
-        create_external_inbound_msg(
-            &AccountId::from([0x11; 32]), 
-            body.clone(),
-        ).write_to_new_cell().unwrap().into()
-    );
+    let is_internal;
+    let value = if msg_value.is_some() {
+        is_internal = true;
+        u64::from_str_radix(msg_value.unwrap(), 10).unwrap()
+    } else {
+        is_internal = false;
+        0
+    };
+    let msg = 
+        if is_internal {
+            create_internal_msg(
+                AccountId::from(&[0u8; 32]), 
+                contract_addr, 
+                value,
+                1,
+                SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32,
+                body.clone()
+            )
+        } else {
+            create_external_inbound_msg(
+                &contract_addr, 
+                body.clone(),
+            )
+        };
+    
+    let msg_cell = StackItem::Cell(msg.write_to_new_cell().unwrap().into());
 
     let mut body: SliceData = match body {
         Some(b) => b.into(),
@@ -124,36 +163,39 @@ pub fn perform_contract_call(
             .into();
 
     let registers = initialize_registers(code.clone(), data);
+    let func_selector = if is_internal { 0 } else { -1 };
     stack
-        .push(int!(0))
-        .push(int!(0))
+        .push(int!(100_000_000_000u64)) //contract balance: 100 grams
+        .push(int!(value))           //msg balance
         .push(msg_cell)
         .push(StackItem::Slice(body)) 
-        .push(int!(-1));
+        .push(int!(func_selector));
 
     let mut engine = Engine::new().setup(code, registers, stack, Gas::test())
         .unwrap_or_else(|e| panic!("Cannot setup engine, error {}", e));
     if debug { 
         engine.set_trace(Engine::TRACE_CODE);
     }
-    let exit_code = match engine.execute() {
+    let exit_code: i32 = match engine.execute() {
         Some(exc) => {
             println!("Unhandled exception: {}", exc); 
-            exc.number
+            exc.number as i32
         },
-        None => 0,
+        None => 0i32,
     };
     println!("TVM terminated with exit code {}", exit_code);
     engine.print_info_stack("Post-execution stack state");
     engine.print_info_ctrls();
 
-    match engine.get_root() {
-        StackItem::Cell(root_cell) => state_init.data = Some(root_cell),
-        _ => panic!("cannot get root data: c4 register is not a cell."),
-    };
-
-    save_to_file(state_init, Some(contract_file)).expect("error");
-    println!("Contract persistent data updated");
+    if exit_code == 0 || exit_code == 1 {
+            match engine.get_root() {
+            StackItem::Cell(root_cell) => state_init.data = Some(root_cell),
+            _ => panic!("cannot get root data: c4 register is not a cell."),
+        };
+        save_to_file(state_init, Some(contract_file)).expect("error");
+        println!("Contract persistent data updated");
+    }
+    
     
     if decode_actions {
         if let StackItem::Cell(cell) = engine.get_actions() {
@@ -241,24 +283,6 @@ fn print_ext_address(addr: &MsgAddressExt) -> String {
 mod tests {
     use super::*;
 
-    fn create_internal_msg(src_addr: AccountId, dst_addr: AccountId) -> Message {
-        let mut anycast = AnycastInfo::default();
-        anycast.set_rewrite_pfx(Bitstring::create(vec![0x98,0x32,0x17], 24)).unwrap();
-        let mut balance = CurrencyCollection::new();
-        balance.grams = Grams::from(4000u64);
-        let mut hdr = InternalMessageHeader::with_addresses(
-            MsgAddressInt::with_standart(None, -1, src_addr).unwrap(),
-            MsgAddressInt::with_standart(Some(anycast), -1, dst_addr).unwrap(),
-            balance,
-        );
-        hdr.bounce = true;
-        hdr.ihr_fee = Grams::from(1000u32);
-        hdr.created_lt = 54321;
-        hdr.created_at = UnixTime32(123456789);
-        let msg = Message::with_int_header(hdr);
-        msg
-    }
-
     #[test]
     fn test_msg_print() {
         let msg = create_external_inbound_msg(
@@ -269,6 +293,10 @@ mod tests {
         let msg2 = create_internal_msg(
             AccountId::from([0x11; 32]),
             AccountId::from([0x22; 32]),
+            12345678,
+            1,
+            2,
+            None,
         );
 
         println!("SendMsg action:\n{}", MsgPrinter{ msg: Arc::new(msg) });

@@ -3,7 +3,6 @@
 	.internal-alias :general_purpose,   1
 	.internal-alias :authenticate,      2
 	.internal-alias :parse_msg,         3
-    .internal-alias :parse_internal_msg,    4
 
     .selector
     ; s0 - func_id
@@ -88,33 +87,25 @@
     SWAP  
     THROWIF 55  ; only version 0 is supported now
     LDU 32      ;load func id
-    SWAP
+    ; load arguments
+;    PUSHCONT {
+;        DUP
+;        SBITS
+;    }
+;    PUSHCONT {
+;        LDU 8
+;        XCHG s2
+;    }    
+;    WHILE
+    LDU 8       ; load argument 1
+    LDU 8       ; load argument 2
+    LDU 8       ; load argument 3
+    XCHG s4
+    ; ececute function
     CALL 1      ;public method call
 
     .internal   :main_internal
-    ; s0 - msg body: slice
-    ; s1 - msg: cell
-    ; s2 - gram balance of msg: int
-    ; s3 - gram balance of contract: int
-    
-    ;call msg parser
-    PUSH s1     ;push msg cell on top
-    CALL $:parse_internal_msg$    ;assume thar parser returns slice - dictionary with msg fields
-    
-    POP s2
-    DUP
-    SDEMPTY
-    IFRET
-    ;parse ABI version (1 byte) and load function id (4 bytes)
-    LDU 8       ;load ABI version
-    SWAP  
-    THROWIF 55  ; only version 0 is supported now
-    LDU 32      ;load func id
-    SWAP
-    CALL 1      ;public method call 
+    RET         ;contract ignores internal msgs by default 
 
     .internal   :parse_msg
     CTOS        ;TODO: use parser from contract_api library
-
-    .internal   :parse_internal_msg
-    CTOS
