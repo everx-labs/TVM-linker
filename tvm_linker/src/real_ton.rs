@@ -74,7 +74,7 @@ pub fn make_boc() {
 //  let address : AccountAddress = AccountAddress::from_str ("1b2fb433e2a10483b51540a314f8558aaf5e824c49abbbf27af0372f74829379").unwrap();
 pub fn compile_real_ton (state: StateInit, body: Option<Arc<CellData>>, output_file_name: &str, pack_code: bool) {
     let address = state.hash().unwrap();
-
+    println!("contract address: {}", hex::encode(&address));
     let mut msg_hdr = ExternalInboundMessageHeader::default();
     msg_hdr.dst = MsgAddressInt::AddrStd (MsgAddrStd::with_address(None, -1, address));
     let mut msg = Message::with_ext_in_header (msg_hdr);
