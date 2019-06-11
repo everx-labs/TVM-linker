@@ -8,7 +8,7 @@ To find out the method id use:
 
 To run test use the following:
 	
-	./target/debug/tvm_linker --lib stdlib.tvm ./tests/deg.s test --body 0085311F81 [--trace] [--decode-c6]
+	./target/debug/tvm_linker address test --body 0085311F81 [--trace] [--decode-c6]
 
 Use `--decode-c6` to see output actions in user friendly format.
 
@@ -21,7 +21,7 @@ To link with new keypair use:
 To sign body for transfer call use:
 
 	./target/debug/tvm_linker --lib stdlib.tvm ./tests/pbank.s --genkey key1
-	./target/debug/tvm_linker --lib stdlib.tvm ./tests/pbank.s --setkey key1 test --body 00XXXXXXXX --sign key1 
+	./target/debug/tvm_linker address test --body 00XXXXXXXX --sign key1 
 
 where XXXXXXXX - id of transfer method (6E118F89).
 
