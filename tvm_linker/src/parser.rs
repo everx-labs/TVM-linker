@@ -78,7 +78,7 @@ pub struct ParseEngine {
     entry_point: String,
     globl_base: u64,
     globl_ptr: u64,
-    persistent_base: u64,
+    pub persistent_base: u64,
     persistent_ptr: u64,
 }
 
@@ -152,8 +152,8 @@ impl ParseEngine {
         ok!()
     }
 
-    pub fn data(&self) -> BuilderData {
-        BuilderData::from_slice(&self.build_data())
+    pub fn data(&self) -> SliceData {
+        self.build_data()
     }
 
     pub fn entry(&self) -> &str {

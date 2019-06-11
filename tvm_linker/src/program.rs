@@ -29,16 +29,19 @@ impl Program {
     }
 
     pub fn data(&self) -> Result<Arc<CellData>, String> {
-        let mut data = self.engine.data().clone();
         let bytes = 
             if let Some(ref pair) = self.keypair {
                 pair.public.to_bytes()
             } else {
                 [0u8; PUBLIC_KEY_LENGTH]
             };
-        data.append_raw(&bytes, bytes.len() * 8)
-                .map_err(|e| format!("{}", e))?;
-        Ok(data.into())
+            
+        let mut data_dict = HashmapE::with_data(64, self.engine.data());
+        data_dict.set(
+            self.engine.persistent_base.write_to_new_cell().unwrap().into(),
+            BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8).into(),
+        ).unwrap();
+        Ok(data_dict.get_data().into_cell())
     }
 
     pub fn entry(&self) -> &str {
