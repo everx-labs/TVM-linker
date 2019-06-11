@@ -53,19 +53,21 @@ to compute address of the contract.
 
 ### 4) Emulating execution of the contract:
 
-	tvm_linker address test --body XXXX... [--sign key-file] [--trace] [--decode-c6] [--internal value]
+	tvm_linker address test --body XXXX... [--sign key-file] [--trace] [--decode-c6] [--internal value] [-s source-file]
 
 Loads contract from file by contract address `address` and emulates contract call sending external inbound message (by default) with body defined after `--body` parameter to the contract. 
 
 `XXXX...` is a hex string. You can insert global ids by their names using `$...$` syntax:
 `$name:[0len][type]$`, where `name` is a name of global object, `len` - length in chars of the label (if `len` is bigger than `name`'s length in chars than zeros will be added at the left side to fit required length), `type` can be `x` or `X` - hexademical integer  in lowercase or uppercase. 
 
+You have to set `-s source` option when you use $...$ syntax.
+
 Example:
 
-	tvm_linker address test --body 00$main$ //main id will be inserted as decimal string. Dont use this case, just as example
-	tvm_linker address test --body 00$main:08X$
-	tvm_linker address test --body 00$main:X$
-	tvm_linker address test --body 00$main:x$
+	tvm_linker address test --body 00$main$ -s source //main id will be inserted as decimal string. Dont use this case, just as example
+	tvm_linker address test --body 00$main:08X$ -s source
+	tvm_linker address test --body 00$main:X$ -s source
+	tvm_linker address test --body 00$main:x$ -s source
 
 If `--sign` specified, the body will be signed with the private key from `key-file` file.
 
