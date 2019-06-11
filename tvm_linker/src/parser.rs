@@ -12,13 +12,13 @@ use ton_block::*;
 enum ObjectType {
     None,
     Function((u32, String)),
-    Data(Vec<DataValue>),
+    Data((u64, Vec<DataValue>)),
 }
 impl From<&str> for ObjectType {
     fn from(stype: &str) -> ObjectType {
         match stype {
             "function" => ObjectType::Function((0, String::new())),
-            "object" => ObjectType::Data(vec![]),
+            "object" => ObjectType::Data((0, vec![])),
             _ => ObjectType::None,
         }
     }
@@ -75,6 +75,7 @@ pub struct ParseEngine {
     signed: HashMap<u32, bool>,
     entry_point: String,
     next_obj: usize,
+    data_pointer: u64
 }
 
 const PATTERN_GLOBL:    &'static str = r"^[\t\s]*\.globl[\t\s]+([a-zA-Z0-9_]+)";
@@ -94,6 +95,9 @@ const SELECTOR: &'static str = ".selector";
 
 const FUNC_SUFFIX_AUTH: &'static str = "_authorized";
 
+const OFFSET_NEXT_DATA: u64 = 8;
+const DATA_BASE_POINTER: u64 = 8000;
+
 impl ParseEngine {
 
     pub fn new() -> Self {
@@ -106,6 +110,7 @@ impl ParseEngine {
             signed:     HashMap::new(),
             entry_point: String::new(),
             next_obj:   0,
+            data_pointer: DATA_BASE_POINTER,
         }
     }
 
@@ -193,6 +198,7 @@ impl ParseEngine {
         let mut obj_name: String = "".to_owned();
         let mut lnum = 0;
         let mut l = String::new();
+        self.data_pointer = DATA_BASE_POINTER;
         while reader.read_line(&mut l)
             .map_err(|_| "error while reading line")? != 0 {
             lnum += 1;
@@ -293,8 +299,10 @@ impl ParseEngine {
                             Err(format!("global function with id = {} already exist", func_id))?;
                         }
                     },
-                    ObjectType::Data(ref mut dparams) => {                        
-                        Self::update_data(body, func, &mut item.size, dparams)?;
+                    ObjectType::Data(ref mut dparams) => {
+                        Self::update_data(body, func, &mut item.size, &mut dparams.1)?;
+                        dparams.0 = self.data_pointer;
+                        self.data_pointer += (dparams.1.len() as u64) * OFFSET_NEXT_DATA;
                     },
                     ObjectType::None => Err(format!("The type of global object {} is unknown. Use: .type {}, xxx", func, func))?,
                 };
@@ -312,7 +320,12 @@ impl ParseEngine {
         ok!()
     }
 
-    fn update_data(body: &str, name: &str, item_size: &mut usize, values: &mut Vec<DataValue>) -> Result<(), String> {
+    fn update_data(
+        body: &str, 
+        name: &str, 
+        item_size: &mut usize, 
+        values: &mut Vec<DataValue>,
+    ) -> Result<(), String> {
         lazy_static! {
             static ref PARAM_RE: Regex = Regex::new(PATTERN_PARAM).unwrap();
         }
@@ -344,25 +357,21 @@ impl ParseEngine {
     }
 
     fn build_data(&self) -> SliceData {
-        let mut index = 0;
         let mut dict = HashmapE::with_bit_len(64);
-        let mut data_vec: Vec<(usize, &Vec<DataValue>)> = 
+        let data_vec: Vec<(u64, &Vec<DataValue>)> = 
             self.globals.iter().filter_map(|item| {
                 match &item.1.dtype {
-                    ObjectType::Data(ref values) => Some((item.1.index, values)),
+                    ObjectType::Data(ref values) => Some((values.0, &values.1)),
                     _ => None,
                 }
             })
             .collect();
-        data_vec.sort_by_key(|e| e.0);
 
         for item in data_vec {
+            let mut ptr = item.0;
             for subitem in item.1 {
-                dict.set(
-                    (index as u64).write_to_new_cell().unwrap().into(),
-                    subitem.write().into()
-                ).unwrap();
-                index += 1;
+                dict.set(ptr.write_to_new_cell().unwrap().into(), subitem.write().into()).unwrap();
+                ptr += OFFSET_NEXT_DATA;
             }
         }
         dict.get_data()
@@ -370,8 +379,14 @@ impl ParseEngine {
 
     fn replace_labels(&mut self, line: &str) -> String {
         resolve_name(line, |name| self.xrefs.get(name).map(|id| id.clone()))
-            .or_else(|_| resolve_name(line, |name| self.intrefs.get(name).map(|id| id.clone())))
-            .unwrap_or(line.to_string())
+        .or_else(|_| resolve_name(line, |name| self.intrefs.get(name).map(|id| id.clone())))
+        .or_else(|_| resolve_name(line, |name| self.globals.get(name).and_then(|obj| {
+                match &obj.dtype {
+                    ObjectType::Data(values) => Some(values.0),
+                    _ => None,
+                }           
+            })))
+        .unwrap_or(line.to_string())
     }
 
     pub fn debug_print(&self) {
@@ -418,57 +433,65 @@ mod tests {
         assert_eq!(parser.parse(pbank_file, vec![test_file]), ok!());  
         parser.debug_print();
 
-        test_case("
+        test_case(&format!("
             LDREFRTOS
             NIP
 
-            PUSHINT 0
-            OVER
+            PUSHINT {base}
+            DUP
+            PUSH s2
             PUSHINT 64
             DICTUGET
             THROWIFNOT 100
             LDI 8
             ENDS
-            SWAP            
+            ROTREV            
      
-            PUSHINT 1
-            OVER
+            ADDCONST {offset}
+            DUP
+            PUSH s2
             PUSHINT 64
             DICTUGET
             THROWIFNOT 100
             LDI 32
             ENDS
-            SWAP    
+            ROTREV    
 
-            PUSHINT 2
-            OVER
+            ADDCONST {offset}
+            DUP
+            PUSH s2
             PUSHINT 64
             DICTUGET
             THROWIFNOT 100
             LDI 32
             ENDS
-            SWAP    
+            ROTREV    
 
-            PUSHINT 3
-            OVER
+            ADDCONST {offset}
+            DUP
+            PUSH s2
             PUSHINT 64
             DICTUGET
             THROWIFNOT 100
             LDI 32
             ENDS
-            SWAP    
+            ROTREV    
 
-            PUSHINT 4
-            OVER
+            ADDCONST {offset}
+            DUP
+            PUSH s2
             PUSHINT 64
             DICTUGET
             THROWIFNOT 100
             LDI 32
             ENDS
-            SWAP    
+            ROTREV    
 
-            DROP
-        ")
+            DROP DROP
+        ", 
+        base = DATA_BASE_POINTER,
+        offset = OFFSET_NEXT_DATA,
+        ))
         .with_stack(
             Stack::new()
                 .push(StackItem::Slice(parser.data().into()))

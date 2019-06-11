@@ -145,7 +145,7 @@ mod tests {
         assert_eq!(parser.parse(pbank_file, vec![test_file]), ok!());
         let prog = Program::new(parser);
         let body = {
-            let buf = hex::decode("002E695F78").unwrap();
+            let buf = hex::decode("000D6E4079").unwrap();
             let buf_bits = buf.len() * 8;
             Some(BuilderData::with_raw(buf, buf_bits).into())
         };

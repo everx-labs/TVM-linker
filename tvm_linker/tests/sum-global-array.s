@@ -172,8 +172,8 @@ main:                                   ; @main
 	PUSHINT	0
 	CALL	$:store$
 	PUSHINT	0
-	PUSHINT	$sum$
 	PUSHINT	$array$
+	PUSHINT	$sum$
 	CALL	1
 	PUSHINT	14
 	CALL	$:leave$
