@@ -67,6 +67,7 @@ fn main() {
             (@arg SIGN: --sign +takes_value "Signs body with private key from defined file")
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
             (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
+            (@arg INTERNAL: --internal +takes_value "Emulates inbound internal message with value instead of external message")
         )
     ).get_matches();
 
@@ -99,7 +100,8 @@ fn main() {
             body, 
             test_matches.value_of("SIGN"), 
             test_matches.is_present("TRACE"), 
-            test_matches.is_present("DECODEC6")
+            test_matches.is_present("DECODEC6"),
+            test_matches.value_of("INTERNAL"),
         );
         println!("TEST COMPLETED");
         return;

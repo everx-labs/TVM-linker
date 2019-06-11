@@ -1,0 +1,379 @@
+    .selector
+    THROWIF 100 ; func selector must be 0
+    LDU 8
+    ENDS
+    THROWIF 101 ; body must contain only one byte = 0x00
+  
+    ; parses internal inbound message and puts it fields into the dict
+    ; args: s0 - cell with msg
+    CTOS
+    SDBEGINS 0 ; int_msg_info$0
+
+    ;stack trace:
+    ; s0 - slice with message
+
+    ;parse ihr_disabled
+    LDSLICE 1
+    PUSHINT 1 ; index
+    SWAP
+
+    ;parse bounce
+    LDSLICE 1
+    PUSHINT 2 ; index
+    SWAP
+
+    ;parse bounced
+    LDSLICE 1
+    NIP
+
+    ;parse src    
+    PUSHCONT {
+        ;parses MsgAddressInt type (only addr_std$10 variant)
+        ;args: s0 - slice
+        ;exceptions: throw type_check_error if struct is invalid
+        ;ret:
+        ;   s0 - remaining slice
+        ;   s1 - address: integer (uint256)
+
+        ;MsgAddressInt must start with bits: 10
+        SDBEGINS xA_ ;addr_std$10
+
+        ; parse 'Maybe Anycast'
+        LDU 1 ; load 'Maybe' tag
+        SWAP
+    
+        ; if anycast present - parse it
+        PUSHCONT {
+            
+            PUSHCONT {
+            ;s0 - slice
+            ;ret: 
+            ;   s0 - slice with anycast
+            ;   s1 - remaining slice
+            LDU 5
+            SWAP
+            LDSLICEX
+            SWAP
+            }
+
+            CALLX
+            ;we don't use anycast now, just drop it
+            DROP
+        }
+        IF
+
+        ;stack trace: s0 - remaining slice 
+
+        ;load workchain_id
+        LDI 8
+        ; we will drop it right now,we dont use workchain_id
+        NIP
+
+        ;load address: uint256 as slice
+        LDSLICE 256
+    }
+    CALLX
+    PUSHINT 3 ; index
+    SWAP
+
+    ;parse dst
+    PUSHCONT {
+        ;parses MsgAddressInt type (only addr_std$10 variant)
+        ;args: s0 - slice
+        ;exceptions: throw type_check_error if struct is invalid
+        ;ret:
+        ;   s0 - remaining slice
+        ;   s1 - address: integer (uint256)
+
+        ;MsgAddressInt must start with bits: 10
+        SDBEGINS xA_ ;addr_std$10
+
+        ; parse 'Maybe Anycast'
+        LDU 1 ; load 'Maybe' tag
+        SWAP
+        
+        ; if anycast present - parse it
+        PUSHCONT {
+            
+            PUSHCONT {
+            ;s0 - slice
+            ;ret: 
+            ;   s0 - slice with anycast
+            ;   s1 - remaining slice
+            LDU 5
+            SWAP
+            LDSLICEX
+            SWAP
+            }
+            CALLX
+            ;we don't use anycast now, just drop it
+            DROP
+        }
+        IF
+
+        ;stack trace: s0 - remaining slice 
+
+        ;load workchain_id
+        LDI 8
+        ; we will drop it right now,we dont use workchain_id
+        NIP
+
+        ;load address: uint256 as slice
+        LDSLICE 256
+    }
+    CALLX
+    PUSHINT 4 ; index
+    SWAP
+
+    ;parse value: CurrencyCollection
+    PUSHCONT {
+        ;parses CurrencyCollection type
+        ;args: s0 - slice
+        ;ret:
+        ;   s0 - remaining slice
+        ;   s1 - grams: slice
+        
+        PUSHCONT {
+            ;parses Grams type (VarInteger 16)
+            ;args: s0 - slice
+            ; ret:
+            ;   s0 - remaining slice
+            ;   s1 - grams: slice
+
+            ;starts with 4bit length field 
+            LDU 4
+            SWAP
+            DUP
+            ; load 'value' len*8 bits if len != 0, otherwise 0
+            PUSHCONT {
+                PUSHINT 8
+                MUL
+                LDUX
+                SWAP
+            }
+            PUSHCONT {
+                DROP
+                PUSHINT 0
+            }
+            IFELSE
+            ;restore it as u128 integer 
+            NEWC
+            STU 128
+            ENDC
+            CTOS
+            SWAP
+        }
+        CALLX
+
+        ; skip HashmapE with currencies.
+        SKIPDICT
+    }
+
+    CALLX
+    PUSHINT 5 ; index
+    SWAP
+
+    ;parse ihr_fee
+    
+    PUSHCONT {
+        ;parses Grams type (VarInteger 16)
+        ;args: s0 - slice
+        ; ret:
+        ;   s0 - remaining slice
+        ;   s1 - grams: slice
+
+        ;starts with 4bit length field 
+        LDU 4
+        SWAP
+        DUP
+        ; load 'value' len*8 bits if len != 0, otherwise 0
+        PUSHCONT {
+            PUSHINT 8
+            MUL
+            LDUX
+            SWAP
+        }
+        PUSHCONT {
+            DROP
+            PUSHINT 0
+        }
+        IFELSE
+        ;restore it as u128 integer 
+        NEWC
+        STU 128
+        ENDC
+        CTOS
+        SWAP
+    }
+    CALLX
+    PUSHINT 6 ; index
+    SWAP
+
+    ;parse fwd_fee
+    PUSHCONT {
+        ;parses Grams type (VarInteger 16)
+        ;args: s0 - slice
+        ; ret:
+        ;   s0 - remaining slice
+        ;   s1 - grams: slice
+
+        ;starts with 4bit length field 
+        LDU 4
+        SWAP
+        DUP
+        ; load 'value' len*8 bits if len != 0, otherwise 0
+        PUSHCONT {
+            PUSHINT 8
+            MUL
+            LDUX
+            SWAP
+        }
+        PUSHCONT {
+            DROP
+            PUSHINT 0
+        }
+        IFELSE
+        ;restore it as u128 integer 
+        NEWC
+        STU 128
+        ENDC
+        CTOS
+        SWAP
+    }
+    CALLX
+    PUSHINT 7 ; index
+    SWAP
+
+    ;parse created_lt time
+    LDSLICE 64
+    PUSHINT 8 ; index
+    SWAP
+
+    ;parse created_at time
+    LDSLICE 32
+    PUSHINT 9 ; index
+    SWAP
+    ; TODO BLCKSWP 3, 1 and UNTILEND
+    PUSHINT 0 ; index of remaining msg slice
+
+    NEWDICT
+    PUSHINT 10
+    PUSHCONT {
+        PUSHINT 8
+        DICTUADD
+        THROWIFNOT 7
+    }
+    REPEAT
+
+    DUP
+    ; load 'ihr_disabled' from dict
+    PUSHINT 1
+    SWAP
+    PUSHINT 8
+    DICTUGET
+    THROWIFNOT 100
+    LDU 1
+    ENDS
+    THROWIFNOT 102
+
+    ; load 'bounce' from dict
+    DUP
+    PUSHINT 2
+    SWAP
+    PUSHINT 8
+    DICTUGET
+    THROWIFNOT 100
+    LDU 1
+    ENDS
+    THROWIFNOT 102
+
+    ; load src address from dict
+    DUP
+    PUSHINT 3
+    SWAP
+    PUSHINT 8
+    DICTUGET
+    THROWIFNOT 100
+    LDU 256
+    ENDS
+    THROWIF 103
+
+    ; load dest address from dict
+    DUP
+    PUSHINT 4
+    SWAP
+    PUSHINT 8
+    DICTUGET
+    THROWIFNOT 100
+    LDU 256
+    ENDS
+    THROWIFNOT 104
+
+    ; load 'value' from dict
+    DUP
+    PUSHINT 5
+    SWAP
+    PUSHINT 8
+    DICTUGET
+    THROWIFNOT 100
+    LDU 128
+    ENDS
+    PUSHINT 15000000000
+    EQUAL
+    THROWIFNOT 105
+
+    ; load 'ihr_fee' from dict
+    DUP
+    PUSHINT 6
+    SWAP
+    PUSHINT 8
+    DICTUGET
+    THROWIFNOT 100
+    LDU 128
+    ENDS
+    THROWIF 106
+
+    ; load 'fwd_fee' from dict
+    DUP
+    PUSHINT 7
+    SWAP
+    PUSHINT 8
+    DICTUGET
+    THROWIFNOT 100
+    LDU 128
+    ENDS
+    THROWIF 106
+
+    ; load 'created_lt' from dict
+    DUP
+    PUSHINT 8
+    SWAP
+    PUSHINT 8
+    DICTUGET
+    THROWIFNOT 100
+    LDU 64
+    ENDS
+    DEC
+    THROWIF 107
+
+    ; load 'created_at' from dict
+    DUP
+    PUSHINT 9
+    SWAP
+    PUSHINT 8
+    DICTUGET
+    THROWIFNOT 100
+    LDU 32
+    ENDS
+    DROP
+    DROP
+
+    PUSHINT 15000000000
+    EQUAL
+    THROWIFNOT 108
+
+    PUSHINT 100000000000
+    EQUAL
+    THROWIFNOT 109
+
+    PUSHINT -1

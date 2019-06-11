@@ -1,0 +1,3 @@
+    .globl test_external
+	RET
+	
