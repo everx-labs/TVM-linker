@@ -12,7 +12,6 @@ use tvm::cells_serialization::{ BocSerialiseMode, BagOfCells, deserialize_cells_
 use tvm::stack::BuilderData;
 use tvm::stack::SliceData;
 use tvm::stack::CellData;
-use tvm::assembler::compile_code;
 
 use ton_block::{ Message, ExternalInboundMessageHeader, MsgAddrStd, MsgAddressInt, 
     Serializable, Deserializable, StateInit, GetRepresentationHash };
@@ -73,31 +72,17 @@ pub fn make_boc() {
 
 //  let address : AccountAddress = AccountAddress::from_str ("5d76362f95fb9187ad94967ecc7347f7fc85fdbbc23722323f82e68f66f9f963").unwrap();
 //  let address : AccountAddress = AccountAddress::from_str ("1b2fb433e2a10483b51540a314f8558aaf5e824c49abbbf27af0372f74829379").unwrap();
-pub fn compile_real_ton (code: &str, data: &BuilderData, msg_data: Option<BuilderData>, output_file_name: &str, pack_code: bool) {
-    let code_cell = compile_code(code).expect("Compilation failed").cell();
-    let mut state_init = StateInit::default();
-    state_init.set_data (data.clone().into());
-    state_init.set_code (code_cell.clone());
-
-    let address = state_init.hash().unwrap();
-    let code_cell_data = code_cell;
-    println!("Code: {}", hex::encode(code_cell_data.data()));
-    println!("Address: {}", hex::encode(address.as_slice()));
+pub fn compile_real_ton (state: StateInit, body: Option<Arc<CellData>>, output_file_name: &str, pack_code: bool) {
+    let address = state.hash().unwrap();
 
     let mut msg_hdr = ExternalInboundMessageHeader::default();
     msg_hdr.dst = MsgAddressInt::AddrStd (MsgAddrStd::with_address(None, -1, address));
     let mut msg = Message::with_ext_in_header (msg_hdr);
 
     if pack_code {
-        msg.init = Some(state_init.clone());
+        msg.init = Some(state.clone());
     }
-
-    match msg_data {
-        None => (),
-        Some(cell) => {
-            msg.body = Some(cell.into());
-        }
-    }
+    msg.body = body;
 
     let root_cell = SliceData::from(Arc::<CellData>::from(msg.write_to_new_cell().unwrap()));
     let boc = BagOfCells::with_root(root_cell);
@@ -105,9 +90,10 @@ pub fn compile_real_ton (code: &str, data: &BuilderData, msg_data: Option<Builde
     let mode = BocSerialiseMode::Generic { index: false, crc: true, cache_bits: false, flags: 0 };
     boc.write_to_ex(&mut bytes, mode, None, Some(4)).unwrap();
 
-    println!("Decoded: {:?}", &msg);
-    println!("Encoded: {}", hex::encode(&bytes));
+    println!("Encoded msg: {}", hex::encode(&bytes));
 
     let mut f = File::create(output_file_name).expect("Unable to create file");
     f.write_all(&bytes).expect("Unable to write data");
+
+    println!("boc file created: {}", output_file_name);
 }
