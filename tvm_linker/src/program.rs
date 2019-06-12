@@ -7,7 +7,7 @@ use tvm::assembler::compile_code;
 use tvm::cells_serialization::{BagOfCells};
 use tvm::stack::*;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
-use parser::ParseEngine;
+use parser::{ptr_to_builder, ParseEngine};
 
 const AUTH_METHOD_NAME: &'static str = ":authenticate";
 
@@ -38,7 +38,7 @@ impl Program {
             
         let mut data_dict = HashmapE::with_data(64, self.engine.data());
         data_dict.set(
-            self.engine.persistent_base.write_to_new_cell().unwrap().into(),
+            ptr_to_builder(self.engine.persistent_base)?.into(),
             BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8).into(),
         ).unwrap();
         Ok(data_dict.get_data().into_cell())

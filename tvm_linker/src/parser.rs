@@ -9,10 +9,18 @@ use tvm::stack::serialization::Serializer;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
 use ton_block::*;
 
+pub type Ptr = i64;
+
+pub fn ptr_to_builder(n: Ptr) -> Result<BuilderData, String> {
+    let mut b = BuilderData::new();
+    b.append_i64(n).map_err(|_| format!("failed to serialize an i64 to buidler"))?;
+    Ok(b)
+}
+
 enum ObjectType {
     None,
     Function((u32, String)),
-    Data { addr: u64, values: Vec<DataValue>, persistent: bool },
+    Data { addr: Ptr, values: Vec<DataValue>, persistent: bool },
 }
 impl From<&str> for ObjectType {
     fn from(stype: &str) -> ObjectType {
@@ -33,7 +41,7 @@ impl DataValue {
         let mut b = BuilderData::new();
         match self {
             DataValue::Number(ref intgr) => {
-                let encoding = SignedIntegerBigEndianEncoding::new(intgr.1 * 8);
+                let encoding = SignedIntegerBigEndianEncoding::new(256);
                 let mut dest_vec = vec![];
                 encoding.try_serialize(&intgr.0).unwrap().into_bitstring_with_completion_tag(&mut dest_vec);
                 b.append_bitstring(&dest_vec[..]).unwrap();
@@ -76,10 +84,10 @@ pub struct ParseEngine {
     internals: HashMap<i32, String>,
     signed: HashMap<u32, bool>,
     entry_point: String,
-    globl_base: u64,
-    globl_ptr: u64,
-    pub persistent_base: u64,
-    persistent_ptr: u64,
+    globl_base: Ptr,
+    globl_ptr: Ptr,
+    pub persistent_base: Ptr,
+    persistent_ptr: Ptr,
 }
 
 const PATTERN_GLOBL:    &'static str = r"^[\t\s]*\.globl[\t\s]+([a-zA-Z0-9_]+)";
@@ -108,9 +116,9 @@ const PERSISTENT_DATA_SUFFIX: &'static str = "_persistent";
 const PUBKEY_NAME: &'static str = "tvm_public_key";
 const SCI_NAME: &'static str = "tvm_contract_info";
 
-const OFFSET_NEXT_DATA: u64 = 8;
-const OFFSET_GLOBL_DATA: u64 = 8;
-const OFFSET_PERS_DATA: u64 = 16;
+const OFFSET_NEXT_DATA: Ptr = 8;
+const OFFSET_GLOBL_DATA: Ptr = 8;
+const OFFSET_PERS_DATA: Ptr = 16;
 
 impl ParseEngine {
 
@@ -225,11 +233,13 @@ impl ParseEngine {
     }
 
     fn update_predefined(&mut self) {
-        if let ObjectType::Data { ref mut addr, values: _, persistent: _ } = self.globals.get_mut(SCI_NAME).unwrap().dtype {
+        if let ObjectType::Data { ref mut addr, values: _, persistent: _ } 
+            = self.globals.get_mut(SCI_NAME).unwrap().dtype {
             *addr = self.globl_base;
         }
 
-        if let ObjectType::Data { ref mut addr, values: _, persistent: _ } = self.globals.get_mut(PUBKEY_NAME).unwrap().dtype {
+        if let ObjectType::Data { ref mut addr, values: _, persistent: _ } 
+            = self.globals.get_mut(PUBKEY_NAME).unwrap().dtype {
             *addr = self.persistent_base;
         }
     }
@@ -262,7 +272,7 @@ impl ParseEngine {
                 let cap = base_glbl_regex.captures(&l).unwrap();
                 let base = cap.get(1).map(|m| m.as_str())
                     .ok_or(format!("line {}: invalid syntax for global base", lnum))?;
-                self.globl_base = u64::from_str_radix(base, 10)
+                self.globl_base = Ptr::from_str_radix(base, 10)
                     .map_err(|_| format!("line {}: invalid global base address", lnum))?;
                 self.globl_ptr = self.globl_base + OFFSET_GLOBL_DATA;
                 self.update_predefined();
@@ -271,7 +281,7 @@ impl ParseEngine {
                 let cap = base_pers_regex.captures(&l).unwrap();
                 let base = cap.get(1).map(|m| m.as_str())
                     .ok_or(format!("line {}: invalid syntax for persistent base", lnum))?;
-                self.persistent_base = u64::from_str_radix(base, 10)
+                self.persistent_base = Ptr::from_str_radix(base, 10)
                     .map_err(|_| format!("line {}: invalid persistent base address", lnum))?;
                 self.persistent_ptr = self.persistent_base + OFFSET_PERS_DATA;
                 self.update_predefined();
@@ -383,7 +393,7 @@ impl ParseEngine {
                             *persistent = true;
                         }
                         Self::update_data(body, func, &mut item.size, values)?;
-                        let offset = (values.len() as u64) * OFFSET_NEXT_DATA;
+                        let offset = (values.len() as Ptr) * OFFSET_NEXT_DATA;
                         if *persistent { 
                             *addr = self.persistent_ptr;
                             self.persistent_ptr += offset;
@@ -433,7 +443,8 @@ impl ParseEngine {
                 *item_size -= value_len;
                 let value = cap.get(2).map_or("", |m| m.as_str()).trim();
                 values.push(DataValue::Number((
-                    IntegerData::from_str_radix(value, 10).map_err(|_| format!("parameter ({}) has invalid value ({})", pname, value))?,
+                    IntegerData::from_str_radix(value, 10)
+                        .map_err(|_| format!("parameter ({}) has invalid value ({})", pname, value))?,
                     value_len,
                 )));
             }
@@ -452,15 +463,15 @@ impl ParseEngine {
                 _ => None,
             }
         });
-        let globl_data_vec: Vec<(&u64, &Vec<DataValue>)> = filter(false).collect();
-        let pers_data_vec: Vec<(&u64, &Vec<DataValue>)> = filter(true).collect();
+        let globl_data_vec: Vec<(&Ptr, &Vec<DataValue>)> = filter(false).collect();
+        let pers_data_vec: Vec<(&Ptr, &Vec<DataValue>)> = filter(true).collect();
 
-        let build_dict = |data_vec: &Vec<(&u64, &Vec<DataValue>)>| {
+        let build_dict = |data_vec: &Vec<(&Ptr, &Vec<DataValue>)>| {
             let mut dict = HashmapE::with_bit_len(64);
             for item in data_vec {
                 let mut ptr = item.0.clone();
                 for subitem in item.1 {
-                    dict.set(ptr.write_to_new_cell().unwrap().into(), subitem.write().into()).unwrap();
+                    dict.set(ptr_to_builder(ptr).unwrap().into(), subitem.write().into()).unwrap();
                     ptr += OFFSET_NEXT_DATA;
                 }
             }
@@ -471,7 +482,7 @@ impl ParseEngine {
         let mut pers_dict = build_dict(&pers_data_vec);
 
         pers_dict.set(
-            (self.persistent_base + 8).write_to_new_cell().unwrap().into(), 
+            ptr_to_builder(self.persistent_base + 8).unwrap().into(), 
             globl_dict.get_data(),
         ).unwrap();
 
@@ -535,24 +546,46 @@ mod tests {
         parser.debug_print();
 
         test_case(&format!("
-            LDREFRTOS
-            NIP
-
             PUSHINT {base}
             DUP
             PUSH s2
             PUSHINT 64
-            DICTUGET
+            DICTIGET
             THROWIFNOT 100
-            LDI 8
-            ENDS
-            ROTREV            
+            SEMPTY
+            THROWIFNOT 100
      
             ADDCONST {offset}
             DUP
             PUSH s2
             PUSHINT 64
-            DICTUGET
+            DICTIGET
+            THROWIFNOT 100
+            
+            PUSHINT 8
+            SWAP
+            PUSHINT 64
+            DICTIGET
+            THROWIFNOT 100
+            LDI 256
+            ENDS
+            ROTREV
+
+            ADDCONST {offset}
+            DUP
+            PUSH s2
+            PUSHINT 64
+            DICTIGET
+            THROWIFNOT 100
+            LDI 256
+            ENDS
+            ROTREV    
+
+            ADDCONST {offset}
+            DUP
+            PUSH s2
+            PUSHINT 64
+            DICTIGET
             THROWIFNOT 100
             LDI 32
             ENDS
@@ -562,7 +595,7 @@ mod tests {
             DUP
             PUSH s2
             PUSHINT 64
-            DICTUGET
+            DICTIGET
             THROWIFNOT 100
             LDI 32
             ENDS
@@ -572,17 +605,7 @@ mod tests {
             DUP
             PUSH s2
             PUSHINT 64
-            DICTUGET
-            THROWIFNOT 100
-            LDI 32
-            ENDS
-            ROTREV    
-
-            ADDCONST {offset}
-            DUP
-            PUSH s2
-            PUSHINT 64
-            DICTUGET
+            DICTIGET
             THROWIFNOT 100
             LDI 32
             ENDS
@@ -590,7 +613,7 @@ mod tests {
 
             DROP DROP
         ", 
-        base = OFFSET_GLOBL_DATA,
+        base = 1000000,
         offset = OFFSET_NEXT_DATA,
         ))
         .with_stack(
