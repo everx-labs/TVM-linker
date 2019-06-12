@@ -7,13 +7,29 @@
     .selector
     SETCP0
     PUSHINT $y_persistent$
+    PUSHROOT CTOS
+    PUSHINT 64
+    DICTIGET
+    THROWIFNOT
+    LDI 256 ENDS
     PUSHINT 127
     EQUAL
-    THROWIFNOT
+    THROWIFNOT 101
+    CALL $:main_external$
+    CALL $:authenticate$
+
+    PUSHINT $a$
+    PUSH c5 CTOS
+    PUSHINT 64
+    DICTIGET
+    THROWIFNOT 102
+    LDI 256 ENDS
+    PUSHINT 1 
+    EQUAL
+    THROWIFNOT 104
 
     .internal   :main_external
-    CALL $:authenticate$ 
-    DROP
+    PUSHINT 10
 
     .internal   :authenticate
     DUP

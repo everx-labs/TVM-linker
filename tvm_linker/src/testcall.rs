@@ -90,7 +90,7 @@ fn initialize_registers(code: SliceData, data: SliceData) -> SaveList {
 
 fn init_logger(debug: bool) {
     SimpleLogger::init(
-        if debug {LevelFilter::Debug } else { LevelFilter::Info }, 
+        if debug {LevelFilter::Trace } else { LevelFilter::Info }, 
         Config { time: None, level: None, target: None, location: None, time_format: None },
     ).unwrap();
 }

@@ -5,7 +5,7 @@
 	.internal-alias :parse_msg,         3
     .internal-alias :parse_internal_msg, 4
     .internal-alias :init_stack,        5
-    .internal-alias :clean_stack,        6
+    .internal-alias :cleanup_stack,     6
 
     .global-base        0
     .persistent-base    1000000
@@ -80,9 +80,9 @@
     PUSHINT $global-base$
     
     PUSHINT $persistent-base$
+    ADDCONST 8
     PUSHROOT
     CTOS
-    ADDCONST 8
     PUSHINT 64
     DICTIGET
     THROWIFNOT 100 ;global data dictionary is invalid
@@ -94,8 +94,7 @@
 
     .internal :cleanup_stack
     PUSHINT $global-base$
-    PUSH c5
-    CTOS
+    PUSH c5 CTOS
     PUSHINT 64
     DICTIGET
     THROWIFNOT 100 ;global data dictionary is invalid

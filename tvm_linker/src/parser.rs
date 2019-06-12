@@ -263,6 +263,8 @@ impl ParseEngine {
         let mut lnum = 0;
         let mut l = String::new();
               
+        self.globl_ptr = self.globl_base + OFFSET_GLOBL_DATA;
+        self.persistent_ptr = self.persistent_base + OFFSET_PERS_DATA;
 
         while reader.read_line(&mut l)
             .map_err(|_| "error while reading line")? != 0 {
@@ -493,11 +495,18 @@ impl ParseEngine {
         resolve_name(line, |name| self.xrefs.get(name).map(|id| id.clone()))
         .or_else(|_| resolve_name(line, |name| self.intrefs.get(name).map(|id| id.clone())))
         .or_else(|_| resolve_name(line, |name| self.globals.get(name).and_then(|obj| {
-                match &obj.dtype {
-                    ObjectType::Data { addr, values: _, persistent: _ } => Some(addr),
-                    _ => None,
-                }           
-            })))
+            match &obj.dtype {
+                ObjectType::Data { addr, values: _, persistent: _ } => Some(addr),
+                _ => None,
+            }           
+        })))
+        .or_else(|_| resolve_name(line, |name| {
+            match name {
+                "global-base" => Some(self.globl_base.clone()),
+                "persistent-base" => Some(self.persistent_base.clone()),
+                _ => None,
+            }
+         }))
         .unwrap_or(line.to_string())
     }
 
@@ -546,15 +555,20 @@ mod tests {
         parser.debug_print();
 
         test_case(&format!("
+        ;s0 - persistent data dictionary
+
+        ;read public key from persistent_base index,
+        ;it must be empty slice
             PUSHINT {base}
             DUP
             PUSH s2
             PUSHINT 64
-            DICTIGET
+            DICTIGET        
             THROWIFNOT 100
             SEMPTY
             THROWIFNOT 100
      
+        ;get base+8 value from the dict - it's a global data dictionary
             ADDCONST {offset}
             DUP
             PUSH s2
@@ -562,6 +576,8 @@ mod tests {
             DICTIGET
             THROWIFNOT 100
             
+        ;read 4 integers starting with address 8 from global dict
+            DUP
             PUSHINT 8
             SWAP
             PUSHINT 64
@@ -569,49 +585,47 @@ mod tests {
             THROWIFNOT 100
             LDI 256
             ENDS
-            ROTREV
+            SWAP
 
-            ADDCONST {offset}
-            DUP
-            PUSH s2
+            PUSHINT 16
+            OVER
             PUSHINT 64
             DICTIGET
             THROWIFNOT 100
             LDI 256
             ENDS
-            ROTREV    
+            SWAP
 
-            ADDCONST {offset}
-            DUP
-            PUSH s2
+            PUSHINT 24
+            OVER
             PUSHINT 64
             DICTIGET
             THROWIFNOT 100
-            LDI 32
+            LDI 256
             ENDS
-            ROTREV    
-
-            ADDCONST {offset}
-            DUP
-            PUSH s2
+            SWAP
+            
+            PUSHINT 32
+            OVER
             PUSHINT 64
             DICTIGET
             THROWIFNOT 100
-            LDI 32
+            LDI 256
             ENDS
-            ROTREV    
-
+            NIP
+            
+        ;read integer with address persistent_base+16 from persistent dict
+            PUSH s4
             ADDCONST {offset}
-            DUP
-            PUSH s2
+            PUSH s6
             PUSHINT 64
             DICTIGET
             THROWIFNOT 100
-            LDI 32
+            LDI 256
             ENDS
-            ROTREV    
 
-            DROP DROP
+            BLKSWAP 2, 5
+            BLKDROP 2
         ", 
         base = 1000000,
         offset = OFFSET_NEXT_DATA,
@@ -623,11 +637,11 @@ mod tests {
         )
         .expect_stack(
             Stack::new()
-                .push(int!(127))
                 .push(int!(1))
                 .push(int!(2))
                 .push(int!(3))
                 .push(int!(4))
+                .push(int!(127))
         );
     }
 

@@ -4,11 +4,11 @@
 	.p2align	1
 	.type	get_smc_first_slice,@function
 get_smc_first_slice:
-	PUSH	c5
-	CTOS
-	LDREF
-	POP	s0
-	CTOS
+	PUSHINT $global-base$
+	PUSH c5	CTOS
+	PUSHINT 64
+	DICTIGET
+	THROWIFNOT 101
 .Lfunc_end0:
 	.size	get_smc_first_slice, .Lfunc_end0-get_smc_first_slice
 
@@ -46,20 +46,15 @@ get_smc_info_block_ut:
 	.p2align	1
 	.type	init_persistent_data,@function
 init_persistent_data:
-	PUSHINT 86400	
-	PUSHINT 300
-	PUSH	c4
-	CTOS
-	NEWC
-	STSLICE
-	STU	32
-	STU	32
 	PUSHINT	$get_smc_info_block_ut$
 	CALL	1
-	XCHG	s0, s1
-	STU	32
-	ENDC
-	POPROOT
+	NEWC STI 256 ENDC CTOS
+	PUSHINT $stime_persistent$
+	PUSH c4	CTOS
+	PUSHINT 64
+	DICTISET
+	NEWC STSLICE ENDC
+	POP		c4
 .Lfunc_end3:
 	.size	init_persistent_data, .Lfunc_end3-init_persistent_data
 
@@ -69,14 +64,14 @@ init_persistent_data:
 get_persistent_total_value:
 	PUSHINT	$init_persistent_data$
 	CALL	1
+	PUSHINT $grams_persistent$
 	PUSH	c4
 	CTOS
-	PUSHINT	256
-	LDSLICEX
-	POP	s1
-	PUSHINT	32
-	LDUX
-	POP	s0
+	PUSHINT 64
+	DICTIGET
+	THROWIFNOT 100
+	LDI 256
+	ENDS
 .Lfunc_end4:
 	.size	get_persistent_total_value, .Lfunc_end4-get_persistent_total_value
 
@@ -129,6 +124,24 @@ transfer_authorized:
 .Lfunc_end7:
 	.size	transfer_authorized, .Lfunc_end7-transfer_authorized
 
+	.data
+	.globl	period_persistent
+	.type	period_persistent, @object
+	.size	period_persistent, 4
+period_persistent:
+	.long	86400
+
+	.globl	grams_persistent
+	.type	grams_persistent, @object
+	.size	grams_persistent, 4
+grams_persistent:
+	.long	300
+
+	.globl	stime_persistent
+	.type	stime_persistent, @object
+	.size	stime_persistent, 4
+stime_persistent:
+	.long	0
 
 	.ident	"clang version 7.0.0 (tags/RELEASE_700/final)"
 	.section	".note.GNU-stack","",@progbits
