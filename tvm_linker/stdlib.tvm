@@ -64,11 +64,15 @@
         LDREFRTOS       ;detach signature slice
         OVER
         HASHSU
-        SWAP    
+        SWAP
+        PUSHINT $tvm_public_key$    
         PUSHROOT        ;load persistent data
-        CTOS            
-        LDU 256         ;load public key
-        DROP            ;drop remaining data slice
+        CTOS   
+        PUSHINT  64         
+        DICTIGET
+        THROWIFNOT 100
+        LDU 256
+        ENDS
         CHKSIGNU
         THROWIFNOT 40   ;access denied exception
     }
