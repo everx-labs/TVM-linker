@@ -48,13 +48,13 @@ impl Program {
 
     pub fn method_dict(&self) -> Result<SliceData, String> {
         let mut method_dict = HashmapE::with_data(32, self.build_toplevel_dict()?);
-        let methods = prepare_methods(self.engine.generals())?;
+        let methods = prepare_methods(&self.engine.globals())?;
         let key = 1i32.write_to_new_cell().unwrap();
         method_dict.set(key.into(), methods).unwrap();
         Ok(method_dict.get_data())
     }
    
-    pub fn compile_to_file(&self) -> Result<(), String> {
+    pub fn compile_to_file(&self) -> Result<String, String> {
         save_to_file(self.compile_to_state()?, None)
     }
 
@@ -93,7 +93,7 @@ impl Program {
     }
 }
 
-pub fn save_to_file(state: StateInit, name: Option<&str>) -> Result<(), String> {
+pub fn save_to_file(state: StateInit, name: Option<&str>) -> Result<String, String> {
     let root_slice = SliceData::from(
         state.write_to_new_cell().map_err(|e| format!("Serialization failed: {}", e))?
     );
@@ -112,8 +112,51 @@ pub fn save_to_file(state: StateInit, name: Option<&str>) -> Result<(), String> 
     let mut file = std::fs::File::create(&file_name).unwrap();
     file.write_all(&buffer).map_err(|e| format!("Write to file failed: {}", e))?;
     if print_filename {
-        println! ("Saved contract to file {}", file_name);
+        println! ("Saved contract to file {}", &file_name);
     }
-    ok!()
+    Ok(file_name)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use testcall::perform_contract_call;
+
+    #[test]
+    fn test_pbank_call() {
+        let mut parser = ParseEngine::new();
+        let pbank_file = File::open("./tests/pbank.s").unwrap();
+        let test_file = File::open("./stdlib.tvm").unwrap();
+        parser.parse(pbank_file, vec![test_file]).unwrap();
+        let prog = Program::new(parser);
+        let body = {
+            let buf = hex::decode("002E695F78").unwrap();
+            let buf_bits = buf.len() * 8;
+            Some(BuilderData::with_raw(buf, buf_bits).into())
+        };
+        let contract_file = prog.compile_to_file().unwrap();
+        let name = contract_file.split('.').next().unwrap();
+
+        assert_eq!(perform_contract_call(name, body, None, false, false, None), 0);
+    }
+
+    #[test]
+    fn test_sum_global_array() {
+        let mut parser = ParseEngine::new();
+        let pbank_file = File::open("./tests/sum-global-array.s").unwrap();
+        let test_file = File::open("./stdlib_c.tvm").unwrap();
+        assert_eq!(parser.parse(pbank_file, vec![test_file]), ok!());
+        let prog = Program::new(parser);
+        let body = {
+            let buf = hex::decode("000D6E4079").unwrap();
+            let buf_bits = buf.len() * 8;
+            Some(BuilderData::with_raw(buf, buf_bits).into())
+        };
+        let contract_file = prog.compile_to_file().unwrap();
+        let name = contract_file.split('.').next().unwrap();
+
+        assert_eq!(perform_contract_call(name, body, None, false, false, None), 0);
+    }
+
+}

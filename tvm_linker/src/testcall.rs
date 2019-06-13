@@ -1,4 +1,5 @@
 use keyman::KeypairManager;
+use log::Level::Error;
 use program::save_to_file;
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use sha2::Sha512;
@@ -148,7 +149,9 @@ pub fn perform_contract_call(
         sign_body(&mut body, key_file.unwrap());
     }
 
-    init_logger(debug);
+    if !log_enabled!(Error) {
+        init_logger(debug);
+    }
 
     let code: SliceData = state_init.code
             .clone()

@@ -11,6 +11,7 @@ extern crate simplelog;
 extern crate ton_block;
 #[macro_use]
 extern crate tvm;
+#[macro_use]
 extern crate log;
 
 mod keyman;
@@ -84,7 +85,7 @@ fn main() {
                 }
 
                 hex_str = resolve_name(&hex_str, |name| {
-                    parser.general_by_name(name).map(|id| id.0)
+                    parser.global_by_name(name).map(|id| id.0)
                 }).expect(&format!("error: failed to resolve body {}", hex_str));
 
                 let buf = hex::decode(&hex_str).map_err(|_| format!("body {} is invalid hex string", hex_str)).expect("error");

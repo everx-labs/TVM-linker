@@ -1,8 +1,5 @@
 	.internal-alias :main_external,     -1
-	.internal-alias :main_internal,     0
-	.internal-alias :general_purpose,   1
 	.internal-alias :authenticate,      2
-	.internal-alias :parse_msg,         3
 
     .selector
     SETCP0
@@ -14,14 +11,29 @@
     .internal   :authenticate
     DUP
 
-    .internal   :main_internal
+    .globl  x
+    .type   x,  @function
+x:
     RET         ;contract ignores internal msgs by default 
 
-    .internal   :parse_msg
-    CTOS        ;TODO: use parser from contract_api library
+    .data
+    .globl  y
+    .type   y,    @object
+    .size   y,    1
+y:
+    .byte   127
 
-    .globl      func2
-    CALL $func1$
+    .globl  z
+z:
+    CTOS
+    .type   z,  @function
 
-    .globl      func1
-    PUSHINT 1
+    .globl  a
+    .align  16
+    .type   a, @object
+    .size   a, 16
+a:
+    .long   1
+    .long   2
+    .long   3
+    .long   4
