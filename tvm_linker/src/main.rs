@@ -146,24 +146,23 @@ fn main() {
     if matches.is_present("DEBUG") {
        prog.debug_print();        
     }
-
-    let node_data = match matches.value_of("DATA") {
-        Some(data) => Some(BuilderData::with_raw(hex::decode(data).unwrap(), data.len()*4)),
-        None => None,
-    };
-
+ 
     if matches.is_present("MESSAGE") {
-        let mut suffix = "".to_owned();
-        if matches.is_present("DATA") {
-            suffix.push_str("-");
-            suffix.push_str(matches.value_of("DATA").unwrap());
+        let msg_body = match matches.value_of("DATA") {
+            Some(data) => Some(BuilderData::with_raw(hex::decode(data).unwrap(), data.len()*8).into()),
+            None => None,
+        };
+        let mut suffix = String::new();
+        suffix += "-msg";
+        if matches.is_present("INIT") {
+        suffix += "-init";
         }
-        suffix.push_str(".boc");
+        suffix += ".boc";
 
         let re = Regex::new(r"\.[^.]+$").unwrap();
-        let output_file = re.replace(matches.value_of("INPUT").unwrap(), suffix.as_str());
+        let msg_file = re.replace(matches.value_of("INPUT").unwrap(), suffix.as_str());
         
-        compile_real_ton(prog.entry(), &BuilderData::from(&prog.data().unwrap()), node_data, &output_file, matches.is_present("INIT"));
+        compile_real_ton(prog.compile_to_state().expect("error"), msg_body, &msg_file, matches.is_present("INIT"));
         return;
     } else {
         prog.compile_to_file().expect("error");

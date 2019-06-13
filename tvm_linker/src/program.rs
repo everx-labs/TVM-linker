@@ -44,6 +44,7 @@ impl Program {
         Ok(data_dict.get_data().into_cell())
     }
 
+    #[allow(dead_code)]
     pub fn entry(&self) -> &str {
         self.engine.entry()
     }
@@ -57,11 +58,14 @@ impl Program {
     }
    
     pub fn compile_to_file(&self) -> Result<String, String> {
+        save_to_file(self.compile_to_state()?, None)
+    }
+
+    pub fn compile_to_state(&self) -> Result<StateInit, String> {
         let mut state = StateInit::default();
         state.set_code(self.compile_asm()?.cell());
         state.set_data(self.data()?.into());
-
-        save_to_file(state, None)
+        Ok(state)
     }
 
     pub fn compile_asm(&self) -> Result<SliceData, String> {
