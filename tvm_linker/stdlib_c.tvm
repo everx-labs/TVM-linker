@@ -5,14 +5,18 @@
 	.internal-alias :parse_msg,         3
 
 	.internal-alias :init_fstack,       4
-	.internal-alias :enter,             5
-	.internal-alias :leave,             6
-	.internal-alias :load,              7
-	.internal-alias :store,             8
-	.internal-alias :frameidx,          9
+    .internal-alias :cleanup_stack,     5
+	.internal-alias :enter,             6
+	.internal-alias :leave,             7
+	.internal-alias :load,              8
+	.internal-alias :store,             9
+	.internal-alias :frameidx,          10
 
-	.internal-alias :load_bp,           10
+	.internal-alias :load_bp,           11
 	.internal-alias :store_bp,          12
+
+    .global-base        0
+    .persistent-base    1000000
 
     .selector
     ; s0 - func_id
@@ -102,6 +106,8 @@
     LDU 32      ;load func id
     SWAP
     CALL 1      ;public method call
+    
+    CALL $:cleanup_stack$
 
     .internal   :main_internal
     RET         ;contract ignores internal msgs by default 
@@ -122,13 +128,39 @@
     CALL $:store$
 
     .internal   :init_fstack
-    ; Initialize stack
-    NEWDICT
+    ;1) get global data dict from persistent dict(c4) with key 8
+    ;2) get SmartContractInfo slice from c5.ref0 
+    ;3) set SmartContractInfo slice to global data dictionary at key 'global-base'
+    ;4) put global data dictionary to the register c5 as cell.
+    PUSH c5
+    CTOS LDREFRTOS NIP
+    PUSHINT $global-base$
+    
+    PUSHINT $persistent-base$
+    ADDCONST 8
+    PUSHROOT
+    CTOS
+    PUSHINT 64
+    DICTIGET
+    THROWIFNOT 100 ;global data dictionary is invalid
+    
+    PUSHINT 64
+    DICTISET
     NEWC STSLICE ENDC
     POP c5
     PUSHINT 1000000000
     CALL $:store_bp$
     RET
+
+    .internal :cleanup_stack
+    PUSHINT $global-base$
+    PUSH c5 CTOS
+    PUSHINT 64
+    DICTIGET
+    THROWIFNOT 100 ;global data dictionary is invalid
+    NEWC STSLICE ENDC
+    NEWC STREF ENDC
+    POP c5
 
     .internal   :enter
     CALL $:load_bp$

@@ -7,7 +7,6 @@ use tvm::stack::{BuilderData, IBitstring, IntegerData, SliceData};
 use tvm::stack::integer::serialization::{Encoding, SignedIntegerBigEndianEncoding};
 use tvm::stack::serialization::Serializer;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
-use ton_block::*;
 
 pub type Ptr = i64;
 

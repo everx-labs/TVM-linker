@@ -75,6 +75,10 @@
     IF
 
     .internal   :init_stack
+    ;1) get global data dict from persistent dict(c4) with key 8
+    ;2) get SmartContractInfo slice from c5.ref0 
+    ;3) set SmartContractInfo slice to global data dictionary at key 'global-base'
+    ;4) put global data dictionary to the register c5 as cell.
     PUSH c5
     CTOS LDREFRTOS NIP
     PUSHINT $global-base$
