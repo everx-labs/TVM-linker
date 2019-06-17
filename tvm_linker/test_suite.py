@@ -105,6 +105,8 @@ def expect_output(regex):
 			return
 	assert False, regex
 
+	# '''
+
 compile_ex('test_factorial.code', 'stdlib_sol.tvm')
 expect_success('constructor', "", "", "")
 expect_success('main', "0003", "6", "")
@@ -139,8 +141,18 @@ cleanup()
 # compile_ex('test_inbound_int_msg2.tvm', 'stdlib_sol.tvm')
 # expect_success('test', "", "-1", "--internal 0")
 
+	# '''
+
 compile_ex('test_send_int_msg.tvm', 'stdlib_sol.tvm')
+# expect_success(None, "", None, "--trace")	# check empty input
 expect_success('main', "", None, "--internal 0 --decode-c6")
 expect_output(r"destination : 0:0+007F")
 expect_output(r"CurrencyCollection: Grams.*value = 1000]")
+
+compile_ex('test_send_int_msg.tvm', 'stdlib_sol.tvm')
+expect_success('main', "", None, "--decode-c6")
+expect_output(r"destination : 0:0+007F")
+expect_output(r"CurrencyCollection: Grams.*value = 1000]")
 	
+compile_ex('test_c5.code', None)
+expect_success('main', "", None, "--internal 0 --trace")

@@ -83,10 +83,22 @@
 	PUSHINT $get_msg_pubkey$
 	CALL 1
 	
-	NEWC
-	STU 256
-	ENDC
-	POP c5
+	PUSHINT $store_signature$
+	CALL 1
+	
+    ; s0 - msg body: slice
+	
+	; check if message is empty
+	DUP
+	SEMPTY
+	PUSHCONT {
+		DROP
+		NEWDICT
+		NEWC STSLICE ENDC
+		POPROOT
+		RET
+	}
+	IFJMP
     
     ;parse ABI version (1 byte) and load function id (4 bytes)
     LDU 8       ;load ABI version
@@ -95,6 +107,33 @@
     LDU 32      ;load func id
     SWAP
     CALL 1      ;public method call
+
+
+
+	.globl		store_signature
+	; stack: sign
+	
+	PUSH c5
+	CTOS
+	LDREFRTOS
+;	LDREF	;; not working by some reason
+	NIP
+	
+	; stack: sign SmartContractInfo(SLICE)
+	NEWC
+	STSLICE
+	ENDC
+
+	; stack: sign SmartContractInfo(CELL)
+	NEWC
+	; stack: sign SmartContractInfo b
+	STREF
+	; stack: sign b'
+	STU 256
+	; stack: b''
+	ENDC
+	POP c5
+	RET
 
     .internal   :main_internal
     ; s0 - msg body: slice

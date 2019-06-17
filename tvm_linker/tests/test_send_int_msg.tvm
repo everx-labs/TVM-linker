@@ -14,7 +14,7 @@
 	PUSHINT $send_int_msg$
 	CALL 1
 	
-	PUSH c6
+;	PUSH c6
 	RET
 	
 
