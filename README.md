@@ -31,25 +31,26 @@ To use this method, call
 	tvm_linker source-code-name --decode
 
 ### 3) Preparing message in boc format.
-The message may be either an initialization message with code,
-or a message to an exisiting contract.
 
-The command format is the same, except for --init and --data additional
-agruments.
+First, generate contract as described in 1). Then use `message` subcommand to create external inbound message in boc format:
 
-	tvm_linker source-code-name --message
+	tvm_linker address message [--init] [--data] [-w]
 
-If you are giving an init message, use --init option:
+If you want to deploy your contract, use --init option:
 
-	tvm_linker source-code-name --message --init
+	tvm_linker address --message --init
 
-If you are giving a message to an exisiting contract, use --data option:
+Constructor message will be created with code and data loaded from file `address.tvc`. 
 
-	tvm_linker source-code-name <main-method-name> --message --data 0000
+Aditional, you can add body to the message with option `--data':
 
-Instead of 0000 in data option, specify the necessary message body in hex
-format. The code is not packed into the message, however, it is necessary
-to compute address of the contract.
+	tvm_linker address message --data XXXX...
+
+Instead of `XXXX...`, specify the necessary message body in hex format. 
+
+By default, -1 is used as a workchain id in contract address. To use another one, use `-w` option:
+
+tvm_linker address --message -w 0
 
 ### 4) Emulating execution of the contract:
 
