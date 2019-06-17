@@ -37,12 +37,12 @@ use tvm::stack::BuilderData;
 
 
 fn main() {
-    panic::set_hook(Box::new(|panic_info| {
+    let default_panic_handler = panic::take_hook();
+    panic::set_hook(Box::new(move |panic_info| {
         if let Some(s) = panic_info.payload().downcast_ref::<String>() {
             println!("{}", s);
         } else {
-            let loc = panic_info.location().unwrap();
-            println!("Fatal error {:?}: {}:{}:{}", panic_info.payload(), loc.file(), loc.line(), loc.column());
+            default_panic_handler(panic_info);
         }
     }));
 
@@ -149,7 +149,11 @@ fn main() {
  
     if matches.is_present("MESSAGE") {
         let msg_body = match matches.value_of("DATA") {
-            Some(data) => Some(BuilderData::with_raw(hex::decode(data).unwrap(), data.len()*8).into()),
+            Some(data) => {
+                let buf = hex::decode(data).unwrap();
+                let len = buf.len() * 8;
+                Some(BuilderData::with_raw(buf, len).into())
+            },
             None => None,
         };
         let mut suffix = String::new();
