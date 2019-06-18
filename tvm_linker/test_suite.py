@@ -51,7 +51,8 @@ def compile_ex(source_file, lib_file):
 	print("Compiling " + source_file + "...")
 	lib = "--lib " + lib_file if lib_file else ""
 	ec = os.system("./target/debug/tvm_linker {} ./tests/{} --debug > compile_log.tmp".format(lib, source_file))
-	assert ec == 0, ec
+	if ec != 0:
+		error("COMPILATION FAILED!")
 
 	lines = [l.rstrip() for l in open("compile_log.tmp").readlines()]
 	# os.remove("compile_log.tmp")
@@ -71,8 +72,14 @@ def exec_and_parse(method, params, expected_ec, options):
 	sign = ("--sign " + SIGN) if SIGN else "";
 	if method and method not in functions:
 		error("Cannot find method '{}'".format(method)) 
-	id = functions[method] if method else ""
-	cmd = "./target/debug/tvm_linker {} test --body 00{}{} {} {} >exec_log.tmp".format(CONTRACT_ADDRESS, id, params, sign, options)
+	if method == None:
+		body = ""
+	elif method == "":
+		body = "--body 00"
+	else:
+		id = functions[method]
+		body = "--body 00{}{}".format(id, params)
+	cmd = "./target/debug/tvm_linker {} test {} {} {} >exec_log.tmp".format(CONTRACT_ADDRESS, body, sign, options)
 	# print cmd
 	ec = os.system(cmd)
 	assert ec == 0, ec
@@ -108,7 +115,7 @@ def expect_output(regex):
 	# '''
 
 compile_ex('test_factorial.code', 'stdlib_sol.tvm')
-expect_success('constructor', "", "", "")
+expect_success('constructor', "", "", "--trace")
 expect_success('main', "0003", "6", "")
 expect_success('main', "0006", "726", "")
 cleanup()
@@ -130,7 +137,7 @@ cleanup()
 
 SIGN = None
 compile_ex('test_inbound_int_msg.tvm', None)
-expect_success(None, "", "-1", "--internal 15000000000")
+expect_success("", "", "-1", "--internal 15000000000")
 cleanup()
 
 SIGN = None
@@ -138,13 +145,10 @@ compile_ex('test_pers_data.tvm', "stdlib.tvm")
 expect_success('ctor', "", "-1", "--internal 100")
 cleanup()
 
-# compile_ex('test_inbound_int_msg2.tvm', 'stdlib_sol.tvm')
-# expect_success('test', "", "-1", "--internal 0")
-
 	# '''
 
 compile_ex('test_send_int_msg.tvm', 'stdlib_sol.tvm')
-# expect_success(None, "", None, "--trace")	# check empty input
+expect_success(None, "", None, "--trace")	# check empty input
 expect_success('main', "", None, "--internal 0 --decode-c6")
 expect_output(r"destination : 0:0+007F")
 expect_output(r"CurrencyCollection: Grams.*value = 1000]")
@@ -154,5 +158,5 @@ expect_success('main', "", None, "--decode-c6")
 expect_output(r"destination : 0:0+007F")
 expect_output(r"CurrencyCollection: Grams.*value = 1000]")
 	
-compile_ex('test_c5.code', None)
-expect_success('main', "", None, "--internal 0 --trace")
+# compile_ex('test_c5.code', None)
+# expect_success('main', "", None, "--internal 0 --trace")

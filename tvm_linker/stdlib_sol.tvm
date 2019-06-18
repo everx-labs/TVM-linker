@@ -24,6 +24,7 @@
     IFELSE
 
     .globl	get_msg_pubkey
+	.type	get_msg_pubkey, @function
 	; s0 - msg body: slice
 	; Returns 0 if message is not signed
 	; Returns sender's pubkey if signature is valid
@@ -111,6 +112,7 @@
 
 
 	.globl		store_signature
+	.type		store_signature, @function
 	; stack: sign
 	
 	PUSH c5
@@ -159,6 +161,7 @@
 
 	;; taken from TON-Wallet
 	.globl	send_int_msg
+	.type	send_int_msg, @function
 					;args: 
 					; s0 - transfer grams value: integer
 					; s1 - dst account address: integer

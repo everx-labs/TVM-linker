@@ -1,10 +1,12 @@
 
 .globl constructor_external
+.type constructor_external, @function
 DROP
 PUSHINT $constructor$
 CALL 1
 
 .globl constructor
+.type constructor, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: constructor
 NEWDICT
@@ -54,12 +56,14 @@ DROP
 RET
 
 .globl set_role_external
+.type set_role_external, @function
 LDU 8
 DROP
 PUSHINT $set_role$
 CALL 1
 
 .globl set_role
+.type set_role, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: set_role
 ;; param: role
@@ -109,11 +113,13 @@ BLKDROP 2
 RET
 
 .globl get_role_external
+.type get_role_external, @function
 DROP
 PUSHINT $get_role$
 CALL 1
 
 .globl get_role
+.type get_role, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: get_role
 ;; tvm_sender_pubkey
