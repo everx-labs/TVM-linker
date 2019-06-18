@@ -1,7 +1,7 @@
 ;;;;
-;; ./target/debug/tvm_linker --lib stdlib.tvm ./tests/test_send_int_msg.tvm test --body 000D6E4079
 
-	.globl main_external
+	.globl	main_external
+	.type	main_external, @function
 	
 	PUSHINT 0 			;; next msg logical time
 	PUSHINT 123
@@ -14,7 +14,7 @@
 	PUSHINT $send_int_msg$
 	CALL 1
 	
-	PUSH c6
+;	PUSH c6
 	RET
 	
 

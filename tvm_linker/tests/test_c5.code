@@ -1,0 +1,39 @@
+	.selector
+	DROP DROP DROP DROP DROP
+	PUSH c5
+	
+	PUSHINT 0
+	
+	;;; .globl store_signature
+	
+	; stack: sign
+	PUSH c5
+	CTOS
+	LDREFRTOS
+;	LDREF	;; not working by some reason
+	NIP
+	
+	; stack: sign SmartContractInfo(SLICE)
+	NEWC
+	STSLICE
+	ENDC
+
+	; stack: sign SmartContractInfo(CELL)
+	NEWC
+	; stack: sign SmartContractInfo b
+	STREF
+	; stack: sign b'
+	STU 256
+	; stack: b''
+	ENDC
+	POP c5
+	
+	PUSH c5
+	
+	RET
+	
+	.globl store_signature
+	RET
+	
+	.globl main_external
+	RET

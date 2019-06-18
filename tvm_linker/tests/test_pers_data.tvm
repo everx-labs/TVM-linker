@@ -16,6 +16,7 @@
 
 
     .globl ctor_external
+    .type ctor_external, @function
     BLKDROP 4
 
     PUSHSLICE x00000001
@@ -38,6 +39,7 @@
     PUSHINT -1
 
     .globl  increment_external
+    .type	increment_external, @function
     PUSHROOT
     CTOS
     LDREFRTOS
@@ -77,6 +79,7 @@
     POPROOT
     
     .globl get_external
+    .type  get_external, @function
     PUSHINT 0
     PUSHROOT
     CTOS

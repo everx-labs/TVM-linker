@@ -1,8 +1,10 @@
 .globl constructor_external
+.type constructor_external, @function
 DROP
 PUSHINT $constructor$
 CALL 1
 .globl constructor
+.type constructor, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: constructor
 NEWDICT
@@ -20,6 +22,7 @@ POPROOT
 ;; return
 RET
 .globl fact
+.type fact, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: fact
 ;; param: n
@@ -54,11 +57,13 @@ MUL
 POP s1
 RET
 .globl main_external
+.type main_external, @function
 LDU 16
 DROP
 PUSHINT $main$
 CALL 1
 .globl main
+.type main, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: main
 ;; param: n
