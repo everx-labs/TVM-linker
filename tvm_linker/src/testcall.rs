@@ -1,13 +1,12 @@
 use keyman::KeypairManager;
 use log::Level::Error;
-use program::save_to_file;
+use program::{load_from_file, save_to_file};
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use sha2::Sha512;
 use std::fmt;
-use std::io::Cursor;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tvm::cells_serialization::{BagOfCells, deserialize_cells_tree};
+use tvm::cells_serialization::BagOfCells;
 use tvm::executor::Engine;
 use tvm::executor::gas::gas_state::Gas;
 use tvm::stack::*;
@@ -95,11 +94,7 @@ fn init_logger(debug: bool) {
     ).unwrap();
 }
 
-fn load_from_file(contract_file: &str) -> StateInit {
-    let mut csor = Cursor::new(std::fs::read(contract_file).unwrap());
-    let cell = deserialize_cells_tree(&mut csor).unwrap().remove(0);
-    StateInit::construct_from(&mut cell.into()).unwrap()
-}
+
 
 pub fn perform_contract_call(
     contract_file: &str, 

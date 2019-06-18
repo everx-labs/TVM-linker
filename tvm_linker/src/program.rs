@@ -1,10 +1,11 @@
 use ed25519_dalek::{Keypair, PUBLIC_KEY_LENGTH};
+use std::io::Cursor;
 use std::io::Write;
 use std::sync::Arc;
 use methdict::*;
 use ton_block::*;
 use tvm::assembler::compile_code;
-use tvm::cells_serialization::{BagOfCells};
+use tvm::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use tvm::stack::*;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
 use parser::ParseEngine;
@@ -115,6 +116,12 @@ pub fn save_to_file(state: StateInit, name: Option<&str>) -> Result<String, Stri
         println! ("Saved contract to file {}", &file_name);
     }
     Ok(file_name)
+}
+
+pub fn load_from_file(contract_file: &str) -> StateInit {
+    let mut csor = Cursor::new(std::fs::read(contract_file).unwrap());
+    let cell = deserialize_cells_tree(&mut csor).unwrap().remove(0);
+    StateInit::construct_from(&mut cell.into()).unwrap()
 }
 
 #[cfg(test)]

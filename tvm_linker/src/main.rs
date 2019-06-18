@@ -25,8 +25,7 @@ mod testcall;
 use keyman::KeypairManager;
 use parser::ParseEngine;
 use program::Program;
-use real_ton::{ decode_boc, compile_real_ton };
-use regex::Regex;
+use real_ton::{ decode_boc, compile_message };
 use resolver::resolve_name;
 use std::fs::File;
 use std::io::{BufReader};
@@ -37,12 +36,12 @@ use tvm::stack::BuilderData;
 
 
 fn main() {
-    panic::set_hook(Box::new(|panic_info| {
+    let default_panic_handler = panic::take_hook();
+    panic::set_hook(Box::new(move |panic_info| {
         if let Some(s) = panic_info.payload().downcast_ref::<String>() {
             println!("{}", s);
         } else {
-            let loc = panic_info.location().unwrap();
-            println!("Fatal error {:?}: {}:{}:{}", panic_info.payload(), loc.file(), loc.line(), loc.column());
+            default_panic_handler(panic_info);
         }
     }));
 
@@ -51,10 +50,7 @@ fn main() {
         (author: "tonlabs")
         (about: "Links TVM assembler file, loads and executes it in testing environment")
         (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
-        (@arg DECODE: --decode "Decodes real TON message")
-        (@arg MESSAGE: --message "Builds TON message for the contract in INPUT")
-        (@arg INIT: --init "Packs code into TON State Init message")
-        (@arg DATA: --data +takes_value "Supplies data to contract in hex format (empty data by default)")
+        (@arg DECODE: --decode "Decodes real TON message")       
         (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
         (@arg LIB: --lib +takes_value "Standard library source file")
         (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file")
@@ -69,6 +65,14 @@ fn main() {
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
             (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
             (@arg INTERNAL: --internal +takes_value "Emulates inbound internal message with value instead of external message")
+        )
+        (@subcommand message =>
+            (about: "generate external inbound message for the blockchain")
+            (version: "0.1")
+            (author: "tonlabs")
+            (@arg INIT: -i --init "Generates constructor message with code and data of the contract")
+            (@arg DATA: -d --data +takes_value "Supplies body for the message in hex format (empty data by default)")
+            (@arg WORKCHAIN: -w --workchain +takes_value "Supplies workchain id for the contract address")
         )
     ).get_matches();
 
@@ -110,7 +114,36 @@ fn main() {
 
     if matches.is_present("DECODE") {
         decode_boc(matches.value_of("INPUT").unwrap());
-        return
+        return;
+    }
+
+    if let Some(msg_matches) = matches.subcommand_matches("message") {
+        let msg_body = match msg_matches.value_of("DATA") {
+            Some(data) => {
+                let buf = hex::decode(data).unwrap();
+                let len = buf.len() * 8;
+                Some(BuilderData::with_raw(buf, len).into())
+            },
+            None => None,
+        };
+        let mut suffix = String::new();
+        suffix += "-msg";
+        if msg_matches.is_present("INIT") {
+        suffix += "-init";
+        }
+        if msg_matches.is_present("DATA") {
+        suffix += "-body";
+        }
+        suffix += ".boc";      
+        
+        compile_message(
+            matches.value_of("INPUT").unwrap(), 
+            msg_matches.value_of("WORKCHAIN"), 
+            msg_body, 
+            msg_matches.is_present("INIT"), 
+            &suffix
+        ).expect("error");
+        return;
     }
 
     let mut parser = ParseEngine::new();
@@ -146,25 +179,6 @@ fn main() {
     if matches.is_present("DEBUG") {
        prog.debug_print();        
     }
- 
-    if matches.is_present("MESSAGE") {
-        let msg_body = match matches.value_of("DATA") {
-            Some(data) => Some(BuilderData::with_raw(hex::decode(data).unwrap(), data.len()*8).into()),
-            None => None,
-        };
-        let mut suffix = String::new();
-        suffix += "-msg";
-        if matches.is_present("INIT") {
-        suffix += "-init";
-        }
-        suffix += ".boc";
-
-        let re = Regex::new(r"\.[^.]+$").unwrap();
-        let msg_file = re.replace(matches.value_of("INPUT").unwrap(), suffix.as_str());
-        
-        compile_real_ton(prog.compile_to_state().expect("error"), msg_body, &msg_file, matches.is_present("INIT"));
-        return;
-    } else {
-        prog.compile_to_file().expect("error");
-    }    
+     
+    prog.compile_to_file().expect("error");
 }
