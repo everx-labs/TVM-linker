@@ -159,17 +159,37 @@
 
     RET
 
-	;; taken from TON-Wallet
+	.globl	send_int_msg_2
+	.type	send_int_msg_2, @function
+		;args: 
+		; s0 - body: slice
+		; s1 - dst account address: integer
+		;ret: none
+		
+		PUSHINT 0	;; next msg logical time
+		PUSH s1		;; body: slice
+		PUSH s3		;; dst account address: integer
+		PUSHINT 1	;; transfer grams value: integer
+		
+		PUSHINT $send_int_msg$
+;		RET
+		CALL 1
+		
+		POP s1
+		POP s1
+		RET
+	
 	.globl	send_int_msg
 	.type	send_int_msg, @function
-					;args: 
-					; s0 - transfer grams value: integer
-					; s1 - dst account address: integer
-					; s2 - body: slice
-					; s3 - next msg logical time
-					;ret: none
+	;; taken from TON-Wallet
+			;args: 
+			; s0 - transfer grams value: integer
+			; s1 - dst account address: integer
+			; s2 - body: slice
+			; s3 - next msg logical time
+			;ret: none
 
-					SWAP
+			SWAP
 					
 			;args: s0 - address: integer u256
 			;ret: s0 - slice

@@ -1,0 +1,49 @@
+
+.globl	get_allowance_external
+.type	get_allowance_external, @function
+LDU 256
+DROP
+PUSHINT $get_allowance$
+CALL 1
+
+.globl	get_allowance
+.type	get_allowance, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: get_allowance
+;; param: requester
+;; requester
+;; stack=1
+DUP
+;; on_get_allowance
+PUSHINT 0
+PUSHINT $on_get_allowance$
+PUSHINT 0
+NEWC
+STU 8
+STU 32
+;; 
+STU 64
+ENDC CTOS
+PUSHINT $send_int_msg_2$
+CALL 1
+PUSHINT 0
+;; return
+POP s1
+POP s1
+RET
+
+.globl	on_get_allowance_external
+.type	on_get_allowance_external, @function
+LDU 64
+DROP
+PUSHINT $on_get_allowance$
+CALL 1
+
+.globl	on_get_allowance
+.type	on_get_allowance, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: on_get_allowance
+;; param: 
+;; return
+DROP
+RET
