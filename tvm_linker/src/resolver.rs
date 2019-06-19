@@ -2,7 +2,7 @@ use regex::Regex;
 
 use std::fmt::{LowerHex, UpperHex, Display};
 lazy_static! {
-    pub static ref NAMES: Regex = Regex::new(r"\$(?P<id>:?[_0-9a-zA-Z]+)(:(?P<len>\d*)?(?P<fmt>[xX])?)?\$").unwrap();
+    pub static ref NAMES: Regex = Regex::new(r"\$(?P<id>:?[-_0-9a-zA-Z]+)(:(?P<len>\d*)?(?P<fmt>[xX])?)?\$").unwrap();
 }
 
 pub fn resolve_name<F, T>(text: &str, get: F) -> Result<String, String> 

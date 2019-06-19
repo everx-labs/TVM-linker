@@ -3,7 +3,12 @@
 	.internal-alias :general_purpose,   1
 	.internal-alias :authenticate,      2
 	.internal-alias :parse_msg,         3
-    .internal-alias :parse_internal_msg,    4
+    .internal-alias :parse_internal_msg, 4
+    .internal-alias :init_stack,        5
+    .internal-alias :cleanup_stack,     6
+
+    .global-base        0
+    .persistent-base    1000000
 
     .selector
     ; s0 - func_id
@@ -59,15 +64,51 @@
         LDREFRTOS       ;detach signature slice
         OVER
         HASHSU
-        SWAP    
+        SWAP
+        PUSHINT $tvm_public_key$    
         PUSHROOT        ;load persistent data
-        CTOS            
-        LDU 256         ;load public key
-        DROP            ;drop remaining data slice
+        CTOS   
+        PUSHINT  64         
+        DICTIGET
+        THROWIFNOT 100
+        LDU 256
+        ENDS
         CHKSIGNU
         THROWIFNOT 40   ;access denied exception
     }
     IF
+
+    .internal   :init_stack
+    ;1) get global data dict from persistent dict(c4) with key 8
+    ;2) get SmartContractInfo slice from c5.ref0 
+    ;3) set SmartContractInfo slice to global data dictionary at key 'global-base'
+    ;4) put global data dictionary to the register c5 as cell.
+    PUSH c5
+    CTOS LDREFRTOS NIP
+    PUSHINT $global-base$
+    
+    PUSHINT $persistent-base$
+    ADDCONST 8
+    PUSHROOT
+    CTOS
+    PUSHINT 64
+    DICTIGET
+    THROWIFNOT 100 ;global data dictionary is invalid
+    
+    PUSHINT 64
+    DICTISET
+    NEWC STSLICE ENDC
+    POP c5
+
+    .internal :cleanup_stack
+    PUSHINT $global-base$
+    PUSH c5 CTOS
+    PUSHINT 64
+    DICTIGET
+    THROWIFNOT 100 ;global data dictionary is invalid
+    NEWC STSLICE ENDC
+    NEWC STREF ENDC
+    POP c5
 
     .internal   :main_external
     ; s0 - msg body: slice
@@ -81,6 +122,9 @@
     ;call msg parser
     PUSH s1     ;push msg cell on top
     CALL $:parse_msg$    ;assume thar parser returns slice - dictionary with msg fields
+
+    ;initializes global data dictionary in c5
+    CALL $:init_stack$
     
     SWAP
     ;parse ABI version (1 byte) and load function id (4 bytes)
@@ -90,6 +134,9 @@
     LDU 32      ;load func id
     SWAP
     CALL 1      ;public method call
+
+    CALL $:cleanup_stack$
+
 
     .internal   :main_internal
     ; s0 - msg body: slice
@@ -101,6 +148,9 @@
     PUSH s1     ;push msg cell on top
     CALL $:parse_internal_msg$    ;assume thar parser returns slice - dictionary with msg fields
     
+    ;initializes global data dictionary in c5
+    CALL $:init_stack$
+
     POP s2
     DUP
     SDEMPTY
@@ -112,6 +162,8 @@
     LDU 32      ;load func id
     SWAP
     CALL 1      ;public method call 
+
+    CALL $:cleanup_stack$
 
     .internal   :parse_msg
     CTOS        ;TODO: use parser from contract_api library

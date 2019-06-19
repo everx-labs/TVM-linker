@@ -1,12 +1,35 @@
 	.internal-alias :main_external,     -1
 	.internal-alias :authenticate,      2
 
+    .global-base        0
+    .persistent-base    1000000
+
     .selector
     SETCP0
+    PUSHINT $y_persistent$
+    PUSHROOT CTOS
+    PUSHINT 64
+    DICTIGET
+    THROWIFNOT
+    LDI 256 ENDS
+    PUSHINT 127
+    EQUAL
+    THROWIFNOT 101
+    CALL $:main_external$
+    CALL $:authenticate$
+
+    PUSHINT $a$
+    PUSH c5 CTOS
+    PUSHINT 64
+    DICTIGET
+    THROWIFNOT 102
+    LDI 256 ENDS
+    PUSHINT 1 
+    EQUAL
+    THROWIFNOT 104
 
     .internal   :main_external
-    CALL $:authenticate$ 
-    DROP
+    PUSHINT 10
 
     .internal   :authenticate
     DUP
@@ -17,10 +40,11 @@ x:
     RET         ;contract ignores internal msgs by default 
 
     .data
-    .globl  y
-    .type   y,    @object
-    .size   y,    1
-y:
+    .globl  y_persistent
+    .align 16
+    .type   y_persistent,  @object
+    .size   y_persistent,  1
+y_persistent:
     .byte   127
 
     .globl  z
