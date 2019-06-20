@@ -3,6 +3,7 @@ use ton_block::Serializable;
 use tvm::assembler::compile_code;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
 use tvm::stack::{BuilderData, SliceData};
+use tvm::assembler::CompileError;
 
 pub fn build_hashmap<K>(pairs: &[(K, SliceData)]) -> SliceData 
 where 
@@ -15,13 +16,17 @@ where
     dict.get_data()
 }
 
-pub fn prepare_methods<T>(methods: &HashMap<T, String>) -> Result<SliceData, String>
+pub fn prepare_methods<T>(methods: &HashMap<T, String>) -> Result<SliceData, (T, CompileError)>
 where T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash {
-    let method_vec: Vec<_> = 
-        methods
-            .iter()
-            .map(|pair| (pair.0.clone(), compile_code(&pair.1).map_err(|e| format!("func {}: compilation failed: {}", &pair.0, e)).expect("error")))
-            .collect(); 
+    let mut method_vec = vec![]; 
+    for pair in methods.iter() {
+        method_vec.push(
+            (
+                pair.0.clone(), 
+                compile_code(&pair.1).map_err(|e| (pair.0.clone(), e))?
+            )
+        );
+    }            
     Ok(build_hashmap(&method_vec[..]))
 }
 
