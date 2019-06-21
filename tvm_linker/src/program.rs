@@ -8,6 +8,7 @@ use tvm::assembler::compile_code;
 use tvm::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use tvm::stack::*;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
+use tvm::assembler::CompileError;
 use parser::{ptr_to_builder, ParseEngine};
 
 const AUTH_METHOD_NAME: &'static str = ":authenticate";
@@ -52,7 +53,12 @@ impl Program {
 
     pub fn method_dict(&self) -> Result<SliceData, String> {
         let mut method_dict = HashmapE::with_data(32, self.build_toplevel_dict()?);
-        let methods = prepare_methods(&self.engine.globals())?;
+        let methods = prepare_methods(&self.engine.globals())
+            .map_err(|e| {
+                let name = self.engine.global_name(e.0).unwrap();
+                let code = self.engine.global_by_name(&name).unwrap().1;
+                format_compilation_error_string(e.1, &name, &code)
+            })?;
         let key = 1i32.write_to_new_cell().unwrap();
         method_dict.set(key.into(), methods).unwrap();
         Ok(method_dict.get_data())
@@ -70,13 +76,19 @@ impl Program {
     }
 
     pub fn compile_asm(&self) -> Result<SliceData, String> {
-        let mut bytecode = compile_code(self.engine.entry()).map_err(|e| format!("Compilation failed: {}", e))?;
+        let mut bytecode = compile_code(self.engine.entry())
+            .map_err(|e| format_compilation_error_string(e, "selector", self.engine.entry()) )?;
         bytecode.append_reference(self.method_dict()?);
         Ok(bytecode)
     }
 
     fn build_toplevel_dict(&self) -> Result<SliceData, String> {
-        let mut dict = prepare_methods(self.engine.internals())?;
+        let mut dict = prepare_methods(self.engine.internals())
+            .map_err(|e| {
+                let name = self.engine.internal_name(e.0).unwrap();
+                let code = self.engine.internal_by_name(&name).unwrap().1;
+                format_compilation_error_string(e.1, &name, &code)
+            })?;
         
         if let Some(auth) = self.engine.internal_by_name(AUTH_METHOD_NAME) {
             let auth_method = prepare_auth_method(
@@ -125,6 +137,19 @@ pub fn load_from_file(contract_file: &str) -> StateInit {
     let mut csor = Cursor::new(std::fs::read(contract_file).unwrap());
     let cell = deserialize_cells_tree(&mut csor).unwrap().remove(0);
     StateInit::construct_from(&mut cell.into()).unwrap()
+}
+
+fn format_compilation_error_string(err: CompileError, func_name: &str, func_code: &str) -> String {
+    let line_num = match err {
+        CompileError::Syntax(position @ _, _) => position.line,
+        CompileError::UnknownOperation(position @ _) => position.line,
+        CompileError::Operation(position @ _, _, _) => position.line,
+    };
+    format!("compilation failed: \"{}\":{}:\"{}\"", 
+        func_name,
+        err,
+        func_code.lines().nth(line_num - 1).unwrap(),
+    )
 }
 
 #[cfg(test)]

@@ -29,22 +29,16 @@ use real_ton::{ decode_boc, compile_message };
 use resolver::resolve_name;
 use std::fs::File;
 use std::io::{BufReader};
-use std::panic;
 use testcall::perform_contract_call;
 use tvm::stack::BuilderData;
 
-
-
 fn main() {
-    let default_panic_handler = panic::take_hook();
-    panic::set_hook(Box::new(move |panic_info| {
-        if let Some(s) = panic_info.payload().downcast_ref::<String>() {
-            println!("{}", s);
-        } else {
-            default_panic_handler(panic_info);
-        }
-    }));
+    if let Err(err_str) = linker_main() {
+        println!("error: {}", err_str);
+    }
+}
 
+fn linker_main() -> Result<(), String> {
     let matches = clap_app! (tvm_loader =>
         (version: "0.1")
         (author: "tonlabs")
@@ -83,16 +77,16 @@ fn main() {
                 let mut parser = ParseEngine::new();
 
                 if let Some(source) = test_matches.value_of("SOURCE") {
-                    let file = File::open(source).expect("error opening source file");
+                    let file = File::open(source).map_err(|e| format!("cannot opening source file: {}", e))?;
                     let mut reader = BufReader::new(file);
-                    parser.parse_code(&mut reader, true).expect("error");
+                    parser.parse_code(&mut reader, true)?;
                 }
 
                 hex_str = resolve_name(&hex_str, |name| {
                     parser.global_by_name(name).map(|id| id.0)
-                }).expect(&format!("error: failed to resolve body {}", hex_str));
+                }).map_err(|e| format!("failed to resolve body {}: {}", hex_str, e))?;
 
-                let buf = hex::decode(&hex_str).map_err(|_| format!("body {} is invalid hex string", hex_str)).expect("error");
+                let buf = hex::decode(&hex_str).map_err(|_| format!("body {} is invalid hex string", hex_str))?;
                 let buf_bits = buf.len() * 8;
                 Some(BuilderData::with_raw(buf, buf_bits).into())
             },
@@ -109,18 +103,18 @@ fn main() {
             test_matches.value_of("INTERNAL"),
         );
         println!("TEST COMPLETED");
-        return;
+        return ok!();
     }
 
     if matches.is_present("DECODE") {
         decode_boc(matches.value_of("INPUT").unwrap());
-        return;
+        return ok!();
     }
 
     if let Some(msg_matches) = matches.subcommand_matches("message") {
         let msg_body = match msg_matches.value_of("DATA") {
             Some(data) => {
-                let buf = hex::decode(data).unwrap();
+                let buf = hex::decode(data).map_err(|_| "data argument has invalid format".to_string())?;
                 let len = buf.len() * 8;
                 Some(BuilderData::with_raw(buf, len).into())
             },
@@ -136,27 +130,25 @@ fn main() {
         }
         suffix += ".boc";      
         
-        compile_message(
+        return compile_message(
             matches.value_of("INPUT").unwrap(), 
             msg_matches.value_of("WORKCHAIN"), 
             msg_body, 
             msg_matches.is_present("INIT"), 
-            &suffix
-        ).expect("error");
-        return;
+            &suffix,
+        )
     }
 
     let mut parser = ParseEngine::new();
     parser.parse(
         File::open(matches.value_of("INPUT").unwrap())
-            .map_err(|e| format!("cannot open source file: {}", e))
-            .expect("error"), 
+            .map_err(|e| format!("cannot open source file: {}", e))?,
         matches.value_of("LIB")
             .map(|val| vec![val])
             .unwrap_or(vec![])
             .iter().map(|lib| File::open(lib).map_err(|e| format!("cannot open library file: {}", e)).expect("error"))
             .collect(),
-    ).expect("error");
+    )?;
 
     let mut prog = Program::new(parser);
 
@@ -180,5 +172,6 @@ fn main() {
        prog.debug_print();        
     }
      
-    prog.compile_to_file().expect("error");
+    prog.compile_to_file()?;
+    ok!()
 }

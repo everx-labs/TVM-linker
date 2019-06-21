@@ -171,6 +171,10 @@ impl ParseEngine {
         &self.internals
     }
 
+    pub fn internal_name(&self, id: i32) -> Option<String> {
+        self.intrefs.iter().find(|i| *i.1 == id).map(|i| i.0.clone())
+    }
+
     pub fn internal_by_name(&self, name: &str) -> Option<(i32, String)> {
         let id = self.intrefs.get(name)?;
         let body = self.internals.get(id).map(|v| v.to_owned())?;
@@ -189,6 +193,16 @@ impl ParseEngine {
             funcs.insert(i.0, i.1.clone());
         }
         funcs
+    }
+
+    pub fn global_name(&self, id: u32) -> Option<String> {
+        self.globals.iter().find(|item| {
+            match item.1.dtype {
+                ObjectType::Function(ref func) => func.0 == id,
+                _ => false,
+            }
+        })
+        .map(|i| i.0.clone())
     }
 
     pub fn global_by_name(&self, name: &str) -> Option<(u32, String)> {
@@ -495,7 +509,7 @@ impl ParseEngine {
         .or_else(|_| resolve_name(line, |name| self.intrefs.get(name).map(|id| id.clone())))
         .or_else(|_| resolve_name(line, |name| self.globals.get(name).and_then(|obj| {
             match &obj.dtype {
-                ObjectType::Data { addr, values: _, persistent: _ } => Some(addr),
+                ObjectType::Data { addr, values: _, persistent: _ } => Some(addr.clone()),
                 _ => None,
             }           
         })))

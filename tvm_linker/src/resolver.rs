@@ -1,14 +1,15 @@
 use regex::Regex;
-
+use std::convert::TryFrom;
 use std::fmt::{LowerHex, UpperHex, Display};
+
 lazy_static! {
-    pub static ref NAMES: Regex = Regex::new(r"\$(?P<id>:?[-_0-9a-zA-Z]+)(:(?P<len>\d*)?(?P<fmt>[xX])?)?\$").unwrap();
+    pub static ref NAMES: Regex = Regex::new(r"\$(?P<id>:?[-_0-9a-zA-Z]+)(?P<offset>\+\d+)?(:(?P<len>\d*)?(?P<fmt>[xX])?)?\$").unwrap();
 }
 
 pub fn resolve_name<F, T>(text: &str, get: F) -> Result<String, String> 
     where 
         F: Fn(&str) -> Option<T>,
-        T: LowerHex + UpperHex + Display {
+        T: LowerHex + UpperHex + Display + TryFrom<isize> + std::ops::AddAssign {
     let mut res_str = String::new();
     let mut end = 0;
     for cap in NAMES.captures_iter(text) {
@@ -19,7 +20,14 @@ pub fn resolve_name<F, T>(text: &str, get: F) -> Result<String, String>
         res_str += text.get(end..name_match.start() - 1).unwrap();
         let name = name_match.as_str();
 
-        let id = get(name).ok_or(format!("name ({}) not found", name))?;
+        let offset = cap.name("offset").map(|m| {
+                let off_str = m.as_str();
+                let off = isize::from_str_radix(off_str.get(1..).unwrap(), 10).unwrap();
+                if off_str.starts_with('-') { 0 - off } else { off }
+            }).unwrap_or(0);
+
+        let mut id = get(name).ok_or(format!("name ({}) not found", name))?;
+        id += T::try_from(offset).map_err(|_| "symbol offset is too big".to_string())?;
 
         let len = match cap.name("len") {
             Some(len_match) => {
@@ -99,5 +107,14 @@ mod tests {
     #[test]
     fn test_resolve_multiple() {
         assert_eq!(resolve_name(" $ctor:X$---$get$$ctor_1:08x$", id_by_name), Ok(" 112233FF---25500001111".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_offset() {
+        assert_eq!(resolve_name("$ctor+16$", id_by_name), Ok("287454223".to_string()));
+        assert_eq!(resolve_name("$ctor+0$", id_by_name), Ok("287454207".to_string()));
+        assert_eq!(resolve_name("$ctor+16:X$", id_by_name), Ok("1122340F".to_string()));
+        assert_eq!(resolve_name("$get+256:08x$", id_by_name), Ok("000001ff".to_string()));
+        assert_eq!(resolve_name("$ctor+$", id_by_name), Ok("$ctor+$".to_string()));
     }
 }

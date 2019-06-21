@@ -10,12 +10,11 @@
     PUSHROOT CTOS
     PUSHINT 64
     DICTIGET
-    THROWIFNOT
+    THROWIFNOT 103
     LDI 256 ENDS
     PUSHINT 127
     EQUAL
     THROWIFNOT 101
-    CALL $:main_external$
     CALL $:authenticate$
 
     PUSHINT $a$
