@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use std::fmt::{LowerHex, UpperHex, Display};
 
 lazy_static! {
-    pub static ref NAMES: Regex = Regex::new(r"\$(?P<id>:?[-_0-9a-zA-Z]+)(?P<offset>\+\d*)?(:(?P<len>\d*)?(?P<fmt>[xX])?)?\$").unwrap();
+    pub static ref NAMES: Regex = Regex::new(r"\$(?P<id>:?[-_0-9a-zA-Z]+)(?P<offset>\+\d+)?(:(?P<len>\d*)?(?P<fmt>[xX])?)?\$").unwrap();
 }
 
 pub fn resolve_name<F, T>(text: &str, get: F) -> Result<String, String> 
@@ -115,5 +115,6 @@ mod tests {
         assert_eq!(resolve_name("$ctor+0$", id_by_name), Ok("287454207".to_string()));
         assert_eq!(resolve_name("$ctor+16:X$", id_by_name), Ok("1122340F".to_string()));
         assert_eq!(resolve_name("$get+256:08x$", id_by_name), Ok("000001ff".to_string()));
+        assert_eq!(resolve_name("$ctor+$", id_by_name), Ok("$ctor+$".to_string()));
     }
 }
