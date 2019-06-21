@@ -112,5 +112,8 @@ mod tests {
     #[test]
     fn test_resolve_offset() {
         assert_eq!(resolve_name("$ctor+16$", id_by_name), Ok("287454223".to_string()));
+        assert_eq!(resolve_name("$ctor+0$", id_by_name), Ok("287454207".to_string()));
+        assert_eq!(resolve_name("$ctor+16:X$", id_by_name), Ok("1122340F".to_string()));
+        assert_eq!(resolve_name("$get+256:08x$", id_by_name), Ok("000001ff".to_string()));
     }
 }
