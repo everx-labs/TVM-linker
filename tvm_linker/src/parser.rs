@@ -509,7 +509,7 @@ impl ParseEngine {
         .or_else(|_| resolve_name(line, |name| self.intrefs.get(name).map(|id| id.clone())))
         .or_else(|_| resolve_name(line, |name| self.globals.get(name).and_then(|obj| {
             match &obj.dtype {
-                ObjectType::Data { addr, values: _, persistent: _ } => Some(addr),
+                ObjectType::Data { addr, values: _, persistent: _ } => Some(addr.clone()),
                 _ => None,
             }           
         })))

@@ -6,7 +6,7 @@
 
     .selector
     SETCP0
-    PUSHINT $y_persistent$$
+    PUSHINT $y_persistent$
     PUSHROOT CTOS
     PUSHINT 64
     DICTIGET
