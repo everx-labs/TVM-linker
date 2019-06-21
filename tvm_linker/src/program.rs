@@ -145,7 +145,7 @@ fn format_compilation_error_string(err: CompileError, func_name: &str, func_code
         CompileError::UnknownOperation(position @ _) => position.line,
         CompileError::Operation(position @ _, _, _) => position.line,
     };
-    format!("compilation failed: {}:{}:{}", 
+    format!("compilation failed: \"{}\":{}:\"{}\"", 
         func_name,
         err,
         func_code.lines().nth(line_num - 1).unwrap(),
