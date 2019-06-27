@@ -6,6 +6,7 @@
     ; s0 - func_id
     ; s1.. - other data
     SETCP0
+	ACCEPT
     PUSHREFSLICE        ; dictionary of methods in first reference
     OVER
     NEQINT 1
@@ -148,6 +149,11 @@
 	POP s1
 	
     ; s0 - msg body: slice
+	
+	; protection against empty message
+	DUP
+	SEMPTY
+	IFRET
     
     ;parse ABI version (1 byte) and load function id (4 bytes)
     LDU 8       ;load ABI version
@@ -403,3 +409,8 @@
 					CALLX
 					PUSHINT 0
 					SENDRAWMSG
+					
+				PUSHINT 123
+				DROP
+				RET
+				
