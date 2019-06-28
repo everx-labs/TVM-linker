@@ -2,7 +2,7 @@
 
 	.globl	main_external
 	.type	main_external, @function
-	
+	ACCEPT
 	PUSHINT 0 			;; next msg logical time
 	PUSHINT 123
 	NEWC 
@@ -14,7 +14,9 @@
 	PUSHINT $send_int_msg$
 	CALL 1
 	
-;	PUSH c6
+	PUSHINT 234
+	DROP
+
 	RET
 	
 
