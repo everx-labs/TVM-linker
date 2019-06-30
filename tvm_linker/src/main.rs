@@ -1,4 +1,4 @@
-
+extern crate abi_json;
 #[macro_use]
 extern crate clap;
 extern crate ed25519_dalek;
@@ -14,6 +14,7 @@ extern crate tvm;
 #[macro_use]
 extern crate log;
 
+mod abi;
 mod keyman;
 mod parser;
 mod program;
@@ -22,6 +23,7 @@ mod resolver;
 mod methdict;
 mod testcall;
 
+use abi::build_abi_body;
 use keyman::KeypairManager;
 use parser::ParseEngine;
 use program::Program;
@@ -67,6 +69,9 @@ fn linker_main() -> Result<(), String> {
             (@arg INIT: -i --init "Generates constructor message with code and data of the contract")
             (@arg DATA: -d --data +takes_value "Supplies body for the message in hex format (empty data by default)")
             (@arg WORKCHAIN: -w --workchain +takes_value "Supplies workchain id for the contract address")
+            (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[DATA] "Supplies json file with contract ABI")
+            (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[DATA] "Supplies the name of the calling contract method")
+            (@arg ABI_PARAMS: -p --("abi-params") +takes_value conflicts_with[DATA] "Supplies ABI arguments for the contract method")
         )
     ).get_matches();
 
@@ -112,23 +117,41 @@ fn linker_main() -> Result<(), String> {
     }
 
     if let Some(msg_matches) = matches.subcommand_matches("message") {
+        let mut suffix = String::new();
+        suffix += "-msg";
+        if msg_matches.is_present("INIT") {
+            suffix += "-init";
+        }
+        if msg_matches.is_present("DATA") || msg_matches.is_present("ABI_JSON") {
+            suffix += "-body";
+        }
+        suffix += ".boc"; 
+
         let msg_body = match msg_matches.value_of("DATA") {
             Some(data) => {
                 let buf = hex::decode(data).map_err(|_| "data argument has invalid format".to_string())?;
                 let len = buf.len() * 8;
                 Some(BuilderData::with_raw(buf, len).into())
             },
-            None => None,
+            None => {
+                let mut mask = 0u8;
+                let abi_file = msg_matches.value_of("ABI_JSON").map(|m| {mask |= 1; m });
+                let method_name = msg_matches.value_of("ABI_METHOD").map(|m| {mask |= 2; m });
+                let params = msg_matches.value_of("ABI_PARAMS").map(|m| {mask |= 4; m });
+
+                if mask == 0x7 {
+                    let key_file = matches.value_of("SETKEY").map(|path| {
+                        let pair = KeypairManager::from_secret_file(path);
+                        pair.drain()
+                    });
+                    Some(build_abi_body(abi_file.unwrap(), method_name.unwrap(), params.unwrap(), key_file)?.into())
+                } else if mask == 0 {
+                    None
+                } else {
+                    return Err("All ABI parameters must be supplied: ABI_JSON, ABI_METHOD, ABI_PARAMS".to_string());
+                }
+            },
         };
-        let mut suffix = String::new();
-        suffix += "-msg";
-        if msg_matches.is_present("INIT") {
-        suffix += "-init";
-        }
-        if msg_matches.is_present("DATA") {
-        suffix += "-body";
-        }
-        suffix += ".boc";      
         
         return compile_message(
             matches.value_of("INPUT").unwrap(), 

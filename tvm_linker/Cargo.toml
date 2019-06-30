@@ -18,5 +18,6 @@ rand = "0.6.5"
 sha2 = "0.8.0"
 #jsonrpc-http-server = "10.0.1"
 
-tvm = { path = "../../sdk-emulator/tvm" }
-ton_block = { path = "../../sdk-emulator/ton_block" }
+abi_json = { git = "ssh://git@github.com/tonlabs/TON-SDK.git",  branch ="dev", package = "ton_abi_json" }
+tvm = { git = "ssh://git@github.com/tonlabs/sdk-emulator.git", branch = "dev", package = "tvm" }
+ton_block = { git = "ssh://git@github.com/tonlabs/sdk-emulator.git", branch = "dev", package = "ton_block" }
