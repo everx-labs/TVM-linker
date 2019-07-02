@@ -175,7 +175,7 @@
 		PUSHINT 0	;; next msg logical time
 		PUSH s1		;; body: slice
 		PUSH s3		;; dst account address: integer
-		PUSHINT 1	;; transfer grams value: integer
+		PUSHINT 10000	;; transfer grams value: integer
 		
 		PUSHINT $send_int_msg$
 ;		RET
@@ -202,6 +202,7 @@
 				NEWC
 				;tag$10 + $0 (anycast is NULL) + $00000000 (workchain_id 0i8)
 				STSLICECONST x801_
+;				STSLICECONST x9FF_
 				STU 256
 				ENDC
 				CTOS
