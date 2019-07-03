@@ -142,7 +142,6 @@ SIGN = None
 compile_ex('test_pers_data.tvm', "stdlib.tvm")
 expect_success('ctor', "", "-1", "--internal 100")
 
-	# '''
 
 compile_ex('test_send_int_msg.tvm', 'stdlib_sol.tvm')
 expect_success(None, "", None, "")	# check empty input (deploy)
@@ -160,5 +159,11 @@ expect_success(None, "", None, "")	# check empty input (deploy)
 expect_success('get_allowance', "1122334455660000000000000000000000000000000000000000005544332211", None, "--internal 0 --decode-c6 --trace")
 expect_output(r"destination : 0:1122334455660000000000000000000000000000000000000000005544332211")
 expect_output(r"body  : .* data: \[0, 26, 11, 86, 135, 0, 0, 0, 0, 0, 0, 0, 0, ")
+
+	# '''
+
+compile_ex('test_msg_sender.code', None)
+expect_success(None, "", None, "--internal 0 --trace")	# check empty input (deploy)
+
 
 cleanup()

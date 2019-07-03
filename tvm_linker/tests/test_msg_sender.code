@@ -1,0 +1,28 @@
+	.selector
+	
+	DROP	; selector
+	
+    ; s0 - msg body: slice
+    ; s1 - msg: cell
+    ; s2 - gram balance of msg: int
+    ; s3 - gram balance of contract: int
+
+	DROP
+	POP s1
+	POP s1
+	
+	CTOS
+    ; s0 - msg: slice
+	
+	LDU 1
+	SWAP
+	THROWIF 99	; only internal messages are supported
+	
+	PUSHINT 2
+	SDSKIPFIRST ; skip ihr_disabled + bounce 
+	
+	LDU 3
+	LDU 8
+	LDU 256
+
+	RET
