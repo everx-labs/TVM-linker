@@ -21,7 +21,13 @@
 	PUSHINT 3
 	SDSKIPFIRST ; skip ihr_disabled + bounce + bounced
 	
-	;; here we parse MsgIntAddress
+	;; here we parse src : MsgIntAddress
+	
+	LDU 3
+	LDU 8
+	LDU 256
+
+	;; here we parse dst : MsgIntAddress
 	
 	LDU 3
 	LDU 8
