@@ -18,8 +18,10 @@
 	SWAP
 	THROWIF 99	; only internal messages are supported
 	
-	PUSHINT 2
-	SDSKIPFIRST ; skip ihr_disabled + bounce 
+	PUSHINT 3
+	SDSKIPFIRST ; skip ihr_disabled + bounce + bounced
+	
+	;; here we parse MsgIntAddress
 	
 	LDU 3
 	LDU 8
