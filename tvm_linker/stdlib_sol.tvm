@@ -69,26 +69,35 @@
 	IFELSE
 	RET
 	
-    .internal   :main_external
-    ; s0 - msg body: slice
-    ; s1 - msg: cell
-    ; s2 - gram balance of msg: int
-    ; s3 - gram balance of contract: int
+	.internal   :main_external
+	; s0 - msg body: slice
+	; s1 - msg: cell
+	; s2 - gram balance of msg: int
+	; s3 - gram balance of contract: int
 
-	POP s1
-	POP s1
-	POP s1
+	POP s2
+	POP s2
 	
-    ; s0 - msg body: slice
+	; s0 - msg body: slice
+	; s1 - msg: cell
 	
-	DUP
+	OVER
+	PUSHINT $get_src_addr$
+	CALL 1
+	; s0 - addr
+	; s1 - msg body: slice
+	; s2 - msg: cell
+	XCHG s1,s2
+	NIP
+	
+	OVER
 	PUSHINT $get_msg_pubkey$
 	CALL 1
 	
 	PUSHINT $store_signature$
 	CALL 1
 	
-    ; s0 - msg body: slice
+	; s0 - msg body: slice
 	
 	; check if message is empty
 	DUP
@@ -110,6 +119,30 @@
     SWAP
     CALL 1      ;public method call
 
+
+	.globl		get_src_addr
+	.type		get_src_addr, @function
+	; s0 - msg: cell
+	CTOS
+	LDU 1
+	SWAP
+	PUSHCONT {
+		DROP
+		PUSHINT 0
+		RET
+	}
+	IF
+	
+	PUSHINT 3
+	SDSKIPFIRST ; skip ihr_disabled + bounce + bounced
+	
+	;; here we parse src : MsgIntAddress
+	
+	PUSHINT 8
+	SDSKIPFIRST ; skip anycast: + workchain_id
+	LDU 256
+	DROP ; drop slice itself
+	RET
 
 
 	.globl		store_signature
@@ -133,7 +166,9 @@
 	STREF
 	; stack: sign b'
 	STU 256
-	; stack: b''
+	; stack: src addr b''
+	STU 256
+	; stack: b'''
 	ENDC
 	POP c5
 	RET
