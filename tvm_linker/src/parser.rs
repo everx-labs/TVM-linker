@@ -1,13 +1,13 @@
+use abi::gen_abi_id;
+use abi_json::Contract;
 use regex::Regex;
 use resolver::resolve_name;
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use tvm::stack::{BuilderData, IBitstring, IntegerData, SliceData};
 use tvm::stack::integer::serialization::{Encoding, SignedIntegerBigEndianEncoding};
 use tvm::stack::serialization::Serializer;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
-
 pub type Ptr = i64;
 
 pub fn ptr_to_builder(n: Ptr) -> Result<BuilderData, String> {
@@ -87,6 +87,7 @@ pub struct ParseEngine {
     globl_ptr: Ptr,
     pub persistent_base: Ptr,
     persistent_ptr: Ptr,
+    abi: Option<Contract>,
 }
 
 const PATTERN_GLOBL:    &'static str = r"^[\t\s]*\.globl[\t\s]+([a-zA-Z0-9_]+)";
@@ -134,10 +135,15 @@ impl ParseEngine {
             globl_ptr: 0,
             persistent_base: 0,
             persistent_ptr: 0,
+            abi: None,
         }
     }
 
-    pub fn parse<T: Read + Seek>(&mut self, source: T, libs: Vec<T>) -> Result<(), String> {
+    pub fn parse<T: Read + Seek>(&mut self, source: T, libs: Vec<T>, abi_json: Option<String>) -> Result<(), String> {
+        if let Some(s) = abi_json {
+            self.abi = Some(Contract::load(s.as_bytes()).map_err(|e| format!("cannot parse contract abi: {:?}", e))?);
+        }
+
         self.preinit()?;
 
         for lib_buf in libs {
@@ -385,7 +391,8 @@ impl ParseEngine {
                 }
             },
             GLOBL => {
-               let item = self.globals.get_mut(func).unwrap();
+               let abi = self.abi.clone();
+               let mut item = self.globals.get_mut(func).unwrap();
                 match &mut item.dtype {
                     ObjectType::Function(fparams) => {
                         let mut signed = false;
@@ -394,7 +401,7 @@ impl ParseEngine {
                                 signed = true;
                             }
                         }
-                        let func_id = calc_func_id(func);
+                        let func_id = gen_abi_id(abi, func);
                         fparams.0 = func_id;
                         fparams.1 = body.trim_end().to_string();
                         self.signed.insert(func_id, signed);
@@ -543,15 +550,6 @@ impl ParseEngine {
     }
 }
 
-pub fn calc_func_id(func_interface: &str) -> u32 {
-    let mut hasher = Sha256::new();
-    hasher.input(func_interface.as_bytes());
-    let mut id_bytes = [0u8; 4];
-    id_bytes.copy_from_slice(&hasher.result()[..4]);
-    u32::from_be_bytes(id_bytes)
-} 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -564,7 +562,7 @@ mod tests {
         let mut parser = ParseEngine::new();
         let pbank_file = File::open("./tests/pbank.s").unwrap();
         let test_file = File::open("./tests/test.tvm").unwrap();
-        assert_eq!(parser.parse(pbank_file, vec![test_file]), ok!());  
+        assert_eq!(parser.parse(pbank_file, vec![test_file], None), ok!());  
         parser.debug_print();
 
         test_case(&format!("
@@ -663,6 +661,6 @@ mod tests {
         let mut parser = ParseEngine::new();
         let pbank_file = File::open("./tests/pbank.s").unwrap();
         let test_file = File::open("./stdlib.tvm").unwrap();
-        assert_eq!(parser.parse(pbank_file, vec![test_file]), ok!());
+        assert_eq!(parser.parse(pbank_file, vec![test_file], None), ok!());
     }    
 }

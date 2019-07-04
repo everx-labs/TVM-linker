@@ -163,7 +163,7 @@ mod tests {
         let mut parser = ParseEngine::new();
         let pbank_file = File::open("./tests/pbank.s").unwrap();
         let test_file = File::open("./stdlib.tvm").unwrap();
-        parser.parse(pbank_file, vec![test_file]).unwrap();
+        parser.parse(pbank_file, vec![test_file], None).unwrap();
         let prog = Program::new(parser);
         let body = {
             let buf = hex::decode("002E695F78").unwrap();
@@ -181,7 +181,7 @@ mod tests {
         let mut parser = ParseEngine::new();
         let pbank_file = File::open("./tests/sum-global-array.s").unwrap();
         let test_file = File::open("./stdlib_c.tvm").unwrap();
-        assert_eq!(parser.parse(pbank_file, vec![test_file]), ok!());
+        assert_eq!(parser.parse(pbank_file, vec![test_file], None), ok!());
         let prog = Program::new(parser);
         let body = {
             let buf = hex::decode("000D6E4079").unwrap();
