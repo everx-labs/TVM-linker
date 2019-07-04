@@ -10,10 +10,12 @@ execute it after preparation for debugging purposes.
 The linker has several modes of work:
 
 ### 1) Generating ready-to-deploy contract
-    tvm_linker source-code-name --lib lib-file
+    tvm_linker source-code-name --lib lib-file [--abi-json <abi_file>]
 
 Here `source-code-name` - a name of tvm asm source file, `lib-file` - a name of a library file.
 Linker generates `address.tvc` file, where address is a hash from initial data and code of the contract.
+
+If contract ABI file presents it is better to use `--abi-json` option to supply contract ABI file. Function ids will be generated according to function signatues in ABI.
 
 To generate a new keypair and put the public key to the contract, call:
 
