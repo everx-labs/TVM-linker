@@ -1,14 +1,13 @@
+use abi::gen_abi_id;
+use abi_json::Contract;
 use regex::Regex;
 use resolver::resolve_name;
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use tvm::stack::{BuilderData, IBitstring, IntegerData, SliceData};
 use tvm::stack::integer::serialization::{Encoding, SignedIntegerBigEndianEncoding};
 use tvm::stack::serialization::Serializer;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
-use abi_json::Contract;
-
 pub type Ptr = i64;
 
 pub fn ptr_to_builder(n: Ptr) -> Result<BuilderData, String> {
@@ -382,20 +381,6 @@ impl ParseEngine {
         ok!()
     }
 
-    fn gen_func_id(mut abi: Option<Contract>, func_name: &str) -> u32 {
-        let signature = 
-        if let Some(ref mut contract) = abi {
-            let mut functions = contract.functions();
-            functions.find(|f| f.name == func_name)
-                .and_then(|f| Some(f.get_function_signature()))
-                .unwrap_or(func_name.to_string())
-        } else {
-            func_name.to_string()
-        };
-        
-        calc_func_id(&signature)
-    }
-
     fn update(&mut self, section: &str, func: &str, body: &str, first_pass: bool) -> Result<(), String> {
         match section {
             SELECTOR => {
@@ -416,7 +401,7 @@ impl ParseEngine {
                                 signed = true;
                             }
                         }
-                        let func_id = Self::gen_func_id(abi, func);
+                        let func_id = gen_abi_id(abi, func);
                         fparams.0 = func_id;
                         fparams.1 = body.trim_end().to_string();
                         self.signed.insert(func_id, signed);
@@ -565,15 +550,6 @@ impl ParseEngine {
     }
 }
 
-pub fn calc_func_id(func_interface: &str) -> u32 {
-    let mut hasher = Sha256::new();
-    hasher.input(func_interface.as_bytes());
-    let mut id_bytes = [0u8; 4];
-    id_bytes.copy_from_slice(&hasher.result()[..4]);
-    u32::from_be_bytes(id_bytes)
-} 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -586,7 +562,7 @@ mod tests {
         let mut parser = ParseEngine::new();
         let pbank_file = File::open("./tests/pbank.s").unwrap();
         let test_file = File::open("./tests/test.tvm").unwrap();
-        assert_eq!(parser.parse(pbank_file, vec![test_file]), ok!());  
+        assert_eq!(parser.parse(pbank_file, vec![test_file], None), ok!());  
         parser.debug_print();
 
         test_case(&format!("
@@ -685,6 +661,6 @@ mod tests {
         let mut parser = ParseEngine::new();
         let pbank_file = File::open("./tests/pbank.s").unwrap();
         let test_file = File::open("./stdlib.tvm").unwrap();
-        assert_eq!(parser.parse(pbank_file, vec![test_file]), ok!());
+        assert_eq!(parser.parse(pbank_file, vec![test_file], None), ok!());
     }    
 }
