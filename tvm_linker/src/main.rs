@@ -6,6 +6,7 @@ extern crate ed25519_dalek;
 extern crate lazy_static;
 extern crate rand;
 extern crate regex;
+extern crate serde_json;
 extern crate sha2;
 extern crate simplelog;
 extern crate ton_block;
@@ -30,7 +31,7 @@ use program::Program;
 use real_ton::{ decode_boc, compile_message };
 use resolver::resolve_name;
 use std::fs::File;
-use std::io::{BufReader};
+use std::io::{BufReader, Read};
 use testcall::perform_contract_call;
 use tvm::stack::BuilderData;
 
@@ -51,6 +52,7 @@ fn linker_main() -> Result<(), String> {
         (@arg LIB: --lib +takes_value "Standard library source file")
         (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file")
         (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
+        (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids")
         (@subcommand test =>
             (about: "execute contract in test environment")
             (version: "0.1")
@@ -163,6 +165,15 @@ fn linker_main() -> Result<(), String> {
     }
 
     let mut parser = ParseEngine::new();
+    let abi_json = 
+        if matches.is_present("ABI") {
+            let abi_file_name = matches.value_of("ABI").unwrap();
+            let mut f = File::open(abi_file_name).map_err(|e| format!("cannot open abi file: {}", e))?;
+            let mut abi = String::new(); 
+            Some(f.read_to_string(&mut abi).map(|_| abi).map_err(|e| format!("failed to read abi: {}", e))?)
+        } else { 
+            None 
+        };
     parser.parse(
         File::open(matches.value_of("INPUT").unwrap())
             .map_err(|e| format!("cannot open source file: {}", e))?,
@@ -171,6 +182,7 @@ fn linker_main() -> Result<(), String> {
             .unwrap_or(vec![])
             .iter().map(|lib| File::open(lib).map_err(|e| format!("cannot open library file: {}", e)).expect("error"))
             .collect(),
+        abi_json,
     )?;
 
     let mut prog = Program::new(parser);

@@ -1,0 +1,15 @@
+	.globl	transfer                    
+	.type	transfer, @function
+transfer:
+    PUSHINT 1
+
+    .globl	getTargetAmount                    
+	.type	getTargetAmount, @function
+getTargetAmount:
+    PUSHINT 2
+
+    .globl	getGoal                    
+	.type	getGoal, @function
+getGoal:
+    PUSHINT 3
+

@@ -7,6 +7,7 @@ use tvm::stack::{BuilderData, IBitstring, IntegerData, SliceData};
 use tvm::stack::integer::serialization::{Encoding, SignedIntegerBigEndianEncoding};
 use tvm::stack::serialization::Serializer;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
+use abi_json::Contract;
 
 pub type Ptr = i64;
 
@@ -87,6 +88,7 @@ pub struct ParseEngine {
     globl_ptr: Ptr,
     pub persistent_base: Ptr,
     persistent_ptr: Ptr,
+    abi: Option<Contract>,
 }
 
 const PATTERN_GLOBL:    &'static str = r"^[\t\s]*\.globl[\t\s]+([a-zA-Z0-9_]+)";
@@ -134,10 +136,15 @@ impl ParseEngine {
             globl_ptr: 0,
             persistent_base: 0,
             persistent_ptr: 0,
+            abi: None,
         }
     }
 
-    pub fn parse<T: Read + Seek>(&mut self, source: T, libs: Vec<T>) -> Result<(), String> {
+    pub fn parse<T: Read + Seek>(&mut self, source: T, libs: Vec<T>, abi_json: Option<String>) -> Result<(), String> {
+        if let Some(s) = abi_json {
+            self.abi = Some(Contract::load(s.as_bytes()).map_err(|e| format!("cannot parse contract abi: {:?}", e))?);
+        }
+
         self.preinit()?;
 
         for lib_buf in libs {
@@ -375,6 +382,20 @@ impl ParseEngine {
         ok!()
     }
 
+    fn gen_func_id(mut abi: Option<Contract>, func_name: &str) -> u32 {
+        let signature = 
+        if let Some(ref mut contract) = abi {
+            let mut functions = contract.functions();
+            functions.find(|f| f.name == func_name)
+                .and_then(|f| Some(f.get_function_signature()))
+                .unwrap_or(func_name.to_string())
+        } else {
+            func_name.to_string()
+        };
+        
+        calc_func_id(&signature)
+    }
+
     fn update(&mut self, section: &str, func: &str, body: &str, first_pass: bool) -> Result<(), String> {
         match section {
             SELECTOR => {
@@ -385,7 +406,8 @@ impl ParseEngine {
                 }
             },
             GLOBL => {
-               let item = self.globals.get_mut(func).unwrap();
+               let abi = self.abi.clone();
+               let mut item = self.globals.get_mut(func).unwrap();
                 match &mut item.dtype {
                     ObjectType::Function(fparams) => {
                         let mut signed = false;
@@ -394,7 +416,7 @@ impl ParseEngine {
                                 signed = true;
                             }
                         }
-                        let func_id = calc_func_id(func);
+                        let func_id = Self::gen_func_id(abi, func);
                         fparams.0 = func_id;
                         fparams.1 = body.trim_end().to_string();
                         self.signed.insert(func_id, signed);
