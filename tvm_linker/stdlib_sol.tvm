@@ -131,7 +131,7 @@
 		PUSHINT 0
 		RET
 	}
-	IF
+	IFJMP
 	
 	PUSHINT 3
 	SDSKIPFIRST ; skip ihr_disabled + bounce + bounced
