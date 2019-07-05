@@ -1,0 +1,12 @@
+{
+	"ABI version": 0,
+	"functions": [{
+		"name": "method_external",
+		"inputs": [{"name": "anotherContract", "type": "uint256"}],
+		"outputs": []
+	}, {
+		"name": "remoteMethod_external",
+		"inputs": [{"name": "value", "type": "uint64"}],
+		"outputs": []
+	}]
+}

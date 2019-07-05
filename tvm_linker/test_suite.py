@@ -138,9 +138,9 @@ SIGN = None
 compile_ex('test_inbound_int_msg.tvm', None)
 expect_success("", "", "-1", "--internal 15000000000")
 
-SIGN = None
-compile_ex('test_pers_data.tvm', "stdlib.tvm")
-expect_success('ctor', "", "-1", "--internal 100")
+# SIGN = None
+# compile_ex('test_pers_data.tvm', "stdlib.tvm")
+# expect_success('ctor', "", "-1", "--internal 100")
 
 	# '''
 
