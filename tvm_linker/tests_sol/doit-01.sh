@@ -4,9 +4,7 @@ msgbody=e6a72ccf-msg-body.boc
 
 rm -f *.tvc *.boc *.tmp
 
-linker=../target/debug/tvm_linker
-emulator=../../../sdk-emulator/target/debug
-tlc="../../../lite-client-build/test-lite-client -C ../../../local-node-config.json"
+source set_env.sh
 
 $linker --lib ../stdlib_sol.tvm ./contract01.code --abi-json ./contract01.abi.json
 

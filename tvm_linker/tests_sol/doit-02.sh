@@ -6,9 +6,7 @@ msginit2=3cfd3ea7-msg-init.boc
 
 rm -f *.tvc *.boc *.tmp
 
-linker=../target/debug/tvm_linker
-emulator=../../../sdk-emulator/target/debug
-tlc="../../../lite-client-build/test-lite-client -C ../../../local-node-config.json"
+source set_env.sh
 
 $linker --lib ../stdlib_sol.tvm ./contract02-a.code --abi-json ./contract02-a.abi.json
 $linker --lib ../stdlib_sol.tvm ./contract02-b.code --abi-json ./contract02-b.abi.json
