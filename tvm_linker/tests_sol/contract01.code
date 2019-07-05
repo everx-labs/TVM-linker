@@ -1,0 +1,39 @@
+
+.globl	main_external
+.type	main_external, @function
+LDU 32
+DROP
+PUSHINT $main$
+CALL 1
+
+.globl	main
+.type	main, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: main
+;; param: a
+;; m_accumulator
+;; stack=1
+PUSHINT 0
+PUSHROOT CTOS
+PUSHINT 256
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; a
+;; stack=2
+PUSH s1
+;; +
+ADD
+;; decl: res
+;; res
+;; stack=2
+DUP
+;; assign m_accumulator
+NEWC STU 256 ENDC CTOS
+PUSHINT 0
+PUSHROOT CTOS
+PUSHINT 256
+DICTUSET
+NEWC STSLICE ENDC
+POPROOT
