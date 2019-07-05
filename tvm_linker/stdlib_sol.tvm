@@ -126,8 +126,9 @@
 	PUSH c5
 	CTOS
 	LDU 256
-	DROP
+	NIP
 	LDU 256
+	DROP ; drop slice itself
 	RET
 
 	.globl		get_src_addr
@@ -189,9 +190,25 @@
     ; s2 - gram balance of msg: int
     ; s3 - gram balance of contract: int
 
-	POP s1
-	POP s1
-	POP s1
+	POP s2
+	POP s2
+	
+	; s0 - msg body: slice
+	; s1 - msg: cell
+	
+	OVER
+	PUSHINT $get_src_addr$
+	CALL 1
+	; s0 - addr
+	; s1 - msg body: slice
+	; s2 - msg: cell
+	XCHG s1,s2
+	NIP
+	
+	PUSHINT 0 ; put 0 instead of signature
+	
+	PUSHINT $store_signature$
+	CALL 1
 	
     ; s0 - msg body: slice
 	
