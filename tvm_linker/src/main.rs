@@ -2,6 +2,7 @@ extern crate abi_json;
 #[macro_use]
 extern crate clap;
 extern crate ed25519_dalek;
+extern crate hex;
 #[macro_use]
 extern crate lazy_static;
 extern crate rand;
@@ -74,6 +75,7 @@ fn linker_main() -> Result<(), String> {
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[DATA] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[DATA] "Supplies the name of the calling contract method")
             (@arg ABI_PARAMS: -p --("abi-params") +takes_value conflicts_with[DATA] "Supplies ABI arguments for the contract method")
+            (@arg ABI_SIGN: -s --("abi-sign") +takes_value conflicts_with[DATA] "Supplies private key file to sign encoded ABI body")
         )
     ).get_matches();
 
@@ -142,7 +144,7 @@ fn linker_main() -> Result<(), String> {
                 let params = msg_matches.value_of("ABI_PARAMS").map(|m| {mask |= 4; m });
 
                 if mask == 0x7 {
-                    let key_file = matches.value_of("SETKEY").map(|path| {
+                    let key_file = msg_matches.value_of("ABI_SIGN").map(|path| {
                         let pair = KeypairManager::from_secret_file(path);
                         pair.drain()
                     });

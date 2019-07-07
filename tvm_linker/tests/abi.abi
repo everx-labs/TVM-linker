@@ -13,11 +13,9 @@
         "inputs": [],
         "outputs": [{"name": "goal", "type": "uint8[]"}]
     }, {
-        "name": "constructor",
-        "inputs": [
-				    {"name": "amount","type": "uint64"},
-            {"name": "goal","type": "uint8[]"}
-        ],
+        "name": "method_authorized",
+        "signed": true,
+        "inputs": [{"name": "amount","type": "uint64"}],
         "outputs": []
     }]
 }

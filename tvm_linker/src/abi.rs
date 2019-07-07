@@ -5,6 +5,7 @@ use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io::Read;
 use tvm::stack::BuilderData;
+use serde_json::Value;
 
 pub fn build_abi_body(abi_file: &str, method: &str, params: &str, keypair: Option<Keypair>) -> Result<BuilderData, String> {
     let mut abi_json = String::new();
@@ -43,11 +44,14 @@ fn calc_func_id(func_interface: &str) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use hex;
+    use keyman::*;
     use super::*;
+
     #[test]
     fn test_build_abi_body() {
         let body = build_abi_body(
-            "./tests/contract.abi", 
+            "./tests/abi.abi", 
             "transfer", 
             "{\"to\":\"0x55\", \"a\":\"0x11223344\"}",
             None
@@ -55,6 +59,26 @@ mod tests {
         let etalon_body: [u8; 10] = [0x00,0x15,0xFE,0xCE,0x26,0x55,0x11,0x22,0x33,0x44];
         println!("body = {}", body);
         assert_eq!(body, BuilderData::with_raw(etalon_body.to_vec(), 10*8));
+    }
+
+    #[test]
+    fn test_build_abi_signed_body() {
+        let pair = KeypairManager::from_secret_file("./key1").drain();
+        let body = build_abi_body(
+            "./tests/abi.abi", 
+            "method_authorized", 
+            "{\"amount\":\"0x100\"}",
+            Some(pair),
+        ).unwrap();
+        let etalon_body: [u8; 13] = [0x00,0x97,0xCE,0x24,0xE7,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x00];
+        let sign = hex::decode(
+            "2915D548D7A0C7A26B89DA2E1DDAB2BAC2F2B9EA25A7F5276FFD8840F5EBF262C717B23F28E1E5AB16B973F7F55AA214C1A626130C632FDA7578F957270DF003"
+        ).unwrap();
+        let mut result_builder = BuilderData::with_raw(etalon_body.to_vec(), 13*8);
+        let sign_builder = BuilderData::with_raw(sign, 512);
+        result_builder.append_reference(sign_builder);
+        println!("body = {}", body);
+        assert_eq!(body, result_builder);
     }
 
     #[test]

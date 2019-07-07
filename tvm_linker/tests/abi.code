@@ -13,3 +13,8 @@ getTargetAmount:
 getGoal:
     PUSHINT 3
 
+    .globl	method_authorized                    
+	.type	method_authorized, @function
+method_authorized:
+    PUSHINT 4
+
