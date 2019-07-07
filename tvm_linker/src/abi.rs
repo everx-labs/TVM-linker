@@ -5,7 +5,6 @@ use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io::Read;
 use tvm::stack::BuilderData;
-use serde_json::Value;
 
 pub fn build_abi_body(abi_file: &str, method: &str, params: &str, keypair: Option<Keypair>) -> Result<BuilderData, String> {
     let mut abi_json = String::new();
