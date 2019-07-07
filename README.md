@@ -52,11 +52,15 @@ Instead of `XXXX...`, specify the necessary message body in hex format.
 
 Linker can create ABI encoded messages:
 
-	tvm_linker address message [--init] [-w] --abi-json <json-file-with-abi> --abi-method <method-name> --abi-params <json-string-with-params> 
+	tvm_linker address message [--init] [-w] --abi-json <json-file-with-abi> --abi-method <method-name> --abi-params <json-string-with-params> [--abi-sign <key_file>]
 
-`<json-file-with-abi>` - path to json file with contract interface described according to ABI specification,
-`<method-name>` - name of the contract method to call,
-`<json-string-with-params>` - arguments of the method, declared in json like this: `{"arg_a": "0x1234", "arg_b": "x12345678"}`
+`<json-file-with-abi>` - path to json file with contract interface described according to ABI specification.
+
+`<method-name>` - name of the contract method to call.
+
+`<json-string-with-params>` - arguments of the method, declared in json like this: `{"arg_a": "0x1234", "arg_b": "x12345678"}`.
+
+`<key_file>` - path to the file with private key.
 
 By default, -1 is used as a workchain id in contract address. To use another one, use `-w` option:
 
