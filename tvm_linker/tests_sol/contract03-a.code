@@ -15,7 +15,7 @@ CALL 1
 ;; stack=1
 DUP
 ;; remoteMethod
-PUSHINT $remoteMethod$
+PUSHINT $remoteMethod_external$
 PUSHINT 0
 NEWC
 STU 8

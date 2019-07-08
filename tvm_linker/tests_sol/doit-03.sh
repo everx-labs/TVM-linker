@@ -1,6 +1,6 @@
-address1=25791eeb94dd46ba4234c30d0228316542d128d2386fdf23525ff4fc4a527df2
-msginit1=25791eeb-msg-init.boc
-msgbody1=25791eeb-msg-body.boc
+address1=48432b505b46b73dc8bf66d215639c08d86b96a447320ea2ed358893f3cc7016
+msginit1=48432b50-msg-init.boc
+msgbody1=48432b50-msg-body.boc
 address2=fc69785cb18700608d297c8b244cb8a8d92f00beef3425ee14827da4d8c6bec5
 msginit2=fc69785c-msg-init.boc
 
