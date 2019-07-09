@@ -46,13 +46,23 @@ fn linker_main() -> Result<(), String> {
         (version: "0.1")
         (author: "tonlabs")
         (about: "Links TVM assembler file, loads and executes it in testing environment")
-        (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
-        (@arg DECODE: --decode "Decodes real TON message")       
-        (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
-        (@arg LIB: --lib +takes_value "Standard library source file")
-        (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file")
-        (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
-        (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids")
+        (@subcommand decode => 
+            (about: "Decode real TON message")
+            (version: "0.1")
+            (author: "tonlabs")
+            (@arg INPUT: +required +takes_value "TON message file")
+        )
+        (@subcommand compile => 
+            (about: "compile contract")
+            (version: "0.1")
+            (author: "tonlabs")
+            (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
+            (@arg LIB: --lib +takes_value "Standard library source file")
+            (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file")
+            (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
+            (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids")
+            (@arg INPUT: +required +takes_value "TVM assembler source file")
+        )
         (@subcommand test =>
             (about: "execute contract in test environment")
             (version: "0.1")
@@ -63,6 +73,7 @@ fn linker_main() -> Result<(), String> {
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
             (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
             (@arg INTERNAL: --internal +takes_value "Emulates inbound internal message with value instead of external message")
+            (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
         )
         (@subcommand message =>
             (about: "generate external inbound message for the blockchain")
@@ -74,6 +85,8 @@ fn linker_main() -> Result<(), String> {
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[DATA] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[DATA] "Supplies the name of the calling contract method")
             (@arg ABI_PARAMS: -p --("abi-params") +takes_value conflicts_with[DATA] "Supplies ABI arguments for the contract method")
+            (@arg SETKEY: --setkey +takes_value "Loads existing keypair from the file")
+            (@arg INPUT: +required +takes_value "TVM assembler source file or contract name")
         )
     ).get_matches();
 
@@ -102,7 +115,7 @@ fn linker_main() -> Result<(), String> {
         
         println!("TEST STARTED\nbody = {:?}", body);
         perform_contract_call(
-            matches.value_of("INPUT").unwrap(), 
+            test_matches.value_of("INPUT").unwrap(), 
             body, 
             test_matches.value_of("SIGN"), 
             test_matches.is_present("TRACE"), 
@@ -113,8 +126,8 @@ fn linker_main() -> Result<(), String> {
         return ok!();
     }
 
-    if matches.is_present("DECODE") {
-        decode_boc(matches.value_of("INPUT").unwrap());
+    if let Some(decode_matches) = matches.subcommand_matches("decode") {
+        decode_boc(decode_matches.value_of("INPUT").unwrap());
         return ok!();
     }
 
@@ -142,7 +155,7 @@ fn linker_main() -> Result<(), String> {
                 let params = msg_matches.value_of("ABI_PARAMS").map(|m| {mask |= 4; m });
 
                 if mask == 0x7 {
-                    let key_file = matches.value_of("SETKEY").map(|path| {
+                    let key_file = msg_matches.value_of("SETKEY").map(|path| {
                         let pair = KeypairManager::from_secret_file(path);
                         pair.drain()
                     });
@@ -156,57 +169,61 @@ fn linker_main() -> Result<(), String> {
         };
         
         return compile_message(
-            matches.value_of("INPUT").unwrap(), 
+            msg_matches.value_of("INPUT").unwrap(), 
             msg_matches.value_of("WORKCHAIN"), 
             msg_body, 
             msg_matches.is_present("INIT"), 
             &suffix,
         )
     }
+    
+    if let Some(compile_matches) = matches.subcommand_matches("compile") {
+        let mut parser = ParseEngine::new();
+        let abi_json = 
+            if compile_matches.is_present("ABI") {
+                let abi_file_name = compile_matches.value_of("ABI").unwrap();
+                let mut f = File::open(abi_file_name).map_err(|e| format!("cannot open abi file: {}", e))?;
+                let mut abi = String::new(); 
+                Some(f.read_to_string(&mut abi).map(|_| abi).map_err(|e| format!("failed to read abi: {}", e))?)
+            } else { 
+                None 
+            };
+        parser.parse(
+            File::open(compile_matches.value_of("INPUT").unwrap())
+                .map_err(|e| format!("cannot open source file: {}", e))?,
+            compile_matches.value_of("LIB")
+                .map(|val| vec![val])
+                .unwrap_or(vec![])
+                .iter().map(|lib| File::open(lib).map_err(|e| format!("cannot open library file: {}", e)).expect("error"))
+                .collect(),
+            abi_json,
+        )?;
 
-    let mut parser = ParseEngine::new();
-    let abi_json = 
-        if matches.is_present("ABI") {
-            let abi_file_name = matches.value_of("ABI").unwrap();
-            let mut f = File::open(abi_file_name).map_err(|e| format!("cannot open abi file: {}", e))?;
-            let mut abi = String::new(); 
-            Some(f.read_to_string(&mut abi).map(|_| abi).map_err(|e| format!("failed to read abi: {}", e))?)
-        } else { 
-            None 
-        };
-    parser.parse(
-        File::open(matches.value_of("INPUT").unwrap())
-            .map_err(|e| format!("cannot open source file: {}", e))?,
-        matches.value_of("LIB")
-            .map(|val| vec![val])
-            .unwrap_or(vec![])
-            .iter().map(|lib| File::open(lib).map_err(|e| format!("cannot open library file: {}", e)).expect("error"))
-            .collect(),
-        abi_json,
-    )?;
+        let mut prog = Program::new(parser);
 
-    let mut prog = Program::new(parser);
-
-    match matches.value_of("GENKEY") {
-        Some(file) => {
-            let pair = KeypairManager::new();
-            pair.store_public(&(file.to_string() + ".pub"));
-            pair.store_secret(file);
-            prog.set_keypair(pair.drain());
-        },
-        None => match matches.value_of("SETKEY") {
+        match compile_matches.value_of("GENKEY") {
             Some(file) => {
-                let pair = KeypairManager::from_secret_file(file);
+                let pair = KeypairManager::new();
+                pair.store_public(&(file.to_string() + ".pub"));
+                pair.store_secret(file);
                 prog.set_keypair(pair.drain());
             },
-            None => (),
-        },
-   };
-   
-    if matches.is_present("DEBUG") {
-       prog.debug_print();        
+            None => match compile_matches.value_of("SETKEY") {
+                Some(file) => {
+                    let pair = KeypairManager::from_secret_file(file);
+                    prog.set_keypair(pair.drain());
+                },
+                None => (),
+            },
+       };
+       
+        if compile_matches.is_present("DEBUG") {
+           prog.debug_print();        
+        }
+         
+        prog.compile_to_file()?;
+        return ok!();
     }
-     
-    prog.compile_to_file()?;
-    ok!()
+
+    Err("No command passed".to_string())
 }
