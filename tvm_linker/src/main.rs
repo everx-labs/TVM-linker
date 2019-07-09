@@ -88,6 +88,7 @@ fn linker_main() -> Result<(), String> {
             (@arg SETKEY: --setkey +takes_value "Loads existing keypair from the file")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name")
         )
+        (@setting SubcommandRequired)
     ).get_matches();
 
     if let Some(test_matches) = matches.subcommand_matches("test") {
@@ -225,5 +226,5 @@ fn linker_main() -> Result<(), String> {
         return ok!();
     }
 
-    Err("No command passed".to_string())
+    unreachable!()
 }
