@@ -70,6 +70,8 @@ def error(msg):
 
 def exec_and_parse(method, params, expected_ec, options):
 	global lines, SIGN
+	if "--trace" not in options:
+		options = options + " --trace"
 	sign = ("--sign " + SIGN) if SIGN else "";
 	if method and method not in functions:
 		error("Cannot find method '{}'".format(method)) 
@@ -116,7 +118,7 @@ def expect_output(regex):
 	# '''
 
 compile_ex('test_factorial.code', 'stdlib_sol.tvm')
-expect_success('constructor', "", "", "--trace")
+expect_success('constructor', "", "", "")
 expect_success('main', "0003", "6", "")
 expect_success('main', "0006", "726", "")
 
@@ -142,7 +144,6 @@ expect_success("", "", "-1", "--internal 15000000000")
 # compile_ex('test_pers_data.tvm', "stdlib.tvm")
 # expect_success('ctor', "", "-1", "--internal 100")
 
-	# '''
 
 compile_ex('test_send_int_msg.tvm', 'stdlib_sol.tvm')
 expect_success(None, "", None, "")	# check empty input (deploy)
@@ -160,5 +161,18 @@ expect_success(None, "", None, "")	# check empty input (deploy)
 expect_success('get_allowance', "1122334455660000000000000000000000000000000000000000005544332211", None, "--internal 0 --decode-c6 --trace")
 expect_output(r"destination : 0:1122334455660000000000000000000000000000000000000000005544332211")
 expect_output(r"body  : .* data: \[0, 26, 11, 86, 135, 0, 0, 0, 0, 0, 0, 0, 0, ")
+
+
+compile_ex('test_msg_sender.code', None)
+expect_success(None, "", None, "--internal 0 --trace")	# check empty input (deploy)
+
+	# '''
+
+compile_ex('test_msg_sender2.code', 'stdlib_sol.tvm')
+# check internal message
+expect_success('main', "", "0", "--internal 0")
+# check external message
+expect_success('main', "", "0", "")
+
 
 cleanup()
