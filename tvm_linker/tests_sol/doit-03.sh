@@ -11,6 +11,16 @@ source set_env.sh
 $linker --lib ../stdlib_sol.tvm ./contract03-a.code --abi-json ./contract03-a.abi.json
 $linker --lib ../stdlib_sol.tvm ./contract03-b.code --abi-json ./contract03-b.abi.json
 
+if [ ! -f "${address1}.tvc" ]; then
+  echo "FILE NOT FOUND! ${address1}.tvc"
+  exit 1
+fi
+
+if [ ! -f "${address2}.tvc" ]; then
+  echo "FILE NOT FOUND! ${address2}.tvc"
+  exit 1
+fi
+
 $linker $address1 message --init -w 0
 $linker $address2 message --init -w 0
 

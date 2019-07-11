@@ -1,6 +1,6 @@
-address=e6a72ccf42f177bbb425be8d782b35f5c708de45c9e557ac55c92b863b292220
-msginit=e6a72ccf-msg-init.boc
-msgbody=e6a72ccf-msg-body.boc
+address=aceb641ba8fb487bd2bec7e94f0532496528cafbe8b84ff229d83106e247fc59
+msginit=aceb641b-msg-init.boc
+msgbody=aceb641b-msg-body.boc
 
 rm -f *.tvc *.boc *.tmp
 

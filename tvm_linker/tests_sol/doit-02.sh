@@ -1,8 +1,8 @@
-address1=9a7dc77d7a5c38fc2274570766855fc4d4f6c6267e76990cf73c202bb4dfefb6
-msginit1=9a7dc77d-msg-init.boc
-msgbody1=9a7dc77d-msg-body.boc
-address2=3cfd3ea7dd58ad1ef43d2e217773cf347f36719144ba6e6895775b70506a4eb3
-msginit2=3cfd3ea7-msg-init.boc
+address1=88a40cc7f39434e14bbb45909bc28f6ee36900d9ccb369c427ec7c799a685fac
+msginit1=88a40cc7-msg-init.boc
+msgbody1=88a40cc7-msg-body.boc
+address2=d31fb5167484526d91c483f4d5463bcedb0535a003a08b0eaf92e95b503da93c
+msginit2=d31fb516-msg-init.boc
 
 rm -f *.tvc *.boc *.tmp
 
@@ -10,6 +10,18 @@ source set_env.sh
 
 $linker --lib ../stdlib_sol.tvm ./contract02-a.code --abi-json ./contract02-a.abi.json
 $linker --lib ../stdlib_sol.tvm ./contract02-b.code --abi-json ./contract02-b.abi.json
+
+if [ ! -f "${address1}.tvc" ]; then
+  echo "FILE NOT FOUND! ${address1}.tvc"
+  exit 1
+fi
+
+if [ ! -f "${address2}.tvc" ]; then
+  echo "FILE NOT FOUND! ${address2}.tvc"
+  exit 1
+fi
+
+
 
 $linker $address1 message --init -w 0
 $linker $address2 message --init -w 0
