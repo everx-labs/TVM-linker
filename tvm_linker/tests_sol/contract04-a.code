@@ -1,0 +1,77 @@
+
+.globl	method_external
+.type	method_external, @function
+LDU 256
+DROP
+PUSHINT $method$
+CALL 1
+
+.globl	method
+.type	method, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: method
+;; param: anotherContract
+;; anotherContract
+;; stack=1
+DUP
+;; remoteMethod
+;; value
+PUSHINT 1000000
+PUSHINT $remoteMethod_external$
+PUSHINT 0
+NEWC
+STU 8
+STU 32
+;; value
+STU 256
+ENDC CTOS
+PUSHINT $send_int_msg_2$
+CALL 1
+;; m_counter
+;; stack=2
+PUSHINT 0
+PUSHROOT CTOS
+PUSHINT 256
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+PUSHINT 1
+;; +
+ADD
+;; assign m_counter
+NEWC STU 256 ENDC CTOS
+PUSHINT 0
+PUSHROOT CTOS
+PUSHINT 256
+DICTUSET
+NEWC STSLICE ENDC
+POPROOT
+;; return
+BLKDROP 2
+RET
+
+.globl	remoteMethod_external
+.type	remoteMethod_external, @function
+LDU 256
+DROP
+PUSHINT $remoteMethod$
+CALL 1
+
+.globl	remoteMethod
+.type	remoteMethod, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: remoteMethod
+;; param: value
+;; value
+;; stack=1
+DUP
+PUSHINT 0
+;; >
+GREATER
+;; require
+;; stack=2
+THROWIFNOT 100
+;; return
+DROP
+RET
