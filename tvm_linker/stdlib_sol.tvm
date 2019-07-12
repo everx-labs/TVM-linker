@@ -227,6 +227,26 @@
 
     RET
 
+	.globl	send_grams
+	.type	send_grams, @function
+		;args:
+		;; s0 - body: slice
+		;; s1 - dst account address: integer
+		;; s2 - transfer grams value: integer
+		;ret: none
+		
+		PUSHINT 0	;; next msg logical time
+		PUSH s1	;; body: slice
+		PUSH s3	;; dst account address: integer
+		PUSH s5	;; transfer grams value: integer
+		PUSHINT $send_int_msg$
+		CALL 1
+		
+		POP s1
+		POP s1
+		POP s1
+		RET
+
 	.globl	send_int_msg_2
 	.type	send_int_msg_2, @function
 		;args: 

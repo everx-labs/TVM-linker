@@ -2,6 +2,7 @@
 .globl	method_external
 .type	method_external, @function
 LDU 256
+LDU 256
 DROP
 PUSHINT $method$
 CALL 1
@@ -11,12 +12,15 @@ CALL 1
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: method
 ;; param: anotherContract
+;; param: amount
 ;; anotherContract
-;; stack=1
-DUP
-;; remoteMethod
+;; stack=2
+PUSH s1
+;; MyContract.remoteMethod
 ;; value
-PUSHINT 1000000
+;; amount
+;; stack=3
+PUSH s1
 PUSHINT $remoteMethod_external$
 PUSHINT 0
 NEWC
@@ -28,7 +32,7 @@ ENDC CTOS
 PUSHINT $send_int_msg_2$
 CALL 1
 ;; m_counter
-;; stack=2
+;; stack=3
 PUSHINT 0
 PUSHROOT CTOS
 PUSHINT 256
@@ -48,7 +52,7 @@ DICTUSET
 NEWC STSLICE ENDC
 POPROOT
 ;; return
-BLKDROP 2
+BLKDROP 3
 RET
 
 .globl	remoteMethod_external

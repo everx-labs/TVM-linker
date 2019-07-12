@@ -4,9 +4,9 @@ contract MyContract {
 
 	uint m_counter;
 
-	function method(MyContract anotherContract) public {
+	function method(MyContract anotherContract, uint amount) public {
 		// call remote contract
-		anotherContract.remoteMethod(1000000);
+		anotherContract.remoteMethod(amount);
 		m_counter = m_counter + 1;
 		return;
 	}
