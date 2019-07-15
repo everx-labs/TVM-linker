@@ -1,0 +1,16 @@
+{
+	"ABI version": 0,
+	"functions": [{
+		"name": "remoteMethod_external",
+		"inputs": [{"name": "x", "type": "uint16"}],
+		"outputs": []
+	}, {
+		"name": "remoteMethodCallback_external",
+		"inputs": [{"name": "x", "type": "uint16"}],
+		"outputs": []
+	}, {
+		"name": "method_external",
+		"inputs": [{"name": "anotherContract", "type": "uint256"}, {"name": "x", "type": "uint16"}],
+		"outputs": []
+	}]
+}

@@ -1,0 +1,69 @@
+
+.globl	method_external
+.type	method_external, @function
+LDU 256
+LDU 16
+DROP
+PUSHINT $method$
+CALL 1
+
+.globl	method
+.type	method, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: method
+;; param: anotherContract
+;; param: x
+;; anotherContract
+;; stack=2
+PUSH s1
+;; IRemoteContract
+;; stack=3
+;; IRemoteContract.remoteMethod
+;; x
+;; x
+;; stack=3
+PUSH s1
+PUSHINT $remoteMethod_external$
+PUSHINT 0
+NEWC
+STU 8
+STU 32
+;; x
+STU 16
+ENDC CTOS
+PUSHINT $send_int_msg_2$
+CALL 1
+;; return
+BLKDROP 3
+RET
+
+.globl	remoteMethodCallback_external
+.type	remoteMethodCallback_external, @function
+LDU 16
+DROP
+PUSHINT $remoteMethodCallback$
+CALL 1
+
+.globl	remoteMethodCallback
+.type	remoteMethodCallback, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: remoteMethodCallback
+;; param: x
+;; x
+;; stack=1
+DUP
+;; assign m_result
+NEWC STU 256 ENDC CTOS
+PUSHINT 0
+PUSHROOT CTOS
+PUSHINT 256
+DICTUSET
+NEWC STSLICE ENDC
+POPROOT
+;; return
+DROP
+RET
+
+.globl	remoteMethod_external
+.type	remoteMethod_external, @function
+RET
