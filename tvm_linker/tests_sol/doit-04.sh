@@ -57,7 +57,7 @@ $tlc -f $msgbody1
 echo "-------------------------------"
 sleep 5
 echo "-------------------------------"
-$tlc -a 0:$address1
+$tlc -a 0:$address2
 sleep 5
 echo "-------------------------------"
-$tlc -a 0:$address2
+$tlc -a 0:$address1
