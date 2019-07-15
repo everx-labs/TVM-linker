@@ -31,6 +31,7 @@
 	; Returns sender's pubkey if signature is valid
 	; Throws exception 40 if signature is invalid
 	DUP
+	LOGSTR get_msg_pubkey
 	SREMPTY
 	PUSHCONT {
 		DROP

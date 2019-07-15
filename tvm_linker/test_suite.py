@@ -51,7 +51,7 @@ def compile_ex(source_file, lib_file):
 	global lines, functions, CONTRACT_ADDRESS
 	print("Compiling " + source_file + "...")
 	lib = "--lib " + lib_file if lib_file else ""
-	ec = os.system("./target/debug/tvm_linker {} ./tests/{} --debug > compile_log.tmp".format(lib, source_file))
+	ec = os.system("./target/debug/tvm_linker compile {} ./tests/{} --debug > compile_log.tmp".format(lib, source_file))
 	if ec != 0:
 		error("COMPILATION FAILED!")
 
@@ -82,7 +82,7 @@ def exec_and_parse(method, params, expected_ec, options):
 	else:
 		id = functions[method]
 		body = "--body 00{}{}".format(id, params)
-	cmd = "./target/debug/tvm_linker {} test {} {} {} >exec_log.tmp".format(CONTRACT_ADDRESS, body, sign, options)
+	cmd = "./target/debug/tvm_linker test {} {} {} {} >exec_log.tmp".format(CONTRACT_ADDRESS, body, sign, options)
 	# print cmd
 	ec = os.system(cmd)
 	assert ec == 0, ec
