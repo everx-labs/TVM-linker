@@ -1,0 +1,49 @@
+
+.globl	remoteMethod_external
+.type	remoteMethod_external, @function
+LDU 256
+DROP
+PUSHINT $remoteMethod$
+CALL 1
+
+.globl	remoteMethod
+.type	remoteMethod, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: remoteMethod
+;; param: value
+LOGSTR SendMoney
+;; get member sender
+PUSHINT $get_msg_sender$
+CALL 1
+;; value
+;; stack=2
+PUSH s1
+;; get member transfer
+;; transfer()
+SWAP
+NEWC ENDC CTOS
+PUSHINT $send_grams$
+CALL 1
+;; m_counter
+;; stack=1
+PUSHINT 0
+PUSHROOT CTOS
+PUSHINT 256
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+PUSHINT 1
+;; +
+ADD
+;; assign m_counter
+NEWC STU 256 ENDC CTOS
+PUSHINT 0
+PUSHROOT CTOS
+PUSHINT 256
+DICTUSET
+NEWC STSLICE ENDC
+POPROOT
+;; return
+DROP
+RET
