@@ -174,5 +174,13 @@ expect_success('main', "", "0", "--internal 0")
 # check external message
 expect_success('main', "", "0", "")
 
+#check msg.value
+compile_ex('test_msg_value.code', 'stdlib_sol.tvm')
+expect_success("main", "", "15000000000", "--internal 15000000000")
+
+#check msg.sender
+compile_ex('test_balance.code', 'stdlib_sol.tvm')
+expect_success("main", "", "100000000000", "--internal 0")
+
 
 cleanup()
