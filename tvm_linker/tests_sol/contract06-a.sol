@@ -17,29 +17,13 @@ contract MyContract is IMyContract {
 	}
 
 	mapping(address => ContractInfo) m_allowed;
-	uint256 m_ownerPubkey;
 	
 	// TVM helpers
-	function tvm_sender_pubkey() pure private returns (uint256) {}
 	function tvm_logstr(bytes32) pure private {}
-	modifier tvm_signed() { _; }
 	
 	// External messages
 	
-	constructor() public tvm_signed {
-		tvm_logstr("constructor");
-		uint256 pubkey = tvm_sender_pubkey();
-		//require(pubkey != 0);
-		m_ownerPubkey = pubkey;
-	}
-	
-	// a kind of modifier
-	function ensureOwner() view private {
-		require(tvm_sender_pubkey() == m_ownerPubkey);
-	}
-	
-	function setAllowance(address anotherContract, uint64 amount) public tvm_signed {
-		ensureOwner();
+	function setAllowance(address anotherContract, uint64 amount) public {
 		m_allowed[anotherContract].allowed = amount;
 	}
 	

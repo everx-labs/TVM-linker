@@ -1,8 +1,8 @@
-address1=9357094a867a96b9e6ccd69043ae3c34fe09e59d3826ca5f1319ae822e8bcabc
+address1=4c559656f23046e36b5743f022fc5760a8d99fddc10875fdbab7ab9814f71a95
 address1short=`echo $address1 | cut -c 1-8`
 msginit1=$address1short-msg-init.boc
 msgbody1=$address1short-msg-body.boc
-address2=fb5a6f44aa1edb15989106e3444bb03a91a280b5c0ae26c5069183dfb2d2f237
+address2=17ed3e4f2d7aceaacadeb88bef73e17645e85568451488c275d5df6dc21a00bc
 address2short=`echo $address2 | cut -c 1-8`
 msginit2=$address2short-msg-init.boc
 msgbody2=$address2short-msg-body.boc
@@ -29,10 +29,10 @@ $linker message $address2 --init -w 0
 
 zeroes=0000000000000000000000000000000000000000000000000000000000000000
 
-$linker message $address1 -w 0 --abi-json contract06-a.abi.json \
-	--abi-method constructor_external	\
-	--abi-params "{}" \
-	--setkey ../key1
+# $linker message $address1 -w 0 --abi-json contract06-a.abi.json \
+	# --abi-method constructor_external	\
+	# --abi-params "{}" \
+	# --setkey ../key1
 
 $emulator/create-msg --type transfer --src $zeroes --dst $address1 --value 10000000 --out sendmoney1.boc
 $emulator/create-msg --type transfer --src $zeroes --dst $address2 --value 10000000 --out sendmoney2.boc
@@ -58,8 +58,8 @@ $tlc -a 0:$address1
 $tlc -a 0:$address2
 
 echo "-------------------------------"
-$tlc -f $msgbody1
-sleep 5
+# $tlc -f $msgbody1
+# sleep 5
 echo "-------------------------------"
 $tlc -a 0:$address1
 $tlc -a 0:$address2
