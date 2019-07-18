@@ -137,6 +137,23 @@
     CALL 1      ;public method call
 
 
+	.globl		get_pubkey
+	.type		get_pubkey, @function
+	;; stack=0
+	PUSHINT 0
+	PUSH c5
+	CTOS
+	LDREF
+	NIP
+	LDDICT
+	DROP
+	PUSHINT 256
+	DICTUGET
+	DROP
+	LDU 256
+	DROP ; drop slice itself
+	RET
+
 	.globl		get_msg_sender
 	.type		get_msg_sender, @function
 	;; stack=0
