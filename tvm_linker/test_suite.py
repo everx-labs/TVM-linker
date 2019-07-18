@@ -51,7 +51,9 @@ def compile_ex(source_file, lib_file):
 	global lines, functions, CONTRACT_ADDRESS
 	print("Compiling " + source_file + "...")
 	lib = "--lib " + lib_file if lib_file else ""
-	ec = os.system("./target/debug/tvm_linker {} ./tests/{} --debug > compile_log.tmp".format(lib, source_file))
+	cmd = "./target/debug/tvm_linker compile ./tests/{} {} --debug > compile_log.tmp".format(source_file, lib)
+	# print cmd
+	ec = os.system(cmd)
 	if ec != 0:
 		error("COMPILATION FAILED!")
 
@@ -82,7 +84,7 @@ def exec_and_parse(method, params, expected_ec, options):
 	else:
 		id = functions[method]
 		body = "--body 00{}{}".format(id, params)
-	cmd = "./target/debug/tvm_linker {} test {} {} {} >exec_log.tmp".format(CONTRACT_ADDRESS, body, sign, options)
+	cmd = "./target/debug/tvm_linker test {} {} {} {} >exec_log.tmp".format(CONTRACT_ADDRESS, body, sign, options)
 	# print cmd
 	ec = os.system(cmd)
 	assert ec == 0, ec
@@ -173,6 +175,14 @@ compile_ex('test_msg_sender2.code', 'stdlib_sol.tvm')
 expect_success('main', "", "0", "--internal 0")
 # check external message
 expect_success('main', "", "0", "")
+
+#check msg.value
+compile_ex('test_msg_value.code', 'stdlib_sol.tvm')
+expect_success("main", "", "15000000000", "--internal 15000000000")
+
+#check msg.sender
+compile_ex('test_balance.code', 'stdlib_sol.tvm')
+expect_success("main", "", "100000000000", "--internal 0")
 
 
 cleanup()

@@ -1,12 +1,12 @@
 
-.globl constructor_external
-.type constructor_external, @function
+.globl	constructor_external
+.type	constructor_external, @function
 DROP
 PUSHINT $constructor$
 CALL 1
 
-.globl constructor
-.type constructor, @function
+.globl	constructor
+.type	constructor, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: constructor
 NEWDICT
@@ -14,10 +14,8 @@ NEWC STSLICE ENDC
 POPROOT
 ;; tvm_sender_pubkey
 ;; stack=0
-PUSH c5
-CTOS
-LDU 256
-DROP
+PUSHINT $get_pubkey$
+CALL 1
 ;; decl: pubkey
 ;; pubkey
 ;; stack=1
@@ -55,24 +53,22 @@ POPROOT
 DROP
 RET
 
-.globl set_role_external
-.type set_role_external, @function
+.globl	set_role_external
+.type	set_role_external, @function
 LDU 8
 DROP
 PUSHINT $set_role$
 CALL 1
 
-.globl set_role
-.type set_role, @function
+.globl	set_role
+.type	set_role, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: set_role
 ;; param: role
 ;; tvm_sender_pubkey
 ;; stack=1
-PUSH c5
-CTOS
-LDU 256
-DROP
+PUSHINT $get_pubkey$
+CALL 1
 ;; decl: pubkey
 ;; pubkey
 ;; stack=2
@@ -112,22 +108,20 @@ POPROOT
 BLKDROP 2
 RET
 
-.globl get_role_external
-.type get_role_external, @function
+.globl	get_role_external
+.type	get_role_external, @function
 DROP
 PUSHINT $get_role$
 CALL 1
 
-.globl get_role
-.type get_role, @function
+.globl	get_role
+.type	get_role, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: get_role
 ;; tvm_sender_pubkey
 ;; stack=0
-PUSH c5
-CTOS
-LDU 256
-DROP
+PUSHINT $get_pubkey$
+CALL 1
 ;; decl: pubkey
 ;; pubkey
 ;; stack=1

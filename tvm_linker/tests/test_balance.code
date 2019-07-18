@@ -1,0 +1,16 @@
+
+.globl	main_external
+.type	main_external, @function
+DROP
+PUSHINT $main$
+CALL 1
+
+.globl	main
+.type	main, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: main
+;; get member balance
+PUSHINT $get_contract_balance$
+CALL 1
+;; return
+RET
