@@ -75,28 +75,45 @@
 	; s1 - msg: cell
 	; s2 - gram balance of msg: int
 	; s3 - gram balance of contract: int
-
-	POP s2
-	POP s2
 	
-	; s0 - msg body: slice
-	; s1 - msg: cell
+	PUSH s3
+	PUSH s3
+	; s0 - gram balance of msg: int
+	; s1 - gram balance of contract: int
+	; s2 - msg body: slice
+	; s3 - msg: cell
+	; s4 - gram balance of msg: int
+	; s5 - gram balance of contract: int
 	
-	OVER
+	PUSH s3
 	PUSHINT $get_src_addr$
 	CALL 1
+	POP s4
+	XCHG s2, s3
+	XCHG s1, s2
+	XCHG s0, s1
 	; s0 - addr
-	; s1 - msg body: slice
-	; s2 - msg: cell
-	XCHG s1,s2
-	NIP
+	; s1 - gram balance of msg: int
+	; s2 - gram balance of contract: int
+	; s3 - msg body: slice
+	; s4 - gram balance of msg: int
+	; s5 - gram balance of contract: int
 	
-	OVER
+	PUSH s3
 	PUSHINT $get_msg_pubkey$
 	CALL 1
+	; s0 - signature
+	; s1 - addr
+	; s2 - gram balance of msg: int
+	; s3 - gram balance of contract: int
+	; s4 - msg body: slice
+	; s5 - gram balance of msg: int
+	; s6 - gram balance of contract: int
 	
 	PUSHINT $store_signature$
 	CALL 1
+	NIP
+	NIP
 	
 	; s0 - msg body: slice
 	
@@ -121,13 +138,70 @@
     CALL 1      ;public method call
 
 
+	.globl		get_pubkey
+	.type		get_pubkey, @function
+	;; stack=0
+	PUSHINT 0
+	PUSH c5
+	CTOS
+	LDREF
+	NIP
+	LDDICT
+	DROP
+	PUSHINT 256
+	DICTUGET
+	DROP
+	LDU 256
+	DROP ; drop slice itself
+	RET
+
 	.globl		get_msg_sender
 	.type		get_msg_sender, @function
 	;; stack=0
+	PUSHINT 1
 	PUSH c5
 	CTOS
-	LDU 256
+	LDREF
 	NIP
+	LDDICT
+	DROP
+	PUSHINT 256
+	DICTUGET
+	DROP
+	LDU 256
+	DROP ; drop slice itself
+	RET
+	
+	.globl		get_msg_balance
+	.type		get_msg_balance, @function
+	;; stack=0
+	PUSHINT 2
+	PUSH c5
+	CTOS
+	LDREF
+	NIP
+	LDDICT
+	DROP
+	PUSHINT 256
+	DICTUGET
+	DROP
+	LDU 256
+	DROP ; drop slice itself
+	RET
+	
+	.globl		get_contract_balance
+	.type		get_contract_balance, @function
+	;; stack=0
+	PUSHINT 3
+	PUSH c5
+	CTOS
+	LDREF
+	NIP
+	LDDICT
+	DROP
+	PUSHINT 256
+	DICTUGET
+	DROP
 	LDU 256
 	DROP ; drop slice itself
 	RET
@@ -176,11 +250,40 @@
 	NEWC
 	; stack: sign SmartContractInfo b
 	STREF
-	; stack: sign b'
-	STU 256
-	; stack: src addr b''
-	STU 256
-	; stack: b'''
+	; stack: sign b' in dict for key 0
+	SWAP
+	NEWC STU 256 ENDC CTOS
+	PUSHINT 0
+	NEWDICT
+	PUSHINT 256
+	DICTUSET
+	; stack: src addr b'' in dict for key 1
+	ROT
+	NEWC STU 256 ENDC CTOS
+	PUSHINT 1
+	PUSH s2
+	PUSHINT 256
+	DICTUSET
+	NIP
+	; stack: msg balance b''' in dict for key 2
+	ROT
+	NEWC STU 256 ENDC CTOS
+	PUSHINT 2
+	PUSH s2
+	PUSHINT 256
+	DICTUSET
+	NIP
+	; stack: gram balance of contract b'''' in dict for key 3
+	ROT
+	NEWC STU 256 ENDC CTOS
+	PUSHINT 3
+	PUSH s2
+	PUSHINT 256
+	DICTUSET
+	NIP
+	; stack: dict with values
+	SWAP
+	STDICT
 	ENDC
 	POP c5
 	RET
@@ -191,25 +294,42 @@
     ; s2 - gram balance of msg: int
     ; s3 - gram balance of contract: int
 
-	POP s2
-	POP s2
+	PUSH s3
+	PUSH s3
+	; s0 - gram balance of msg: int
+	; s1 - gram balance of contract: int
+	; s2 - msg body: slice
+	; s3 - msg: cell
+	; s4 - gram balance of msg: int
+	; s5 - gram balance of contract: int
 	
-	; s0 - msg body: slice
-	; s1 - msg: cell
-	
-	OVER
+	PUSH s3
 	PUSHINT $get_src_addr$
 	CALL 1
+	POP s4
+	XCHG s2, s3
+	XCHG s1, s2
+	XCHG s0, s1
 	; s0 - addr
-	; s1 - msg body: slice
-	; s2 - msg: cell
-	XCHG s1,s2
-	NIP
+	; s1 - gram balance of msg: int
+	; s2 - gram balance of contract: int
+	; s3 - msg body: slice
+	; s4 - gram balance of msg: int
+	; s5 - gram balance of contract: int
 	
 	PUSHINT 0 ; put 0 instead of signature
+	; s0 - 0 as signature
+	; s1 - addr
+	; s2 - gram balance of msg: int
+	; s3 - gram balance of contract: int
+	; s4 - msg body: slice
+	; s5 - gram balance of msg: int
+	; s6 - gram balance of contract: int
 	
 	PUSHINT $store_signature$
 	CALL 1
+	NIP
+	NIP
 	
     ; s0 - msg body: slice
 	

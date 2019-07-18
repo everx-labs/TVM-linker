@@ -1,0 +1,24 @@
+
+.globl	remoteMethod_external
+.type	remoteMethod_external, @function
+DROP
+PUSHINT $remoteMethod$
+CALL 1
+
+.globl	remoteMethod
+.type	remoteMethod, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: remoteMethod
+;; get member value
+PUSHINT $get_msg_balance$
+CALL 1
+;; assign m_value
+NEWC STU 256 ENDC CTOS
+PUSHINT 0
+PUSHROOT CTOS
+PUSHINT 256
+DICTUSET
+NEWC STSLICE ENDC
+POPROOT
+;; return
+RET
