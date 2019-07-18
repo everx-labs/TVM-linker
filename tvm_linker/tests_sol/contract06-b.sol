@@ -7,7 +7,7 @@ contract MyContract {
 	// A method to be called from another contract
 	
 	function remoteMethod() public {
-		m_value = msg.sender.balance;
+		m_value = address(this).balance;
 		return; 
 	}
 	
