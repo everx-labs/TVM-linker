@@ -10,10 +10,12 @@
 		"outputs": []
 	}, {
 		"name": "constructor_external",
+		"signed": true,
 		"inputs": [],
 		"outputs": []
 	}, {
 		"name": "setAllowance_external",
+		"signed": true,
 		"inputs": [{"name": "anotherContract", "type": "uint256"}, {"name": "amount", "type": "uint64"}],
 		"outputs": []
 	}]

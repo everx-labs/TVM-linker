@@ -12,6 +12,7 @@ CALL 1
 NEWDICT
 NEWC STSLICE ENDC
 POPROOT
+LOGSTR constructor
 ;; tvm_sender_pubkey
 ;; stack=0
 PUSH c5
@@ -19,7 +20,6 @@ CTOS
 LDU 256
 DROP
 ;; decl: pubkey
-LOGSTR after_pubkey
 ;; pubkey
 ;; stack=1
 DUP

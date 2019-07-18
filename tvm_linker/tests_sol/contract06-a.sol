@@ -22,27 +22,28 @@ contract MyContract is IMyContract {
 	// TVM helpers
 	function tvm_sender_pubkey() pure private returns (uint256) {}
 	function tvm_logstr(bytes32) pure private {}
+	modifier tvm_signed() { _; }
 	
-	// External methods
+	// External messages
 	
-	constructor() public {
+	constructor() public tvm_signed {
+		tvm_logstr("constructor");
 		uint256 pubkey = tvm_sender_pubkey();
-		tvm_logstr("after_pubkey");
 		//require(pubkey != 0);
 		m_ownerPubkey = pubkey;
 	}
 	
-	// a kind of modificator
+	// a kind of modifier
 	function ensureOwner() view private {
 		require(tvm_sender_pubkey() == m_ownerPubkey);
 	}
 	
-	function setAllowance(address anotherContract, uint64 amount) public {
+	function setAllowance(address anotherContract, uint64 amount) public tvm_signed {
 		ensureOwner();
 		m_allowed[anotherContract].allowed = amount;
 	}
 	
-	// Internal methods
+	// Internal messages
 
 	function getCredit() public {
 		IMyContractCallback(msg.sender).getCreditCallback(m_allowed[msg.sender].allowed);
