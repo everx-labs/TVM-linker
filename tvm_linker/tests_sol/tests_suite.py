@@ -39,11 +39,14 @@ def runLinker(args: str):
 
 def runLinkerCompile(contract:str, abi_json:str = None):
     res=None
+    print("Compiling {}".format(contract))
     if not(os.access(os.path.abspath(contract), os.R_OK)):
+        print("Cannot access " + os.path.abspath(contract))
         return(res)
     cmd = "compile --lib " + cfg.get('tvm_linker').get('lib_path', None) + \
         " " + os.path.abspath(contract) + \
         (" --abi-json " + abi_json if abi_json!=None else "")
+    # print(cmd)
     proc = runLinker(cmd)
     proc.wait()
     if proc.returncode!=0:
@@ -186,15 +189,18 @@ class SoliditySuite(unittest.TestCase):
         self.cfg = cfg
         self.assertNotEqual(self.cfg.get('node', None), None, 'No node config provided')
         wd = self.cfg['node'].get('work_dir',None)
+        saved_workdir = os.getcwd()
         if wd!=None: 
             self.assertTrue(os.access(wd, os.R_OK),'No node workdir found')
             os.chdir(wd)
         subprocess.call('pkill ton-node', shell=True)
-        subprocess.call('rm ./log/output.log', shell=True)
+        subprocess.call('rm -f ./log/output.log', shell=True)
         subprocess.call('rm -rf ./workchains', shell=True)
         cmd = self.cfg['node'].get('cmd')
         self.cfg['node']['proc'] = subprocess.Popen(cmd, shell=True)
-        os.chdir(os.path.dirname(os.path.abspath(__file__)))
+        os.chdir(saved_workdir)
+        # give some time for node to start
+        time.sleep(3)
         subprocess.call('rm -f *.tvc *.boc *.tmp', shell=True)
     
     def tearDown(self):
