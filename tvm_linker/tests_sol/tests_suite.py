@@ -6,6 +6,8 @@ import json
 import time
 
 cfgFile_name = __file__.replace('.py','') + '.json'
+script_path = os.path.dirname(os.path.abspath(__file__))
+print('Script folder {}'.format(script_path))
 print('Loading config file ' + cfgFile_name)
 cfgFile = None
 if os.access(cfgFile_name, os.R_OK):
@@ -195,15 +197,13 @@ class SoliditySuite(unittest.TestCase):
         subprocess.call('pkill ton-node', shell=True)
         subprocess.call('rm -f ./log/output.log', shell=True)
         subprocess.call('rm -rf ./workchains', shell=True)
-        subprocess.call('pwd', shell=True)
         cmd = self.cfg['node'].get('cmd')
-        self.node = subprocess.Popen(cmd, shell=True)
+        subprocess.Popen(cmd, shell=True)
         time.sleep(3)
-        os.chdir(os.path.dirname(__file__))
+        os.chdir(script_path)
         subprocess.call('rm -f *.tvc *.boc *.tmp', shell=True)
     
     def tearDown(self):
-        self.node.terminate()
         subprocess.call('pkill ton-node', shell=True)
     
     def test_01(self):
