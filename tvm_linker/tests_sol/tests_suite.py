@@ -5,6 +5,19 @@ import unittest
 import json
 import time
 
+'''
+    TODO:
+        - remove sleep(5) and just wait that account balance is changed instead
+        - parse account state for data section:
+                data:(just
+                  value:(raw@^Cell 
+                    x{}
+                     x{}
+                    ))
+                library:hme_empty))))
+        - add contract02 support
+'''
+
 cfgFile_name = __file__.replace('.py','') + '.json'
 script_path = os.path.dirname(os.path.abspath(__file__))
 print('Script folder {}'.format(script_path))
@@ -146,16 +159,20 @@ lastLine = None
 
 def runTLCAccount(address:str):
     global lastLine
-    res=None
+    print("Getting account " + address)
+    res = None
     cmd = '-a 0:{}'
     proc = runTLC(cmd.format(address))
     st = time.time()*1000
     ec = proc.poll()
-    while ec==None and (time.time()*1000-st)<10000:
+    while (ec == None) and (time.time()*1000-st) < 3000:
         ec = proc.poll()
         time.sleep(0.1)
-    if ec==None:
+    if ec == None:
+        print("timeout")
+        # print(proc.pid)
         proc.terminate()
+        return ""
     res = proc.stdout.read()
 
     # print last line of output where data section is
@@ -167,7 +184,7 @@ def runTLCAccount(address:str):
     if match: print(match.group(0).replace("\n", " "))
     
     proc.stdout.close()
-    return(res)
+    return res
 
 def runTLCFile(boc_file:str):
     res=None
@@ -204,8 +221,8 @@ class SoliditySuite(unittest.TestCase):
         self.cfg = cfg
         self.assertNotEqual(self.cfg.get('node', None), None, 'No node config provided')
         wd = self.cfg['node'].get('work_dir',None)
-        if wd!=None: 
-            self.assertTrue(os.access(wd, os.R_OK),'No node workdir found')
+        if wd != None: 
+            self.assertTrue(os.access(wd, os.R_OK), 'No node workdir found')
             os.chdir(wd)
         subprocess.call('pkill ton-node', shell=True)
         subprocess.call('rm -f ./log/output.log', shell=True)
@@ -213,7 +230,10 @@ class SoliditySuite(unittest.TestCase):
         cmd = self.cfg['node'].get('cmd')
         self.node = None
         self.node = subprocess.Popen(cmd, shell=True)
-        time.sleep(3)
+        
+        # give some time for node to start
+        time.sleep(1)
+        
         os.chdir(script_path)
         subprocess.call('rm -f *.tvc *.boc *.tmp', shell=True)
         
@@ -222,30 +242,40 @@ class SoliditySuite(unittest.TestCase):
             self.node.terminate()
             self.node.wait()
         subprocess.call('pkill ton-node', shell=True)
-    
-    def test_01(self):
+        
+    def deployContract(self, contractName):
         address = runLinkerCompile('contract01.code', 'contract01.abi.json')
         print('Contract address:', address)
         self.assertNotEqual(address,None, 'Contract hasn\'t been compiled')
         msginit = runLinkerMsgInit(address)
         self.assertNotEqual(msginit, None, 'No msg init boc file created')
         print('Message init file:', msginit)
-        msgbody = runLinkerMsgBody(address, 'contract01.abi.json', '{"a":"0x1234"}', 'main_external')
-        self.assertNotEqual(msgbody, None, 'No msg body boc file created')
-        print('Message body file:', msgbody)
-
+        
         msgfile = runCreateMessage('0000000000000000000000000000000000000000000000000000000000000000', address, '1000000', './sendmoney.boc')
         self.assertEqual(msgfile, os.path.abspath('./sendmoney.boc'), 'Expected message file wasn\'t been created')
         print('Created message file:', msgfile)
         print('')
-        
+
+        # fetching state of zero account to make sure node is up
+        waitFor(runTLCAccount, ["0" * 64], 5000, r'state:\(account_active')
+
         waitFor(runTLCFile, [msgfile], 5000, r'external message status is 1')
-        
-        waitFor(runTLCAccount,[address], 5000, r'state:account_uninit')
+        waitFor(runTLCAccount, [address], 5000, r'state:account_uninit')
         
         waitFor(runTLCFile, [msginit], 5000, r'external message status is 1')
+        waitFor(runTLCAccount, [address], 5000, r'state:\(account_active')
+        
+        return address
+    
+    
+    def test_01(self):
+        address = self.deployContract("contract01")
+    
+        msgbody = runLinkerMsgBody(address, 'contract01.abi.json', '{"a":"0x1234"}', 'main_external')
+        self.assertNotEqual(msgbody, None, 'No msg body boc file created')
+        print('Message body file:', msgbody)
 
-        waitFor(runTLCAccount,[address], 5000, r'state:\(account_active')
+        waitFor(runTLCAccount, [address], 5000, r'state:\(account_active')
         print(lastLine)
         self.assertEqual(lastLine, " x{4_}")
 
