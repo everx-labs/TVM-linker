@@ -138,7 +138,14 @@ def runTLCAccount(address:str):
     res=None
     cmd = '-a 0:{}'
     proc = runTLC(cmd.format(address))
-    proc.wait()
+    print('{}: {}'.format(address, proc.pid))
+    st = time.time()*1000
+    ec = proc.poll()
+    while ec==None and (time.time()*1000-st)<10000:
+        ec = proc.poll()
+        time.sleep(0.1)
+    if ec==None:
+        proc.terminate()
     res = proc.stdout.read()
     proc.stdout.close()
     return(res)
@@ -149,7 +156,14 @@ def runTLCFile(boc_file:str):
         return(res)
     cmd = '-f {}'
     proc = runTLC(cmd.format(boc_file))
-    proc.wait()
+    print('{}: {}'.format(boc_file, proc.pid))
+    st = time.time()*1000
+    ec = proc.poll()
+    while ec==None and (time.time()*1000-st)<10000:
+        ec = proc.poll()
+        time.sleep(0.1)
+    if ec==None:
+        proc.terminate()
     res = proc.stdout.read()
     proc.stdout.close()
     return(res)
@@ -175,15 +189,16 @@ class SoliditySuite(unittest.TestCase):
         if wd!=None: 
             self.assertTrue(os.access(wd, os.R_OK),'No node workdir found')
             os.chdir(wd)
-        subprocess.call('pkill ton-node && rm ./log/output.log && rm -rf ./workchains', shell=True)
+        subprocess.call('pkill ton-node', shell=True)
+        subprocess.call('rm ./log/output.log', shell=True)
+        subprocess.call('rm -rf ./workchains', shell=True)
         cmd = self.cfg['node'].get('cmd')
         self.cfg['node']['proc'] = subprocess.Popen(cmd, shell=True)
         os.chdir(os.path.dirname(os.path.abspath(__file__)))
         subprocess.call('rm -f *.tvc *.boc *.tmp', shell=True)
     
     def tearDown(self):
-        if self.cfg.get('node', None) != None and self.cfg['node'].get('proc',None) !=None:
-            self.cfg['node']['proc'].terminate()
+        subprocess.call('pkill ton-node', shell=True)
     
     def test_01(self):
         address = runLinkerCompile('contract02-a.code')
