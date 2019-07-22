@@ -189,25 +189,25 @@ class SoliditySuite(unittest.TestCase):
         self.cfg = cfg
         self.assertNotEqual(self.cfg.get('node', None), None, 'No node config provided')
         wd = self.cfg['node'].get('work_dir',None)
-        saved_workdir = os.getcwd()
         if wd!=None: 
             self.assertTrue(os.access(wd, os.R_OK),'No node workdir found')
             os.chdir(wd)
         subprocess.call('pkill ton-node', shell=True)
         subprocess.call('rm -f ./log/output.log', shell=True)
         subprocess.call('rm -rf ./workchains', shell=True)
+        subprocess.call('pwd', shell=True)
         cmd = self.cfg['node'].get('cmd')
-        self.cfg['node']['proc'] = subprocess.Popen(cmd, shell=True)
-        os.chdir(saved_workdir)
-        # give some time for node to start
+        self.node = subprocess.Popen(cmd, shell=True)
         time.sleep(3)
+        os.chdir(os.path.dirname(__file__))
         subprocess.call('rm -f *.tvc *.boc *.tmp', shell=True)
     
     def tearDown(self):
+        self.node.terminate()
         subprocess.call('pkill ton-node', shell=True)
     
     def test_01(self):
-        address = runLinkerCompile('contract02-a.code')
+        address = runLinkerCompile('contract01.code', 'contract01.abi.json')
         print('Contract address:', address)
         self.assertNotEqual(address,None, 'Contract hasn\'t been compiled')
         msginit = runLinkerMsgInit(address)
