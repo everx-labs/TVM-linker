@@ -83,7 +83,9 @@ def runLinkerMsgBody(address:str, abi_json:str, abi_params:str, method:str):
     if not(os.access(os.path.abspath(abi_json), os.R_OK)):
         return(res)
     cmd = 'message {} -w 0 --abi-json {} --abi-method {} --abi-params {}'
-    proc = runLinker(cmd.format(address, os.path.abspath(abi_json), method, abi_params))
+    cmd = cmd.format(address, os.path.abspath(abi_json), method, abi_params)
+    # print(cmd)
+    proc = runLinker(cmd)
     proc.wait()
     if proc.returncode!=0:
         err = proc.stdout.read()
@@ -92,6 +94,7 @@ def runLinkerMsgBody(address:str, abi_json:str, abi_params:str, method:str):
         raise Exception('Error preparing message body for contract')
     else:
         output = proc.stdout.read()
+        # print(output)
         proc.stdout.close()
         res = re.findall(r'boc file created: ([A-Za-z0-9-\.]*)$',output)[0]
     return(res)
@@ -139,7 +142,10 @@ def runTLC(args:str):
         stderr = subprocess.STDOUT)
     return(proc)
 
+lastLine = None
+
 def runTLCAccount(address:str):
+    global lastLine
     res=None
     cmd = '-a 0:{}'
     proc = runTLC(cmd.format(address))
@@ -152,6 +158,15 @@ def runTLCAccount(address:str):
     if ec==None:
         proc.terminate()
     res = proc.stdout.read()
+
+    # print last line of output where data section is
+    lastLine = res.splitlines()[-1];
+    
+    # print account balance
+    regex = re.compile(r"grams:\(nanograms.*?\)\)", re.MULTILINE | re.DOTALL);
+    match = regex.search(res);
+    if match: print(match.group(0).replace("\n", " "))
+    
     proc.stdout.close()
     return(res)
 
@@ -229,10 +244,17 @@ class SoliditySuite(unittest.TestCase):
         waitFor(runTLCFile, [msginit], 5000, r'external message status is 1')
 
         waitFor(runTLCAccount,[address], 5000, r'state:\(account_active')
-        
+        print(lastLine)
+        self.assertEqual(lastLine, " x{4_}");
+
         waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
 
+        # TODO: this sleep() should be avoided!
+        time.sleep(5)
+
         waitFor(runTLCAccount,[address], 5000, r'state:\(account_active')
+        print(lastLine)
+        self.assertEqual(lastLine, "  x{D000000000000000000000000000000000000000000000000000000000000001234}");
         
 if __name__ == '__main__':
     unittest.main()
