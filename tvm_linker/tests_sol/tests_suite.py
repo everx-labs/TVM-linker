@@ -149,7 +149,6 @@ def runTLCAccount(address:str):
     res=None
     cmd = '-a 0:{}'
     proc = runTLC(cmd.format(address))
-    print('{}: {}'.format(address, proc.pid))
     st = time.time()*1000
     ec = proc.poll()
     while ec==None and (time.time()*1000-st)<10000:
@@ -160,11 +159,11 @@ def runTLCAccount(address:str):
     res = proc.stdout.read()
 
     # print last line of output where data section is
-    lastLine = res.splitlines()[-1];
+    lastLine = res.splitlines()[-1]
     
     # print account balance
-    regex = re.compile(r"grams:\(nanograms.*?\)\)", re.MULTILINE | re.DOTALL);
-    match = regex.search(res);
+    regex = re.compile(r"grams:\(nanograms.*?\)\)", re.MULTILINE | re.DOTALL)
+    match = regex.search(res)
     if match: print(match.group(0).replace("\n", " "))
     
     proc.stdout.close()
@@ -176,7 +175,6 @@ def runTLCFile(boc_file:str):
         return(res)
     cmd = '-f {}'
     proc = runTLC(cmd.format(boc_file))
-    print('{}: {}'.format(boc_file, proc.pid))
     st = time.time()*1000
     ec = proc.poll()
     while ec==None and (time.time()*1000-st)<10000:
@@ -213,12 +211,16 @@ class SoliditySuite(unittest.TestCase):
         subprocess.call('rm -f ./log/output.log', shell=True)
         subprocess.call('rm -rf ./workchains', shell=True)
         cmd = self.cfg['node'].get('cmd')
-        subprocess.Popen(cmd, shell=True)
+        self.node = None
+        self.node = subprocess.Popen(cmd, shell=True)
         time.sleep(3)
         os.chdir(script_path)
         subprocess.call('rm -f *.tvc *.boc *.tmp', shell=True)
-    
+        
     def tearDown(self):
+        if self.node!=None:
+            self.node.terminate()
+            self.node.wait()
         subprocess.call('pkill ton-node', shell=True)
     
     def test_01(self):
@@ -245,7 +247,7 @@ class SoliditySuite(unittest.TestCase):
 
         waitFor(runTLCAccount,[address], 5000, r'state:\(account_active')
         print(lastLine)
-        self.assertEqual(lastLine, " x{4_}");
+        self.assertEqual(lastLine, " x{4_}")
 
         waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
 
@@ -254,7 +256,7 @@ class SoliditySuite(unittest.TestCase):
 
         waitFor(runTLCAccount,[address], 5000, r'state:\(account_active')
         print(lastLine)
-        self.assertEqual(lastLine, "  x{D000000000000000000000000000000000000000000000000000000000000001234}");
+        self.assertEqual(lastLine, "  x{D000000000000000000000000000000000000000000000000000000000000001234}")
         
 if __name__ == '__main__':
     unittest.main()
