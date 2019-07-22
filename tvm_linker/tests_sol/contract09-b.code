@@ -1,0 +1,35 @@
+
+.globl	acceptMoneyAndNumber_external
+.type	acceptMoneyAndNumber_external, @function
+LDU 64
+DROP
+PUSHINT $acceptMoneyAndNumber$
+CALL 1
+
+.globl	acceptMoneyAndNumber
+.type	acceptMoneyAndNumber, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: acceptMoneyAndNumber
+;; param: number
+;; number
+;; stack=1
+DUP
+;; assign m_number
+NEWC STU 64 ENDC CTOS
+PUSHINT 0
+PUSHROOT CTOS
+PUSHINT 256
+DICTUSET
+NEWC STSLICE ENDC
+POPROOT
+;; get member value
+PUSHINT $get_msg_balance$
+CALL 1
+;; assign m_msg_value
+NEWC STU 256 ENDC CTOS
+PUSHINT 1
+PUSHROOT CTOS
+PUSHINT 256
+DICTUSET
+NEWC STSLICE ENDC
+POPROOT

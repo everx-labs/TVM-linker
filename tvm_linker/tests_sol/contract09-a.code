@@ -1,0 +1,54 @@
+
+.globl	sendMoneyAndNumber_external
+.type	sendMoneyAndNumber_external, @function
+LDU 256
+LDU 64
+DROP
+PUSHINT $sendMoneyAndNumber$
+CALL 1
+
+.globl	sendMoneyAndNumber
+.type	sendMoneyAndNumber, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: sendMoneyAndNumber
+;; param: remote
+;; param: number
+;; number
+;; stack=2
+DUP
+;; get member acceptMoneyAndNumber
+PUSHINT $acceptMoneyAndNumber$
+PUSHINT 100000
+;; get member value
+PUSHINT $get_msg_balance$
+CALL 1
+;; return
+BLKDROP 6
+RET
+
+.globl	sendMoneyAndNumberCallback_external
+.type	sendMoneyAndNumberCallback_external, @function
+LDU 64
+DROP
+PUSHINT $sendMoneyAndNumberCallback$
+CALL 1
+
+.globl	sendMoneyAndNumberCallback
+.type	sendMoneyAndNumberCallback, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: sendMoneyAndNumberCallback
+;; param: number
+;; number
+;; stack=1
+DUP
+;; assign m_result
+NEWC STU 64 ENDC CTOS
+PUSHINT 0
+PUSHROOT CTOS
+PUSHINT 256
+DICTUSET
+NEWC STSLICE ENDC
+POPROOT
+;; return
+DROP
+RET
