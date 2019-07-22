@@ -213,7 +213,7 @@ class SoliditySuite(unittest.TestCase):
         subprocess.call('rm -f ./log/output.log', shell=True)
         subprocess.call('rm -rf ./workchains', shell=True)
         cmd = self.cfg['node'].get('cmd')
-        subprocess.Popen(cmd, shell=True)
+        self.node = subprocess.Popen(cmd, shell=True)
         time.sleep(3)
         os.chdir(script_path)
         subprocess.call('rm -f *.tvc *.boc *.tmp', shell=True)
