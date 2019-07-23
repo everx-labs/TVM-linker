@@ -13,17 +13,29 @@ CALL 1
 ;; Function: sendMoneyAndNumber
 ;; param: remote
 ;; param: number
-;; number
-;; stack=2
-DUP
-;; get member acceptMoneyAndNumber
-PUSHINT $acceptMoneyAndNumber_external$
 PUSHINT 100000
-;; get member value
-PUSHINT $get_msg_balance$
+;; remote
+;; stack=3
+PUSH s2
+;; IRemoteContract
+;; stack=4
+;; IRemoteContract.acceptMoneyAndNumber
+;; number
+;; number
+;; stack=4
+PUSH s2
+PUSHINT $acceptMoneyAndNumber_external$
+PUSHINT 0
+NEWC
+STU 8
+STU 32
+;; number
+STU 64
+ENDC CTOS
+PUSHINT $send_grams$
 CALL 1
 ;; return
-BLKDROP 6
+BLKDROP 4
 RET
 
 .globl	sendMoneyAndNumberCallback_external

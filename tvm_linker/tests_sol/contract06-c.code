@@ -15,7 +15,13 @@ PUSHINT 50000
 ;; bank
 ;; stack=2
 PUSH s1
-NEWC ENDC CTOS
+;; IMyContract.getCredit
+PUSHINT $getCredit_external$
+PUSHINT 0
+NEWC
+STU 8
+STU 32
+ENDC CTOS
 PUSHINT $send_grams$
 CALL 1
 ;; return
@@ -45,3 +51,7 @@ PUSHINT 256
 DICTUSET
 NEWC STSLICE ENDC
 POPROOT
+
+.globl	getCredit_external
+.type	getCredit_external, @function
+RET
