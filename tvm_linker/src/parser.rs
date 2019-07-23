@@ -97,8 +97,8 @@ const PATTERN_SELECTOR: &'static str = r"^[\t\s]*\.selector";
 const PATTERN_ALIAS:    &'static str = r"^[\t\s]*\.internal-alias (:[a-zA-Z0-9_]+),[\t\s]+(-?\d+)";
 const PATTERN_GLBLBASE: &'static str = r"^[\t\s]*\.global-base[\t\s]+([0-9]+)";
 const PATTERN_PERSBASE: &'static str = r"^[\t\s]*\.persistent-base[\t\s]+([0-9]+)";
-const PATTERN_LABEL:    &'static str = r"^\.[a-zA-Z0-9_]+:";
-const PATTERN_GLOBLSTART: &'static str = r"^([a-zA-Z0-9_]+):";
+const PATTERN_LABEL:    &'static str = r"^[\.a-zA-Z0-9_]+:";
+//const PATTERN_GLOBLSTART: &'static str = r"^([a-zA-Z0-9_]+):";
 const PATTERN_PARAM:    &'static str = r"^[\t\s]+\.([a-zA-Z0-9_]+),?[\t\s]*([a-zA-Z0-9_]+)";
 const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+([a-zA-Z0-9_]+),[\t\s]*@([a-zA-Z]+)";
 const PATTERN_SIZE:     &'static str = r"^[\t\s]*\.size[\t\s]+([a-zA-Z0-9_]+),[\t\s]*([\.a-zA-Z0-9_]+)";
@@ -276,7 +276,6 @@ impl ParseEngine {
         let size_regex = Regex::new(PATTERN_SIZE).unwrap();
         let base_glbl_regex = Regex::new(PATTERN_GLBLBASE).unwrap();
         let base_pers_regex = Regex::new(PATTERN_PERSBASE).unwrap();
-        let globlstart_regex = Regex::new(PATTERN_GLOBLSTART).unwrap();
         let ignored_regex = Regex::new(PATTERN_IGNORED).unwrap();
 
         let mut section_name: String = String::new();
@@ -291,7 +290,6 @@ impl ParseEngine {
         while reader.read_line(&mut l)
             .map_err(|_| "error while reading line")? != 0 {
             lnum += 1;
-            //l.trim_start();
             if ignored_regex.is_match(&l) {
                 //ignore unused parameters
                 debug!("ignored: {}", l);
@@ -315,10 +313,15 @@ impl ParseEngine {
                 self.update_predefined();
             } else if type_regex.is_match(&l) {
                 // .type x, @...
+                //it's a mark for begining of a new object (func or data)
+                self.update(&section_name, &obj_name, &obj_body, first_pass)
+                    .map_err(|e| format!("line {}: {}", lnum, e))?;
+                section_name = GLOBL.to_owned();
+                obj_body = "".to_owned(); 
                 let cap = type_regex.captures(&l).unwrap();
-                let name = cap.get(1).unwrap().as_str().to_owned();
+                obj_name = cap.get(1).unwrap().as_str().to_owned();
                 let type_name = cap.get(2).ok_or(format!("line {}: .type option is invalid", lnum))?.as_str();
-                let obj = self.globals.entry(name.clone()).or_insert(Object::new(name, &type_name));
+                let obj = self.globals.entry(obj_name.clone()).or_insert(Object::new(obj_name.clone(), &type_name));
                 obj.dtype = ObjectType::from(type_name);
             } else if size_regex.is_match(&l) {
                 // .size x, val
@@ -332,22 +335,9 @@ impl ParseEngine {
                 let cap = globl_regex.captures(&l).unwrap();
                 let name = cap.get(1).unwrap().as_str().to_owned();
                 self.globals.entry(name.clone()).or_insert(Object::new(name.clone(), ""));
-            } else if globlstart_regex.is_match(&l) {
-                // x: begining of the globl object's body
-                self.update(&section_name, &obj_name, &obj_body, first_pass)
-                    .map_err(|e| format!("line {}: {}", lnum, e))?;
-                section_name = GLOBL.to_owned();
-                let cap = globlstart_regex.captures(&l).unwrap();
-                obj_name = cap.get(1).unwrap().as_str().to_owned();
-                obj_body = "".to_owned(); 
             } else if data_regex.is_match(&l) {
                 // .data
                 //ignore, not used
-                /*self.update(&section_name, &obj_name, &obj_body, first_pass)
-                    .map_err(|e| format!("line {}: {}", lnum, e))?;
-                section_name = DATA.to_owned();
-                obj_name = "".to_owned();
-                obj_body = "".to_owned();*/
             } else if selector_regex.is_match(&l) {                
                 // .selector
                 self.update(&section_name, &obj_name, &obj_body, first_pass)?;
