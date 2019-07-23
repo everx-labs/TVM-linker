@@ -205,6 +205,6 @@ expect_success("main", "", "100000000000", "--internal 0")
 compile2('contract09-a')
 expect_success('sendMoneyAndNumber', ("12" * 32) + ("7" * 16), None, "--internal 0 --decode-c6")
 expect_output(r"destination : 0:12121212")
-expect_output(r"CurrencyCollection: Grams.*value = 1000]")
+expect_output(r"CurrencyCollection: Grams.*value = 100000]")
 
 cleanup()

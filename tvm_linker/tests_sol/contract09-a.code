@@ -35,7 +35,7 @@ ENDC CTOS
 PUSHINT $send_grams$
 CALL 1
 ;; return
-BLKDROP 4
+BLKDROP 3
 RET
 
 .globl	sendMoneyAndNumberCallback_external
