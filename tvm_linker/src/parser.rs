@@ -102,7 +102,7 @@ const PATTERN_GLOBLSTART: &'static str = r"^([a-zA-Z0-9_]+):";
 const PATTERN_PARAM:    &'static str = r"^[\t\s]+\.([a-zA-Z0-9_]+),?[\t\s]*([a-zA-Z0-9_]+)";
 const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+([a-zA-Z0-9_]+),[\t\s]*@([a-zA-Z]+)";
 const PATTERN_SIZE:     &'static str = r"^[\t\s]*\.size[\t\s]+([a-zA-Z0-9_]+),[\t\s]*([\.a-zA-Z0-9_]+)";
-const PATTERN_IGNORED:  &'static str = r"^[\t\s]+\.(p2align|text|file|ident|section)";
+const PATTERN_IGNORED:  &'static str = r"^[\t\s]+\.(p2align|align|text|file|ident|section)";
 
 const GLOBL:    &'static str = ".globl";
 const INTERNAL: &'static str = ".internal";
