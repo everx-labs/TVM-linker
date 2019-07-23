@@ -473,13 +473,13 @@ impl ParseEngine {
                 let value = cap.get(2).map_or("", |m| m.as_str()).trim();
                 values.push(DataValue::Number((
                     IntegerData::from_str_radix(value, 10)
-                        .map_err(|_| format!("parameter ({}) has invalid value ({})", pname, value))?,
+                        .map_err(|_| format!("parameter \"{}\" has invalid value \"{}\"", pname, value))?,
                     value_len,
                 )));
             }
         }
         if *item_size > 0 {
-            Err(format!("global object {} has invalid .size parameter: bigger than defined values", *item_size))?;
+            Err(format!("global object {} has invalid \".size\" value: bigger than defined values", name))?;
         }
         ok!()
     }
@@ -669,5 +669,13 @@ mod tests {
         let pbank_file = File::open("./tests/pbank.s").unwrap();
         let test_file = File::open("./stdlib.tvm").unwrap();
         assert_eq!(parser.parse(pbank_file, vec![test_file], None), ok!());
+    }    
+
+    #[test]
+    fn test_parser_var_without_globl() {
+        let mut parser = ParseEngine::new();
+        let source_file = File::open("./tests/local_global_var.code").unwrap();
+        let lib_file = File::open("./stdlib.tvm").unwrap();
+        assert_eq!(parser.parse(source_file, vec![lib_file], None), ok!());
     }    
 }
