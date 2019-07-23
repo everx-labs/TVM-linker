@@ -7,11 +7,10 @@ import time
 
 '''
     TODO:
-        - remove sleep(5) and just wait that account balance is changed instead
         - parse account state for data section:
                 data:(just
                   value:(raw@^Cell 
-                    x{}
+                    x{}l
                      x{}
                     ))
                 library:hme_empty))))
@@ -104,7 +103,7 @@ def runLinkerMsgBody(address:str, abi_json:str, abi_params:str, method:str):
         err = proc.stdout.read()
         proc.stdout.close()
         print(err)
-        raise Exception('Error preparing message body for contract')
+        raise Exception('Error preparing message body for contract address {}'.format(address))
     else:
         output = proc.stdout.read()
         # print(output)
@@ -159,22 +158,25 @@ lastLine = None
 
 def runTLCAccount(address:str):
     global lastLine
-    print("Getting account " + address)
+    print("Getting account {} state".format(address))
     res = None
     cmd = '-a 0:{}'
     proc = runTLC(cmd.format(address))
     st = time.time()*1000
     ec = proc.poll()
-    while (ec == None) and (time.time()*1000-st) < 3000:
+    while (ec == None) and (time.time()*1000-st) < 1500:
         ec = proc.poll()
         time.sleep(0.1)
     if ec == None:
-        print("timeout")
-        # print(proc.pid)
+        print('Process {} is probably hanged. Terminating.'.format(proc.pid))
         proc.terminate()
-        return ""
+        #print(proc.stdout.read())
+        proc.stdout.close()
+        if not(proc.poll()):
+            proc.kill()
+        return res
     res = proc.stdout.read()
-
+    #print(res)
     # print last line of output where data section is
     lastLine = res.splitlines()[-1]
     
@@ -197,8 +199,14 @@ def runTLCFile(boc_file:str):
     while ec==None and (time.time()*1000-st)<10000:
         ec = proc.poll()
         time.sleep(0.1)
-    if ec==None:
+    if ec == None:
+        print('Process {} is probably hanged. Terminating.'.format(proc.pid))
         proc.terminate()
+        #print(proc.stdout.read())
+        proc.stdout.close()
+        if not(proc.poll()):
+            proc.kill()
+        return res
     res = proc.stdout.read()
     proc.stdout.close()
     return(res)
@@ -218,6 +226,7 @@ def waitFor(function, args, timeout, condition):
 
 class SoliditySuite(unittest.TestCase):
     def setUp(self):
+        print('\nSetting up')
         self.cfg = cfg
         self.assertNotEqual(self.cfg.get('node', None), None, 'No node config provided')
         wd = self.cfg['node'].get('work_dir',None)
@@ -238,22 +247,24 @@ class SoliditySuite(unittest.TestCase):
         subprocess.call('rm -f *.tvc *.boc *.tmp', shell=True)
         
     def tearDown(self):
+        print('\nFinishing')
         if self.node!=None:
             self.node.terminate()
             self.node.wait()
         subprocess.call('pkill ton-node', shell=True)
         
-    def deployContract(self, contractName):
-        address = runLinkerCompile('contract01.code', 'contract01.abi.json')
-        print('Contract address:', address)
-        self.assertNotEqual(address,None, 'Contract hasn\'t been compiled')
+    def deployContract(self, contractName:str, contract_abi:str, amount: str):
+        address = runLinkerCompile(contractName, contract_abi)
+        self.assertNotEqual(address,None, 'Contract {} hasn\'t been compiled'.format(contractName))
+        print('Contract {} address: {}'.format(contractName, address))
         msginit = runLinkerMsgInit(address)
-        self.assertNotEqual(msginit, None, 'No msg init boc file created')
-        print('Message init file:', msginit)
+        self.assertNotEqual(msginit, None, 'No msg init boc file created for contract {}'.format(contractName))
+        print('Contract {} message init file: {}'.format(contractName, msginit))
         
-        msgfile = runCreateMessage('0000000000000000000000000000000000000000000000000000000000000000', address, '1000000', './sendmoney.boc')
-        self.assertEqual(msgfile, os.path.abspath('./sendmoney.boc'), 'Expected message file wasn\'t been created')
-        print('Created message file:', msgfile)
+        msgfile = runCreateMessage('0' * 64, address, amount, './sendmoney{}.boc'.format(address))
+        self.assertEqual(msgfile, os.path.abspath('./sendmoney{}.boc'.format(address)),\
+            'Expected message file for contract {} wasn\'t been created'.format(contractName))
+        print('Created message file for contract {}:'.format(contractName), msgfile)
         print('')
 
         # fetching state of zero account to make sure node is up
@@ -269,7 +280,7 @@ class SoliditySuite(unittest.TestCase):
     
     
     def test_01(self):
-        address = self.deployContract("contract01")
+        address = self.deployContract('contract01.code', 'contract01.abi.json','1000000')
     
         msgbody = runLinkerMsgBody(address, 'contract01.abi.json', '{"a":"0x1234"}', 'main_external')
         self.assertNotEqual(msgbody, None, 'No msg body boc file created')
@@ -281,12 +292,39 @@ class SoliditySuite(unittest.TestCase):
 
         waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
 
-        # TODO: this sleep() should be avoided!
-        time.sleep(5)
-
-        waitFor(runTLCAccount,[address], 5000, r'state:\(account_active')
+        waitFor(runTLCAccount,[address], 5000, r'\{D000000000000000000000000000000000000000000000000000000000000001234\}')
         print(lastLine)
         self.assertEqual(lastLine, "  x{D000000000000000000000000000000000000000000000000000000000000001234}")
         
+    def test_02(self):
+        # prepare contract a
+        address1 = self.deployContract('contract02-a.code', 'contract02-a.abi.json','1000000')
+        
+        # prepare contract b
+        address2 = self.deployContract('contract02-b.code', 'contract02-b.abi.json','1000000')
+        # prepare message body for contract a
+        msgbody = runLinkerMsgBody(address1, 'contract02-a.abi.json', '{"anotherContract":"0x' + address2 + '"}', 'method_external')
+
+        # checking initial account state
+        r1 = waitFor(runTLCAccount,[address1], 5000, r'(state:\(account_active)')
+        print(lastLine)
+        r2 = waitFor(runTLCAccount,[address2], 5000, r'(state:\(account_active)')
+        print(lastLine)
+        
+        # sending body to node
+        waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
+
+        r1 = waitFor(runTLCAccount,[address1], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000001\}')
+        print(lastLine)
+        r2 = waitFor(runTLCAccount,[address2], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000101\}')
+        print(lastLine)
+        """
+        print('###################################')
+        print(r1['output'])
+        print('###################################')
+        print(r2['output'])
+        print('###################################')
+        """
+
 if __name__ == '__main__':
     unittest.main()
