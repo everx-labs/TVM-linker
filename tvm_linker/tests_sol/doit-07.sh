@@ -1,15 +1,15 @@
-address1=e81f5144ff7888b42b969ee8b3e95d2f1db1f0905c65753ee5d3893e10d8b4d6
-msginit1=e81f5144-msg-init.boc
-msgbody1=e81f5144-msg-body.boc
-address2=4724a7afea47104d62d22dd00acf7b212d2c04dfd6154b709ea422715034242c
-msginit2=4724a7af-msg-init.boc
+address1=4c559656f23046e36b5743f022fc5760a8d99fddc10875fdbab7ab9814f71a95
+msginit1=4c559656-msg-init.boc
+msgbody1=4c559656-msg-body.boc
+address2=17ed3e4f2d7aceaacadeb88bef73e17645e85568451488c275d5df6dc21a00bc
+msginit2=17ed3e4f-msg-init.boc
 
 rm -f *.tvc *.boc *.tmp
 
 source set_env.sh
 
-$linker --lib ../stdlib_sol.tvm ./contract06-a.code --abi-json ./contract06-a.abi.json
-$linker --lib ../stdlib_sol.tvm ./contract06-b.code --abi-json ./contract06-b.abi.json
+$linker compile --lib ../stdlib_sol.tvm ./contract06-a.code --abi-json ./contract06-a.abi.json
+$linker compile --lib ../stdlib_sol.tvm ./contract06-b.code --abi-json ./contract06-b.abi.json
 
 if [ ! -f "${address1}.tvc" ]; then
   echo "FILE NOT FOUND! ${address1}.tvc"
@@ -21,11 +21,11 @@ if [ ! -f "${address2}.tvc" ]; then
   exit 1
 fi
 
-$linker $address1 message --init -w 0
-$linker $address2 message --init -w 0
+$linker message --init -w 0 $address1
+$linker message --init -w 0 $address2
 
-$linker $address1 message -w 0 --abi-json contract06-a.abi.json --abi-method method_external \
-	--abi-params "{\"anotherContract\":\"0x${address2}\"}"
+$linker message -w 0 --abi-json contract07-a.abi.json --abi-method method_external \
+	--abi-params "{\"anotherContract\":\"0x${address2}\"}" $address1
 
 zeroes=0000000000000000000000000000000000000000000000000000000000000000
 
