@@ -7,8 +7,8 @@ x:
 	.quad	2
 	.size	x, 16
 
-	.type	y,@object
-y:
+	.type	y.a,@object
+y.a:
 	.byte	1
-	.size	y, 1
+	.size	y.a, 1
 
