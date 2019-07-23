@@ -108,6 +108,9 @@ def runLinkerMsgBody(address:str, abi_json:str, abi_params:str, method:str):
         output = proc.stdout.read()
         # print(output)
         proc.stdout.close()
+        if len(re.findall(r'boc file created: ([A-Za-z0-9-\.]*)$',output))==0:
+            print(output)
+            raise Exception('No boc file created for address {}'.format(address))
         res = re.findall(r'boc file created: ([A-Za-z0-9-\.]*)$',output)[0]
     return(res)
 
@@ -302,29 +305,47 @@ class SoliditySuite(unittest.TestCase):
         
         # prepare contract b
         address2 = self.deployContract('contract02-b.code', 'contract02-b.abi.json','1000000')
+        
         # prepare message body for contract a
         msgbody = runLinkerMsgBody(address1, 'contract02-a.abi.json', '{"anotherContract":"0x' + address2 + '"}', 'method_external')
 
         # checking initial account state
-        r1 = waitFor(runTLCAccount,[address1], 5000, r'(state:\(account_active)')
+        waitFor(runTLCAccount,[address1], 5000, r'(state:\(account_active)')
         print(lastLine)
-        r2 = waitFor(runTLCAccount,[address2], 5000, r'(state:\(account_active)')
+        waitFor(runTLCAccount,[address2], 5000, r'(state:\(account_active)')
         print(lastLine)
         
         # sending body to node
         waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
 
-        r1 = waitFor(runTLCAccount,[address1], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000001\}')
+        waitFor(runTLCAccount,[address1], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000001\}')
         print(lastLine)
-        r2 = waitFor(runTLCAccount,[address2], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000101\}')
+        waitFor(runTLCAccount,[address2], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000101\}')
         print(lastLine)
-        """
-        print('###################################')
-        print(r1['output'])
-        print('###################################')
-        print(r2['output'])
-        print('###################################')
-        """
+        
+    def test_04(self):
+        # prepare contract a
+        address1 = self.deployContract('contract04-a.code', 'contract04-a.abi.json','10000000')
+        
+        # prepare contract b
+        address2 = self.deployContract('contract04-b.code', 'contract04-b.abi.json','10000000')
+        
+        # prepare message body for contract a
+        msgbody = runLinkerMsgBody(address1, 'contract04-a.abi.json', '{"anotherContract":"0x' + address2 + '","amount":"5000000"}', 'method_external')
+        
+        # checking initial account state
+        waitFor(runTLCAccount,[address1], 5000, r'grams:\(nanograms[\n\s]*amount:\(var_uint len:3 value:9937527\)\)')
+        print(lastLine)
+        waitFor(runTLCAccount,[address2], 5000, r'grams:\(nanograms[\n\s]*amount:\(var_uint len:3 value:9937527\)\)')
+        print(lastLine)
+        
+        # sending body to node
+        waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
 
+        waitFor(runTLCAccount,[address1], 5000, r'grams:\(nanograms[\n\s]*amount:\(var_uint len:3 value:14711643\)\)')
+        print(lastLine)
+        waitFor(runTLCAccount,[address2], 5000, r'grams:\(nanograms[\n\s]*amount:\(var_uint len:3 value:4782174\)\)')
+        print(lastLine)
+        
 if __name__ == '__main__':
     unittest.main()
