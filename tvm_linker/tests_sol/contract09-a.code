@@ -17,7 +17,7 @@ CALL 1
 ;; stack=2
 DUP
 ;; get member acceptMoneyAndNumber
-PUSHINT $acceptMoneyAndNumber$
+PUSHINT $acceptMoneyAndNumber_external$
 PUSHINT 100000
 ;; get member value
 PUSHINT $get_msg_balance$
@@ -51,4 +51,8 @@ NEWC STSLICE ENDC
 POPROOT
 ;; return
 DROP
+RET
+
+.globl	acceptMoneyAndNumber_external
+.type	acceptMoneyAndNumber_external, @function
 RET

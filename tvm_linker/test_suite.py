@@ -46,12 +46,34 @@ def cleanup():
 
 CONTRACT_ADDRESS = None
 
-def compile_ex(source_file, lib_file):
+def compile1(source_file, lib_file):
 	cleanup()
 	global lines, functions, CONTRACT_ADDRESS
 	print("Compiling " + source_file + "...")
 	lib = "--lib " + lib_file if lib_file else ""
 	cmd = "./target/debug/tvm_linker compile ./tests/{} {} --debug > compile_log.tmp".format(source_file, lib)
+	# print cmd
+	ec = os.system(cmd)
+	if ec != 0:
+		error("COMPILATION FAILED!")
+
+	lines = [l.rstrip() for l in open("compile_log.tmp").readlines()]
+	# os.remove("compile_log.tmp")
+
+	functions = dict()
+	getFunctions()
+	CONTRACT_ADDRESS = getContractAddress()
+
+def compile2(source_name):
+	cleanup()
+	global lines, functions, CONTRACT_ADDRESS
+	print("Compiling " + source_name + "...")
+	lib_file = "stdlib_sol.tvm"
+	source_file = "./tests_sol/{}.code".format(source_name)
+	abi_file = "./tests_sol/{}.abi.json".format(source_name)
+	
+	cmd = "./target/debug/tvm_linker compile {} --abi-json {} --lib {} --debug > compile_log.tmp"
+	cmd = cmd.format(source_file, abi_file, lib_file)
 	# print cmd
 	ec = os.system(cmd)
 	if ec != 0:
@@ -119,12 +141,12 @@ def expect_output(regex):
 
 	# '''
 
-compile_ex('test_factorial.code', 'stdlib_sol.tvm')
+compile1('test_factorial.code', 'stdlib_sol.tvm')
 expect_success('constructor', "", "", "")
 expect_success('main', "0003", "6", "")
 expect_success('main', "0006", "726", "")
 
-compile_ex('test_signature.code', 'stdlib_sol.tvm')
+compile1('test_signature.code', 'stdlib_sol.tvm')
 expect_failure('constructor', "", 100, "")
 SIGN = "key1"
 expect_success('constructor', "", "", "")
@@ -139,50 +161,50 @@ expect_success('set_role', "02", "", "")
 expect_success('get_role', "", "2", "")
 
 SIGN = None
-compile_ex('test_inbound_int_msg.tvm', None)
+compile1('test_inbound_int_msg.tvm', None)
 expect_success("", "", "-1", "--internal 15000000000")
 
-# SIGN = None
-# compile_ex('test_pers_data.tvm', "stdlib.tvm")
-# expect_success('ctor', "", "-1", "--internal 100")
-
-
-compile_ex('test_send_int_msg.tvm', 'stdlib_sol.tvm')
+compile1('test_send_int_msg.tvm', 'stdlib_sol.tvm')
 expect_success(None, "", None, "")	# check empty input (deploy)
 expect_success('main', "", None, "--internal 0 --decode-c6")
 expect_output(r"destination : 0:0+007F")
 expect_output(r"CurrencyCollection: Grams.*value = 1000]")
 
-compile_ex('test_send_int_msg.tvm', 'stdlib_sol.tvm')
+compile1('test_send_int_msg.tvm', 'stdlib_sol.tvm')
 expect_success('main', "", None, "--decode-c6")
 expect_output(r"destination : 0:0+007F")
 expect_output(r"CurrencyCollection: Grams.*value = 1000]")
 	
-compile_ex('test_send_msg.code', 'stdlib_sol.tvm')
+compile1('test_send_msg.code', 'stdlib_sol.tvm')
 expect_success(None, "", None, "")	# check empty input (deploy)
 expect_success('get_allowance', "1122334455660000000000000000000000000000000000000000005544332211", None, "--internal 0 --decode-c6 --trace")
 expect_output(r"destination : 0:1122334455660000000000000000000000000000000000000000005544332211")
 expect_output(r"body  : .* data: \[0, 26, 11, 86, 135, 0, 0, 0, 0, 0, 0, 0, 0, ")
 
 
-compile_ex('test_msg_sender.code', None)
+compile1('test_msg_sender.code', None)
 expect_success(None, "", None, "--internal 0 --trace")	# check empty input (deploy)
 
-	# '''
 
-compile_ex('test_msg_sender2.code', 'stdlib_sol.tvm')
+compile1('test_msg_sender2.code', 'stdlib_sol.tvm')
 # check internal message
 expect_success('main', "", "0", "--internal 0")
 # check external message
 expect_success('main', "", "0", "")
 
 #check msg.value
-compile_ex('test_msg_value.code', 'stdlib_sol.tvm')
+compile1('test_msg_value.code', 'stdlib_sol.tvm')
 expect_success("main", "", "15000000000", "--internal 15000000000")
 
+	# '''
+
 #check msg.sender
-compile_ex('test_balance.code', 'stdlib_sol.tvm')
+compile1('test_balance.code', 'stdlib_sol.tvm')
 expect_success("main", "", "100000000000", "--internal 0")
 
+compile2('contract09-a')
+expect_success('sendMoneyAndNumber', ("12" * 32) + ("7" * 16), None, "--internal 0 --decode-c6")
+expect_output(r"destination : 0:12121212")
+expect_output(r"CurrencyCollection: Grams.*value = 1000]")
 
 cleanup()
