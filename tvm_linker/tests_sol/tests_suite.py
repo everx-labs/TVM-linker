@@ -157,12 +157,8 @@ def runTLC(args:str):
         stderr = subprocess.STDOUT)
     return(proc)
 
-lastLine = None
-
 def runTLCAccount(address:str):
-    global lastLine
-    print("Getting account {} state".format(address))
-    res = None
+    res = {'result': False, 'output': None}
     cmd = '-a 0:{}'
     proc = runTLC(cmd.format(address))
     st = time.time()*1000
@@ -173,26 +169,40 @@ def runTLCAccount(address:str):
     if ec == None:
         print('Process {} is probably hanged. Terminating.'.format(proc.pid))
         proc.terminate()
-        #print(proc.stdout.read())
         proc.stdout.close()
         if not(proc.poll()):
             proc.kill()
         return res
-    res = proc.stdout.read()
-    #print(res)
-    # print last line of output where data section is
-    lastLine = res.splitlines()[-1]
-    
-    # print account balance
-    regex = re.compile(r"grams:\(nanograms.*?\)\)", re.MULTILINE | re.DOTALL)
-    match = regex.search(res)
-    if match: print(match.group(0).replace("\n", " "))
-    
+    res['output'] = proc.stdout.read()
     proc.stdout.close()
+    
+    # fetching address
+    tmp = re.findall(r'address\:x([\da-fA-F]*)',res['output'])
+    if len(tmp)>0: res['address'] = tmp[0]
+    
+    # fetching anycast status
+    tmp = re.findall(r'anycast\:([\w]*)',res['output'])
+    if len(tmp)>0: res['anycast'] = tmp[0]
+
+    # fetching workchain
+    tmp = re.findall(r'workchain_id\:([\da-fA-F]*)',res['output'])
+    if len(tmp)>0: res['workchain'] = tmp[0]
+    
+    # fetching balance
+    tmp = re.findall(r'grams:\(nanograms[\n\s]*amount:\(var_uint len:[\d]* value:([\d]*)\)\)',res['output'])
+    if len(tmp)>0: 
+        res['balance'] = int(tmp[0])
+        print('Account {} balance {}'.format(res.get('address',None),res['balance']))
+
+    # fetching stack
+    tmp = re.findall(r'library\:hme_empty[\)]*[\n\s]*([\d\w\n\{\}\s]*)',res['output'])
+    if len(tmp)>0: res['stack'] = tmp[0].splitlines()
+
+    # return result
     return res
 
 def runTLCFile(boc_file:str):
-    res=None
+    res = {'result': False, 'output': None}
     if not(os.access(os.path.abspath(boc_file), os.R_OK)):
         return(res)
     cmd = '-f {}'
@@ -205,26 +215,41 @@ def runTLCFile(boc_file:str):
     if ec == None:
         print('Process {} is probably hanged. Terminating.'.format(proc.pid))
         proc.terminate()
-        #print(proc.stdout.read())
         proc.stdout.close()
         if not(proc.poll()):
             proc.kill()
         return res
-    res = proc.stdout.read()
+    res['output'] = proc.stdout.read()
     proc.stdout.close()
+    res['result'] = True
     return(res)
 
 def waitFor(function, args, timeout, condition):
     sdt = int(round(time.time()*1000))
     res = {'result': False, 'output': None}
     while (res['output']==None or len(re.findall(condition, res['output']))<1) and (int(round(time.time()*1000))-sdt)<timeout:
-        res['output'] = function(*args)
+        res = function(*args)
         time.sleep(0.25)
     if len(re.findall(condition, res['output']))==0:
         print('Looking for:\n{}\nOutput:\n{}'.format(condition, res['output']))
         raise Exception('Unable to find condition string in output')
     else:
         res['result'] = True
+    return(res)        
+
+def waitForBalanceInRange(account, min_value, max_value, timeout):
+    if max_value<min_value:
+        _min = max_value
+        _max = min_value
+    else:
+        _min = min_value
+        _max = max_value
+    sdt = int(round(time.time()*1000))
+    res = runTLCAccount(account)
+    while res.get('balance')!=None and (res.get('balance')<_min or res.get('balance')>_max) and (int(round(time.time()*1000))-sdt)<timeout:
+        res = runTLCAccount(account)
+    if res.get('balance')!=None and (res.get('balance')<_min or res.get('balance')>_max):
+        raise Exception('Balance ' + res.get('balance') + ' not in specified range')
     return(res)        
 
 class SoliditySuite(unittest.TestCase):
@@ -268,7 +293,6 @@ class SoliditySuite(unittest.TestCase):
         self.assertEqual(msgfile, os.path.abspath('./sendmoney{}.boc'.format(address)),\
             'Expected message file for contract {} wasn\'t been created'.format(contractName))
         print('Created message file for contract {}:'.format(contractName), msgfile)
-        print('')
 
         # fetching state of zero account to make sure node is up
         waitFor(runTLCAccount, ["0" * 64], 5000, r'state:\(account_active')
@@ -289,15 +313,15 @@ class SoliditySuite(unittest.TestCase):
         self.assertNotEqual(msgbody, None, 'No msg body boc file created')
         print('Message body file:', msgbody)
 
-        waitFor(runTLCAccount, [address], 5000, r'state:\(account_active')
-        print(lastLine)
-        self.assertEqual(lastLine, " x{4_}")
+        tmp = waitFor(runTLCAccount, [address], 5000, r'state:\(account_active')
+        print(tmp['stack'][len(tmp['stack'])-1] if len(tmp.get('stack',None))>0 else None)
+        self.assertEqual(tmp['stack'][len(tmp['stack'])-1] if len(tmp.get('stack',None))>0 else None, " x{4_}")
 
-        waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
+        tmp = waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
 
-        waitFor(runTLCAccount,[address], 5000, r'\{D000000000000000000000000000000000000000000000000000000000000001234\}')
-        print(lastLine)
-        self.assertEqual(lastLine, "  x{D000000000000000000000000000000000000000000000000000000000000001234}")
+        tmp = waitFor(runTLCAccount,[address], 5000, r'\{D000000000000000000000000000000000000000000000000000000000000001234\}')
+        print(tmp['stack'][len(tmp['stack'])-1] if len(tmp.get('stack',None))>0 else None)
+        self.assertEqual(tmp['stack'][len(tmp['stack'])-1] if len(tmp.get('stack',None))>0 else None, "  x{D000000000000000000000000000000000000000000000000000000000000001234}")
         
     def test_02(self):
         # prepare contract a
@@ -310,18 +334,18 @@ class SoliditySuite(unittest.TestCase):
         msgbody = runLinkerMsgBody(address1, 'contract02-a.abi.json', '{"anotherContract":"0x' + address2 + '"}', 'method_external')
 
         # checking initial account state
-        waitFor(runTLCAccount,[address1], 5000, r'(state:\(account_active)')
-        print(lastLine)
-        waitFor(runTLCAccount,[address2], 5000, r'(state:\(account_active)')
-        print(lastLine)
+        tmp = waitFor(runTLCAccount,[address1], 5000, r'(state:\(account_active)')
+        print(tmp['stack'][len(tmp['stack'])-1] if len(tmp.get('stack',None))>0 else None)
+        tmp = waitFor(runTLCAccount,[address2], 5000, r'(state:\(account_active)')
+        print(tmp['stack'][len(tmp['stack'])-1] if len(tmp.get('stack',None))>0 else None)
         
         # sending body to node
-        waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
+        tmp = waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
 
-        waitFor(runTLCAccount,[address1], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000001\}')
-        print(lastLine)
+        tmp = waitFor(runTLCAccount,[address1], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000001\}')
+        print(tmp['stack'][len(tmp['stack'])-1] if len(tmp.get('stack',None))>0 else None)
         waitFor(runTLCAccount,[address2], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000101\}')
-        print(lastLine)
+        print(tmp['stack'][len(tmp['stack'])-1] if len(tmp.get('stack',None))>0 else None)
         
     def test_04(self):
         # prepare contract a
@@ -334,18 +358,15 @@ class SoliditySuite(unittest.TestCase):
         msgbody = runLinkerMsgBody(address1, 'contract04-a.abi.json', '{"anotherContract":"0x' + address2 + '","amount":"5000000"}', 'method_external')
         
         # checking initial account state
-        waitFor(runTLCAccount,[address1], 5000, r'grams:\(nanograms[\n\s]*amount:\(var_uint len:3 value:9937527\)\)')
-        print(lastLine)
-        waitFor(runTLCAccount,[address2], 5000, r'grams:\(nanograms[\n\s]*amount:\(var_uint len:3 value:9937527\)\)')
-        print(lastLine)
+        waitFor(runTLCAccount,[address1], 5000, r'state:\(account_active')
+        waitFor(runTLCAccount,[address2], 5000, r'state:\(account_active')
         
         # sending body to node
         waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
 
-        waitFor(runTLCAccount,[address1], 5000, r'grams:\(nanograms[\n\s]*amount:\(var_uint len:3 value:14711643\)\)')
-        print(lastLine)
-        waitFor(runTLCAccount,[address2], 5000, r'grams:\(nanograms[\n\s]*amount:\(var_uint len:3 value:4782174\)\)')
-        print(lastLine)
+        # checking account balance changes
+        waitForBalanceInRange(address1, 14700000, 15100000, 5000)
+        waitForBalanceInRange(address2, 4700000, 5300000, 5000)
         
 if __name__ == '__main__':
     unittest.main()
