@@ -15,6 +15,7 @@ contract RemoteContract is IMyContractCallback {
 	// external methods
 	
 	function getMyCredit(IMyContract bank) public {
+		// call method of remote contract
 		bank.getCredit();
 		return;
 	}
@@ -22,6 +23,7 @@ contract RemoteContract is IMyContractCallback {
 	// interface IMyContractCallback
 	
 	function getCreditCallback(uint64 balance) public {
+		// save balance of credit (received from another contract) in persistent variable
 		m_credit = balance;
 	}
 	
