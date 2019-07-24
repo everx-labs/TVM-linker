@@ -481,7 +481,7 @@ impl ParseEngine {
                     "long"  => 4,
                     "short" => 2,
                     "quad"  => 8,
-                    _ => Err(format!("unsupported parameter ({})", pname))?,
+                    _ => Err(format!("invalid parameter: \"{}\":", param))?,
                 };
                 if *item_size < value_len {
                     Err(format!("global object {} has invalid .size parameter: too small", name))?;
