@@ -102,6 +102,7 @@ const PATTERN_LABEL:    &'static str = r"^[\.a-zA-Z0-9_]+:";
 const PATTERN_PARAM:    &'static str = r"^[\t\s]+\.([a-zA-Z0-9_]+),?[\t\s]*([a-zA-Z0-9_]+)";
 const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*@([a-zA-Z]+)";
 const PATTERN_SIZE:     &'static str = r"^[\t\s]*\.size[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([\.a-zA-Z0-9_]+)";
+const PATTERN_COMM:     &'static str = r"^[\t\s]*\.comm[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([0-9]+),[\t\s]*([0-9]+)";
 const PATTERN_IGNORED:  &'static str = r"^[\t\s]+\.(p2align|align|text|file|ident|section)";
 
 const GLOBL:    &'static str = ".globl";
@@ -370,7 +371,7 @@ impl ParseEngine {
                 let cap = dotted_regex.captures(&l).unwrap();
                 let param = cap.get(1).unwrap().as_str();
                 match param {
-                    "byte" | "long" | "short" | "quad" => obj_body.push_str(&l),
+                    "byte" | "long" | "short" | "quad" | "comm" => obj_body.push_str(&l),
                     _ => Err(format!("line {}: invalid param \"{}\":{}", lnum, param, l))?,
                 };
             } else {
@@ -431,7 +432,7 @@ impl ParseEngine {
                             self.globl_ptr += offset;
                         }
                     },
-                    ObjectType::None => Err(format!("The type of global object {} is unknown. Use: .type {}, xxx", func, func))?,
+                    ObjectType::None => Err(format!("The type of global object {} is unknown. Use .type {}, xxx", func, func))?,
                 };
             },
             INTERNAL => {
@@ -455,9 +456,25 @@ impl ParseEngine {
     ) -> Result<(), String> {
         lazy_static! {
             static ref PARAM_RE: Regex = Regex::new(PATTERN_PARAM).unwrap();
+            static ref COMM_RE:  Regex = Regex::new(PATTERN_COMM).unwrap();
         }
         for param in body.lines() {
-            if let Some(cap) = PARAM_RE.captures(param) {
+            if let Some(cap) = COMM_RE.captures(param) {
+                let size_bytes = usize::from_str_radix(
+                    cap.get(2).unwrap().as_str(), 
+                    10,
+                ).map_err(|_| "invalid \".comm\" 2nd argument".to_string())?;
+                let align = usize::from_str_radix(
+                    cap.get(3).unwrap().as_str(),
+                    10,
+                ).map_err(|_| "invalid \".comm\" 3rd argument".to_string())?;
+                if (size_bytes == 0) || (align == 0) {
+                    Err("\".comm\" arguments cannot be zero".to_string())?;
+                }
+                let value_len = (size_bytes + (align - 1)) & !(align - 1);
+                values.push(DataValue::Number((IntegerData::zero(), value_len)));
+                *item_size = 0;
+            } else if let Some(cap) = PARAM_RE.captures(param) {
                 let pname = cap.get(1).unwrap().as_str();
                 let value_len = match pname {
                     "byte"  => 1,
