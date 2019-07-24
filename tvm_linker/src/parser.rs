@@ -694,5 +694,13 @@ mod tests {
         let source_file = File::open("./tests/local_global_var.code").unwrap();
         let lib_file = File::open("./stdlib.tvm").unwrap();
         assert_eq!(parser.parse(source_file, vec![lib_file], None), ok!());
-    }    
+    }   
+
+    #[test]
+    fn test_parser_var_with_comm() {
+        let mut parser = ParseEngine::new();
+        let source_file = File::open("./tests/comm-test.s").unwrap();
+        let lib_file = File::open("./stdlib.tvm").unwrap();
+        assert_eq!(parser.parse(source_file, vec![lib_file], None), ok!());
+    }     
 }
