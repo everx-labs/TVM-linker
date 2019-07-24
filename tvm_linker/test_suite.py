@@ -184,5 +184,30 @@ expect_success("main", "", "15000000000", "--internal 15000000000")
 compile_ex('test_balance.code', 'stdlib_sol.tvm')
 expect_success("main", "", "100000000000", "--internal 0")
 
+#check tvm_balance
+compile_ex('test_tvm_balance.code', 'stdlib_sol.tvm')
+expect_success("main", "", "0", "--internal 0")
+
+#check tvm_now
+compile_ex('test_now.code', 'stdlib_sol.tvm')
+expect_success("main", "", "0", "--internal 0")
+
+# TODO: not working in current implementation
+#check this.address
+#compile_ex('test_this_address.code', 'stdlib_sol.tvm')
+#expect_success("main", "", "0", "--internal 0")
+
+# TODO: cannot check returned value, because it is random
+#check tvm_block_lt
+#compile_ex('test_tvm_block_lt.code', 'stdlib_sol.tvm')
+#expect_success("main", "", "6717376598095429632", "--internal 0")
+
+#check tvm_trans_lt
+compile_ex('test_tvm_trans_lt.code', 'stdlib_sol.tvm')
+expect_success("main", "", "0", "--internal 0")
+
+#check tvm_rand_seed
+compile_ex('test_tvm_rand_seed.code', 'stdlib_sol.tvm')
+expect_success("main", "", "0", "--internal 0")
 
 cleanup()
