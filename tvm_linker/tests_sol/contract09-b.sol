@@ -4,10 +4,6 @@ contract IRemoteContract {
 	function acceptMoneyAndNumber(uint64 number) payable public;
 }
 
-contract IRemoteContractCallback {
-	function sendMoneyAndNumberCallback(uint64 number) public;
-}
-
 contract RemoteContract is IRemoteContract {
 
 	uint64 m_number;

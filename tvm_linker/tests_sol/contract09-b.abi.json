@@ -4,9 +4,5 @@
 		"name": "acceptMoneyAndNumber_external",
 		"inputs": [{"name": "number", "type": "uint64"}],
 		"outputs": []
-	}, {
-		"name": "sendMoneyAndNumberCallback_external",
-		"inputs": [{"name": "number", "type": "uint64"}],
-		"outputs": []
 	}]
 }

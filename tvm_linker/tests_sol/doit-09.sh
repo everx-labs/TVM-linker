@@ -1,4 +1,4 @@
-address1=34c0d3b8423f51b2a1700ae592054f646b8a1a425891e09fdbf194aa63faf5d6
+address1=7b13b56196d37a164e7ba9d9544626bfe7a02854dc2b9a4d5edea798c8ba7b7f
 address1short=`echo $address1 | cut -c 1-8`
 msginit1=$address1short-msg-init.boc
 msgbody1=$address1short-msg-body.boc
