@@ -27,6 +27,7 @@
 	.globl	parse_smartcontractinfo
 	.type	parse_smartcontractinfo, @function
 	;; stack=0
+	LOGSTR parse_continfo
 	PUSH c5
 	CTOS
 	LDREFRTOS

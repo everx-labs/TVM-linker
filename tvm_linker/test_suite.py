@@ -192,10 +192,9 @@ expect_success("main", "", "0", "--internal 0")
 compile_ex('test_now.code', 'stdlib_sol.tvm')
 expect_success("main", "", "0", "--internal 0")
 
-# TODO: not working in current implementation
-#check this.address
-#compile_ex('test_this_address.code', 'stdlib_sol.tvm')
-#expect_success("main", "", "0", "--internal 0")
+#check tvm_address
+compile_ex('test_tvm_address.code', 'stdlib_sol.tvm')
+expect_success("main", "", "973644886071025112261942737692110103884545957699263814706526407930870235136", "--internal 0")
 
 # TODO: cannot check returned value, because it is random
 #check tvm_block_lt

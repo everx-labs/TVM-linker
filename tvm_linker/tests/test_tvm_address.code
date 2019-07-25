@@ -1,0 +1,15 @@
+
+.globl	main_external
+.type	main_external, @function
+DROP
+PUSHINT $main$
+CALL 1
+
+.globl	main
+.type	main, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: main
+PUSHINT $get_address$
+CALL 1
+;; return
+RET
