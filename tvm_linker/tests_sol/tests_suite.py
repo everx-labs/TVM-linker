@@ -287,7 +287,7 @@ def waitForStackChanged(account, timeout, prev_stack=None):
     stack_eq = True
     sdt = int(round(time.time()*1000))
     while c_stack!=None and stack_eq\
-        and (int(round(time.time()*1000))-sdt)<3000:
+        and (int(round(time.time()*1000))-sdt)<5000:
         res = runTLCAccount(account)
         c_stack = res.get('stack')
         stack_eq = init_stack!=None and c_stack!=None
@@ -463,7 +463,7 @@ class SoliditySuite(unittest.TestCase):
         # sending contract2 message body to node
         waitFor(runTLCFile, [msgbody2], 5000, r'external message status is 1')
 
-        # checking account balance changes
+        # checking account stack changes
         tmp = waitForStackChanged(address2, 10000, a2.get('stack'))
         last_rec = tmp['stack'][len(tmp['stack'])-1] if len(tmp.get('stack'))>0 else None
         self.assertEqual(last_rec.strip(),\
