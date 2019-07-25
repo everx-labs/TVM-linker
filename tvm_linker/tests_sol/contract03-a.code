@@ -14,7 +14,7 @@ CALL 1
 ;; anotherContract
 ;; stack=1
 DUP
-;; remoteMethod
+;; AnotherContract.remoteMethod
 PUSHINT $remoteMethod_external$
 PUSHINT 0
 NEWC
@@ -49,13 +49,4 @@ RET
 
 .globl	remoteMethod_external
 .type	remoteMethod_external, @function
-DROP
-PUSHINT $remoteMethod$
-CALL 1
-
-.globl	remoteMethod
-.type	remoteMethod, @function
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: remoteMethod
-;; return
 RET
