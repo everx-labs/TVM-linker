@@ -2,6 +2,7 @@
 	.internal-alias :main_internal,     0
 	.internal-alias :general_purpose,   1
 	.internal-alias :encode_grams,      2
+	.internal-alias :parse_grams,       3
 
     .selector
     ; s0 - func_id
@@ -50,6 +51,36 @@
 		STUR 4
 	}
 	IFELSE
+
+
+	.internal   :parse_grams
+	;parses Grams type (VarInteger 16)
+	;args: s0 - slice
+	; ret:
+	;   s0 - remaining slice
+	;   s1 - grams: slice
+	;starts with 4bit length field
+	LDU 4
+	SWAP
+	DUP
+	; load 'value' len*8 bits if len != 0, otherwise 0
+	PUSHCONT {
+		PUSHINT 8
+		MUL
+		LDUX
+		SWAP
+	}
+	PUSHCONT {
+		DROP
+		PUSHINT 0
+	}
+	IFELSE
+	;restore it as u128 integer
+	NEWC
+	STU 128
+	ENDC
+	CTOS
+	SWAP
 
 
     .globl	get_msg_pubkey
@@ -464,33 +495,7 @@
 				;   s1 - grams: slice
 					
 			PUSHCONT {
-				;parses Grams type (VarInteger 16)
-				;args: s0 - slice
-				; ret:
-				;   s0 - remaining slice
-				;   s1 - grams: slice
-				;starts with 4bit length field 
-				LDU 4
-				SWAP
-				DUP
-				; load 'value' len*8 bits if len != 0, otherwise 0
-				PUSHCONT {
-					PUSHINT 8
-					MUL
-					LDUX
-					SWAP
-				}
-				PUSHCONT {
-					DROP
-					PUSHINT 0
-				}
-				IFELSE
-				;restore it as u128 integer 
-				NEWC
-				STU 128
-				ENDC
-				CTOS
-				SWAP
+				CALL $:parse_grams$
 			}
 
 					CALLX
