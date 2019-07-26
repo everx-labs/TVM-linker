@@ -1,6 +1,7 @@
 	.internal-alias :main_external,     -1
 	.internal-alias :main_internal,     0
 	.internal-alias :general_purpose,   1
+	.internal-alias :encode_grams,      2
 
     .selector
     ; s0 - func_id
@@ -23,6 +24,33 @@
         THROW 51
     }
     IFELSE
+
+
+	.internal   :encode_grams
+	;s0 - value: integer (u64)
+	;s1 - builder
+	DUP
+	PUSHCONT {
+		DUP
+		UBITSIZE    ; bit count used by integer
+		PUSHINT 8
+		DIVC        ; calculate number of bytes needed for integer
+		DUP
+		PUSH s3     ; push builder
+		STU 4       ; store len (bytes)
+		SWAP
+		PUSHINT 8
+		MUL         ; calculate bits for integer (rounded to byte)
+		STUX        ; store value
+		NIP
+	}
+	PUSHCONT {
+		DROP
+		PUSHINT 0
+		STUR 4
+	}
+	IFELSE
+
 
     .globl	get_msg_pubkey
 	.type	get_msg_pubkey, @function
@@ -522,30 +550,7 @@
 					
 				;s0 - value: integer (u64)
 				;s1 - builder
-				
-				;s0 - value: integer (u64)
-				;s1 - builder
-				DUP
-				PUSHCONT {
-					DUP
-					UBITSIZE     ; bit count used by integer 
-					PUSHINT 8   
-					DIVC        ; calculate number of bytes needed for integer
-					DUP
-					PUSH s3     ; push builder
-					STU 4       ; store len (bytes)
-					SWAP        
-					PUSHINT 8   
-					MUL         ; calculate bits for integer (rounded to byte)
-					STUX        ; store value
-					NIP
-				}
-				PUSHCONT {
-					DROP
-					PUSHINT 0
-					STUR 4
-				}
-				IFELSE
+				CALL $:encode_grams$
 
 				STSLICECONST 0
 				
@@ -553,53 +558,13 @@
 					
 				;s0 - value: integer (u64)
 				;s1 - builder
-				DUP
-				PUSHCONT {
-					DUP
-					UBITSIZE     ; bit count used by integer 
-					PUSHINT 8   
-					DIVC        ; calculate number of bytes needed for integer
-					DUP
-					PUSH s3     ; push builder
-					STU 4       ; store len (bytes)
-					SWAP        
-					PUSHINT 8   
-					MUL         ; calculate bits for integer (rounded to byte)
-					STUX        ; store value
-					NIP
-				}
-				PUSHCONT {
-					DROP
-					PUSHINT 0
-					STUR 4
-				}
-				IFELSE
+				CALL $:encode_grams$
 			 ; store ihr_fee
 					SWAP
 					
 				;s0 - value: integer (u64)
 				;s1 - builder
-				DUP
-				PUSHCONT {
-					DUP
-					UBITSIZE     ; bit count used by integer 
-					PUSHINT 8   
-					DIVC        ; calculate number of bytes needed for integer
-					DUP
-					PUSH s3     ; push builder
-					STU 4       ; store len (bytes)
-					SWAP        
-					PUSHINT 8   
-					MUL         ; calculate bits for integer (rounded to byte)
-					STUX        ; store value
-					NIP
-				}
-				PUSHCONT {
-					DROP
-					PUSHINT 0
-					STUR 4
-				}
-				IFELSE
+				CALL $:encode_grams$
 			 ; store fwd_fee
 					STU 64        ; store logical time
 					STU 32        ; store unixtime
@@ -617,4 +582,3 @@
 				PUSHINT 123
 				DROP
 				RET
-				
