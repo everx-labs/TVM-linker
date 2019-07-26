@@ -3,6 +3,7 @@
 	.internal-alias :general_purpose,   1
 	.internal-alias :encode_grams,      2
 	.internal-alias :parse_grams,       3
+	.internal-alias :build_internal_outbound_message,       4
 
     .selector
     ; s0 - func_id
@@ -51,6 +52,30 @@
 		STUR 4
 	}
 	IFELSE
+
+
+	.internal :build_internal_outbound_message
+	; build internal outbound message
+	; s0 - ihr_disabled: integer (1 or 0)
+	; s1 - bounce: integer (1 or 0)
+	; s2 - src address : slice (MsgAddressInt)
+	; s3 - dst address : slice (MsgAddressInt)
+	; s4 - value: integer
+	; s5 - ihr_fee: integer
+	; s6 - fwd_fee: integer
+	; s7 - logical time: integer (u64)
+	; s8 - unixtime: integer (u32)
+	; s9 - body: slice
+	; returns: msg: cell
+
+	NEWC
+	STSLICECONST 0 ; int_msg_info$0
+	STU 1 ; ihr_disabled
+	STU 1 ; bounce
+	STSLICECONST 0 ; bounced
+	STSLICE
+	STSLICE
+	SWAP
 
 
 	.internal   :parse_grams
@@ -531,27 +556,7 @@
 					PUSHINT 0   ; reset ihr_disabled flag
 					
 				PUSHCONT {
-				; build internal outbound message
-				; s0 - ihr_disabled: integer (1 or 0)
-				; s1 - bounce: integer (1 or 0)
-				; s2 - src address : slice (MsgAddressInt)
-				; s3 - dst address : slice (MsgAddressInt)
-				; s4 - value: integer
-				; s5 - ihr_fee: integer
-				; s6 - fwd_fee: integer
-				; s7 - logical time: integer (u64)
-				; s8 - unixtime: integer (u32)
-				; s9 - body: slice
-				; returns: msg: cell
-
-					NEWC
-					STSLICECONST 0 ; int_msg_info$0
-					STU 1 ; ihr_disabled
-					STU 1 ; bounce
-					STSLICECONST 0 ; bounced
-					STSLICE
-					STSLICE
-					SWAP
+					CALL $:build_internal_outbound_message$
 					
 				;s0 - value: integer (u64)
 				;s1 - builder
