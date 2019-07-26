@@ -467,7 +467,7 @@ class SoliditySuite(unittest.TestCase):
         tmp = waitForStackChanged(address2, 10000, a2.get('stack'))
         last_rec = tmp['stack'][len(tmp['stack'])-1] if len(tmp.get('stack'))>0 else None
         self.assertEqual(last_rec.strip(),\
-            'x{D000000000000000000000000000000000000000000000000000000000012345678}',\
+            'x{D000000000012345678}',\
             'Unexpected allowance value for contract2')
         
 if __name__ == '__main__':
