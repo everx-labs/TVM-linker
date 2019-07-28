@@ -468,7 +468,7 @@ class SoliditySuite(unittest.TestCase):
 
         # checking account balance changes
         waitFor(runTLCAccount,[address2], 5000, r'x\{D000101\}')
-        waitFor(runTLCAccount,[address1], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000001010\}').get('stack')
+        waitFor(runTLCAccount,[address1], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000001010\}')
 
     def test_06(self):
         # prepare contract a
@@ -528,11 +528,33 @@ class SoliditySuite(unittest.TestCase):
         s1 = waitForStackChanged(address1, 5000).get('stack')
         s1 = re.findall(r'D0([0-9]*)',s1[len(s1)-1])[0]
         v1 = int(s1, base=16)
-        self.assertEqual(v1, 1, 'Unexpected stack value')
+        self.assertEqual(v1, 1, 'Unexpected stack value for counter')
         s2 = runTLCAccount(address2).get('stack')
         s2 = re.findall(r'D0([0-9A-Z]*)',s2[len(s2)-1])[0]
         v2 = int(s2, base=16)
-        self.assertTrue(v2>b2 and v2<1000000, 'Unexpected stack balance value')
+        self.assertTrue(v2 > b2 and v2 < 1000000, 'Unexpected stack value for balance')
+    
+    def test_08(self):
+        # prepare contract a
+        address1 = self.deployContract('contract08-a.code', 'contract08-a.abi.json','10000000')
         
+        # prepare contract b
+        address2 = self.deployContract('contract08-b.code', 'contract08-b.abi.json','10000000')
+        
+        # prepare message body for contract a
+        msgbody = runLinkerMsgBody(address1, 'contract08-a.abi.json', '{"anotherContract":"0x' + \
+            address2 + '"}', 'method_external')
+
+        # checking initial account state
+        waitFor(runTLCAccount,[address1], 5000, r'state:\(account_active')
+        waitFor(runTLCAccount,[address2], 5000, r'state:\(account_active')
+        
+        # sending body to node
+        waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
+
+        # checking account balance changes
+        waitFor(runTLCAccount,[address1], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000001\}')
+        waitFor(runTLCAccount,[address2], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000000\}')
+    
 if __name__ == '__main__':
     unittest.main()
