@@ -108,6 +108,21 @@
 	SWAP
 
 
+	.globl	parse_currency_collection
+	.type	parse_currency_collection, @function
+	;parses CurrencyCollection type
+	;args: s0 - slice
+	;ret:
+	;   s0 - remaining slice
+	;   s1 - grams: slice
+	PUSHCONT {
+		CALL $:parse_grams$
+	}
+	CALLX
+	; skip HashmapE with currencies.
+	SKIPDICT
+
+
     .globl	get_msg_pubkey
 	.type	get_msg_pubkey, @function
 	; s0 - msg body: slice
@@ -513,19 +528,8 @@
 
 					
 				PUSHCONT {
-				;parses CurrencyCollection type
-				;args: s0 - slice
-				;ret:
-				;   s0 - remaining slice
-				;   s1 - grams: slice
-					
-			PUSHCONT {
-				CALL $:parse_grams$
-			}
-
-					CALLX
-					; skip HashmapE with currencies.
-					SKIPDICT
+					PUSHINT $parse_currency_collection$
+					CALL 1
 				}
 				
 					CALLX
