@@ -90,7 +90,7 @@ pub struct ParseEngine {
     abi: Option<Contract>,
 }
 
-const PATTERN_GLOBL:    &'static str = r"^[\t\s]*\.globl[\t\s]+([a-zA-Z0-9_]+)";
+const PATTERN_GLOBL:    &'static str = r"^[\t\s]*\.globl[\t\s]+([a-zA-Z0-9_\.]+)";
 const PATTERN_DATA:     &'static str = r"^[\t\s]*\.data";
 const PATTERN_INTERNAL: &'static str = r"^[\t\s]*\.internal[\t\s]+(:[a-zA-Z0-9_]+)";
 const PATTERN_SELECTOR: &'static str = r"^[\t\s]*\.selector";
@@ -98,13 +98,14 @@ const PATTERN_ALIAS:    &'static str = r"^[\t\s]*\.internal-alias (:[a-zA-Z0-9_]
 const PATTERN_GLBLBASE: &'static str = r"^[\t\s]*\.global-base[\t\s]+([0-9]+)";
 const PATTERN_PERSBASE: &'static str = r"^[\t\s]*\.persistent-base[\t\s]+([0-9]+)";
 const PATTERN_LABEL:    &'static str = r"^[\.a-zA-Z0-9_]+:";
+//const PATTERN_GLOBLSTART: &'static str = r"^([a-zA-Z0-9_]+):";
 const PATTERN_PARAM:    &'static str = r"^[\t\s]+\.([a-zA-Z0-9_]+),?[\t\s]*([a-zA-Z0-9_]+)";
-const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+([a-zA-Z0-9_]+),[\t\s]*@([a-zA-Z]+)";
-const PATTERN_SIZE:     &'static str = r"^[\t\s]*\.size[\t\s]+([a-zA-Z0-9_]+),[\t\s]*([\.a-zA-Z0-9_]+)";
+const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*@([a-zA-Z]+)";
+const PATTERN_SIZE:     &'static str = r"^[\t\s]*\.size[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([\.a-zA-Z0-9_]+)";
+const PATTERN_IGNORED:  &'static str = r"^[\t\s]+\.(p2align|align|text|file|ident|section)";
 
 const GLOBL:    &'static str = ".globl";
 const INTERNAL: &'static str = ".internal";
-const DATA:     &'static str = ".data";
 const SELECTOR: &'static str = ".selector";
 
 //const FUNCTION_TYPENAME:&'static str = "function";
@@ -275,6 +276,7 @@ impl ParseEngine {
         let size_regex = Regex::new(PATTERN_SIZE).unwrap();
         let base_glbl_regex = Regex::new(PATTERN_GLBLBASE).unwrap();
         let base_pers_regex = Regex::new(PATTERN_PERSBASE).unwrap();
+        let ignored_regex = Regex::new(PATTERN_IGNORED).unwrap();
 
         let mut section_name: String = String::new();
         let mut obj_body: String = "".to_owned();
@@ -288,7 +290,10 @@ impl ParseEngine {
         while reader.read_line(&mut l)
             .map_err(|_| "error while reading line")? != 0 {
             lnum += 1;
-            if base_glbl_regex.is_match(&l) {
+            if ignored_regex.is_match(&l) {
+                //ignore unused parameters
+                debug!("ignored: {}", l);
+            } else if base_glbl_regex.is_match(&l) {
                 // .global-base
                 let cap = base_glbl_regex.captures(&l).unwrap();
                 let base = cap.get(1).map(|m| m.as_str())
@@ -308,33 +313,31 @@ impl ParseEngine {
                 self.update_predefined();
             } else if type_regex.is_match(&l) {
                 // .type x, @...
+                //it's a mark for begining of a new object (func or data)
+                self.update(&section_name, &obj_name, &obj_body, first_pass)
+                    .map_err(|e| format!("line {}: {}", lnum, e))?;
+                section_name = GLOBL.to_owned();
+                obj_body = "".to_owned(); 
                 let cap = type_regex.captures(&l).unwrap();
-                let name = cap.get(1).unwrap().as_str().to_owned();
-                let type_name = cap.get(2).ok_or(format!("line:{}: .type option is invalid", lnum))?.as_str();
-                let obj = self.globals.entry(name.clone()).or_insert(Object::new(name, &type_name));
+                obj_name = cap.get(1).unwrap().as_str().to_owned();
+                let type_name = cap.get(2).ok_or(format!("line {}: .type option is invalid", lnum))?.as_str();
+                let obj = self.globals.entry(obj_name.clone()).or_insert(Object::new(obj_name.clone(), &type_name));
                 obj.dtype = ObjectType::from(type_name);
             } else if size_regex.is_match(&l) {
                 // .size x, val
                 let cap = size_regex.captures(&l).unwrap();
                 let name = cap.get(1).unwrap().as_str().to_owned();
-                let size_str = cap.get(2).ok_or(format!("line:{}: .size option is invalid", lnum))?.as_str();
+                let size_str = cap.get(2).ok_or(format!("line {}: .size option is invalid", lnum))?.as_str();
                 let item_ref = self.globals.entry(name.clone()).or_insert(Object::new(name, ""));
                 item_ref.size = usize::from_str_radix(size_str, 10).unwrap_or(0);
             } else if globl_regex.is_match(&l) { 
                 // .globl x
-                self.update(&section_name, &obj_name, &obj_body, first_pass)
-                    .map_err(|e| format!("line {}: {}", lnum, e))?;
-                section_name = GLOBL.to_owned();
-                obj_body = "".to_owned(); 
-                obj_name = globl_regex.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
-                self.globals.entry(obj_name.clone()).or_insert(Object::new(obj_name.clone(), ""));
+                let cap = globl_regex.captures(&l).unwrap();
+                let name = cap.get(1).unwrap().as_str().to_owned();
+                self.globals.entry(name.clone()).or_insert(Object::new(name.clone(), ""));
             } else if data_regex.is_match(&l) {
                 // .data
-                self.update(&section_name, &obj_name, &obj_body, first_pass)
-                    .map_err(|e| format!("line {}: {}", lnum, e))?;
-                section_name = DATA.to_owned();
-                obj_name = "".to_owned();
-                obj_body = "".to_owned();
+                //ignore, not used
             } else if selector_regex.is_match(&l) {                
                 // .selector
                 self.update(&section_name, &obj_name, &obj_body, first_pass)?;
@@ -368,7 +371,7 @@ impl ParseEngine {
                 let param = cap.get(1).unwrap().as_str();
                 match param {
                     "byte" | "long" | "short" | "quad" => obj_body.push_str(&l),
-                    _ => (),
+                    _ => Err(format!("line {}: invalid param \"{}\":{}", lnum, param, l))?,
                 };
             } else {
                 let l_with_numbers = if first_pass { l.to_owned() } else { self.replace_labels(&l) };
@@ -392,7 +395,7 @@ impl ParseEngine {
             },
             GLOBL => {
                let abi = self.abi.clone();
-               let mut item = self.globals.get_mut(func).unwrap();
+               let item = self.globals.get_mut(func).unwrap();
                 match &mut item.dtype {
                     ObjectType::Function(fparams) => {
                         let mut signed = false;
@@ -407,7 +410,11 @@ impl ParseEngine {
                         self.signed.insert(func_id, signed);
                         let prev = self.xrefs.insert(func.to_string(), func_id);
                         if first_pass && prev.is_some() {
-                            Err(format!("global function with id = {} already exist", func_id))?;
+                            Err(format!(
+                                "global function with id = {:x} and name \"{}\" already exist", 
+                                func_id,
+                                func
+                            ))?;
                         }
                     },
                     ObjectType::Data { addr, ref mut values, persistent } => {
@@ -460,19 +467,19 @@ impl ParseEngine {
                     _ => Err(format!("unsupported parameter ({})", pname))?,
                 };
                 if *item_size < value_len {
-                    Err(format!("global object {} has invalid .size parameter: too small)", name))?;
+                    Err(format!("global object {} has invalid .size parameter: too small", name))?;
                 }
                 *item_size -= value_len;
                 let value = cap.get(2).map_or("", |m| m.as_str()).trim();
                 values.push(DataValue::Number((
                     IntegerData::from_str_radix(value, 10)
-                        .map_err(|_| format!("parameter ({}) has invalid value ({})", pname, value))?,
+                        .map_err(|_| format!("parameter \"{}\" has invalid value \"{}\"", pname, value))?,
                     value_len,
                 )));
             }
         }
         if *item_size > 0 {
-            Err(format!("global object {} has invalid .size parameter: bigger than defined values", *item_size))?;
+            Err(format!("global object {} has invalid \".size\" value: bigger than defined values", name))?;
         }
         ok!()
     }
@@ -662,5 +669,13 @@ mod tests {
         let pbank_file = File::open("./tests/pbank.s").unwrap();
         let test_file = File::open("./stdlib.tvm").unwrap();
         assert_eq!(parser.parse(pbank_file, vec![test_file], None), ok!());
+    }    
+
+    #[test]
+    fn test_parser_var_without_globl() {
+        let mut parser = ParseEngine::new();
+        let source_file = File::open("./tests/local_global_var.code").unwrap();
+        let lib_file = File::open("./stdlib.tvm").unwrap();
+        assert_eq!(parser.parse(source_file, vec![lib_file], None), ok!());
     }    
 }
