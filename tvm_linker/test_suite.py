@@ -196,23 +196,22 @@ expect_success('main', "", "0", "")
 compile1('test_msg_value.code', 'stdlib_sol.tvm')
 expect_success("main", "", "15000000000", "--internal 15000000000")
 
-	# '''
 
 #check msg.sender
 compile1('test_balance.code', 'stdlib_sol.tvm')
 expect_success("main", "", "100000000000", "--internal 0")
 
+	# '''
+
 compile2('contract09-a')
 expect_success('sendMoneyAndNumber', ("12" * 32) + ("7" * 16), None, "--internal 0 --decode-c6")
 expect_output(r"destination : 0:12121212")
-expect_output(r"CurrencyCollection: Grams.*value = 100000]")
+expect_output(r"CurrencyCollection: Grams.*value = 3000000]")
+expect_output(r"body.*119, 119, 119, 119, 119, 119, 119, 119, 128\]")
 
 #check tvm_balance
 compile_ex('test_tvm_balance.code', 'stdlib_sol.tvm')
 expect_success("main", "", "10000", "--internal 0")
-
-	# '''
-
 
 # TODO: cannot predict value of now, need to test it somehow
 #check tvm_now
