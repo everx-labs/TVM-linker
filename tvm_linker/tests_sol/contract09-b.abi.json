@@ -1,0 +1,8 @@
+{
+	"ABI version": 0,
+	"functions": [{
+		"name": "acceptMoneyAndNumber_external",
+		"inputs": [{"name": "number", "type": "uint64"}],
+		"outputs": []
+	}]
+}

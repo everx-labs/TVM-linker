@@ -1,0 +1,43 @@
+
+.globl	sendMoneyAndNumber_external
+.type	sendMoneyAndNumber_external, @function
+LDU 256
+LDU 64
+DROP
+PUSHINT $sendMoneyAndNumber$
+CALL 1
+
+.globl	sendMoneyAndNumber
+.type	sendMoneyAndNumber, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: sendMoneyAndNumber
+;; param: remote
+;; param: number
+PUSHINT 3000000
+;; remote
+;; stack=3
+PUSH s2
+;; IRemoteContract
+;; stack=4
+;; IRemoteContract.acceptMoneyAndNumber
+;; number
+;; number
+;; stack=4
+PUSH s2
+PUSHINT $acceptMoneyAndNumber_external$
+PUSHINT 0
+NEWC
+STU 8
+STU 32
+;; number
+STU 64
+ENDC CTOS
+PUSHINT $send_grams$
+CALL 1
+;; return
+BLKDROP 3
+RET
+
+.globl	acceptMoneyAndNumber_external
+.type	acceptMoneyAndNumber_external, @function
+RET
