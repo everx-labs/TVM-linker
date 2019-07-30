@@ -293,7 +293,7 @@
     ; s1 - msg: cell
     ; s2 - gram balance of msg: int
     ; s3 - gram balance of contract: int
-
+	LOGSTR main_internal
 	PUSH s3
 	PUSH s3
 	; s0 - gram balance of msg: int

@@ -1,8 +1,8 @@
-address1=7b13b56196d37a164e7ba9d9544626bfe7a02854dc2b9a4d5edea798c8ba7b7f
+address1=c83110fa488ea86ba33faca30bf63cfe72674ca3a454980ebf6cfb0b56e7bd1e
 address1short=`echo $address1 | cut -c 1-8`
 msginit1=$address1short-msg-init.boc
 msgbody1=$address1short-msg-body.boc
-address2=1d1fc2e851a5a19cad417a08b94ba78af91279d53113012bccfb8e0140e73532
+address2=c6a8c826d066ede07eef5aa6991ac49f427a5768868f6be21e91bb4b2f5bbac6
 address2short=`echo $address2 | cut -c 1-8`
 msginit2=$address2short-msg-init.boc
 
