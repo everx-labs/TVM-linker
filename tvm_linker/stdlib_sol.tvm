@@ -67,7 +67,6 @@
 	; s8 - unixtime: integer (u32)
 	; s9 - body: slice
 	; returns: msg: cell
-
 	NEWC
 	STSLICECONST 0 ; int_msg_info$0
 	STU 1 ; ihr_disabled
@@ -76,6 +75,32 @@
 	STSLICE
 	STSLICE
 	SWAP
+
+	;s0 - value: integer (u64)
+	;s1 - builder
+	CALL $:encode_grams$
+
+	STSLICECONST 0
+
+	SWAP
+
+	;s0 - value: integer (u64)
+	;s1 - builder
+	CALL $:encode_grams$
+	; store ihr_fee
+	SWAP
+
+	;s0 - value: integer (u64)
+	;s1 - builder
+	CALL $:encode_grams$
+	; store fwd_fee
+	STU 64        ; store logical time
+	STU 32        ; store unixtime
+
+	STSLICECONST 0 ; (Maybe StateInit) to 0bit
+	STSLICECONST 0 ; (body Either) to left$0
+	STSLICE       ; store body
+	ENDC
 
 
 	.internal   :parse_grams
@@ -115,10 +140,7 @@
 	;ret:
 	;   s0 - remaining slice
 	;   s1 - grams: slice
-	PUSHCONT {
-		CALL $:parse_grams$
-	}
-	CALLX
+	CALL $:parse_grams$
 	; skip HashmapE with currencies.
 	SKIPDICT
 
@@ -527,12 +549,8 @@
 					SDSKIPFIRST ; skip rand_seed
 
 					
-				PUSHCONT {
 					PUSHINT $parse_currency_collection$
 					CALL 1
-				}
-				
-					CALLX
 
 					NIP
 					; s0 - myself: MsgAddressInt (slice) 
@@ -559,37 +577,7 @@
 					PUSHINT 1   ; bounce flag
 					PUSHINT 0   ; reset ihr_disabled flag
 					
-				PUSHCONT {
 					CALL $:build_internal_outbound_message$
-					
-				;s0 - value: integer (u64)
-				;s1 - builder
-				CALL $:encode_grams$
-
-				STSLICECONST 0
-				
-					SWAP
-					
-				;s0 - value: integer (u64)
-				;s1 - builder
-				CALL $:encode_grams$
-			 ; store ihr_fee
-					SWAP
-					
-				;s0 - value: integer (u64)
-				;s1 - builder
-				CALL $:encode_grams$
-			 ; store fwd_fee
-					STU 64        ; store logical time
-					STU 32        ; store unixtime
-					
-					STSLICECONST 0 ; (Maybe StateInit) to 0bit
-					STSLICECONST 0 ; (body Either) to left$0
-					STSLICE       ; store body
-					ENDC
-				}
-				
-					CALLX
 					PUSHINT 0
 					SENDRAWMSG
 					
