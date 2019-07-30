@@ -447,8 +447,8 @@ class SoliditySuite(unittest.TestCase):
         waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
 
         # checking account balance changes
-        waitForBalanceInRange(address1, 14700000, 15100000, 5000)
-        waitForBalanceInRange(address2, 4700000, 5300000, 5000)
+        waitForBalanceInRange(address1, 14400000, 15100000, 5000)
+        waitForBalanceInRange(address2, 4500000, 5300000, 5000)
 
     def test_05(self):
         # prepare contract a
