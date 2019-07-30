@@ -176,6 +176,7 @@ mod tests {
         assert_eq!(perform_contract_call(name, body, None, false, false, None), 0);
     }
 
+    //TODO: contract is broken, throws exception code 60
     #[test]
     fn test_sum_global_array() {
         let mut parser = ParseEngine::new();
