@@ -154,7 +154,6 @@ fn linker_main() -> Result<(), String> {
                 let abi_file = msg_matches.value_of("ABI_JSON").map(|m| {mask |= 1; m });
                 let method_name = msg_matches.value_of("ABI_METHOD").map(|m| {mask |= 2; m });
                 let params = msg_matches.value_of("ABI_PARAMS").map(|m| {mask |= 4; m });
-                println!("!!!!!!!!!!! mask = {}", mask);
                 if mask == 0x7 {
                     let key_file = msg_matches.value_of("SETKEY").map(|path| {
                         let pair = KeypairManager::from_secret_file(path);

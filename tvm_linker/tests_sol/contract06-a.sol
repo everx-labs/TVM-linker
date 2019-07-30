@@ -12,10 +12,12 @@ contract IMyContractCallback {
 
 contract MyContract is IMyContract {
 
+	// struct for info about credit
 	struct ContractInfo {
 		uint64	allowed;
 	}
 
+	// persistent variable storing a credit infomation for some addresses
 	mapping(address => ContractInfo) m_allowed;
 	
 	// TVM helpers
@@ -23,6 +25,7 @@ contract MyContract is IMyContract {
 	
 	// External messages
 	
+	// set the credit limit for the address
 	function setAllowance(address anotherContract, uint64 amount) public {
 		m_allowed[anotherContract].allowed = amount;
 	}
@@ -30,6 +33,8 @@ contract MyContract is IMyContract {
 	// Internal messages
 
 	function getCredit() public {
+		// cast calleer to IMyContractCallback and call method getCreditCallback
+		// with value getted from persistent variable
 		IMyContractCallback(msg.sender).getCreditCallback(m_allowed[msg.sender].allowed);
 		return;
 	}
