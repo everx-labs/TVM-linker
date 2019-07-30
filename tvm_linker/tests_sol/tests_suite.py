@@ -433,6 +433,7 @@ class SoliditySuite(unittest.TestCase):
         waitForBalanceInRange(address1, 14700000, 15100000, 5000)
         waitForBalanceInRange(address2, 4700000, 5300000, 5000)
 
+'''
     def test_06(self):
         # prepare contract a
         address1 = self.deployContract('contract06-a.code', 'contract06-a.abi.json','10000000')
@@ -469,6 +470,7 @@ class SoliditySuite(unittest.TestCase):
         self.assertEqual(last_rec.strip(),\
             'x{D000000000000000000000000000000000000000000000000000000000012345678}',\
             'Unexpected allowance value for contract2')
-        
+'''
+   
 if __name__ == '__main__':
     unittest.main()
