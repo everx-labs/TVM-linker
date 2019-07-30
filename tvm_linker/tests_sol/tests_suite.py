@@ -53,7 +53,7 @@ def runLinker(args: str):
 
 def runLinkerCompile(contract:str, abi_json:str = None):
     res=None
-    #print("Compiling {}".format(contract))
+    print("Compiling {}".format(contract))
     if not(os.access(os.path.abspath(contract), os.R_OK)):
         print("Cannot access " + os.path.abspath(contract))
         return(res)
