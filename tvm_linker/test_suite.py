@@ -168,7 +168,6 @@ expect_output(r"body  : .* data: \[0, 26, 11, 86, 135, 0, 0, 0, 0, 0, 0, 0, 0, "
 compile_ex('test_msg_sender.code', None)
 expect_success(None, "", None, "--internal 0 --trace")	# check empty input (deploy)
 
-	# '''
 
 compile_ex('test_msg_sender2.code', 'stdlib_sol.tvm')
 # check internal message
@@ -184,5 +183,32 @@ expect_success("main", "", "15000000000", "--internal 15000000000")
 compile_ex('test_balance.code', 'stdlib_sol.tvm')
 expect_success("main", "", "100000000000", "--internal 0")
 
+#check tvm_balance
+compile_ex('test_tvm_balance.code', 'stdlib_sol.tvm')
+expect_success("main", "", "10000", "--internal 0")
+
+	# '''
+
+
+# TODO: cannot predict value of now, need to test it somehow
+#check tvm_now
+compile_ex('test_now.code', 'stdlib_sol.tvm')
+# expect_success("main", "", "1564090968", "--internal 0")
+
+#check tvm_address
+compile_ex('test_tvm_address.code', 'stdlib_sol.tvm')
+expect_success("main", "", "0", "--internal 0")
+
+#check tvm_block_lt
+compile_ex('test_tvm_block_lt.code', 'stdlib_sol.tvm')
+expect_success("main", "", "0", "--internal 0")
+
+#check tvm_trans_lt
+compile_ex('test_tvm_trans_lt.code', 'stdlib_sol.tvm')
+expect_success("main", "", "0", "--internal 0")
+
+#check tvm_rand_seed
+compile_ex('test_tvm_rand_seed.code', 'stdlib_sol.tvm')
+expect_success("main", "", "0", "--internal 0")
 
 cleanup()

@@ -12,6 +12,7 @@
     NEQINT 1
     PUSHCONT {          ; if func_id negative or zero - direct call to method
         PUSHINT 32
+        LOGSTR selector_jmp_0
         DICTIGETJMP     ; execute method and return
     }
     PUSHCONT {          ; get dictionary with methods
@@ -19,10 +20,186 @@
         DICTIGET
         THROWIFNOT 52   ; no dictionary of methods
         PUSHINT 32
+        LOGSTR selector_jmp
         DICTUGETJMP     ; execute method and return
         THROW 51
     }
     IFELSE
+
+	.globl	parse_smartcontractinfo
+	.type	parse_smartcontractinfo, @function
+	;; stack=0
+	LOGSTR parse_continfo
+	PUSH c5
+	CTOS
+	LDREFRTOS
+	NIP ; drop rest of the cell
+	PUSHINT 64 ; 32 + 16 + 16
+	SDSKIPFIRST ; skip tag + actions + msgs_sent
+	LDU 32 ; put unixtime field on stack
+	LDU 64 ; put block_lt field on stack
+	LDU 64 ; put trans_lt field on stack
+	LDU 256 ; put rand_seed field on stack
+	PUSHCONT {
+		;parses CurrencyCollection type
+		;args: s0 - slice
+		;ret:
+		;   s0 - remaining slice
+		;   s1 - grams: slice
+		PUSHCONT {
+			;parses Grams type (VarInteger 16)
+			;args: s0 - slice
+			; ret:
+			;   s0 - remaining slice
+			;   s1 - grams: slice
+			;starts with 4bit length field 
+			LDU 4
+			SWAP
+			DUP
+			; load 'value' len*8 bits if len != 0, otherwise 0
+			PUSHCONT {
+				PUSHINT 8
+				MUL
+				LDUX
+				SWAP
+			}
+			PUSHCONT {
+				DROP
+				PUSHINT 0
+			}
+			IFELSE
+			;restore it as u128 integer 
+			NEWC
+			STU 128
+			ENDC
+			CTOS
+			SWAP
+		}
+		CALLX
+		; skip HashmapE with currencies.
+		SKIPDICT
+	}
+	CALLX
+	; parse MsgAddressInt
+	PUSHINT 11 
+	SDSKIPFIRST ; skip anycast: + workchain_id
+	LDU 256 ; put address on stack
+	DROP ; drop rest of c5 slice
+	; s0 - address
+	; s1 - balance
+	; s2 - rand_seed
+	; s3 - trans_lt
+	; s4 - block_lt
+	; s5 - unixtime
+	RET
+
+	.globl		get_address
+	.type		get_address, @function
+	;; stack=0
+	LOGSTR get_address
+	PUSHINT 4
+	PUSH c5
+	CTOS
+	LDREF
+	NIP
+	LDDICT
+	DROP
+	PUSHINT 256
+	DICTUGET
+	DROP
+	LDU 256
+	DROP ; drop slice itself
+	RET
+	
+	.globl		get_balance
+	.type		get_balance, @function
+	;; stack=0
+	LOGSTR get_balance
+	PUSHINT 5
+	PUSH c5
+	CTOS
+	LDREF
+	NIP
+	LDDICT
+	DROP
+	PUSHINT 256
+	DICTUGET
+	DROP
+	LDU 128
+	DROP ; drop slice itself
+	RET
+	
+	.globl		get_rand_seed
+	.type		get_rand_seed, @function
+	;; stack=0
+	LOGSTR get_rand_seed
+	PUSHINT 6
+	PUSH c5
+	CTOS
+	LDREF
+	NIP
+	LDDICT
+	DROP
+	PUSHINT 256
+	DICTUGET
+	DROP
+	LDU 256
+	DROP ; drop slice itself
+	RET
+	
+	.globl		get_trans_lt
+	.type		get_trans_lt, @function
+	;; stack=0
+	LOGSTR get_trans_lt
+	PUSHINT 7
+	PUSH c5
+	CTOS
+	LDREF
+	NIP
+	LDDICT
+	DROP
+	PUSHINT 256
+	DICTUGET
+	DROP
+	LDU 64
+	DROP ; drop slice itself
+	RET
+	
+	.globl		get_block_lt
+	.type		get_block_lt, @function
+	;; stack=0
+	LOGSTR get_block_lt
+	PUSHINT 8
+	PUSH c5
+	CTOS
+	LDREF
+	NIP
+	LDDICT
+	DROP
+	PUSHINT 256
+	DICTUGET
+	DROP
+	LDU 64
+	DROP ; drop slice itself
+	RET
+	
+	.globl		get_unixtime
+	.type		get_unixtime, @function
+	;; stack=0
+	LOGSTR get_unixtime
+	PUSHINT 9
+	PUSH c5
+	CTOS
+	LDREF
+	NIP
+	LDDICT
+	DROP
+	PUSHINT 256
+	DICTUGET
+	DROP
+	LDU 32
+	DROP ; drop slice itself
+	RET
 
     .globl	get_msg_pubkey
 	.type	get_msg_pubkey, @function
@@ -75,7 +252,7 @@
 	; s1 - msg: cell
 	; s2 - gram balance of msg: int
 	; s3 - gram balance of contract: int
-	
+	LOGSTR main_external
 	PUSH s3
 	PUSH s3
 	; s0 - gram balance of msg: int
@@ -141,6 +318,7 @@
 	.globl		get_pubkey
 	.type		get_pubkey, @function
 	;; stack=0
+	LOGSTR get_pubkey
 	PUSHINT 0
 	PUSH c5
 	CTOS
@@ -158,6 +336,7 @@
 	.globl		get_msg_sender
 	.type		get_msg_sender, @function
 	;; stack=0
+	LOGSTR get_msg_sender
 	PUSHINT 1
 	PUSH c5
 	CTOS
@@ -175,6 +354,7 @@
 	.globl		get_msg_balance
 	.type		get_msg_balance, @function
 	;; stack=0
+	LOGSTR get_msg_balance
 	PUSHINT 2
 	PUSH c5
 	CTOS
@@ -192,6 +372,7 @@
 	.globl		get_contract_balance
 	.type		get_contract_balance, @function
 	;; stack=0
+	LOGSTR get_cnt_balance
 	PUSHINT 3
 	PUSH c5
 	CTOS
@@ -209,6 +390,7 @@
 	.globl		get_src_addr
 	.type		get_src_addr, @function
 	; s0 - msg: cell
+	LOGSTR get_src_addr
 	CTOS
 	LDU 1
 	SWAP
@@ -234,7 +416,7 @@
 	.globl		store_signature
 	.type		store_signature, @function
 	; stack: sign
-	
+	LOGSTR store_signature
 	PUSH c5
 	CTOS
 	LDREFRTOS
@@ -281,6 +463,61 @@
 	PUSHINT 256
 	DICTUSET
 	NIP
+	PUSHINT $parse_smartcontractinfo$
+	CALL 1 ; get additional values from smartcontractinfo
+	; s0 - address
+	; s1 - balance
+	; s2 - rand_seed
+	; s3 - trans_lt
+	; s4 - block_lt
+	; s5 - unixtime
+	; s6 - dict
+	; put address into dict for key 4
+	NEWC STU 256 ENDC CTOS
+	PUSHINT 4
+	PUSH s7
+	PUSHINT 256
+	DICTUSET
+	; put balance into dict for key 5
+	SWAP
+	PUSHINT 5
+	PUSH s2
+	PUSHINT 256
+	DICTUSET
+	NIP
+	; put rand_seed into dict for key 6
+	SWAP
+	NEWC STU 256 ENDC CTOS
+	PUSHINT 6
+	PUSH s2
+	PUSHINT 256
+	DICTUSET
+	NIP
+	; put trans_lt into dict for key 7
+	SWAP
+	NEWC STU 64 ENDC CTOS
+	PUSHINT 7
+	PUSH s2
+	PUSHINT 256
+	DICTUSET
+	NIP
+	; put block_lt into dict for key 8
+	SWAP
+	NEWC STU 64 ENDC CTOS
+	PUSHINT 8
+	PUSH s2
+	PUSHINT 256
+	DICTUSET
+	NIP
+	; put unixtime into dict for key 9
+	SWAP
+	NEWC STU 32 ENDC CTOS
+	PUSHINT 9
+	PUSH s2
+	PUSHINT 256
+	DICTUSET
+	NIP
+	NIP ; drop old dict which was at s6 at start of adding smartcontractinfo
 	; stack: dict with values
 	SWAP
 	STDICT
@@ -293,7 +530,7 @@
     ; s1 - msg: cell
     ; s2 - gram balance of msg: int
     ; s3 - gram balance of contract: int
-
+	LOGSTR main_internal
 	PUSH s3
 	PUSH s3
 	; s0 - gram balance of msg: int
@@ -355,7 +592,7 @@
 		;; s1 - dst account address: integer
 		;; s2 - transfer grams value: integer
 		;ret: none
-		
+		LOGSTR send_grams
 		PUSHINT 0	;; next msg logical time
 		PUSH s1	;; body: slice
 		PUSH s3	;; dst account address: integer
