@@ -207,4 +207,32 @@ expect_success('sendMoneyAndNumber', ("12" * 32) + ("7" * 16), None, "--internal
 expect_output(r"destination : 0:12121212")
 expect_output(r"CurrencyCollection: Grams.*value = 100000]")
 
+#check tvm_balance
+compile_ex('test_tvm_balance.code', 'stdlib_sol.tvm')
+expect_success("main", "", "10000", "--internal 0")
+
+	# '''
+
+
+# TODO: cannot predict value of now, need to test it somehow
+#check tvm_now
+compile_ex('test_now.code', 'stdlib_sol.tvm')
+# expect_success("main", "", "1564090968", "--internal 0")
+
+#check tvm_address
+compile_ex('test_tvm_address.code', 'stdlib_sol.tvm')
+expect_success("main", "", "0", "--internal 0")
+
+#check tvm_block_lt
+compile_ex('test_tvm_block_lt.code', 'stdlib_sol.tvm')
+expect_success("main", "", "0", "--internal 0")
+
+#check tvm_trans_lt
+compile_ex('test_tvm_trans_lt.code', 'stdlib_sol.tvm')
+expect_success("main", "", "0", "--internal 0")
+
+#check tvm_rand_seed
+compile_ex('test_tvm_rand_seed.code', 'stdlib_sol.tvm')
+expect_success("main", "", "0", "--internal 0")
+
 cleanup()

@@ -1,0 +1,17 @@
+{
+  "@type": "config.global",
+  "liteclients": [
+    {
+      "@type": "liteclient.config.global",
+      "ip1": 1137658550,
+      "ip": 2130706433,
+      "port1": 4924,
+      "port": 3030,
+      "id": {
+        "@type": "pub.ed25519",
+        "key1": "peJTw/arlRfssgTuf9BMypJzqOi7SXEqSPSWiEw2U1M=",
+        "key": "BBKmgGAxz4ZofRgMO2qhYt+K1bGlGeowukPONVAkOcU="
+      }
+    }
+  ]
+}

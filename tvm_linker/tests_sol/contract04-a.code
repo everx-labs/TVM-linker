@@ -16,7 +16,7 @@ CALL 1
 ;; anotherContract
 ;; stack=2
 PUSH s1
-;; MyContract.remoteMethod
+;; AnotherContract.remoteMethod
 ;; value
 ;; amount
 ;; stack=3
@@ -57,25 +57,4 @@ RET
 
 .globl	remoteMethod_external
 .type	remoteMethod_external, @function
-LDU 256
-DROP
-PUSHINT $remoteMethod$
-CALL 1
-
-.globl	remoteMethod
-.type	remoteMethod, @function
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: remoteMethod
-;; param: value
-;; value
-;; stack=1
-DUP
-PUSHINT 0
-;; >
-GREATER
-;; require
-;; stack=2
-THROWIFNOT 100
-;; return
-DROP
 RET

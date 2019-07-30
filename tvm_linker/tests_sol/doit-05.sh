@@ -1,8 +1,8 @@
-address1=03d796589e3f02cf70c707743dbeb0074edb1e583ba245448d0f75fc846130be
-msginit1=03d79658-msg-init.boc
-msgbody1=03d79658-msg-body.boc
-address2=0f2dccd895dfa554a407381dbcc61dff27e1c4a92172f984eb9f127df61c2780
-msginit2=0f2dccd8-msg-init.boc
+address1=c8b7d32afd3daa3429a6bb562cafd89668fa4d271bb7638cb6f2949062f6d76b
+msginit1=c8b7d32a-msg-init.boc
+msgbody1=c8b7d32a-msg-body.boc
+address2=98cac5f04312dbaaa452b79ebc1c6868fb6e32e27e47cad6a2a4f260fe9753c7
+msginit2=98cac5f0-msg-init.boc
 
 rm -f *.tvc *.boc *.tmp
 
@@ -21,11 +21,11 @@ if [ ! -f "${address2}.tvc" ]; then
   exit 1
 fi
 
-$linker message $address1 --init -w 0
-$linker message $address2 --init -w 0
+$linker message --init -w 0 $address1
+$linker message --init -w 0 $address2
 
-$linker message $address1 -w 0 --abi-json contract05-a.abi.json --abi-method method_external \
-	--abi-params "{\"anotherContract\":\"0x${address2}\", \"x\":\"257\"}"
+$linker message -w 0 --abi-json contract05-a.abi.json --abi-method method_external \
+	--abi-params "{\"anotherContract\":\"0x${address2}\", \"x\":\"257\"}" $address1
 
 zeroes=0000000000000000000000000000000000000000000000000000000000000000
 

@@ -1,20 +1,22 @@
 pragma solidity ^0.5.0;
 
+// the interface of a remote contract
+contract AnotherContract {
+	function remoteMethod() pure public;
+}
+
+// the contract calling the remote method without parameters
 contract MyContract {
 
+	// persistent variable storing the number of function 'method' was called
 	uint m_counter;
 
-	function method(MyContract anotherContract) public {
-		// call remote contract
+	function method(AnotherContract anotherContract) public {
+		// call function of remote contract without parameters
 		anotherContract.remoteMethod();
+		// incrementing the counter
 		m_counter = m_counter + 1;
 		return;
-	}
-	
-	// Dummy function for a remote contract. Later to be represented by a distinct interface
-	
-	function remoteMethod() pure public {
-		return; 
 	}
 	
 }

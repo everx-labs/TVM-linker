@@ -1,12 +1,15 @@
-address=aceb641ba8fb487bd2bec7e94f0532496528cafbe8b84ff229d83106e247fc59
-msginit=aceb641b-msg-init.boc
-msgbody=aceb641b-msg-body.boc
+address=b172728fcf1457ba937af4c45e053a8371594e2d8219d105292fdd7c11eecad1
+address1short=`echo $address | cut -c 1-8`
+msginit=$address1short-msg-init.boc
+msgbody=$address1short-msg-body.boc
 
 rm -f *.tvc *.boc *.tmp
 
+set +x
+
 source set_env.sh
 
-$linker --lib ../stdlib_sol.tvm ./contract01.code --abi-json ./contract01.abi.json
+$linker compile --lib ../stdlib_sol.tvm ./contract01.code --abi-json ./contract01.abi.json
 
 if [ ! -f "${address}.tvc" ]; then
   echo "FILE NOT FOUND! ${address}.tvc"
@@ -14,8 +17,9 @@ if [ ! -f "${address}.tvc" ]; then
 fi
 
 
-$linker $address message --init -w 0
-$linker $address message -w 0 --abi-json contract01.abi.json --abi-method main_external --abi-params "{\"a\":\"0x1234\"}"
+$linker message $address --init -w 0
+echo    $linker message $address -w 0 --abi-json contract01.abi.json --abi-method main_external --abi-params "{\"a\":\"0x1234\"}"
+$linker message $address -w 0 --abi-json contract01.abi.json --abi-method main_external --abi-params "{\"a\":\"0x1234\"}"
 
 zeroes=0000000000000000000000000000000000000000000000000000000000000000
 
