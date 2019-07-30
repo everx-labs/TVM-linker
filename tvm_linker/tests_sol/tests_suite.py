@@ -373,13 +373,15 @@ class SoliditySuite(unittest.TestCase):
         self.assertEqual(tmp['stack'][len(tmp['stack'])-1] \
             if len(tmp.get('stack',None))>0 else None, " x{4_}")
 
+        print("Sending " + msgbody)		
         waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
 
+        print("Getting account state")		
         tmp = waitFor(runTLCAccount,[address], 5000, \
             r'\{D0000001234\}')
         self.assertEqual(tmp['stack'][len(tmp['stack'])-1] if len(tmp.get('stack',None))>0 \
             else None, "  x{D0000001234}")
-        
+
     def test_02(self):
         # prepare contract a
         address1 = self.deployContract('contract02-a.code', 'contract02-a.abi.json','1000000')
@@ -555,6 +557,6 @@ class SoliditySuite(unittest.TestCase):
         # checking account balance changes
         waitFor(runTLCAccount,[address1], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000001\}')
         waitFor(runTLCAccount,[address2], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000000\}')
-    
+		
 if __name__ == '__main__':
     unittest.main()
