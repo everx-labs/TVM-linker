@@ -210,28 +210,28 @@ expect_output(r"CurrencyCollection: Grams.*value = 3000000]")
 expect_output(r"body.*119, 119, 119, 119, 119, 119, 119, 119, 128\]")
 
 #check tvm_balance
-compile_ex('test_tvm_balance.code', 'stdlib_sol.tvm')
+compile1('test_tvm_balance.code', 'stdlib_sol.tvm')
 expect_success("main", "", "10000", "--internal 0")
 
 # TODO: cannot predict value of now, need to test it somehow
 #check tvm_now
-compile_ex('test_now.code', 'stdlib_sol.tvm')
+compile1('test_now.code', 'stdlib_sol.tvm')
 # expect_success("main", "", "1564090968", "--internal 0")
 
 #check tvm_address
-compile_ex('test_tvm_address.code', 'stdlib_sol.tvm')
+compile1('test_tvm_address.code', 'stdlib_sol.tvm')
 expect_success("main", "", "0", "--internal 0")
 
 #check tvm_block_lt
-compile_ex('test_tvm_block_lt.code', 'stdlib_sol.tvm')
+compile1('test_tvm_block_lt.code', 'stdlib_sol.tvm')
 expect_success("main", "", "0", "--internal 0")
 
 #check tvm_trans_lt
-compile_ex('test_tvm_trans_lt.code', 'stdlib_sol.tvm')
+compile1('test_tvm_trans_lt.code', 'stdlib_sol.tvm')
 expect_success("main", "", "0", "--internal 0")
 
 #check tvm_rand_seed
-compile_ex('test_tvm_rand_seed.code', 'stdlib_sol.tvm')
+compile1('test_tvm_rand_seed.code', 'stdlib_sol.tvm')
 expect_success("main", "", "0", "--internal 0")
 
 cleanup()
