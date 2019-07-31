@@ -160,46 +160,8 @@
 	LDU 64 ; put block_lt field on stack
 	LDU 64 ; put trans_lt field on stack
 	LDU 256 ; put rand_seed field on stack
-	PUSHCONT {
-		;parses CurrencyCollection type
-		;args: s0 - slice
-		;ret:
-		;   s0 - remaining slice
-		;   s1 - grams: slice
-		PUSHCONT {
-			;parses Grams type (VarInteger 16)
-			;args: s0 - slice
-			; ret:
-			;   s0 - remaining slice
-			;   s1 - grams: slice
-			;starts with 4bit length field 
-			LDU 4
-			SWAP
-			DUP
-			; load 'value' len*8 bits if len != 0, otherwise 0
-			PUSHCONT {
-				PUSHINT 8
-				MUL
-				LDUX
-				SWAP
-			}
-			PUSHCONT {
-				DROP
-				PUSHINT 0
-			}
-			IFELSE
-			;restore it as u128 integer 
-			NEWC
-			STU 128
-			ENDC
-			CTOS
-			SWAP
-		}
-		CALLX
-		; skip HashmapE with currencies.
-		SKIPDICT
-	}
-	CALLX
+	PUSHINT $parse_currency_collection$
+	CALL 1
 	; parse MsgAddressInt
 	PUSHINT 11 
 	SDSKIPFIRST ; skip anycast: + workchain_id

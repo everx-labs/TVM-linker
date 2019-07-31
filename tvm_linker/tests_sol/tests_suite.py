@@ -252,7 +252,7 @@ def waitForBalanceInRange(account, min_value, max_value, timeout):
         and (int(round(time.time()*1000))-sdt)<timeout:
         res = runTLCAccount(account)
     if res.get('balance')!=None and (res.get('balance')<_min or res.get('balance')>_max):
-        raise Exception('Balance ' + res.get('balance') + ' not in specified range')
+        raise Exception('Balance ' + str(res.get('balance')) + ' not in specified range')
     return(res)        
 
 def waitForStackChanged(account, timeout, prev_stack=None):
@@ -447,7 +447,7 @@ class SoliditySuite(unittest.TestCase):
         waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
 
         # checking account balance changes
-        waitForBalanceInRange(address1, 14400000, 15100000, 5000)
+        waitForBalanceInRange(address1, 14300000, 15100000, 5000)
         waitForBalanceInRange(address2, 4500000, 5300000, 5000)
 
     def test_05(self):
