@@ -1,6 +1,9 @@
 	.internal-alias :main_external,     -1
 	.internal-alias :main_internal,     0
 	.internal-alias :general_purpose,   1
+	.internal-alias :encode_grams,      2
+	.internal-alias :parse_grams,       3
+	.internal-alias :build_internal_outbound_message,       4
 
     .selector
     ; s0 - func_id
@@ -26,6 +29,123 @@
     }
     IFELSE
 
+
+	.internal   :encode_grams
+	;s0 - value: integer (u64)
+	;s1 - builder
+	DUP
+	PUSHCONT {
+		DUP
+		UBITSIZE    ; bit count used by integer
+		PUSHINT 8
+		DIVC        ; calculate number of bytes needed for integer
+		DUP
+		PUSH s3     ; push builder
+		STU 4       ; store len (bytes)
+		SWAP
+		PUSHINT 8
+		MUL         ; calculate bits for integer (rounded to byte)
+		STUX        ; store value
+		NIP
+	}
+	PUSHCONT {
+		DROP
+		PUSHINT 0
+		STUR 4
+	}
+	IFELSE
+
+
+	.internal :build_internal_outbound_message
+	; build internal outbound message
+	; s0 - ihr_disabled: integer (1 or 0)
+	; s1 - bounce: integer (1 or 0)
+	; s2 - src address : slice (MsgAddressInt)
+	; s3 - dst address : slice (MsgAddressInt)
+	; s4 - value: integer
+	; s5 - ihr_fee: integer
+	; s6 - fwd_fee: integer
+	; s7 - logical time: integer (u64)
+	; s8 - unixtime: integer (u32)
+	; s9 - body: slice
+	; returns: msg: cell
+	NEWC
+	STSLICECONST 0 ; int_msg_info$0
+	STU 1 ; ihr_disabled
+	STU 1 ; bounce
+	STSLICECONST 0 ; bounced
+	STSLICE
+	STSLICE
+	SWAP
+
+	;s0 - value: integer (u64)
+	;s1 - builder
+	CALL $:encode_grams$
+
+	STSLICECONST 0
+
+	SWAP
+
+	;s0 - value: integer (u64)
+	;s1 - builder
+	CALL $:encode_grams$
+	; store ihr_fee
+	SWAP
+
+	;s0 - value: integer (u64)
+	;s1 - builder
+	CALL $:encode_grams$
+	; store fwd_fee
+	STU 64        ; store logical time
+	STU 32        ; store unixtime
+
+	STSLICECONST 0 ; (Maybe StateInit) to 0bit
+	STSLICECONST 0 ; (body Either) to left$0
+	STSLICE       ; store body
+	ENDC
+
+
+	.internal   :parse_grams
+	;parses Grams type (VarInteger 16)
+	;args: s0 - slice
+	; ret:
+	;   s0 - remaining slice
+	;   s1 - grams: slice
+	;starts with 4bit length field
+	LDU 4
+	SWAP
+	DUP
+	; load 'value' len*8 bits if len != 0, otherwise 0
+	PUSHCONT {
+		PUSHINT 8
+		MUL
+		LDUX
+		SWAP
+	}
+	PUSHCONT {
+		DROP
+		PUSHINT 0
+	}
+	IFELSE
+	;restore it as u128 integer
+	NEWC
+	STU 128
+	ENDC
+	CTOS
+	SWAP
+
+
+	.globl	parse_currency_collection
+	.type	parse_currency_collection, @function
+	;parses CurrencyCollection type
+	;args: s0 - slice
+	;ret:
+	;   s0 - remaining slice
+	;   s1 - grams: slice
+	CALL $:parse_grams$
+	; skip HashmapE with currencies.
+	SKIPDICT
+
 	.globl	parse_smartcontractinfo
 	.type	parse_smartcontractinfo, @function
 	;; stack=0
@@ -40,46 +160,8 @@
 	LDU 64 ; put block_lt field on stack
 	LDU 64 ; put trans_lt field on stack
 	LDU 256 ; put rand_seed field on stack
-	PUSHCONT {
-		;parses CurrencyCollection type
-		;args: s0 - slice
-		;ret:
-		;   s0 - remaining slice
-		;   s1 - grams: slice
-		PUSHCONT {
-			;parses Grams type (VarInteger 16)
-			;args: s0 - slice
-			; ret:
-			;   s0 - remaining slice
-			;   s1 - grams: slice
-			;starts with 4bit length field 
-			LDU 4
-			SWAP
-			DUP
-			; load 'value' len*8 bits if len != 0, otherwise 0
-			PUSHCONT {
-				PUSHINT 8
-				MUL
-				LDUX
-				SWAP
-			}
-			PUSHCONT {
-				DROP
-				PUSHINT 0
-			}
-			IFELSE
-			;restore it as u128 integer 
-			NEWC
-			STU 128
-			ENDC
-			CTOS
-			SWAP
-		}
-		CALLX
-		; skip HashmapE with currencies.
-		SKIPDICT
-	}
-	CALLX
+	PUSHINT $parse_currency_collection$
+	CALL 1
 	; parse MsgAddressInt
 	PUSHINT 11 
 	SDSKIPFIRST ; skip anycast: + workchain_id
@@ -665,49 +747,8 @@
 					SDSKIPFIRST ; skip rand_seed
 
 					
-				PUSHCONT {
-				;parses CurrencyCollection type
-				;args: s0 - slice
-				;ret:
-				;   s0 - remaining slice
-				;   s1 - grams: slice
-					
-			PUSHCONT {
-				;parses Grams type (VarInteger 16)
-				;args: s0 - slice
-				; ret:
-				;   s0 - remaining slice
-				;   s1 - grams: slice
-				;starts with 4bit length field 
-				LDU 4
-				SWAP
-				DUP
-				; load 'value' len*8 bits if len != 0, otherwise 0
-				PUSHCONT {
-					PUSHINT 8
-					MUL
-					LDUX
-					SWAP
-				}
-				PUSHCONT {
-					DROP
-					PUSHINT 0
-				}
-				IFELSE
-				;restore it as u128 integer 
-				NEWC
-				STU 128
-				ENDC
-				CTOS
-				SWAP
-			}
-
-					CALLX
-					; skip HashmapE with currencies.
-					SKIPDICT
-				}
-				
-					CALLX
+					PUSHINT $parse_currency_collection$
+					CALL 1
 
 					NIP
 					; s0 - myself: MsgAddressInt (slice) 
@@ -734,124 +775,10 @@
 					PUSHINT 1   ; bounce flag
 					PUSHINT 0   ; reset ihr_disabled flag
 					
-				PUSHCONT {
-				; build internal outbound message
-				; s0 - ihr_disabled: integer (1 or 0)
-				; s1 - bounce: integer (1 or 0)
-				; s2 - src address : slice (MsgAddressInt)
-				; s3 - dst address : slice (MsgAddressInt)
-				; s4 - value: integer
-				; s5 - ihr_fee: integer
-				; s6 - fwd_fee: integer
-				; s7 - logical time: integer (u64)
-				; s8 - unixtime: integer (u32)
-				; s9 - body: slice
-				; returns: msg: cell
-
-					NEWC
-					STSLICECONST 0 ; int_msg_info$0
-					STU 1 ; ihr_disabled
-					STU 1 ; bounce
-					STSLICECONST 0 ; bounced
-					STSLICE
-					STSLICE
-					SWAP
-					
-				;s0 - value: integer (u64)
-				;s1 - builder
-				
-				;s0 - value: integer (u64)
-				;s1 - builder
-				DUP
-				PUSHCONT {
-					DUP
-					UBITSIZE     ; bit count used by integer 
-					PUSHINT 8   
-					DIVC        ; calculate number of bytes needed for integer
-					DUP
-					PUSH s3     ; push builder
-					STU 4       ; store len (bytes)
-					SWAP        
-					PUSHINT 8   
-					MUL         ; calculate bits for integer (rounded to byte)
-					STUX        ; store value
-					NIP
-				}
-				PUSHCONT {
-					DROP
-					PUSHINT 0
-					STUR 4
-				}
-				IFELSE
-
-				STSLICECONST 0
-				
-					SWAP
-					
-				;s0 - value: integer (u64)
-				;s1 - builder
-				DUP
-				PUSHCONT {
-					DUP
-					UBITSIZE     ; bit count used by integer 
-					PUSHINT 8   
-					DIVC        ; calculate number of bytes needed for integer
-					DUP
-					PUSH s3     ; push builder
-					STU 4       ; store len (bytes)
-					SWAP        
-					PUSHINT 8   
-					MUL         ; calculate bits for integer (rounded to byte)
-					STUX        ; store value
-					NIP
-				}
-				PUSHCONT {
-					DROP
-					PUSHINT 0
-					STUR 4
-				}
-				IFELSE
-			 ; store ihr_fee
-					SWAP
-					
-				;s0 - value: integer (u64)
-				;s1 - builder
-				DUP
-				PUSHCONT {
-					DUP
-					UBITSIZE     ; bit count used by integer 
-					PUSHINT 8   
-					DIVC        ; calculate number of bytes needed for integer
-					DUP
-					PUSH s3     ; push builder
-					STU 4       ; store len (bytes)
-					SWAP        
-					PUSHINT 8   
-					MUL         ; calculate bits for integer (rounded to byte)
-					STUX        ; store value
-					NIP
-				}
-				PUSHCONT {
-					DROP
-					PUSHINT 0
-					STUR 4
-				}
-				IFELSE
-			 ; store fwd_fee
-					STU 64        ; store logical time
-					STU 32        ; store unixtime
-					
-					STSLICECONST 0 ; (Maybe StateInit) to 0bit
-					STSLICECONST 0 ; (body Either) to left$0
-					STSLICE       ; store body
-					ENDC
-				}
-				
-					CALLX
+					CALL $:build_internal_outbound_message$
 					PUSHINT 0
 					SENDRAWMSG
 					
 				PUSHINT 123
 				DROP
 				RET
-				
