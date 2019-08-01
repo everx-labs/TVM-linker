@@ -170,6 +170,12 @@ expect_success('main', "", None, "--internal 0 --decode-c6")
 expect_output(r"destination : 0:0+007F")
 expect_output(r"CurrencyCollection: Grams.*value = 1000]")
 
+compile1('test_send_ext_msg.tvm', 'stdlib_sol.tvm')
+expect_success(None, "", None, "")	# check empty input (deploy)
+expect_success('main', "", None, "--internal 0 --decode-c6")
+expect_output(r"destination : AddrNone")
+expect_output(r"data: \[0, 0, 48, 57, 128\]")
+
 compile1('test_send_int_msg.tvm', 'stdlib_sol.tvm')
 expect_success('main', "", None, "--decode-c6")
 expect_output(r"destination : 0:0+007F")
