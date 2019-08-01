@@ -782,3 +782,91 @@
 				PUSHINT 123
 				DROP
 				RET
+
+
+
+	.globl   build_external_outbound_message
+	.type	 build_external_outbound_message, @function
+	; build external outbound message
+	; s0 - src address : MsgAddressInt
+	; s1 - logical time
+	; s2 - body
+	; returns: msg: cell
+
+	NEWC
+	TWO
+	STONES ; ext_out_msg_info$11
+
+	STSLICE ; store MsgAddressInt
+
+	TWO
+	STZEROES ; addr_none$00
+
+	STU 64  ; created_lt:uint64
+	PUSHINT 0
+	STUR 32  ; created_at:uint32
+
+	ONE
+	STZEROES   ; Maybe StateInit to 0bit
+
+	;check that the result builder can fit
+	;body slice
+	DUP2
+	BREMBITS
+	SWAP
+	SBITS
+	INC         ;include body either bit
+	GEQ
+	PUSHCONT {
+		;builder has enough free bits,
+		;just append body slice to builder
+		ONE
+		STZEROES  ;body Either: left$0
+		STSLICE
+	}
+	PUSHCONT {
+		;builder's remaining bits are not enough
+		;to append body slice, instead append bit 1
+		;and attach body as reference.
+		ONE
+		STONES   ;body Either: right$1
+		SWAP
+		;body is a slice, and we need to convert
+		;it to cell before storing as reference.
+		NEWC
+		STSLICE
+		ENDC
+		STREFR
+	}
+	IFELSE
+
+	ENDC
+
+
+
+	.globl   send_ext_msg
+	.type    send_ext_msg, @function
+	;args: s0 - body: slice
+	;ret: none
+	; load SmartContractInfo
+	PUSHCTR c5
+	CTOS
+	LDREF
+	DROP
+	CTOS
+
+	PUSHINT 160 ; 32 + 16 + 16 + 32 + 64
+	SDSKIPFIRST ; skip tag + actions + msgs_sent + unixtime + block_lt
+	LDU 64      ; load transaction logical time
+
+	PUSHINT 256
+	SDSKIPFIRST ; skip rand_seed
+	PUSHINT $parse_currency_collection$
+	CALL 1
+	NIP
+	; s0 - myself: MsgAddressInt (slice)
+	; s1 - trans_lt: u64
+	PUSHINT $build_external_outbound_message$
+	CALL 1
+	PUSHINT 0
+	SENDRAWMSG
