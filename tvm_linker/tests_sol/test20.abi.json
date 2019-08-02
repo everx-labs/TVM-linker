@@ -1,0 +1,8 @@
+{
+	"ABI version": 0,
+	"functions": [{
+		"name": "test19_external",
+		"inputs": [{"name": "a", "type": "uint32"}, {"name": "b", "type": "uint32"}],
+		"outputs": []
+	}]
+}
