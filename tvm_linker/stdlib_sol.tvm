@@ -870,3 +870,20 @@
 	CALL 1
 	PUSHINT 0
 	SENDRAWMSG
+
+	.globl	decode_array
+	.type	decode_array, @function
+	
+	; Decode array of numbers of given number of bits
+	; args: 
+	;   s1 - numBits
+	;   s0 - slice
+	; ret:
+	;   s1 - dict with decoded array
+	;   s0 - remaining slice
+
+	POP s1
+	NEWDICT
+	SWAP
+	RET
+	
