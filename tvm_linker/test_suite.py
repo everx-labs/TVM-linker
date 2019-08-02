@@ -64,13 +64,13 @@ def compile1(source_file, lib_file):
 	getFunctions()
 	CONTRACT_ADDRESS = getContractAddress()
 
-def compile2(source_name):
+def compile2(source_name, directory = "tests_sol"):
 	cleanup()
 	global lines, functions, CONTRACT_ADDRESS
 	print("Compiling " + source_name + "...")
 	lib_file = "stdlib_sol.tvm"
-	source_file = "./tests_sol/{}.code".format(source_name)
-	abi_file = "./tests_sol/{}.abi.json".format(source_name)
+	source_file = "./" + directory + "/{}.code".format(source_name)
+	abi_file = "./" + directory + "/{}.abi.json".format(source_name)
 	
 	cmd = "./target/debug/tvm_linker compile {} --abi-json {} --lib {} --debug > compile_log.tmp"
 	cmd = cmd.format(source_file, abi_file, lib_file)
@@ -215,7 +215,7 @@ expect_output(r"destination : 0:12121212")
 expect_output(r"CurrencyCollection: Grams.*value = 3000000]")
 expect_output(r"body.*119, 119, 119, 119, 119, 119, 119, 119, 128\]")
 
-compile2('test20')
+compile2('test20', 'tests')
 expect_success('test19', "0000007F000000FF", None, "--internal 0 --decode-c6")
 expect_output(r"body.*0, 0, 0, 127, 0, 0, 0, 255, 128\]")
 expect_success('test19', "1122334455667788", None, "--internal 0 --decode-c6")
