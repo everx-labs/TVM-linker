@@ -215,6 +215,12 @@ expect_output(r"destination : 0:12121212")
 expect_output(r"CurrencyCollection: Grams.*value = 3000000]")
 expect_output(r"body.*119, 119, 119, 119, 119, 119, 119, 119, 128\]")
 
+compile2('test20')
+expect_success('test19', "0000007F000000FF", None, "--internal 0 --decode-c6")
+expect_output(r"body.*0, 0, 0, 127, 0, 0, 0, 255, 128\]")
+expect_success('test19', "1122334455667788", None, "--internal 0 --decode-c6")
+expect_output(r"body.*17, 34, 51, 68, 85, 102, 119, 136, 128\]")
+
 #check tvm_balance
 compile1('test_tvm_balance.code', 'stdlib_sol.tvm')
 expect_success("main", "", "10000", "--internal 0")
