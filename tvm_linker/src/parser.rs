@@ -81,7 +81,6 @@ pub struct ParseEngine {
     aliases: HashMap<String, i32>,
     globals: HashMap<String, Object>,
     internals: HashMap<i32, String>,
-    signed: HashMap<u32, bool>,
     entry_point: String,
     globl_base: Ptr,
     globl_ptr: Ptr,
@@ -112,7 +111,6 @@ const SELECTOR: &'static str = ".selector";
 //const FUNCTION_TYPENAME:&'static str = "function";
 const DATA_TYPENAME:    &'static str = "object";
 
-const FUNC_SUFFIX_AUTH: &'static str = "_authorized";
 const PERSISTENT_DATA_SUFFIX: &'static str = "_persistent";
 
 const PUBKEY_NAME: &'static str = "tvm_public_key";
@@ -131,7 +129,6 @@ impl ParseEngine {
             aliases:    HashMap::new(),
             globals:    HashMap::new(), 
             internals:  HashMap::new(),
-            signed:     HashMap::new(),
             entry_point: String::new(),
             globl_base: 0,
             globl_ptr: 0,
@@ -221,11 +218,7 @@ impl ParseEngine {
             }
         })
     }
-
-    pub fn signed(&self) -> &HashMap<u32, bool> {
-        &self.signed
-    }
-
+   
     fn preinit(&mut self) -> Result <(), String> {
         self.globals.insert(
             PUBKEY_NAME.to_string(), 
@@ -399,16 +392,9 @@ impl ParseEngine {
                let item = self.globals.get_mut(func).unwrap();
                 match &mut item.dtype {
                     ObjectType::Function(fparams) => {
-                        let mut signed = false;
-                        if let Some(index) = func.find(FUNC_SUFFIX_AUTH) {
-                            if (index + FUNC_SUFFIX_AUTH.len()) == func.len() {
-                                signed = true;
-                            }
-                        }
                         let func_id = gen_abi_id(abi, func);
                         fparams.0 = func_id;
                         fparams.1 = body.trim_end().to_string();
-                        self.signed.insert(func_id, signed);
                         let prev = self.xrefs.insert(func.to_string(), func_id);
                         if first_pass && prev.is_some() {
                             Err(format!(
@@ -569,7 +555,7 @@ impl ParseEngine {
         println!("Entry point:\n{}\n{}\n{}", line, self.entry(), line);
         println!("General-purpose functions:\n{}", line);
         for (k, v) in &self.xrefs {
-            println! ("Function {:30}: id={:08X}, sign-check={:?}", k, v, self.signed.get(&v).unwrap());
+            println! ("Function {:30}: id={:08X}", k, v);
         }
         for (k, v) in self.globals() {
             println! ("Function {:08X}\n{}\n{}\n{}", k, line, v, line);

@@ -4,7 +4,7 @@ import os
 def getFunctions():
 	global functions
 	for l in lines:
-		match = re.search(r"Function (\S+)_external\s+: id=([0-9A-F]+), .*", l);
+		match = re.search(r"Function (\S+)_external\s+: id=([0-9A-F]+)", l);
 		if match:
 			functions[match.group(1)] = match.group(2)
 			# print match.group(1), match.group(2) 
@@ -165,7 +165,6 @@ def expect_output(regex):
 			return
 	assert False, regex
 
-	# '''
 
 compile1('test_factorial.code', 'stdlib_sol.tvm')
 expect_success('constructor', "", "", "")
@@ -234,7 +233,6 @@ expect_success("main", "", "15000000000", "--internal 15000000000")
 compile1('test_balance.code', 'stdlib_sol.tvm')
 expect_success("main", "", "100000000000", "--internal 0")
 
-	# '''
 
 compile2('contract09-a')
 expect_success('sendMoneyAndNumber', ("12" * 32) + ("7" * 16), None, "--internal 0 --decode-c6")
@@ -281,5 +279,13 @@ expect_success2("test_arrays", "main_external", '{"idx": "2", "myarray": ["3", "
 expect_success2("test_arrays", "main_external", '{"idx": "3", "myarray": ["3", "5", "7", "21"]}', "21", "--internal 0 --decode-c6 --trace")
 expect_success2("test_arrays", "main_external", '{"idx": "4", "myarray": ["3", "5", "7", "21"]}', "0", "--internal 0 --decode-c6 --trace")
 
+SIGN = 'key1'
+compile1('hello.code', 'stdlib_c.tvm')
+expect_success("hello", "", "1", "")
+expect_output(r"Hello")
+SIGN = None
+compile1('hello.code', 'stdlib_c.tvm')
+expect_success("hello", "", "1", "")
+expect_output(r"Hello")
 
 cleanup()

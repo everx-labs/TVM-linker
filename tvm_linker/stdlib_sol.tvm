@@ -304,6 +304,15 @@
 		ZERO SWAP
 		; stack: 0 msg
 		LDREFRTOS
+		;check if it's empty
+		DUP
+		SDEMPTY
+		PUSHCONT {
+			; signature slice is empty
+			; clean the stack and return 0
+			BLKDROP 2
+		}
+		IFJMP
 		; stack: 0 msg' slice:sign+pubKey
 		DUP
 		; stack: 0 msg' slice:sign+pubKey slice:sign+pubKey
@@ -378,7 +387,7 @@
 	
 	; check if message is empty
 	DUP
-	SEMPTY
+	SDEMPTY
 	PUSHCONT {
 		DROP
 		NEWDICT

@@ -11,8 +11,6 @@ use tvm::stack::dictionary::{HashmapE, HashmapType};
 use tvm::assembler::CompileError;
 use parser::{ptr_to_builder, ParseEngine};
 
-const AUTH_METHOD_NAME: &'static str = ":authenticate";
-
 pub struct Program {
     engine: ParseEngine,
     keypair: Option<Keypair>,
@@ -83,20 +81,13 @@ impl Program {
     }
 
     fn build_toplevel_dict(&self) -> Result<SliceData, String> {
-        let mut dict = prepare_methods(self.engine.internals())
+        let dict = prepare_methods(self.engine.internals())
             .map_err(|e| {
                 let name = self.engine.internal_name(e.0).unwrap();
                 let code = self.engine.internal_by_name(&name).unwrap().1;
                 format_compilation_error_string(e.1, &name, &code)
             })?;
         
-        if let Some(auth) = self.engine.internal_by_name(AUTH_METHOD_NAME) {
-            let auth_method = prepare_auth_method(
-                &auth.1,
-                self.engine.signed()
-            );
-            dict = attach_method(dict, (auth.0, auth_method));
-        }
         Ok(dict)
     }
 
@@ -202,7 +193,6 @@ mod tests {
         let lib = File::open("./stdlib_c.tvm").unwrap();
         assert_eq!(parser.parse(source, vec![lib], None), ok!());
         let prog = Program::new(parser);
-        //encode 'main' call
         let body = {
             let buf = hex::decode("000D6E4079").unwrap();
             let buf_bits = buf.len() * 8;
@@ -212,5 +202,25 @@ mod tests {
         let name = contract_file.split('.').next().unwrap();
 
         assert_eq!(perform_contract_call(name, body, None, false, false, None), 0);
+    }
+
+    #[test]
+    #[ignore]
+    //TODO: use when stdlib will be modified to store sender key.
+    fn test_sender_pubkey() {
+        let mut parser = ParseEngine::new();
+        let source = File::open("./tests/sign-test.s").unwrap();
+        let lib = File::open("./stdlib_c.tvm").unwrap();
+        assert_eq!(parser.parse(source, vec![lib], None), ok!());
+        let prog = Program::new(parser);
+        let body = {
+            let buf = hex::decode("000D6E4079").unwrap();
+            let buf_bits = buf.len() * 8;
+            Some(BuilderData::with_raw(buf, buf_bits).into())
+        };
+        let contract_file = prog.compile_to_file().unwrap();
+        let name = contract_file.split('.').next().unwrap();
+        
+        assert_eq!(perform_contract_call(name, body, Some("key1"), true, false, None), 0);
     }
 }
