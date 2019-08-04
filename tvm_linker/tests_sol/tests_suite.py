@@ -566,8 +566,8 @@ class SoliditySuite(unittest.TestCase):
         address2 = self.deployContract('contract09-b.code', 'contract09-b.abi.json','10000000')
         
         # prepare message body for contract a
-        msgbody = runLinkerMsgBody(address1, 'contract09-a.abi.json', '"{"remote":"0x' + \
-            address2 + '","number":"257"}"', 'sendMoneyAndNumber_external')
+        msgbody = runLinkerMsgBody(address1, 'contract09-a.abi.json', '{"remote":"0x' + \
+            address2 + '","number":"257"}', 'sendMoneyAndNumber_external')
 
         # checking initial account state
         waitFor(runTLCAccount,[address1], 5000, r'state:\(account_active')
