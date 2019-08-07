@@ -34,75 +34,70 @@ pipeline {
         buildDiscarder logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '20')
         disableConcurrentBuilds()
         lock('RamDrive')
-        }
+    }
     environment {
         WORKDIR = getVar(G_workdir)
         RAMDIR = getVar(G_ramdir)
     }
-    stage('Build docker-image') {
-                    agent {
-                        node {label 'master'}
-                    }
-                    stages {
-                        stage('Build') {
-                            steps {
-                                script {
+    stages {
+    	 stage('Build docker-image') {
+		agent {
+                	node {label 'master'}
+            	}
+         	stage('Build') {
+			steps {
+                        	script {
                                     G_dockerimage = "tonlabs/tvm_linker:${GIT_COMMIT}"
                                     app_image = docker.build(
                                         "${G_dockerimage}", 
                                         '--label "git-commit=${GIT_COMMIT}" .'
                                     )
                                 }
-                            }
                         }
-                        stage('Test') { 
-                            steps {
-                                script {
+                }
+                stage('Test') { 
+                	steps {
+                	        script {
                                     sh '''
                                         echo "Ok."
                                     '''
                                 }
-                            }
                         }
-                        stage('Push docker-image') {
-                            steps {
-                                script {
-                                    docker.withRegistry('', 'dockerhubLanin') {
-                                        app_image.push()
-                                    }
+                }
+                stage('Push docker-image') {
+                	steps {
+                        	script {
+                                	docker.withRegistry('', 'dockerhubLanin') {
+                                		app_image.push()
+                                    	}
                                 }
-                            }
-                            post {
-                                success {
-                                    script{
-                                        G_buildstatus = "success"
-                                    }
+                        }
+                        post {
+                        	success {
+                        	        script{
+                        	                G_buildstatus = "success"
+                          	        }
                                 }
                                 failure {script{G_buildstatus = "failure"}}
-                            }
                         }
-                    }
-                }
+                 }
+         }
+	 stage ('Tag as latest') {
+         	when {
+                	expression {
+                    		GIT_BRANCH = 'origin/' + sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
+                    		return GIT_BRANCH == G_promoted_branch || params.FORCE_PROMOTE_LATEST
+                	} 
+            	}
+                agent {
+                	node {label 'master'}
+            	}
+            	steps {
+                	script {
+                    		docker.withRegistry('', 'dockerhubLanin') {
+                        		docker.image("${G_dockerimage}").push('latest')
+                    		}
+                	}
+            	}        
         }
-	stage ('Tag as latest') {
-            when {
-                expression {
-                    GIT_BRANCH = 'origin/' + sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
-                    return GIT_BRANCH == G_promoted_branch || params.FORCE_PROMOTE_LATEST
-                } 
-            }
-            agent {
-                node {label 'master'}
-            }
-            steps {
-                script {
-                    docker.withRegistry('', 'dockerhubLanin') {
-                        docker.image("${G_dockerimage}").push('latest')
-                    }
-                }
-            }        
-        }
-    }
-   
-    }
 }
