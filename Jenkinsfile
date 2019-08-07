@@ -39,10 +39,14 @@ pipeline {
                             steps {
                                 script {
                                     G_dockerimage = "tonlabs/tvm_linker:${GIT_COMMIT}"
-                                    app_image = docker.build(
-                                        "${G_dockerimage}", 
-                                        '--label "git-commit=${GIT_COMMIT}" .'
-                                    )
+                                     sshagent (credentials: [G_gitcred]) {
+                                    withEnv(['DOCKER_BUILDKIT=1']) {
+                                        app_image = docker.build(
+                                             "${G_dockerimage}",
+                                            '--label "git-commit=${GIT_COMMIT}" --ssh default .'
+                                         )
+                                     }
+                                    }
                                 }
                             }
                         }
