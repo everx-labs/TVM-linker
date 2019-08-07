@@ -871,19 +871,112 @@
 	PUSHINT 0
 	SENDRAWMSG
 
+
+
 	.globl	decode_array
 	.type	decode_array, @function
 	
 	; Decode array of numbers of given number of bits
 	; args: 
-	;   s1 - numBits
-	;   s0 - slice
+	;   s0 - sl (slice) - encoded array
+	;   s1 - numBits (integer) - lenght of array's values
 	; ret:
-	;   s1 - dict with decoded array
 	;   s0 - remaining slice
+	;   s1 - dict represented decoded array
 
-	POP s1
-	NEWDICT
-	SWAP
+	; Stucture of encoded array
+	; 2 bits put in the cell-data define serialization algorithm.
+	; [00] - array is put into a separate cell. In case of array overflowing the maximum cell-data size it's split into multiple sequential cells.
+	; [10] - bits sequence is put in the cell-data. The next 8 bits (1 byte) define the number of elements of the array. It's followed by the sequence of encoded array elements.
+	; [01]/[11] - reserved.
+
+	LDU 2 ; algo sl
+	SWAP  ; sl algo
+
+	DUP
+	PUSHINT 0
+	EQUAL
+
+	PUSHCONT { ; [00] serialization algorithm
+		DROP
+
+		; TODO
+		THROW 11 ; unsupported serialization algorithm
+	}
+	PUSHCONT {
+		DUP
+		PUSHINT 2
+		EQUAL
+
+		PUSHCONT { ; [10] serialization algorithm
+			DROP
+
+			LDU 8 ; load number of elements of the array
+			SWAP
+			; stacktrace: numBits sl arrSz
+
+			NEWDICT
+			PUSHINT 0
+			; stacktrace: numBits sl arrSz arr key
+
+			PUSH s2
+			; stacktrace: numBits sl arrSz arr key arrSz
+			PUSHCONT {
+				; stacktrace: numBits sl arrSz arr key
+
+				PUSH2 s3, s4
+				; stacktrace: numBits sl arrSz arr key sl numBits
+
+				LDSLICEX
+				; stacktrace: numBits sl arrSz arr key arrValue sl
+
+				XCHG s0, s5
+				DROP
+				; stacktrace: numBits sl arrSz arr key arrValue
+
+				PUSH2 s1, s2
+				PUSHINT 32
+				; stacktrace: numBits sl arrSz arr key arrValue key arr 32
+
+				DICTUSET
+				; stacktrace: numBits sl arrSz arr key arr
+
+				XCHG s0, s2
+				DROP
+				; stacktrace: numBits sl arrSz arr key
+
+				INC
+				; stacktrace: numBits sl arrSz arr key
+			}
+			REPEAT
+
+			; stacktrace: numBits sl arrSz arr key
+			XCHG s1, s4
+			; stacktrace: arr sl arrSz numBits key
+			BLKDROP 3
+			; stacktrace: arr sl
+		}
+		PUSHCONT {
+			THROW 11 ; unsupported serialization algorithm
+		}
+		IFELSE
+	}
+	IFELSE
+
 	RET
-	
+
+
+
+	.globl	encode_array
+	.type	encode_array, @function
+
+	; serialization of array of numbers of given number of bits
+	; args:
+	;   s0 - length of values of array
+	;   s1 - dict represented array
+	;   s2 - builder for storing array
+	; ret:
+	;   s0 - builder
+
+	; TODO
+	RET

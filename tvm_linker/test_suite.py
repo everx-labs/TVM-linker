@@ -139,6 +139,29 @@ def expect_output(regex):
 			return
 	assert False, regex
 
+# algo - serialization algorithm
+# numBits - binary length of arr's elements
+# arr - array
+def encodeArrayToHexString(algo, numBits, arr):
+	assert algo == 2, "Not implemented algo"
+
+	binStr = "{0:02b}".format(algo)
+	binStr += "{0:08b}".format(len(arr))
+	for value in arr:
+		binStr += "{0:0{1}b}".format(value, numBits)
+	cntZeros = (8 - len(binStr) % 8)
+	binStr += '0' * cntZeros
+	assert len(binStr) % 8 == 0, "Logincal error"
+
+	result = ""
+	for i in xrange(0, len(binStr), 4):
+		#print i, binStr[i : i + 4]
+		result += hex(int(binStr[i : i + 4], 2))[2:]
+	assert len(result) % 2 == 0, "Logincal error"
+
+	#print "encodeArrayToHexString:", binStr, result
+	return result
+
 	# '''
 
 compile1('test_factorial.code', 'stdlib_sol.tvm')
@@ -245,5 +268,13 @@ expect_success("main", "", "0", "--internal 0")
 #check tvm_rand_seed
 compile1('test_tvm_rand_seed.code', 'stdlib_sol.tvm')
 expect_success("main", "", "0", "--internal 0")
+
+compile2('test_arrays', 'tests')
+expect_success('main', "01" + encodeArrayToHexString(2, 32, []), "0", "--internal 0 --decode-c6")
+expect_success('main', "00" + encodeArrayToHexString(2, 32, [200, 100, 400]), "200", "--internal 0 --decode-c6")
+expect_success('main', "01" + encodeArrayToHexString(2, 32, [200, 100, 400]), "100", "--internal 0 --decode-c6")
+expect_success('main', "02" + encodeArrayToHexString(2, 32, [200, 100, 400]), "400", "--internal 0 --decode-c6")
+expect_success('main', "03" + encodeArrayToHexString(2, 32, [200, 100, 400]), "0", "--internal 0 --decode-c6")
+
 
 cleanup()
