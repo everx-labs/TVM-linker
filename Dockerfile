@@ -2,13 +2,13 @@ FROM rust:1.35 as build-tvm-linker
 LABEL stage=intermediate-tvm-linker
 USER root
 RUN apt-get -y update
+RUN apt-get -y install cmake
 RUN mkdir -m 700 ~/.ssh; \
     touch -m 600 ~/.ssh/known_hosts; \
     ssh-keyscan github.com > ~/.ssh/known_hosts
 
 WORKDIR /home/user
 COPY . TVM-linker
-RUN USER=root cargo new --bin tvm
 WORKDIR /home/user/TVM-linker/tvm_linker
 RUN --mount=type=ssh cargo build --release --features 'ci_run'
 
