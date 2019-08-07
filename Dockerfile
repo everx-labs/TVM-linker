@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.0.0-experimental
+
 FROM rust:1.35 as builder
 LABEL stage=build-ton-node
 USER root
