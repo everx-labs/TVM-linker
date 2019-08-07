@@ -33,6 +33,7 @@ impl From<&str> for ObjectType {
 enum DataValue {
     Empty,
     Number((IntegerData, usize)),
+    Slice(SliceData),
 }
 
 impl DataValue {
@@ -46,6 +47,7 @@ impl DataValue {
                 b.append_bitstring(&dest_vec[..]).unwrap();
                 b
             },
+            DataValue::Slice(ref slice) => { b.checked_append_references_and_data(slice).unwrap(); b },
             DataValue::Empty => b,
         }
     }
@@ -99,10 +101,11 @@ const PATTERN_GLBLBASE: &'static str = r"^[\t\s]*\.global-base[\t\s]+([0-9]+)";
 const PATTERN_PERSBASE: &'static str = r"^[\t\s]*\.persistent-base[\t\s]+([0-9]+)";
 const PATTERN_LABEL:    &'static str = r"^[\.a-zA-Z0-9_]+:";
 //const PATTERN_GLOBLSTART: &'static str = r"^([a-zA-Z0-9_]+):";
-const PATTERN_PARAM:    &'static str = r"^[\t\s]+\.([a-zA-Z0-9_]+),?[\t\s]*([a-zA-Z0-9-_]*)";
+const PATTERN_PARAM:    &'static str = r#"^[\t\s]+\.([a-zA-Z0-9_]+),?[\t\s]*([a-zA-Z0-9-_\s"]+)"#;
 const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*@([a-zA-Z]+)";
 const PATTERN_SIZE:     &'static str = r"^[\t\s]*\.size[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([\.a-zA-Z0-9_]+)";
 const PATTERN_COMM:     &'static str = r"^[\t\s]*\.comm[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([0-9]+),[\t\s]*([0-9]+)";
+const PATTERN_ASCIZ:    &'static str = r#"^[\t\s]*\.asciz[\t\s]+"(.+)""#;
 const PATTERN_IGNORED:  &'static str = r"^[\t\s]+\.(p2align|align|text|file|ident|section)";
 
 const GLOBL:    &'static str = ".globl";
@@ -371,7 +374,7 @@ impl ParseEngine {
                 let cap = dotted_regex.captures(&l).unwrap();
                 let param = cap.get(1).unwrap().as_str();
                 match param {
-                    "byte" | "long" | "short" | "quad" | "comm" | "bss" => obj_body.push_str(&l),
+                    "byte" | "long" | "short" | "quad" | "comm" | "bss" | "asciz" => obj_body.push_str(&l),
                     _ => Err(format!("line {}: invalid param \"{}\":{}", lnum, param, l))?,
                 };
             } else {
@@ -457,45 +460,53 @@ impl ParseEngine {
         lazy_static! {
             static ref PARAM_RE: Regex = Regex::new(PATTERN_PARAM).unwrap();
             static ref COMM_RE:  Regex = Regex::new(PATTERN_COMM).unwrap();
+            static ref ASCI_RE:  Regex = Regex::new(PATTERN_ASCIZ).unwrap();
         }
         for param in body.lines() {
+            let mut value_len: usize = 0;
             if let Some(cap) = COMM_RE.captures(param) {
-                let size_bytes = i64::from_str_radix(
+                // .comm <symbol>, <size>, <align>
+                let size_bytes = usize::from_str_radix(
                     cap.get(2).unwrap().as_str(), 
                     10,
                 ).map_err(|_| "invalid \".comm\": invalid size".to_string())?;
-                let align = i64::from_str_radix(
+                let align = usize::from_str_radix(
                     cap.get(3).unwrap().as_str(),
                     10,
                 ).map_err(|_| "\".comm\": invalid align".to_string())?;
 
-                if size_bytes <= 0  {
+                if size_bytes == 0  {
                     Err("\".comm\": invalid size".to_string())?;
                 }
-                if (align <= 0) || (align % WORD_SIZE != 0) {
+                if (align == 0) || (align % WORD_SIZE as usize != 0) {
                     Err("\".comm\": invalid align".to_string())?;
                 }
-                let value_len = (size_bytes + (align - 1)) & !(align - 1);
-
-                for _i in 0..(value_len / WORD_SIZE) {
+                value_len = (size_bytes + (align - 1)) & !(align - 1);
+                for _i in 0..(value_len / WORD_SIZE as usize) {
                     values.push(DataValue::Number((IntegerData::zero(), WORD_SIZE as usize)));
                 }
                 *item_size = 0;
             } else if param.trim() == ".bss" {
                 //ignore this directive
+            } else if let Some(cap) = ASCI_RE.captures(param) {
+                // .asciz "string"
+                let mut str_bytes = cap.get(1).unwrap().as_str().as_bytes().to_vec();
+                //include 1 byte for termination zero, assume that it is C string
+                value_len = str_bytes.len() + 1;
+                (0..(WORD_SIZE - (str_bytes.len() as Ptr % WORD_SIZE))).for_each(|_| str_bytes.push(0));
+                for chunk in str_bytes.chunks(WORD_SIZE as usize) {
+                    let slice: SliceData = BuilderData::with_raw(chunk.to_vec(), WORD_SIZE as usize * 8).into();
+                    values.push(DataValue::Slice(slice));
+                }
             } else if let Some(cap) = PARAM_RE.captures(param) {
                 let pname = cap.get(1).unwrap().as_str();
-                let value_len = match pname {
+                value_len = match pname {
                     "byte"  => 1,
                     "long"  => 4,
                     "short" => 2,
                     "quad"  => 8,
-                    _ => Err(format!("invalid parameter: \"{}\":", param))?,
+                    _ => Err(format!("invalid parameter: \"{}\"", param))?,
                 };
-                if *item_size < value_len {
-                    Err(format!("global object {} has invalid .size value: too small", name))?;
-                }
-                *item_size -= value_len;
                 let value = cap.get(2).map_or("", |m| m.as_str()).trim();
                 values.push(DataValue::Number((
                     IntegerData::from_str_radix(value, 10)
@@ -503,7 +514,10 @@ impl ParseEngine {
                     value_len,
                 )));
             }
-            //.bss can be here - just ignore.
+            if *item_size < value_len {
+                Err(format!("global object {} has invalid .size parameter: too small", name))?;
+            }
+            *item_size -= value_len;
         }
         if *item_size > 0 {
             Err(format!("global object {} has invalid \".size\" value: real size = {}", name, *item_size))?;
