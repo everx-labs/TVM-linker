@@ -12,7 +12,7 @@ do_smth:
 	.size	do_smth, .Lfunc_end0-do_smth
 
 	.type	x,@object
-	.comm	x,6,4
+	.comm	x,6,16
 	.type	y,@object
 	.comm	y,6,8
 	.type	z,@object

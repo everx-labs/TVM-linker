@@ -53,8 +53,9 @@ mod tests {
             None
         ).unwrap();
         let etalon_body: [u8; 10] = [0x00,0x15,0xFE,0xCE,0x26,0x55,0x11,0x22,0x33,0x44];
-        println!("body = {}", body);
-        assert_eq!(body, BuilderData::with_raw(etalon_body.to_vec(), 10*8));
+        let mut etalon_body = BuilderData::with_raw(etalon_body.to_vec(), 10*8);
+        etalon_body.append_reference(BuilderData::new());
+        assert_eq!(body, etalon_body);
     }
 
     #[test]
