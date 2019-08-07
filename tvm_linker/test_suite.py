@@ -143,6 +143,7 @@ def expect_output(regex):
 
 compile1('test_factorial.code', 'stdlib_sol.tvm')
 expect_success('constructor', "", "", "")
+expect_output(r"Gas used:.*")
 expect_success('main', "0003", "6", "")
 expect_success('main', "0006", "726", "")
 
