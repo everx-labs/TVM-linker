@@ -10,13 +10,13 @@ RUN mkdir -m 700 ~/.ssh; \
 
 WORKDIR /home/user
 COPY . TVM-linker
-WORKDIR /home/user/TVM-linker
+WORKDIR /home/user/TVM-linker/tvm_linker
 RUN --mount=type=ssh cargo build --release --features 'ci_run'
 
-RUN chmod a+x /home/user/TVM-linker/stdlib_c.tvm
-RUN chmod a+x /home/user/TVM-linker/stdlib_sol.tvm
-RUN chmod a+x /home/user/TVM-linker/stdlib_arg.tvm
-RUN chmod a+x /home/user/TVM-linker/target/release/tvm_linker
+RUN chmod a+x /home/user/TVM-linker/tvm_linker/stdlib_c.tvm
+RUN chmod a+x /home/user/TVM-linker/tvm_linker/stdlib_sol.tvm
+RUN chmod a+x /home/user/TVM-linker/tvm_linker/stdlib_arg.tvm
+RUN chmod a+x /home/user/TVM-linker/tvm_linker/target/release/tvm_linker
 
 
 FROM alpine
