@@ -4,11 +4,14 @@ USER root
 RUN echo deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/grizzly main >>/etc/apt/sources.list
 RUN apt-get update
 RUN apt-get install cargo -y
+RUN mkdir -m 700 ~/.ssh; \
+    touch -m 600 ~/.ssh/known_hosts; \
+    ssh-keyscan github.com > ~/.ssh/known_hosts
 
 WORKDIR /home/user
 COPY . TVM-linker
 WORKDIR /home/user/TVM-linker/tvm_linker
-RUN cargo build --release;
+RUN --mount=type=ssh cargo build --release --features 'ci_run'
 
 RUN chmod a+x stdlib_c.tvm
 RUN chmod a+x stdlib_sol.tvm
