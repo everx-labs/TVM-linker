@@ -1,6 +1,8 @@
 FROM eclipse/ubuntu_jdk8:latest as build-tvm-linker
 LABEL stage=intermediate-tvm-linker
 USER root
+RUN echo deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/grizzly main >>/etc/apt/sources.list
+RUN apt-get update
 RUN apt-get install cargo
 
 WORKDIR /home/user
