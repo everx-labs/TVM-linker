@@ -11,7 +11,7 @@ RUN mkdir -m 700 ~/.ssh; \
 WORKDIR /home/user
 COPY . TVM-linker
 WORKDIR /home/user/TVM-linker/tvm_linker
-RUN --mount=type=ssh cargo build --release --features 'ci_run'
+RUN --mount=type=ssh cargo build --release
 
 RUN chmod a+x /home/user/TVM-linker/tvm_linker/stdlib_c.tvm
 RUN chmod a+x /home/user/TVM-linker/tvm_linker/stdlib_sol.tvm
