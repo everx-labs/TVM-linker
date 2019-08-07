@@ -74,8 +74,7 @@ pipeline {
                         }
                     }
                 }
-            }
-        stage ('Tag as latest') {
+            stage ('Tag as latest') {
             when {
                 expression {
                     GIT_BRANCH = 'origin/' + sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
@@ -93,6 +92,8 @@ pipeline {
                 }
             }        
         }
+            }
+        
     post {
         always {
             node ('master') {
