@@ -195,4 +195,22 @@ mod tests {
         assert_eq!(perform_contract_call(name, body, None, false, false, None), 0);
     }
 
+    #[test]
+    fn test_comm_var_addresses() {
+        let mut parser = ParseEngine::new();
+        let source = File::open("./tests/comm_test2.s").unwrap();
+        let lib = File::open("./stdlib_c.tvm").unwrap();
+        assert_eq!(parser.parse(source, vec![lib], None), ok!());
+        let prog = Program::new(parser);
+        //encode 'main' call
+        let body = {
+            let buf = hex::decode("000D6E4079").unwrap();
+            let buf_bits = buf.len() * 8;
+            Some(BuilderData::with_raw(buf, buf_bits).into())
+        };
+        let contract_file = prog.compile_to_file().unwrap();
+        let name = contract_file.split('.').next().unwrap();
+
+        assert_eq!(perform_contract_call(name, body, None, false, false, None), 0);
+    }
 }

@@ -118,7 +118,7 @@ const PERSISTENT_DATA_SUFFIX: &'static str = "_persistent";
 const PUBKEY_NAME: &'static str = "tvm_public_key";
 const SCI_NAME: &'static str = "tvm_contract_info";
 
-const OFFSET_NEXT_DATA: Ptr = 8;
+const WORD_SIZE: Ptr = 8;
 const OFFSET_GLOBL_DATA: Ptr = 8;
 const OFFSET_PERS_DATA: Ptr = 16;
 
@@ -423,7 +423,7 @@ impl ParseEngine {
                             *persistent = true;
                         }
                         Self::update_data(body, func, &mut item.size, values)?;
-                        let offset = (values.len() as Ptr) * OFFSET_NEXT_DATA;
+                        let offset = (values.len() as Ptr) * WORD_SIZE;
                         if *persistent { 
                             *addr = self.persistent_ptr;
                             self.persistent_ptr += offset;
@@ -460,20 +460,29 @@ impl ParseEngine {
         }
         for param in body.lines() {
             if let Some(cap) = COMM_RE.captures(param) {
-                let size_bytes = usize::from_str_radix(
+                let size_bytes = i64::from_str_radix(
                     cap.get(2).unwrap().as_str(), 
                     10,
-                ).map_err(|_| "invalid \".comm\" 2nd argument".to_string())?;
-                let align = usize::from_str_radix(
+                ).map_err(|_| "invalid \".comm\": invalid size".to_string())?;
+                let align = i64::from_str_radix(
                     cap.get(3).unwrap().as_str(),
                     10,
-                ).map_err(|_| "invalid \".comm\" 3rd argument".to_string())?;
-                if (size_bytes == 0) || (align == 0) {
-                    Err("\".comm\" arguments cannot be zero".to_string())?;
+                ).map_err(|_| "\".comm\": invalid align".to_string())?;
+
+                if size_bytes <= 0  {
+                    Err("\".comm\": invalid size".to_string())?;
+                }
+                if (align <= 0) || (align % WORD_SIZE != 0) {
+                    Err("\".comm\": invalid align".to_string())?;
                 }
                 let value_len = (size_bytes + (align - 1)) & !(align - 1);
-                values.push(DataValue::Number((IntegerData::zero(), value_len)));
+
+                for _i in 0..(value_len / WORD_SIZE) {
+                    values.push(DataValue::Number((IntegerData::zero(), WORD_SIZE as usize)));
+                }
+
                 *item_size = 0;
+
             } else if let Some(cap) = PARAM_RE.captures(param) {
                 let pname = cap.get(1).unwrap().as_str();
                 let value_len = match pname {
@@ -518,7 +527,7 @@ impl ParseEngine {
                 let mut ptr = item.0.clone();
                 for subitem in item.1 {
                     dict.set(ptr_to_builder(ptr).unwrap().into(), subitem.write().into()).unwrap();
-                    ptr += OFFSET_NEXT_DATA;
+                    ptr += WORD_SIZE;
                 }
             }
             dict
@@ -663,7 +672,7 @@ mod tests {
             BLKDROP 2
         ", 
         base = 1000000,
-        offset = OFFSET_NEXT_DATA,
+        offset = WORD_SIZE,
         ))
         .with_stack(
             Stack::new()
@@ -699,7 +708,7 @@ mod tests {
     #[test]
     fn test_parser_var_with_comm() {
         let mut parser = ParseEngine::new();
-        let source_file = File::open("./tests/comm-test.s").unwrap();
+        let source_file = File::open("./tests/comm_test1.s").unwrap();
         let lib_file = File::open("./stdlib.tvm").unwrap();
         assert_eq!(parser.parse(source_file, vec![lib_file], None), ok!());
     }     

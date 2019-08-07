@@ -166,6 +166,7 @@ def encodeArrayToHexString(algo, numBits, arr):
 
 compile1('test_factorial.code', 'stdlib_sol.tvm')
 expect_success('constructor', "", "", "")
+expect_output(r"Gas used:.*")
 expect_success('main', "0003", "6", "")
 expect_success('main', "0006", "726", "")
 
@@ -210,7 +211,7 @@ expect_success('get_allowance', "11223344556600000000000000000000000000000000000
 expect_output(r"destination : 0:1122334455660000000000000000000000000000000000000000005544332211")
 expect_output(r"body  : .* data: \[0, 26, 11, 86, 135, 0, 0, 0, 0, 0, 0, 0, 0, ")
 
-
+	# '''
 compile1('test_msg_sender.code', None)
 expect_success(None, "", None, "--internal 0 --trace")	# check empty input (deploy)
 

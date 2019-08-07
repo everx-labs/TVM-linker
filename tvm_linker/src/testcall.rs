@@ -179,6 +179,8 @@ pub fn perform_contract_call(
         None => 0i32,
     };
     println!("TVM terminated with exit code {}", exit_code);
+    println!("Gas used: {}", engine.get_gas().get_gas_used());
+    println!("");
     engine.print_info_stack("Post-execution stack state");
     engine.print_info_ctrls();
 
