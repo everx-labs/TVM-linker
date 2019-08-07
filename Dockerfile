@@ -1,6 +1,7 @@
 FROM eclipse/ubuntu_jdk8:latest as build-tvm-linker
 LABEL stage=intermediate-tvm-linker
 USER root
+RUN apt-get install cargo
 
 WORKDIR /home/user
 COPY . TVM-linker
