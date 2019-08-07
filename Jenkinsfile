@@ -40,6 +40,7 @@ pipeline {
         RAMDIR = getVar(G_ramdir)
     }
     stages {
+	 stage('build') {
     	 stage('Build docker-image') {
 		agent {
                 	node {label 'master'}
@@ -100,5 +101,6 @@ pipeline {
                 	}
             	}        
         }
+	}
    }
 }
