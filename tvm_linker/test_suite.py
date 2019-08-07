@@ -188,7 +188,7 @@ expect_success('get_allowance', "11223344556600000000000000000000000000000000000
 expect_output(r"destination : 0:1122334455660000000000000000000000000000000000000000005544332211")
 expect_output(r"body  : .* data: \[0, 26, 11, 86, 135, 0, 0, 0, 0, 0, 0, 0, 0, ")
 
-
+	# '''
 compile1('test_msg_sender.code', None)
 expect_success(None, "", None, "--internal 0 --trace")	# check empty input (deploy)
 

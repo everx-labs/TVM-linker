@@ -186,7 +186,7 @@
 	NIP
 	LDDICT
 	DROP
-	PUSHINT 256
+	PUSHINT 8
 	DICTUGET
 	DROP
 	LDU 256
@@ -204,7 +204,7 @@
 	NIP
 	LDDICT
 	DROP
-	PUSHINT 256
+	PUSHINT 8
 	DICTUGET
 	DROP
 	LDU 128
@@ -222,7 +222,7 @@
 	NIP
 	LDDICT
 	DROP
-	PUSHINT 256
+	PUSHINT 8
 	DICTUGET
 	DROP
 	LDU 256
@@ -240,7 +240,7 @@
 	NIP
 	LDDICT
 	DROP
-	PUSHINT 256
+	PUSHINT 8
 	DICTUGET
 	DROP
 	LDU 64
@@ -258,7 +258,7 @@
 	NIP
 	LDDICT
 	DROP
-	PUSHINT 256
+	PUSHINT 8
 	DICTUGET
 	DROP
 	LDU 64
@@ -276,7 +276,7 @@
 	NIP
 	LDDICT
 	DROP
-	PUSHINT 256
+	PUSHINT 8
 	DICTUGET
 	DROP
 	LDU 32
@@ -397,78 +397,6 @@
     CALL 1      ;public method call
 
 
-	.globl		get_pubkey
-	.type		get_pubkey, @function
-	;; stack=0
-	LOGSTR get_pubkey
-	PUSHINT 0
-	PUSH c5
-	CTOS
-	LDREF
-	NIP
-	LDDICT
-	DROP
-	PUSHINT 256
-	DICTUGET
-	DROP
-	LDU 256
-	DROP ; drop slice itself
-	RET
-
-	.globl		get_msg_sender
-	.type		get_msg_sender, @function
-	;; stack=0
-	LOGSTR get_msg_sender
-	PUSHINT 1
-	PUSH c5
-	CTOS
-	LDREF
-	NIP
-	LDDICT
-	DROP
-	PUSHINT 256
-	DICTUGET
-	DROP
-	LDU 256
-	DROP ; drop slice itself
-	RET
-	
-	.globl		get_msg_balance
-	.type		get_msg_balance, @function
-	;; stack=0
-	LOGSTR get_msg_balance
-	PUSHINT 2
-	PUSH c5
-	CTOS
-	LDREF
-	NIP
-	LDDICT
-	DROP
-	PUSHINT 256
-	DICTUGET
-	DROP
-	LDU 256
-	DROP ; drop slice itself
-	RET
-	
-	.globl		get_contract_balance
-	.type		get_contract_balance, @function
-	;; stack=0
-	LOGSTR get_cnt_balance
-	PUSHINT 3
-	PUSH c5
-	CTOS
-	LDREF
-	NIP
-	LDDICT
-	DROP
-	PUSHINT 256
-	DICTUGET
-	DROP
-	LDU 256
-	DROP ; drop slice itself
-	RET
-
 	.globl		get_src_addr
 	.type		get_src_addr, @function
 	; s0 - msg: cell
@@ -519,14 +447,14 @@
 	NEWC STU 256 ENDC CTOS
 	PUSHINT 0
 	NEWDICT
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	; stack: src addr b'' in dict for key 1
 	ROT
 	NEWC STU 256 ENDC CTOS
 	PUSHINT 1
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	; stack: msg balance b''' in dict for key 2
@@ -534,7 +462,7 @@
 	NEWC STU 256 ENDC CTOS
 	PUSHINT 2
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	; stack: gram balance of contract b'''' in dict for key 3
@@ -542,7 +470,7 @@
 	NEWC STU 256 ENDC CTOS
 	PUSHINT 3
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	PUSHINT $parse_smartcontractinfo$
@@ -558,13 +486,13 @@
 	NEWC STU 256 ENDC CTOS
 	PUSHINT 4
 	PUSH s7
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	; put balance into dict for key 5
 	SWAP
 	PUSHINT 5
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	; put rand_seed into dict for key 6
@@ -572,7 +500,7 @@
 	NEWC STU 256 ENDC CTOS
 	PUSHINT 6
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	; put trans_lt into dict for key 7
@@ -580,7 +508,7 @@
 	NEWC STU 64 ENDC CTOS
 	PUSHINT 7
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	; put block_lt into dict for key 8
@@ -588,7 +516,7 @@
 	NEWC STU 64 ENDC CTOS
 	PUSHINT 8
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	; put unixtime into dict for key 9
@@ -596,7 +524,7 @@
 	NEWC STU 32 ENDC CTOS
 	PUSHINT 9
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	NIP ; drop old dict which was at s6 at start of adding smartcontractinfo
@@ -887,3 +815,93 @@
 	SWAP
 	RET
 	
+	.globl		get_contract_balance
+	.type		get_contract_balance, @function
+	;; stack=0
+	LOGSTR get_cnt_balance
+	PUSHINT 3
+	PUSH c5
+	CTOS
+	LDREF
+	NIP
+	LDDICT
+	DROP
+	PUSHINT 8
+	DICTUGET
+	DROP
+	LDU 256
+	DROP ; drop slice itself
+	RET
+
+				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				;;; THE CODE BELOW IS GENERATED. DO NOT CHANGE IT!	
+
+
+.globl	get_pubkey
+.type	get_pubkey, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: get_pubkey
+;; get member pubkey
+;; TvmTempData.pubkey
+PUSHINT 0
+;; tvm_get_tmp_dictionary
+;; stack=1
+PUSH c5
+CTOS
+LDREF
+NIP
+LDDICT
+DROP
+PUSHINT 8
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; return
+RET
+
+.globl	get_msg_sender
+.type	get_msg_sender, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: get_msg_sender
+;; get member msgSender
+;; TvmTempData.msgSender
+PUSHINT 1
+;; tvm_get_tmp_dictionary
+;; stack=1
+PUSH c5
+CTOS
+LDREF
+NIP
+LDDICT
+DROP
+PUSHINT 8
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; return
+RET
+
+.globl	get_msg_balance
+.type	get_msg_balance, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: get_msg_balance
+;; get member msgBalance
+;; TvmTempData.msgBalance
+PUSHINT 2
+;; tvm_get_tmp_dictionary
+;; stack=1
+PUSH c5
+CTOS
+LDREF
+NIP
+LDDICT
+DROP
+PUSHINT 8
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; return
+RET
