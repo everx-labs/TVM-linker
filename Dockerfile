@@ -1,9 +1,7 @@
-FROM eclipse/ubuntu_jdk8:latest as build-tvm-linker
+FROM rust:1.35 as build-tvm-linker
 LABEL stage=intermediate-tvm-linker
 USER root
-RUN echo deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/grizzly main >>/etc/apt/sources.list
-RUN apt-get update
-RUN apt-get install cargo -y
+RUN apt-get -y update
 RUN mkdir -m 700 ~/.ssh; \
     touch -m 600 ~/.ssh/known_hosts; \
     ssh-keyscan github.com > ~/.ssh/known_hosts
