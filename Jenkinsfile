@@ -75,7 +75,6 @@ pipeline {
                     }
                 }
             }
-        }
         stage ('Tag as latest') {
             when {
                 expression {
