@@ -8,6 +8,7 @@ RUN mkdir -m 700 ~/.ssh; \
 
 WORKDIR /home/user
 COPY . TVM-linker
+RUN USER=root cargo new --bin tvm
 WORKDIR /home/user/TVM-linker/tvm_linker
 RUN --mount=type=ssh cargo build --release --features 'ci_run'
 
