@@ -3,7 +3,7 @@ LABEL stage=intermediate-tvm-linker
 USER root
 RUN echo deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/grizzly main >>/etc/apt/sources.list
 RUN apt-get update
-RUN apt-get install cargo
+RUN apt-get install cargo -y
 
 WORKDIR /home/user
 COPY . TVM-linker
