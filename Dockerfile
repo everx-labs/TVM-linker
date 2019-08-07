@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1.0.0-experimental
 
-FROM rust:1.35 as builder
-LABEL stage=build-ton-node
+FROM rust:1.35 as build-ton-compiler
 USER root
 RUN apt-get -y update
 RUN apt-get -y install cmake
