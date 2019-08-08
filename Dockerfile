@@ -20,9 +20,9 @@ RUN chmod a+x /home/user/TVM-linker/tvm_linker/target/release/tvm_linker
 
 
 FROM alpine
-COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/target/release/tvm_linker /usr/bin/
-COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/stdlib_c.tvm /usr/bin/
-COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/stdlib_sol.tvm /usr/bin/
-COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/stdlib_arg.tvm /usr/bin/
+COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/target/release/tvm_linker /home/user/bin/
+COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/stdlib_c.tvm /home/user/bin/
+COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/stdlib_sol.tvm /home/user/bin/
+COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/stdlib_arg.tvm /home/user/bin/
 
 
