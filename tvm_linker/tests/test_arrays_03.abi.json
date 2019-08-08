@@ -1,0 +1,8 @@
+{
+	"ABI version": 0,
+	"functions": [{
+		"name": "main_external",
+		"inputs": [{"name": "idx", "type": "uint32"}, {"name": "myarray", "type": "uint256[]"}, {"name": "idy", "type": "uint32"}],
+		"outputs": []
+	}]
+}

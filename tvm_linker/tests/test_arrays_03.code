@@ -1,0 +1,39 @@
+
+.globl	main_external
+.type	main_external, @function
+LDU 32
+PUSHINT 256 PUSHINT $decode_array$ CALL 1
+LDU 32
+DROP
+PUSHINT $main$
+CALL 1
+
+.globl	main
+.type	main, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: main
+;; param: idx
+;; param: myarray
+;; param: idy
+;; myarray
+;; stack=3
+PUSH s1
+;; idx
+;; stack=4
+PUSH s3
+;; idy
+;; stack=5
+PUSH s2
+;; +
+ADD
+;; index
+SWAP
+PUSHINT 32
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; return
+XCHG s3
+BLKDROP 3
+RET
