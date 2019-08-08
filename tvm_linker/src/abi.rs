@@ -47,7 +47,7 @@ mod tests {
     #[test]
     fn test_build_abi_body() {
         let body = build_abi_body(
-            "./tests/contract.abi", 
+            "./tests/test_abi.abi", 
             "transfer", 
             "{\"to\":\"0x55\", \"a\":\"0x11223344\"}",
             None
