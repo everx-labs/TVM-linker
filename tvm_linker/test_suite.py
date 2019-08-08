@@ -63,6 +63,7 @@ def compile1(source_file, lib_file):
 	functions = dict()
 	getFunctions()
 	CONTRACT_ADDRESS = getContractAddress()
+	# print functions, CONTRACT_ADDRESS
 
 def compile2(source_name, directory = "tests_sol"):
 	cleanup()
@@ -85,6 +86,7 @@ def compile2(source_name, directory = "tests_sol"):
 	functions = dict()
 	getFunctions()
 	CONTRACT_ADDRESS = getContractAddress()
+	# print functions, CONTRACT_ADDRESS
 
 SIGN = None
 
@@ -92,8 +94,20 @@ def error(msg):
 	print "ERROR!", msg
 	quit(1)
 
-def exec_and_parse(method, params, expected_ec, options):
-	global lines, SIGN
+def exec_and_parse(cmd, expected_ec):
+	global lines
+	# print cmd
+	ec = os.system(cmd)
+	assert ec == 0, ec
+
+	lines = [l.rstrip() for l in open("exec_log.tmp").readlines()]
+	# os.remove("exec_log.tmp")
+
+	ec = getExitCode()
+	assert ec == expected_ec, "ec = {}".format(ec)
+
+def build_cmd_exec_and_parse(method, params, expected_ec, options):
+	global SIGN
 	if "--trace" not in options:
 		options = options + " --trace"
 	sign = ("--sign " + SIGN) if SIGN else "";
@@ -107,29 +121,41 @@ def exec_and_parse(method, params, expected_ec, options):
 		id = functions[method]
 		body = "--body 00{}{}".format(id, params)
 	cmd = "./target/debug/tvm_linker test {} {} {} {} >exec_log.tmp".format(CONTRACT_ADDRESS, body, sign, options)
-	# print cmd
-	ec = os.system(cmd)
-	assert ec == 0, ec
-
-	lines = [l.rstrip() for l in open("exec_log.tmp").readlines()]
-	# os.remove("exec_log.tmp")
-
-	ec = getExitCode()
-	assert ec == expected_ec, "ec = {}".format(ec)
+	exec_and_parse(cmd, expected_ec)
 	
+def build_cmd_exec_and_parse2(abi_json_file, abi_method, abi_params, tvm_linker_options, expected_ec):
+	if "--trace" not in tvm_linker_options:
+		tvm_linker_options = tvm_linker_options + " --trace"
+	cmd = "./target/debug/tvm_linker \
+test {} \
+--abi-json {} \
+--abi-method {} \
+--abi-params '{}' \
+{} \
+>exec_log.tmp"\
+.format(CONTRACT_ADDRESS, "./tests/" + abi_json_file + ".abi.json", abi_method, abi_params, tvm_linker_options)
+	exec_and_parse(cmd, expected_ec)
+
 def expect_failure(method, params, expected_ec, options):
-	exec_and_parse(method, params, expected_ec, options)
+	build_cmd_exec_and_parse(method, params, expected_ec, options)
 	print("OK:  {} {} {}".format(method, params, expected_ec))
 	
-def expect_success(method, params, expected, options):
-	exec_and_parse(method, params, 0, options)
+def checkStack(method, params, expected_stack):
 	stack = getStack()
-	if expected != None and stack != expected:
+	if expected_stack != None and stack != expected_stack:
 		print("Failed:  {} {}".format(method, params))
-		print("EXP: ", expected)
+		print("EXP: ", expected_stack)
 		print("GOT: ", stack)
 		quit(1)
-	print("OK:  {} {} {}".format(method, params, expected))
+	print("OK:  {} {} {}".format(method, params, expected_stack))
+
+def expect_success(method, params, expected, options):
+	build_cmd_exec_and_parse(method, params, 0, options)
+	checkStack(method, params, expected)
+
+def expect_success2(abi_json_file, abi_method, abi_params, expected_stack, tvm_linker_options):
+	build_cmd_exec_and_parse2(abi_json_file, abi_method, abi_params, tvm_linker_options, 0)
+	checkStack(abi_method, abi_params, expected_stack)
 
 def expect_output(regex):
 	for l in lines:
@@ -138,29 +164,6 @@ def expect_output(regex):
 			print "> ", match.group(0)
 			return
 	assert False, regex
-
-# algo - serialization algorithm
-# numBits - binary length of arr's elements
-# arr - array
-def encodeArrayToHexString(algo, numBits, arr):
-	assert algo == 2, "Not implemented algo"
-
-	binStr = "{0:02b}".format(algo)
-	binStr += "{0:08b}".format(len(arr))
-	for value in arr:
-		binStr += "{0:0{1}b}".format(value, numBits)
-	cntZeros = (8 - len(binStr) % 8)
-	binStr += '0' * cntZeros
-	assert len(binStr) % 8 == 0, "Logincal error"
-
-	result = ""
-	for i in xrange(0, len(binStr), 4):
-		#print i, binStr[i : i + 4]
-		result += hex(int(binStr[i : i + 4], 2))[2:]
-	assert len(result) % 2 == 0, "Logincal error"
-
-	#print "encodeArrayToHexString:", binStr, result
-	return result
 
 	# '''
 
@@ -271,11 +274,12 @@ compile1('test_tvm_rand_seed.code', 'stdlib_sol.tvm')
 expect_success("main", "", "0", "--internal 0")
 
 compile2('test_arrays', 'tests')
-expect_success('main', "01" + encodeArrayToHexString(2, 32, []), "0", "--internal 0 --decode-c6")
-expect_success('main', "00" + encodeArrayToHexString(2, 32, [200, 100, 400]), "200", "--internal 0 --decode-c6")
-expect_success('main', "01" + encodeArrayToHexString(2, 32, [200, 100, 400]), "100", "--internal 0 --decode-c6")
-expect_success('main', "02" + encodeArrayToHexString(2, 32, [200, 100, 400]), "400", "--internal 0 --decode-c6")
-expect_success('main', "03" + encodeArrayToHexString(2, 32, [200, 100, 400]), "0", "--internal 0 --decode-c6")
+expect_success2("test_arrays", "main_external", '{"idx": "0", "myarray": []}', "0", "--internal 0 --decode-c6 --trace")
+expect_success2("test_arrays", "main_external", '{"idx": "0", "myarray": ["3", "5", "7", "21"]}', "3", "--internal 0 --decode-c6 --trace")
+expect_success2("test_arrays", "main_external", '{"idx": "1", "myarray": ["3", "5", "7", "21"]}', "5", "--internal 0 --decode-c6 --trace")
+expect_success2("test_arrays", "main_external", '{"idx": "2", "myarray": ["3", "5", "7", "21"]}', "7", "--internal 0 --decode-c6 --trace")
+expect_success2("test_arrays", "main_external", '{"idx": "3", "myarray": ["3", "5", "7", "21"]}', "21", "--internal 0 --decode-c6 --trace")
+expect_success2("test_arrays", "main_external", '{"idx": "4", "myarray": ["3", "5", "7", "21"]}', "0", "--internal 0 --decode-c6 --trace")
 
 
 cleanup()
