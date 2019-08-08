@@ -1,18 +1,11 @@
 
 .globl	main_external
 .type	main_external, @function
-
-LDU 8 ; load parameter idx of function main
-
-; written by hand
-PUSHINT 32 ; stacktrace: idx slice 32
-PUSHINT $decode_array$
-CALL 1     ; stacktrace: idx arr slice
-DROP       ; stacktrace: idx arr
-
+LDU 8
+PUSHINT 32 PUSHINT $decode_array$ CALL 1
+DROP
 PUSHINT $main$
 CALL 1
-
 
 .globl	main
 .type	main, @function
