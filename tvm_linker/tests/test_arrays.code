@@ -6,7 +6,6 @@ LDU 8 ; load parameter idx of function main
 
 ; written by hand
 PUSHINT 32 ; stacktrace: idx slice 32
-SWAP       ; stacktrace: idx 32 slice
 PUSHINT $decode_array$
 CALL 1     ; stacktrace: idx arr slice
 DROP       ; stacktrace: idx arr

@@ -806,8 +806,8 @@
 	
 	; Decode array of numbers of given number of bits
 	; args: 
-	;   s0 - sl (slice) - encoded array
-	;   s1 - numBits (integer) - lenght of array's values
+	;   s0 - numBits (integer) - lenght of array's values
+	;   s1 - sl (slice) - encoded array
 	; ret:
 	;   s0 - remaining slice
 	;   s1 - dict represented decoded array
@@ -818,8 +818,10 @@
 	; [10] - bits sequence is put in the cell-data. The next 8 bits (1 byte) define the number of elements of the array. It's followed by the sequence of encoded array elements.
 	; [01]/[11] - reserved.
 
-	LDU 2 ; algo sl
-	SWAP  ; sl algo
+	; stacktrace: sl numBits
+	SWAP  ; stacktrace: numBits sl
+	LDU 2 ; stacktrace: numBits algo sl
+	SWAP  ; stacktrace: numBits sl algo
 
 	DUP
 	PUSHINT 0
