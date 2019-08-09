@@ -329,5 +329,3 @@ expect_success2("test_arrays", "at32_external", '{"idx":  "53", ' + abi_params +
 expect_success2("test_arrays", "at32_external", '{"idx":  "54", ' + abi_params + '}', "1000001137")
 
 cleanup()
-
-
