@@ -70,7 +70,7 @@ get_persistent_total_value:
 	PUSHINT 64
 	DICTIGET
 	THROWIFNOT 100
-	LDI 256
+	PUSHINT 257 LDIX
 	ENDS
 .Lfunc_end4:
 	.size	get_persistent_total_value, .Lfunc_end4-get_persistent_total_value

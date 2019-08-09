@@ -40,7 +40,7 @@ impl DataValue {
         let mut b = BuilderData::new();
         match self {
             DataValue::Number(ref intgr) => {
-                let encoding = SignedIntegerBigEndianEncoding::new(256);
+                let encoding = SignedIntegerBigEndianEncoding::new(257);
                 let mut dest_vec = vec![];
                 encoding.try_serialize(&intgr.0).unwrap().into_bitstring_with_completion_tag(&mut dest_vec);
                 b.append_bitstring(&dest_vec[..]).unwrap();
