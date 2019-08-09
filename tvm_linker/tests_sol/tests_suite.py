@@ -557,6 +557,31 @@ class SoliditySuite(unittest.TestCase):
         # checking account balance changes
         waitFor(runTLCAccount,[address1], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000001\}')
         waitFor(runTLCAccount,[address2], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000000\}')
-		
+
+    def test_09(self):
+        # prepare contract a
+        address1 = self.deployContract('contract09-a.code', 'contract09-a.abi.json','10000000')
+        
+        # prepare contract b
+        address2 = self.deployContract('contract09-b.code', 'contract09-b.abi.json','10000000')
+        
+        # prepare message body for contract a
+        msgbody = runLinkerMsgBody(address1, 'contract09-a.abi.json', '{"remote":"0x' + \
+            address2 + '","number":"257"}', 'sendMoneyAndNumber_external')
+
+        # checking initial account state
+        waitFor(runTLCAccount,[address1], 5000, r'state:\(account_active')
+        waitFor(runTLCAccount,[address2], 5000, r'state:\(account_active')
+        
+        # sending body to node
+        waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
+
+        # checking account changes
+        waitForBalanceInRange(address1, 6445936, 6545936, 5000)
+        waitForBalanceInRange(address2, 12599714, 12699714, 5000)
+        waitFor(runTLCAccount,[address2], 5000, r'x\{00000000000000406_\}')
+        waitFor(runTLCAccount,[address2], 5000, r'x\{00000000000000000000000000000000000000000000000000000000000B71AFA_\}')
+
+
 if __name__ == '__main__':
     unittest.main()
