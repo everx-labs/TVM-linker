@@ -800,12 +800,22 @@
 	SENDRAWMSG
 
 
+	.globl	insert_value_and_inc_key
+	.type	insert_value_and_inc_key, @function
+	; arr key arrValue
+	PUSH2 s1, s2 ; stacktrace: arr key arrValue key arr
+	PUSHINT 32   ; stacktrace: arr key arrValue key arr 32
+	DICTUSET     ; stacktrace: arr key arr
+	XCHG s2      ; stacktrace: arr key arr
+	DROP         ; stacktrace: arr key
+	INC          ; stacktrace: arr key
+
 
 	.globl	decode_array
 	.type	decode_array, @function
-	
+
 	; Decode array of numbers of given number of bits
-	; args: 
+	; args:
 	;   s0 - numBits (integer) - lenght of array's values
 	;   s1 - sl (slice) - encoded array
 	; ret:
@@ -828,10 +838,110 @@
 	EQUAL
 
 	PUSHCONT { ; [00] serialization algorithm
-		DROP
+		;stacktrace: numBits sl algo
 
-		; TODO
-		THROW 11 ; unsupported serialization algorithm
+		DROP      ; stacktrace: numBits sl
+		LDREF     ; stacktrace: numBits cell sl
+		ROTREV    ; stacktrace: sl numBits cell
+		CTOS      ; stacktrace: sl numBits slData
+		NEWDICT   ; stacktrace: sl numBits slData arr
+		PUSHINT 0 ; stacktrace: sl numBits slData arr key
+
+		PUSHCONT {
+			; stacktrace: numBits slData arr key
+			PUSH s2 ; stacktrace: sl numBits slData arr key slData
+			SBITS   ; stacktrace: sl numBits slData arr key slBits
+			PUSH S4 ; stacktrace: sl numBits slData arr key slBits numBits
+			GEQ     ; stacktrace: sl numBits slData arr key slBits>=numBits
+			PUSHCONT { ; slBits >= numBits
+				; stacktrace: sl numBits slData arr key
+
+				PUSH2 s2, s3 ; stacktrace: sl numBits slData arr key slData numBits
+				LDSLICEX     ; stacktrace: sl numBits slData arr key arrValue slData
+				XCHG s4      ; stacktrace: sl numBits slData arr key arrValue slData
+				DROP         ; stacktrace: sl numBits slData arr key arrValue
+
+				PUSHINT $insert_value_and_inc_key$
+				CALL 1
+				PUSHINT 0    ; stacktrace: sl numBits slData arr key 0
+			}
+			PUSHCONT { ; slBits < numBits
+				; stacktrace: numBits slData arr key
+				PUSH s2   ; stacktrace: sl numBits slData arr key slData
+				SBITS     ; stacktrace: sl numBits slData arr key slBits
+				PUSHINT 0 ; stacktrace: sl numBits slData arr key slBits 0
+				EQUAL     ; stacktrace: sl numBits slData arr key slBits==0
+
+				PUSHCONT { ; slBits == 0
+					; stacktrace: sl numBits slData arr key
+					PUSH  s2  ; stacktrace: sl numBits slData arr key slData
+					SREFS     ; stacktrace: sl numBits slData arr key refCnt
+					PUSHINT 0 ; stacktrace: sl numBits slData arr key refCnt 0
+					EQUAL     ; stacktrace: sl numBits slData arr key refCnt==0
+					PUSHCONT { ; no next cell
+						; stacktrace: sl numBits slData arr key
+						PUSHINT -1 ; stacktrace: sl numBits slData arr key -1
+					}
+					PUSHCONT { ; load next cell
+						; stacktrace: sl numBits slData arr key
+						PUSH  s2   ; stacktrace: sl numBits slData arr key slData
+						LDREF      ; stacktrace: sl numBits slData arr key cell slData
+						DROP       ; stacktrace: sl numBits slData arr key cell
+						CTOS       ; stacktrace: sl numBits slData arr key slData
+						XCHG s3    ; stacktrace: sl numBits slData arr key slData
+						DROP       ; stacktrace: sl numBits slData arr key
+						PUSHINT 0  ; stacktrace: sl numBits slData arr key -1
+					}
+					IFELSE
+				}
+				PUSHCONT { ; merge value from two cells
+					; stacktrace: sl numBits slData arr key
+
+					; load part 1 (arrValue0)
+					PUSH s2   ; stacktrace: sl numBits slData arr key slData
+					DUP       ; stacktrace: sl numBits slData arr key slData slData
+					SBITS     ; stacktrace: sl numBits slData arr key slData slBits0
+					DUP       ; stacktrace: sl numBits slData arr key slData slBits0 slBits0
+					ROTREV    ; stacktrace: sl numBits slData arr key slBits0 slData slBits0
+					LDSLICEX  ; stacktrace: sl numBits slData arr key slBits0 arrValue0 slData   ;;arrValue0 - is slice!
+
+					; load part 2 (arrValue1)
+					LDREF     ; stacktrace: sl numBits slData arr key slBits0 arrValue0 cell slData
+					DROP      ; stacktrace: sl numBits slData arr key slBits0 arrValue0 cell
+					CTOS      ; stacktrace: sl numBits slData arr key slBits0 arrValue0 slData
+					ROT       ; stacktrace: sl numBits slData arr key arrValue0 slData slBits0
+					PUSH s6   ; stacktrace: sl numBits slData arr key arrValue0 slData slBits0 numBits
+					SWAP      ; stacktrace: sl numBits slData arr key arrValue0 slData numBits slBits0
+					SUB       ; stacktrace: sl numBits slData arr key arrValue0 slData slBits1
+					LDSLICEX  ; stacktrace: sl numBits slData arr key arrValue0 arrValue1 slData
+
+					; merge arrValue0 and arrValue1
+					ROTREV      ; stacktrace: sl numBits slData arr key slData arrValue0 arrValue1
+					NEWC        ; stacktrace: sl numBits slData arr key slData arrValue0 arrValue1 builderArrValue
+					XCHG s1, s2 ; stacktrace: sl numBits slData arr key slData arrValue1 arrValue0 builderArrValue
+					STSLICE     ; stacktrace: sl numBits slData arr key slData arrValue1 builderArrValue
+					STSLICE     ; stacktrace: sl numBits slData arr key slData builderArrValue
+					ENDC        ; stacktrace: sl numBits slData arr key slData cellArrValue
+					CTOS        ; stacktrace: sl numBits slData arr key slData arrValue
+					SWAP        ; stacktrace: sl numBits slData arr key arrValue slData
+					XCHG s4     ; stacktrace: sl numBits slData arr key arrValue slData
+					DROP        ; stacktrace: sl numBits slData arr key arrValue
+
+					PUSHINT $insert_value_and_inc_key$
+					CALL 1
+					PUSHINT 0    ; stacktrace: sl numBits slData arr key 0
+				}
+				IFELSE ; slBits == 0
+			}
+			IFELSE ; slBits >= numBits
+			; stacktrace: sl numBits slData arr key -1/0
+		}
+		UNTIL
+
+		; stacktrace: sl numBits slData arr key
+		XCHG s1, s3 ; stacktrace: sl arr slData numBits key
+		BLKDROP 3   ; stacktrace: sl arr
+		SWAP        ; stacktrace: arr sl
 	}
 	PUSHCONT {
 		DUP
@@ -892,7 +1002,6 @@
 		IFELSE
 	}
 	IFELSE
-
 	RET
 
 

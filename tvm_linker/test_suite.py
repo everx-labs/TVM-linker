@@ -153,7 +153,7 @@ def expect_success(method, params, expected, options):
 	build_cmd_exec_and_parse(method, params, 0, options)
 	checkStack(method, params, expected)
 
-def expect_success2(abi_json_file, abi_method, abi_params, expected_stack, tvm_linker_options):
+def expect_success2(abi_json_file, abi_method, abi_params, expected_stack, tvm_linker_options = "--internal 0 --decode-c6"):
 	build_cmd_exec_and_parse2(abi_json_file, abi_method, abi_params, tvm_linker_options, 0)
 	checkStack(abi_method, abi_params, expected_stack)
 
@@ -273,13 +273,61 @@ expect_success("main", "", "0", "--internal 0")
 compile1('test_tvm_rand_seed.code', 'stdlib_sol.tvm')
 expect_success("main", "", "0", "--internal 0")
 
-compile2('test_arrays', 'tests')
-expect_success2("test_arrays", "main_external", '{"idx": "0", "myarray": []}', "0", "--internal 0 --decode-c6 --trace")
-expect_success2("test_arrays", "main_external", '{"idx": "0", "myarray": ["3", "5", "7", "21"]}', "3", "--internal 0 --decode-c6 --trace")
-expect_success2("test_arrays", "main_external", '{"idx": "1", "myarray": ["3", "5", "7", "21"]}', "5", "--internal 0 --decode-c6 --trace")
-expect_success2("test_arrays", "main_external", '{"idx": "2", "myarray": ["3", "5", "7", "21"]}', "7", "--internal 0 --decode-c6 --trace")
-expect_success2("test_arrays", "main_external", '{"idx": "3", "myarray": ["3", "5", "7", "21"]}', "21", "--internal 0 --decode-c6 --trace")
-expect_success2("test_arrays", "main_external", '{"idx": "4", "myarray": ["3", "5", "7", "21"]}', "0", "--internal 0 --decode-c6 --trace")
+	# '''
 
+compile2('test_arrays', 'tests')
+
+expect_success2("test_arrays", "at32_external", '{"idx": 0, "arr": []}', "0")
+expect_success2("test_arrays", "at32_external", '{"idx": 1, "arr": []}', "0")
+
+expect_success2("test_arrays", "at32_external", '{"idx": 0, "arr": [2, 3, 5, 7]}', "2")
+expect_success2("test_arrays", "at32_external", '{"idx": 1, "arr": [2, 3, 5, 7]}', "3")
+expect_success2("test_arrays", "at32_external", '{"idx": 2, "arr": [2, 3, 5, 7]}', "5")
+expect_success2("test_arrays", "at32_external", '{"idx": 3, "arr": [2, 3, 5, 7]}', "7")
+expect_success2("test_arrays", "at32_external", '{"idx": 4, "arr": [2, 3, 5, 7]}', "0")
+
+expect_success2("test_arrays", "at256_external", '{"idx": "0", "arr": [2, 3, 5, 7, 11, 13, 17]}', "2")
+expect_success2("test_arrays", "at256_external", '{"idx": "1", "arr": [2, 3, 5, 7, 11, 13, 17]}', "3")
+expect_success2("test_arrays", "at256_external", '{"idx": "2", "arr": [2, 3, 5, 7, 11, 13, 17]}', "5")
+expect_success2("test_arrays", "at256_external", '{"idx": "3", "arr": [2, 3, 5, 7, 11, 13, 17]}', "7")
+expect_success2("test_arrays", "at256_external", '{"idx": "4", "arr": [2, 3, 5, 7, 11, 13, 17]}', "11")
+expect_success2("test_arrays", "at256_external", '{"idx": "5", "arr": [2, 3, 5, 7, 11, 13, 17]}', "13")
+expect_success2("test_arrays", "at256_external", '{"idx": "6", "arr": [2, 3, 5, 7, 11, 13, 17]}', "17")
+expect_success2("test_arrays", "at256_external", '{"idx": "7", "arr": [2, 3, 5, 7, 11, 13, 17]}', "0")
+
+## https://oeis.org/A000040/list
+abi_params = '"arr": [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199]'
+expect_success2("test_arrays", "at256_external", '{"idx":  "0", ' + abi_params + '}', "2")
+expect_success2("test_arrays", "at256_external", '{"idx":  "1", ' + abi_params + '}', "3")
+expect_success2("test_arrays", "at256_external", '{"idx":  "2", ' + abi_params + '}', "5")
+expect_success2("test_arrays", "at256_external", '{"idx": "33", ' + abi_params + '}', "139")
+expect_success2("test_arrays", "at256_external", '{"idx": "34", ' + abi_params + '}', "149")
+expect_success2("test_arrays", "at256_external", '{"idx": "35", ' + abi_params + '}', "151")
+expect_success2("test_arrays", "at256_external", '{"idx": "36", ' + abi_params + '}', "157")
+expect_success2("test_arrays", "at256_external", '{"idx": "37", ' + abi_params + '}', "163")
+expect_success2("test_arrays", "at256_external", '{"idx": "42", ' + abi_params + '}', "191")
+expect_success2("test_arrays", "at256_external", '{"idx": "43", ' + abi_params + '}', "193")
+expect_success2("test_arrays", "at256_external", '{"idx": "44", ' + abi_params + '}', "197")
+expect_success2("test_arrays", "at256_external", '{"idx": "45", ' + abi_params + '}', "199")
+
+expect_success2("test_arrays", "atAt256_external", '{"idx": "30", ' + abi_params + ', "idy": "6"}', "157")
+expect_success2("test_arrays", "atAt256_external", '{"idx": "30", ' + abi_params + ', "idy": "7"}', "163")
+expect_success2("test_arrays", "atAt256_external", '{"idx": "40", ' + abi_params + ', "idy": "2"}', "191")
+
+expect_success2("test_arrays", "atAt32_external", '{"idx": "1", "arr": [2, 3, 5, 7], "idy": "2"}', "7")
+expect_success2("test_arrays", "atAt32_external", '{"idx": "2", "arr": [2, 3, 5, 7], "idy": "1"}', "7")
+
+abi_params = '"arr": [1000000007, 1000000009, 1000000021, 1000000033, 1000000087, 1000000093, 1000000097, 1000000103, 1000000123, 1000000181, 1000000207, 1000000223, 1000000241, 1000000271, 1000000289, 1000000297, 1000000321, 1000000349, 1000000363, 1000000403, 1000000409, 1000000411, 1000000427, 1000000433, 1000000439, 1000000447, 1000000453, 1000000459, 1000000483, 1000000513, 1000000531, 1000000579, 1000000607, 1000000613, 1000000637, 1000000663, 1000000711, 1000000753, 1000000787, 1000000801, 1000000829, 1000000861, 1000000871, 1000000891, 1000000901, 1000000919, 1000000931, 1000000933, 1000000993, 1000001011, 1000001021, 1000001053, 1000001087, 1000001099, 1000001137, 1000001161, 1000001203, 1000001213, 1000001237, 1000001263, 1000001269, 1000001273, 1000001279, 1000001311, 1000001329, 1000001333, 1000001351, 1000001371, 1000001393, 1000001413, 1000001447, 1000001449, 1000001491, 1000001501, 1000001531, 1000001537, 1000001539, 1000001581, 1000001617, 1000001621, 1000001633, 1000001647, 1000001663, 1000001677, 1000001699, 1000001759, 1000001773, 1000001789, 1000001791, 1000001801, 1000001803, 1000001819, 1000001857, 1000001887, 1000001917, 1000001927, 1000001957, 1000001963, 1000001969]'
+expect_success2("test_arrays", "at32_external", '{"idx":   "0", ' + abi_params + '}', "1000000007")
+expect_success2("test_arrays", "at32_external", '{"idx":   "1", ' + abi_params + '}', "1000000009")
+expect_success2("test_arrays", "at32_external", '{"idx":   "2", ' + abi_params + '}', "1000000021")
+expect_success2("test_arrays", "at32_external", '{"idx":  "29", ' + abi_params + '}', "1000000513")
+expect_success2("test_arrays", "at32_external", '{"idx":  "30", ' + abi_params + '}', "1000000531")
+expect_success2("test_arrays", "at32_external", '{"idx":  "31", ' + abi_params + '}', "1000000579")
+expect_success2("test_arrays", "at32_external", '{"idx":  "52", ' + abi_params + '}', "1000001087")
+expect_success2("test_arrays", "at32_external", '{"idx":  "53", ' + abi_params + '}', "1000001099")
+expect_success2("test_arrays", "at32_external", '{"idx":  "54", ' + abi_params + '}', "1000001137")
 
 cleanup()
+
+
