@@ -577,8 +577,8 @@ class SoliditySuite(unittest.TestCase):
         waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
 
         # checking account changes
-        waitFor(runTLCAccount,[address1], 5000, r'value:6495936')
-        waitFor(runTLCAccount,[address2], 5000, r'value:12649714')
+        waitForBalanceInRange(address1, 6445936, 6545936, 5000)
+        waitForBalanceInRange(address2, 12599714, 12699714, 5000)
         waitFor(runTLCAccount,[address2], 5000, r'x\{00000000000000406_\}')
         waitFor(runTLCAccount,[address2], 5000, r'x\{00000000000000000000000000000000000000000000000000000000000B71AFA_\}')
 
