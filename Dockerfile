@@ -20,6 +20,7 @@ RUN chmod a+x /home/user/TVM-linker/tvm_linker/target/release/tvm_linker
 
 
 FROM eclipse/ubuntu_jdk8:latest
+USER root
 RUN apt-get update; \
     apt-get install -qqy --no-install-recommends \
     autoconf automake dpkg-dev file git make patch \
