@@ -99,7 +99,7 @@ const PATTERN_GLBLBASE: &'static str = r"^[\t\s]*\.global-base[\t\s]+([0-9]+)";
 const PATTERN_PERSBASE: &'static str = r"^[\t\s]*\.persistent-base[\t\s]+([0-9]+)";
 const PATTERN_LABEL:    &'static str = r"^[\.a-zA-Z0-9_]+:";
 //const PATTERN_GLOBLSTART: &'static str = r"^([a-zA-Z0-9_]+):";
-const PATTERN_PARAM:    &'static str = r"^[\t\s]+\.([a-zA-Z0-9_]+),?[\t\s]*([a-zA-Z0-9_]+)";
+const PATTERN_PARAM:    &'static str = r"^[\t\s]+\.([a-zA-Z0-9_]+),?[\t\s]*([a-zA-Z0-9_]*)";
 const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*@([a-zA-Z]+)";
 const PATTERN_SIZE:     &'static str = r"^[\t\s]*\.size[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([\.a-zA-Z0-9_]+)";
 const PATTERN_COMM:     &'static str = r"^[\t\s]*\.comm[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([0-9]+),[\t\s]*([0-9]+)";
@@ -371,7 +371,7 @@ impl ParseEngine {
                 let cap = dotted_regex.captures(&l).unwrap();
                 let param = cap.get(1).unwrap().as_str();
                 match param {
-                    "byte" | "long" | "short" | "quad" | "comm" => obj_body.push_str(&l),
+                    "byte" | "long" | "short" | "quad" | "comm" | "bss" => obj_body.push_str(&l),
                     _ => Err(format!("line {}: invalid param \"{}\":{}", lnum, param, l))?,
                 };
             } else {
@@ -480,9 +480,9 @@ impl ParseEngine {
                 for _i in 0..(value_len / WORD_SIZE) {
                     values.push(DataValue::Number((IntegerData::zero(), WORD_SIZE as usize)));
                 }
-
                 *item_size = 0;
-
+            } else if param.trim() == ".bss" {
+                //ignore this directive
             } else if let Some(cap) = PARAM_RE.captures(param) {
                 let pname = cap.get(1).unwrap().as_str();
                 let value_len = match pname {
@@ -493,7 +493,7 @@ impl ParseEngine {
                     _ => Err(format!("invalid parameter: \"{}\":", param))?,
                 };
                 if *item_size < value_len {
-                    Err(format!("global object {} has invalid .size parameter: too small", name))?;
+                    Err(format!("global object {} has invalid .size value: too small", name))?;
                 }
                 *item_size -= value_len;
                 let value = cap.get(2).map_or("", |m| m.as_str()).trim();
@@ -503,9 +503,10 @@ impl ParseEngine {
                     value_len,
                 )));
             }
+            //.bss can be here - just ignore.
         }
         if *item_size > 0 {
-            Err(format!("global object {} has invalid \".size\" value: bigger than defined values", name))?;
+            Err(format!("global object {} has invalid \".size\" value: real size = {}", name, *item_size))?;
         }
         ok!()
     }
@@ -711,5 +712,13 @@ mod tests {
         let source_file = File::open("./tests/comm_test1.s").unwrap();
         let lib_file = File::open("./stdlib.tvm").unwrap();
         assert_eq!(parser.parse(source_file, vec![lib_file], None), ok!());
+    }
+
+    #[test]
+    fn test_parser_bss() {
+        let mut parser = ParseEngine::new();
+        let source = File::open("./tests/bss_test1.s").unwrap();
+        let lib = File::open("./stdlib.tvm").unwrap();
+        assert_eq!(parser.parse(source, vec![lib], None), ok!());
     }     
 }
