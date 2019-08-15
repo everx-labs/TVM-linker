@@ -39,11 +39,10 @@ impl DataValue {
     pub fn write(&self) -> BuilderData {
         let mut b = BuilderData::new();
         match self {
-            DataValue::Number(ref intgr) => {
+            DataValue::Number(ref integer) => {
                 let encoding = SignedIntegerBigEndianEncoding::new(257);
-                let mut dest_vec = vec![];
-                encoding.try_serialize(&intgr.0).unwrap().into_bitstring_with_completion_tag(&mut dest_vec);
-                b.append_bitstring(&dest_vec[..]).unwrap();
+                let bitstring = encoding.try_serialize(&integer.0).unwrap();
+                b.append_builder(&bitstring).unwrap();
                 b
             },
             DataValue::Empty => b,
@@ -513,7 +512,7 @@ impl ParseEngine {
             for item in data_vec {
                 let mut ptr = item.0.clone();
                 for subitem in item.1 {
-                    dict.set(ptr_to_builder(ptr).unwrap().into(), subitem.write().into()).unwrap();
+                    dict.set(ptr_to_builder(ptr).unwrap().into(), &subitem.write().into()).unwrap();
                     ptr += WORD_SIZE;
                 }
             }
@@ -525,7 +524,7 @@ impl ParseEngine {
 
         pers_dict.set(
             ptr_to_builder(self.persistent_base + 8).unwrap().into(), 
-            globl_dict.get_data(),
+            &globl_dict.get_data(),
         ).unwrap();
 
         pers_dict.get_data()
@@ -574,6 +573,7 @@ impl ParseEngine {
 mod tests {
     use super::*;
     use std::fs::File;
+    use std::sync::Arc;
     use tvm::test_framework::*;
     use tvm::stack::*;
 

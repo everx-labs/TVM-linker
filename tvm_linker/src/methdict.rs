@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use ton_block::Serializable;
+use tvm::block::Serializable;
 use tvm::assembler::compile_code;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
 use tvm::stack::SliceData;
@@ -11,7 +11,7 @@ where
     let bit_len = SliceData::from(K::default().write_to_new_cell().unwrap()).remaining_bits();
     let mut dict = HashmapE::with_bit_len(bit_len);
     for pair in pairs.iter() {
-        dict.set(pair.0.write_to_new_cell().unwrap().into(), pair.1.clone()).unwrap();
+        dict.set(pair.0.write_to_new_cell().unwrap().into(), &pair.1).unwrap();
     }
     dict.get_data()
 }
@@ -36,6 +36,6 @@ where T: Default + Serializable {
     let key_slice: SliceData = method.0.write_to_new_cell().unwrap().into();
     let bit_len = key_slice.remaining_bits();
     let mut dict = HashmapE::with_data(bit_len, dict);
-    dict.set(key_slice, method.1).unwrap();
+    dict.set(key_slice, &method.1).unwrap();
     dict.get_data()
 }

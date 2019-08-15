@@ -9,7 +9,6 @@ extern crate regex;
 extern crate serde_json;
 extern crate sha2;
 extern crate simplelog;
-extern crate ton_block;
 #[macro_use]
 extern crate tvm;
 #[macro_use]

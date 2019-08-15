@@ -6,7 +6,7 @@ use std::str;
 use std::io::prelude::*;
 use std::fs::File;
 extern crate hex;
-use ton_block::*;
+use tvm::block::*;
 use tvm::types::{AccountAddress, AccountId};
 use tvm::cells_serialization::{BocSerialiseMode, BagOfCells, deserialize_cells_tree_ex };
 use tvm::stack::BuilderData;
@@ -52,14 +52,14 @@ pub fn make_boc() {
     node.append_reference (right);
     node.append_raw(&[0,0,1,35], 32).unwrap();
 
-    msg.body = Some(Arc::<CellData>::from(node));
+    *msg.body_mut() = Some(node.into());
 
     println!("Message = {:?}", msg);
 
-    let root_cell = SliceData::from(Arc::<CellData>::from(msg.write_to_new_cell().unwrap()));
+    let root_cell = msg.write_to_new_cell().unwrap().into();
 
     let mode = BocSerialiseMode::Generic { index: false, crc: true, cache_bits: false, flags: 0 };
-    let boc = BagOfCells::with_roots([root_cell].to_vec());
+    let boc = BagOfCells::with_roots([&root_cell].to_vec());
     let mut bytes = Vec::with_capacity(100);
     boc.write_to_ex(&mut bytes, mode.clone(), None, Some(4)).unwrap();
 
@@ -90,11 +90,11 @@ pub fn compile_message(
     let mut msg_hdr = ExternalInboundMessageHeader::default();
     msg_hdr.dst = dest_address;
     let mut msg = Message::with_ext_in_header(msg_hdr);
-    msg.init = state;
-    msg.body = body;
+    *msg.state_init_mut() = state;
+    *msg.body_mut() = body.map(|cell| SliceData::from(cell));
 
-    let root_cell = SliceData::from(Arc::<CellData>::from(msg.write_to_new_cell().unwrap()));
-    let boc = BagOfCells::with_root(root_cell);
+    let root_cell = msg.write_to_new_cell().unwrap().into();
+    let boc = BagOfCells::with_root(&root_cell);
     let mut bytes = Vec::new();
     let mode = BocSerialiseMode::Generic { index: false, crc: true, cache_bits: false, flags: 0 };
     boc.write_to_ex(&mut bytes, mode, None, Some(4)).unwrap();
