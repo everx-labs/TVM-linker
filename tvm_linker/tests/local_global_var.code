@@ -3,7 +3,7 @@
 	.globl	x
 	.p2align	3
 x:
-	.quad	1
+	.quad	-1
 	.quad	2
 	.size	x, 16
 
