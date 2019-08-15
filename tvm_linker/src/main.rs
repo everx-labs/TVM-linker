@@ -32,9 +32,8 @@ use real_ton::{ decode_boc, compile_message };
 use resolver::resolve_name;
 use std::fs::File;
 use std::io::{BufReader, Read};
-use std::sync::Arc;
 use testcall::perform_contract_call;
-use tvm::stack::{BuilderData, CellData};
+use tvm::stack::{BuilderData, SliceData};
 
 fn main() {
     if let Err(err_str) = linker_main() {
@@ -106,7 +105,7 @@ fn linker_main() -> Result<(), String> {
                 pair.drain()
             });
             println!("key_file.is_none = {}", key_file.is_none());
-            let body: Arc<CellData> = build_abi_body(
+            let body: SliceData = build_abi_body(
                 abi_file.unwrap(), 
                 method_name.unwrap(), 
                 params.unwrap(), 

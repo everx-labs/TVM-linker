@@ -23,17 +23,17 @@ fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Arc<CellData> {
     builder.into()
 }
 
-fn create_external_inbound_msg(dst_addr: &AccountId, body: Option<Arc<CellData>>) -> Message {
+fn create_external_inbound_msg(dst_addr: &AccountId, body: Option<SliceData>) -> Message {
     let mut hdr = ExternalInboundMessageHeader::default();
     hdr.dst = MsgAddressInt::with_standart(None, -1, dst_addr.clone()).unwrap();
     hdr.src = MsgAddressExt::with_extern(BuilderData::with_raw(vec![0x55; 8], 64).into()).unwrap();
     hdr.import_fee = Grams(0x1234u32.into());
     let mut msg = Message::with_ext_in_header(hdr);
-    *msg.body_mut() = body.map(|cell| SliceData::from(cell));
+    *msg.body_mut() = body;
     msg
 }
 
-fn create_internal_msg(src_addr: AccountId, dst_addr: AccountId, value: u64, lt: u64, at: u32, body: Option<Arc<CellData>>) -> Message {
+fn create_internal_msg(src_addr: AccountId, dst_addr: AccountId, value: u64, lt: u64, at: u32, body: Option<SliceData>) -> Message {
     let mut hdr = InternalMessageHeader::with_addresses(
         MsgAddressInt::with_standart(None, 0, src_addr).unwrap(),
         MsgAddressInt::with_standart(None, 0, dst_addr).unwrap(),
@@ -45,7 +45,7 @@ fn create_internal_msg(src_addr: AccountId, dst_addr: AccountId, value: u64, lt:
     hdr.created_lt = lt;
     hdr.created_at = UnixTime32(at);
     let mut msg = Message::with_int_header(hdr);
-    *msg.body_mut() = body.map(|cell| SliceData::from(cell));
+    *msg.body_mut() = body;
     msg
 }
 
@@ -63,19 +63,12 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) {
     *body = signed_body.into();
 }
 
-fn initialize_registers(code: SliceData, data: SliceData) -> SaveList {
+fn initialize_registers(data: SliceData) -> SaveList {
     let mut ctrls = SaveList::new();
-    let empty_cont = StackItem::Continuation(Arc::new(ContinuationData::new_empty()));
-    let empty_cell = StackItem::Cell(SliceData::new_empty().cell());
-
     let mut info = SmartContractInfo::with_myself(MsgAddressInt::with_standart(None, 0, AccountId::from([0u8; 32])).unwrap());
     *info.balance_remaining_mut() = CurrencyCollection::with_grams(10000);
 
-    ctrls.put(0, &mut empty_cont.clone()).unwrap();
-    ctrls.put(1, &mut empty_cont.clone()).unwrap();
-    ctrls.put(3, &mut StackItem::Continuation(Arc::new(ContinuationData::with_code(code)))).unwrap();
     ctrls.put(4, &mut StackItem::Cell(data.into_cell())).unwrap();
-    ctrls.put(5, &mut empty_cell.clone()).unwrap();
     ctrls.put(7, &mut info.into_temp_data().unwrap()).unwrap();
     ctrls
 }
@@ -91,14 +84,14 @@ fn init_logger(debug: bool) {
 
 pub fn perform_contract_call(
     contract_file: &str, 
-    body: Option<Arc<CellData>>, 
+    body: Option<SliceData>, 
     key_file: Option<Option<&str>>, 
     debug: bool, 
     decode_actions: bool,
     msg_value: Option<&str>,
 ) -> i32 {
     let mut state_init = load_from_file(&format!("{}.tvc", contract_file));
-    let contract_addr = AccountId::from(&[0x11u8; 32][..]);
+    let contract_addr = [0x11u8; 32].into();
     
     let mut stack = Stack::new();
     let is_internal;
@@ -112,7 +105,7 @@ pub fn perform_contract_call(
     let msg = 
         if is_internal {
             create_internal_msg(
-                AccountId::from(&[0u8; 32][..]), 
+                [0u8; 32].into(),
                 contract_addr, 
                 value,
                 1,
@@ -148,7 +141,7 @@ pub fn perform_contract_call(
             .unwrap_or(BuilderData::new().into())
             .into();
 
-    let registers = initialize_registers(code.clone(), data);
+    let registers = initialize_registers(data);
     let func_selector = if is_internal { 0 } else { -1 };
     stack
         .push(int!(100_000_000_000u64)) //contract balance: 100 grams
@@ -173,8 +166,8 @@ pub fn perform_contract_call(
     println!("TVM terminated with exit code {}", exit_code);
     println!("Gas used: {}", engine.get_gas().get_gas_used());
     println!("");
-    engine.dump_stack("Post-execution stack state", false);
-    engine.dump_ctrls(false);
+    println!("{}", engine.dump_stack("Post-execution stack state", false));
+    println!("{}", engine.dump_ctrls(false));
 
     if exit_code == 0 || exit_code == 1 {
             match engine.get_root() {
@@ -248,6 +241,7 @@ fn print_msg_header(header: &CommonMsgInfo) -> String {
 }
 
 fn print_int_address(addr: &MsgAddressInt) -> String {
+    //TODO: use display method of SliceData (std.address) when it will be implemented
     match addr {
         MsgAddressInt::AddrStd(ref std) => format!("{}:{}", std.workchain_id, hex::encode(std.address.get_bytestring(0))),
         MsgAddressInt::AddrVar(ref var) => format!("{}:{}", var.workchain_id, hex::encode(var.address.get_bytestring(0))),
@@ -269,13 +263,13 @@ mod tests {
     #[test]
     fn test_msg_print() {
         let msg = create_external_inbound_msg(
-            &AccountId::from([0x11; 32]), 
+            &[0x11; 32].into(), 
             Some(create_inbound_body(10, 20, 0x11223344)),
         );
 
         let msg2 = create_internal_msg(
-            AccountId::from([0x11; 32]),
-            AccountId::from([0x22; 32]),
+            [0x11; 32].into(),
+            [0x22; 32].into(),
             12345678,
             1,
             2,
