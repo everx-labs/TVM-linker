@@ -201,7 +201,7 @@ mod tests {
         let contract_file = prog.compile_to_file().unwrap();
         let name = contract_file.split('.').next().unwrap();
 
-        assert_eq!(perform_contract_call(name, body, None, false, false, None), 0);
+        assert_eq!(perform_contract_call(name, body, Some(None), false, false, None), 0);
     }
 
     #[test]

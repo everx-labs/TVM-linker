@@ -11,6 +11,7 @@
     SETCP0
 	ACCEPT
     PUSHREFSLICE        ; dictionary of methods in first reference
+	PLDDICT
     OVER
     NEQINT 1
     PUSHCONT {          ; if func_id negative or zero - direct call to method
@@ -20,7 +21,7 @@
     }
     PUSHCONT {          ; get dictionary with methods
         PUSHINT 32
-        DICTIGET
+        DICTIGETREF
         THROWIFNOT 52   ; no dictionary of methods
         PUSHINT 32
         LOGSTR selector_jmp
@@ -150,23 +151,27 @@
 	.type	parse_smartcontractinfo, @function
 	;; stack=0
 	LOGSTR parse_continfo
-	PUSH c5
-	CTOS
-	LDREFRTOS
-	NIP ; drop rest of the cell
-	PUSHINT 64 ; 32 + 16 + 16
-	SDSKIPFIRST ; skip tag + actions + msgs_sent
-	LDU 32 ; put unixtime field on stack
-	LDU 64 ; put block_lt field on stack
-	LDU 64 ; put trans_lt field on stack
-	LDU 256 ; put rand_seed field on stack
-	PUSHINT $parse_currency_collection$
-	CALL 1
+	NOW		; put unixtime field on stack
+	BLOCKLT ; put block_lt field on stack
+	LTIME	; put trans_lt field on stack
+	PUSHCTR c7
+	FIRST
+	INDEX 6 ; put rand_seed field on stack
+	PUSHCTR c7
+	FIRST
+	INDEX 7 ; put balance remaining on stack
+	FIRST	; put nanograms integer
+	NEWC STU 128 ENDC CTOS
+
 	; parse MsgAddressInt
+	PUSHCTR c7
+	FIRST
+	INDEX 8
 	PUSHINT 11 
 	SDSKIPFIRST ; skip anycast: + workchain_id
 	LDU 256 ; put address on stack
-	DROP ; drop rest of c5 slice
+	DROP
+	
 	; s0 - address
 	; s1 - balance
 	; s2 - rand_seed
@@ -179,108 +184,55 @@
 	.type		get_address, @function
 	;; stack=0
 	LOGSTR get_address
-	PUSHINT 4
-	PUSH c5
-	CTOS
+	
+	PUSHCTR c7
+	FIRST
+	INDEX 8
 	LDREF
-	NIP
-	LDDICT
-	DROP
-	PUSHINT 8
-	DICTUGET
-	DROP
+	PUSHINT 11 
+	SDSKIPFIRST ; skip anycast: + workchain_id
 	LDU 256
-	DROP ; drop slice itself
+	DROP
 	RET
 	
 	.globl		get_balance
 	.type		get_balance, @function
 	;; stack=0
 	LOGSTR get_balance
-	PUSHINT 5
-	PUSH c5
-	CTOS
-	LDREF
-	NIP
-	LDDICT
-	DROP
-	PUSHINT 8
-	DICTUGET
-	DROP
-	LDU 128
-	DROP ; drop slice itself
+	PUSHCTR c7
+	FIRST
+	INDEX 7
+	FIRST
 	RET
 	
 	.globl		get_rand_seed
 	.type		get_rand_seed, @function
 	;; stack=0
 	LOGSTR get_rand_seed
-	PUSHINT 6
-	PUSH c5
-	CTOS
-	LDREF
-	NIP
-	LDDICT
-	DROP
-	PUSHINT 8
-	DICTUGET
-	DROP
-	LDU 256
-	DROP ; drop slice itself
+	PUSH c7
+	FIRST
+	INDEX 6
 	RET
 	
 	.globl		get_trans_lt
 	.type		get_trans_lt, @function
 	;; stack=0
 	LOGSTR get_trans_lt
-	PUSHINT 7
-	PUSH c5
-	CTOS
-	LDREF
-	NIP
-	LDDICT
-	DROP
-	PUSHINT 8
-	DICTUGET
-	DROP
-	LDU 64
-	DROP ; drop slice itself
+	LTIME
 	RET
 	
 	.globl		get_block_lt
 	.type		get_block_lt, @function
 	;; stack=0
 	LOGSTR get_block_lt
-	PUSHINT 8
-	PUSH c5
-	CTOS
-	LDREF
-	NIP
-	LDDICT
-	DROP
-	PUSHINT 8
-	DICTUGET
-	DROP
-	LDU 64
-	DROP ; drop slice itself
+	BLOCKLT
 	RET
 	
 	.globl		get_unixtime
 	.type		get_unixtime, @function
 	;; stack=0
 	LOGSTR get_unixtime
-	PUSHINT 9
-	PUSH c5
-	CTOS
-	LDREF
-	NIP
-	LDDICT
-	DROP
-	PUSHINT 8
-	DICTUGET
-	DROP
-	LDU 32
-	DROP ; drop slice itself
+	NOW
 	RET
 
     .globl	get_msg_pubkey
@@ -370,7 +322,7 @@
 	PUSH s3
 	PUSHINT $get_msg_pubkey$
 	CALL 1
-	; s0 - signature
+	; s0 - pubkey
 	; s1 - addr
 	; s2 - gram balance of msg: int
 	; s3 - gram balance of contract: int
@@ -391,7 +343,7 @@
 	PUSHCONT {
 		DROP
 		NEWDICT
-		NEWC STSLICE ENDC
+		NEWC STDICT ENDC
 		POPROOT
 		RET
 	}
@@ -436,15 +388,8 @@
 	.type		store_signature, @function
 	; stack: sign
 	LOGSTR store_signature
-	PUSH c5
-	CTOS
-	LDREFRTOS
-;	LDREF	;; not working by some reason
-	NIP
 	
-	; stack: sign SmartContractInfo(SLICE)
 	NEWC
-	STSLICE
 	ENDC
 
 	; stack: sign SmartContractInfo(CELL)
@@ -541,7 +486,10 @@
 	SWAP
 	STDICT
 	ENDC
-	POP c5
+	PUSHCTR c7
+	SWAP
+	TPUSH
+	POP c7
 	RET
 
     .internal   :main_internal
@@ -665,29 +613,13 @@
 				STU 256
 				ENDC
 				CTOS
-
-
 					; load SmartContractInfo 
-					PUSHCTR c5
-					CTOS
-					LDREFRTOS
-					NIP
-					
-					PUSHINT 64 ; 32 + 16 + 16
-					SDSKIPFIRST ; skip tag + actions + msgs_sent
-					LDU 32      ; unixtime
-					PUSHINT 128
-					SDSKIPFIRST ; skip block_lt + trans_lt 
-					PUSH s5     ; push msg lt
-					SWAP        
-					PUSHINT 256
-					SDSKIPFIRST ; skip rand_seed
+					NOW			; unixtime		
+					PUSHINT 0   ; push msg lt
+					PUSHCTR c7
+					FIRST
+					INDEX 8
 
-					
-					PUSHINT $parse_currency_collection$
-					CALL 1
-
-					NIP
 					; s0 - myself: MsgAddressInt (slice) 
 					; s1 - trans_lt: u64
 					; s2 - tr unixtime: u32
@@ -786,28 +718,16 @@
 	;args: s0 - body: slice
 	;ret: none
 	; load SmartContractInfo
-	PUSHCTR c5
-	CTOS
-	LDREF
-	DROP
-	CTOS
-
-	PUSHINT 160 ; 32 + 16 + 16 + 32 + 64
-	SDSKIPFIRST ; skip tag + actions + msgs_sent + unixtime + block_lt
-	LDU 64      ; load transaction logical time
-
-	PUSHINT 256
-	SDSKIPFIRST ; skip rand_seed
-	PUSHINT $parse_currency_collection$
-	CALL 1
-	NIP
+	LTIME
+	PUSHCTR c7
+	FIRST
+	INDEX 8
 	; s0 - myself: MsgAddressInt (slice)
 	; s1 - trans_lt: u64
 	PUSHINT $build_external_outbound_message$
 	CALL 1
 	PUSHINT 0
 	SENDRAWMSG
-
 
 
 	.globl	decode_array
@@ -924,18 +844,10 @@
 	.type		get_contract_balance, @function
 	;; stack=0
 	LOGSTR get_cnt_balance
-	PUSHINT 3
-	PUSH c5
-	CTOS
-	LDREF
-	NIP
-	LDDICT
-	DROP
-	PUSHINT 8
-	DICTUGET
-	DROP
-	LDU 256
-	DROP ; drop slice itself
+	PUSHCTR c7
+	FIRST
+	INDEX 7
+	FIRST
 	RET
 
 				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -951,12 +863,10 @@
 PUSHINT 0
 ;; tvm_get_tmp_dictionary
 ;; stack=1
-PUSH c5
+PUSH c7
+SECOND
 CTOS
-LDREF
-NIP
-LDDICT
-DROP
+PLDDICT
 PUSHINT 8
 DICTUGET
 PUSHCONT { LDU 256 ENDS }
@@ -974,12 +884,10 @@ RET
 PUSHINT 1
 ;; tvm_get_tmp_dictionary
 ;; stack=1
-PUSH c5
+PUSH c7
+SECOND
 CTOS
-LDREF
-NIP
-LDDICT
-DROP
+PLDDICT
 PUSHINT 8
 DICTUGET
 PUSHCONT { LDU 256 ENDS }
@@ -997,12 +905,10 @@ RET
 PUSHINT 2
 ;; tvm_get_tmp_dictionary
 ;; stack=1
-PUSH c5
+PUSH c7
+SECOND
 CTOS
-LDREF
-NIP
-LDDICT
-DROP
+PLDDICT
 PUSHINT 8
 DICTUGET
 PUSHCONT { LDU 256 ENDS }
