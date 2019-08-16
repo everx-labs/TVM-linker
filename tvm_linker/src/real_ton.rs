@@ -1,17 +1,15 @@
 use program::load_from_file;
 use std::str::FromStr;
-use std::sync::Arc;
 use std::io::Cursor;
 use std::str;
 use std::io::prelude::*;
 use std::fs::File;
 extern crate hex;
-use ton_block::*;
+use tvm::block::*;
 use tvm::types::{AccountAddress, AccountId};
 use tvm::cells_serialization::{BocSerialiseMode, BagOfCells, deserialize_cells_tree_ex };
 use tvm::stack::BuilderData;
 use tvm::stack::SliceData;
-use tvm::stack::CellData;
 
 //"B5EE9C7241040301000000008A0002CF89FF86EE2B1CE113242F7CAE3511009B84F9E460D38773688AF808406AA75537991A119295932524BB029FC6BBD76D06AE732E89C14DFE4F9B1D8424BF90701E3B70E13CE43815613880BC04C254251497885DEFC82DFDE25682247A0F16269E782E0060000000100102002C20DDA4F260F8005F04ED44D0D31F30A4C8CB1FC9ED54000800000000EE5A8D0B"; 
 //"B5EE9C7241040201000000006600014F89FEA71F4F9849FF1D54203B094BE356FD065FC3B0966139BFDE9DD286E755901EFA00000000980C010072427FBE50ECD496653C6CE8EF33294BF67835ED2C962454F34A37AEB2445CB03629D5A82363E7F0000000000000000000000000000047494654E8A1E917";
@@ -52,14 +50,14 @@ pub fn make_boc() {
     node.append_reference (right);
     node.append_raw(&[0,0,1,35], 32).unwrap();
 
-    msg.body = Some(Arc::<CellData>::from(node));
+    *msg.body_mut() = Some(node.into());
 
     println!("Message = {:?}", msg);
 
-    let root_cell = SliceData::from(Arc::<CellData>::from(msg.write_to_new_cell().unwrap()));
+    let root_cell = msg.write_to_new_cell().unwrap().into();
 
     let mode = BocSerialiseMode::Generic { index: false, crc: true, cache_bits: false, flags: 0 };
-    let boc = BagOfCells::with_roots([root_cell].to_vec());
+    let boc = BagOfCells::with_roots([&root_cell].to_vec());
     let mut bytes = Vec::with_capacity(100);
     boc.write_to_ex(&mut bytes, mode.clone(), None, Some(4)).unwrap();
 
@@ -70,7 +68,7 @@ pub fn make_boc() {
 pub fn compile_message(
     address_str: &str, 
     wc: Option<&str>, 
-    body: Option<Arc<CellData>>, 
+    body: Option<SliceData>, 
     pack_code: bool, 
     suffix: &str,
 ) -> Result<(), String> {
@@ -90,11 +88,11 @@ pub fn compile_message(
     let mut msg_hdr = ExternalInboundMessageHeader::default();
     msg_hdr.dst = dest_address;
     let mut msg = Message::with_ext_in_header(msg_hdr);
-    msg.init = state;
-    msg.body = body;
+    *msg.state_init_mut() = state;
+    *msg.body_mut() = body;
 
-    let root_cell = SliceData::from(Arc::<CellData>::from(msg.write_to_new_cell().unwrap()));
-    let boc = BagOfCells::with_root(root_cell);
+    let root_cell = msg.write_to_new_cell().unwrap().into();
+    let boc = BagOfCells::with_root(&root_cell);
     let mut bytes = Vec::new();
     let mode = BocSerialiseMode::Generic { index: false, crc: true, cache_bits: false, flags: 0 };
     boc.write_to_ex(&mut bytes, mode, None, Some(4)).unwrap();

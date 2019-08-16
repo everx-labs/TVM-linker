@@ -197,25 +197,25 @@ def testOld():
 	compile1('test_send_int_msg.tvm', 'stdlib_sol.tvm')
 	expect_success(None, "", None, "")	# check empty input (deploy)
 	expect_success('main', "", None, "--internal 0 --decode-c6")
-	expect_output(r"destination : 0:0+007F")
+	expect_output(r"destination : 0:0+007f")
 	expect_output(r"CurrencyCollection: Grams.*value = 1000]")
 
 	compile1('test_send_ext_msg.tvm', 'stdlib_sol.tvm')
 	expect_success(None, "", None, "")	# check empty input (deploy)
 	expect_success('main', "", None, "--internal 0 --decode-c6")
 	expect_output(r"destination : AddrNone")
-	expect_output(r"data: \[0, 0, 48, 57, 128\]")
+	expect_output(r"body_hex: 00003039")
 
 	compile1('test_send_int_msg.tvm', 'stdlib_sol.tvm')
 	expect_success('main', "", None, "--decode-c6")
-	expect_output(r"destination : 0:0+007F")
+	expect_output(r"destination : 0:0+007f")
 	expect_output(r"CurrencyCollection: Grams.*value = 1000]")
 		
 	compile1('test_send_msg.code', 'stdlib_sol.tvm')
 	expect_success(None, "", None, "")	# check empty input (deploy)
 	expect_success('get_allowance', "1122334455660000000000000000000000000000000000000000005544332211", None, "--internal 0 --decode-c6 --trace")
 	expect_output(r"destination : 0:1122334455660000000000000000000000000000000000000000005544332211")
-	expect_output(r"body  : .* data: \[0, 26, 11, 86, 135, 0, 0, 0, 0, 0, 0, 0, 0, ")
+	expect_output(r"body_hex: 001a0b56870000000000000000")
 
 		# '''
 	compile1('test_msg_sender.code', None)
@@ -252,7 +252,7 @@ def testOld2():
 
 	#check tvm_balance
 	compile1('test_tvm_balance.code', 'stdlib_sol.tvm')
-	expect_success("main", "", "10000", "--internal 0")
+	expect_success("main", "", "100000000000", "--internal 0")
 
 	# TODO: cannot predict value of now, need to test it somehow
 	#check tvm_now
@@ -276,7 +276,8 @@ def testOld2():
 	expect_success("main", "", "0", "--internal 0")
 
 def testArrays():
-	linker_options = "--internal 0"
+	#it maybe '--sign key1' or '--internal 0' - test will work correctly
+	linker_options = ""
 	compile2('test_arrays', 'tests')
 
 	expect_success2("test_arrays", "at32_external", '{"idx": 0, "arr": []}', "0", linker_options)
@@ -287,7 +288,7 @@ def testArrays():
 	expect_success2("test_arrays", "at32_external", '{"idx": 2, "arr": [2, 3, 5, 7]}', "5", linker_options)
 	# expect_success2("test_arrays", "at32_external", '{"idx": 3, "arr": [2, 3, 5, 7]}', "7", linker_options)
 	expect_success2("test_arrays", "at32_external", '{"idx": 4, "arr": [2, 3, 5, 7]}', "0", linker_options)
-
+	
 	expect_success2("test_arrays", "at256_external", '{"idx": "0", "arr": [2, 3, 5, 7, 11, 13, 17]}', "2", linker_options)
 	# expect_success2("test_arrays", "at256_external", '{"idx": "1", "arr": [2, 3, 5, 7, 11, 13, 17]}', "3", linker_options)
 	# expect_success2("test_arrays", "at256_external", '{"idx": "2", "arr": [2, 3, 5, 7, 11, 13, 17]}', "5", linker_options)
@@ -340,6 +341,8 @@ testOld2()
 testArrays()
 # testFailing()
 
+'''
+TODO: uncomment tests when stdlib_c.tvm will support new spec
 SIGN = 'key1'
 compile1('hello.code', 'stdlib_c.tvm')
 expect_success("hello", "", "1", "")
@@ -348,5 +351,5 @@ SIGN = None
 compile1('hello.code', 'stdlib_c.tvm')
 expect_success("hello", "", "1", "")
 expect_output(r"Hello")
-
+'''
 cleanup()
