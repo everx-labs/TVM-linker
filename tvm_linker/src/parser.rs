@@ -485,7 +485,7 @@ impl ParseEngine {
                 for _i in 0..(value_len / WORD_SIZE as usize) {
                     values.push(DataValue::Number((IntegerData::zero(), WORD_SIZE as usize)));
                 }
-                *item_size = 0;
+                *item_size = value_len;
             } else if param.trim() == ".bss" {
                 //ignore this directive
             } else if let Some(cap) = ASCI_RE.captures(param) {
