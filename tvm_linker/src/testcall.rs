@@ -51,18 +51,21 @@ fn create_internal_msg(src_addr: AccountId, dst_addr: AccountId, value: u64, lt:
     msg
 }
 
-fn sign_body(body: &mut SliceData, key_file: &str) {
-    let pair = KeypairManager::from_secret_file(key_file).drain();
-    let pub_key = pair.public.to_bytes();
-    let signature = 
-        pair.sign::<Sha512>(
-            BagOfCells::with_root(body.clone()).get_repr_hash_by_index(0).unwrap().as_slice()
-        ).to_bytes();
-    let mut sign_builder = BuilderData::new();
-    sign_builder.append_raw(&signature, signature.len() * 8).unwrap();
-    sign_builder.append_raw(&pub_key, pub_key.len() * 8).unwrap();
-
+fn sign_body(body: &mut SliceData, key_file: Option<&str>) {
     let mut signed_body = BuilderData::from_slice(body);
+    let mut sign_builder = BuilderData::new();
+    if let Some(f) = key_file {
+        let pair = KeypairManager::from_secret_file(f).drain();
+        let pub_key = pair.public.to_bytes();
+        let signature = pair.sign::<Sha512>(
+            BagOfCells::with_root(body.clone())
+                .get_repr_hash_by_index(0)
+                .unwrap()
+                .as_slice()
+        ).to_bytes();
+        sign_builder.append_raw(&signature, signature.len() * 8).unwrap();
+        sign_builder.append_raw(&pub_key, pub_key.len() * 8).unwrap();
+    }
     signed_body.prepend_reference(sign_builder);
     *body = signed_body.into();
 }
@@ -99,7 +102,7 @@ fn init_logger(debug: bool) {
 pub fn perform_contract_call(
     contract_file: &str, 
     body: Option<Arc<CellData>>, 
-    key_file: Option<&str>, 
+    key_file: Option<Option<&str>>, 
     debug: bool, 
     decode_actions: bool,
     msg_value: Option<&str>,
@@ -140,9 +143,7 @@ pub fn perform_contract_call(
         None => BuilderData::new().into(),
     };
 
-    if key_file.is_some() {
-        sign_body(&mut body, key_file.unwrap());
-    }
+    key_file.map(|key| sign_body(&mut body, key));
 
     if !log_enabled!(Error) {
         init_logger(debug);

@@ -10,6 +10,7 @@ pub fn build_abi_body(abi_file: &str, method: &str, params: &str, keypair: Optio
     let mut abi_json = String::new();
     let mut file = File::open(abi_file).map_err(|e| format!("cannot open abi file: {}", e))?;
     file.read_to_string(&mut abi_json).map_err(|e| format!("failed to read abi file: {}", e))?;
+    
     encode_function_call(
         abi_json, 
         method.to_owned(), 
