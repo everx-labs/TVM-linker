@@ -41,5 +41,4 @@ COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/target/release/t
 COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/stdlib_c.tvm /home/user/bin/
 COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/stdlib_sol.tvm /home/user/bin/
 COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/stdlib_arg.tvm /home/user/bin/
-
-
+COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/target/release/tvm_linker /usr/bin/tvm_linker
