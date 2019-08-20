@@ -1,0 +1,20 @@
+{
+	"ABI version": 0,
+	"functions": [{
+		"name": "at32_external",
+		"inputs": [{"name": "idx", "type": "uint8"}, {"name": "arr", "type": "uint32[]"}],
+		"outputs": []
+	}, {
+		"name": "at256_external",
+		"inputs": [{"name": "idx", "type": "uint8"}, {"name": "arr", "type": "uint256[]"}],
+		"outputs": []
+	}, {
+		"name": "atAt32_external",
+		"inputs": [{"name": "idx", "type": "uint32"}, {"name": "arr", "type": "uint32[]"}, {"name": "idy", "type": "uint32"}],
+		"outputs": []
+	}, {
+		"name": "atAt256_external",
+		"inputs": [{"name": "idx", "type": "uint32"}, {"name": "arr", "type": "uint256[]"}, {"name": "idy", "type": "uint32"}],
+		"outputs": []
+	}]
+}

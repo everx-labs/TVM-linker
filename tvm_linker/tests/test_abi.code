@@ -1,6 +1,10 @@
 	.globl	transfer                    
 	.type	transfer, @function
 transfer:
+    NIP NIP NIP NIP
+    LDU 8
+    LDU 32
+    ENDS    
     PUSHINT 1
 
     .globl	getTargetAmount                    

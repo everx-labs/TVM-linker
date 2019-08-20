@@ -1,0 +1,150 @@
+
+.globl	at32_external
+.type	at32_external, @function
+LDU 8
+PUSHINT 32
+PUSHINT $decode_array$
+CALL 1
+DROP
+PUSHINT $at32$
+CALL 1
+
+.globl	at32
+.type	at32, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: at32
+;; param: idx
+;; param: arr
+;; arr
+;; stack=2
+DUP
+;; idx
+;; stack=3
+PUSH s2
+;; index
+SWAP
+PUSHINT 32
+DICTUGET
+PUSHCONT { LDU 32 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; return
+POP s1
+POP s1
+RET
+
+.globl	at256_external
+.type	at256_external, @function
+LDU 8
+PUSHINT 256
+PUSHINT $decode_array$
+CALL 1
+DROP
+PUSHINT $at256$
+CALL 1
+
+.globl	at256
+.type	at256, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: at256
+;; param: idx
+;; param: arr
+;; arr
+;; stack=2
+DUP
+;; idx
+;; stack=3
+PUSH s2
+;; index
+SWAP
+PUSHINT 32
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; return
+POP s1
+POP s1
+RET
+
+.globl	atAt32_external
+.type	atAt32_external, @function
+LDU 32
+PUSHINT 32
+PUSHINT $decode_array$
+CALL 1
+LDU 32
+DROP
+PUSHINT $atAt32$
+CALL 1
+
+.globl	atAt32
+.type	atAt32, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: atAt32
+;; param: idx
+;; param: arr
+;; param: idy
+;; arr
+;; stack=3
+PUSH s1
+;; idx
+;; stack=4
+PUSH s3
+;; idy
+;; stack=5
+PUSH s2
+;; +
+ADD
+;; index
+SWAP
+PUSHINT 32
+DICTUGET
+PUSHCONT { LDU 32 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; return
+XCHG s3
+BLKDROP 3
+RET
+
+.globl	atAt256_external
+.type	atAt256_external, @function
+LDU 32
+PUSHINT 256
+PUSHINT $decode_array$
+CALL 1
+LDU 32
+DROP
+PUSHINT $atAt256$
+CALL 1
+
+.globl	atAt256
+.type	atAt256, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: atAt256
+;; param: idx
+;; param: arr
+;; param: idy
+;; arr
+;; stack=3
+PUSH s1
+;; idx
+;; stack=4
+PUSH s3
+;; idy
+;; stack=5
+PUSH s2
+;; +
+ADD
+;; index
+SWAP
+PUSHINT 32
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; return
+XCHG s3
+BLKDROP 3
+RET

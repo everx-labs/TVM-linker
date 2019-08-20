@@ -218,7 +218,7 @@
 	NIP
 	LDDICT
 	DROP
-	PUSHINT 256
+	PUSHINT 8
 	DICTUGET
 	DROP
 	LDU 256
@@ -236,7 +236,7 @@
 	NIP
 	LDDICT
 	DROP
-	PUSHINT 256
+	PUSHINT 8
 	DICTUGET
 	DROP
 	LDU 128
@@ -254,7 +254,7 @@
 	NIP
 	LDDICT
 	DROP
-	PUSHINT 256
+	PUSHINT 8
 	DICTUGET
 	DROP
 	LDU 256
@@ -272,7 +272,7 @@
 	NIP
 	LDDICT
 	DROP
-	PUSHINT 256
+	PUSHINT 8
 	DICTUGET
 	DROP
 	LDU 64
@@ -290,7 +290,7 @@
 	NIP
 	LDDICT
 	DROP
-	PUSHINT 256
+	PUSHINT 8
 	DICTUGET
 	DROP
 	LDU 64
@@ -308,7 +308,7 @@
 	NIP
 	LDDICT
 	DROP
-	PUSHINT 256
+	PUSHINT 8
 	DICTUGET
 	DROP
 	LDU 32
@@ -336,6 +336,15 @@
 		ZERO SWAP
 		; stack: 0 msg
 		LDREFRTOS
+		;check if it's empty
+		DUP
+		SDEMPTY
+		PUSHCONT {
+			; signature slice is empty
+			; clean the stack and return 0
+			BLKDROP 2
+		}
+		IFJMP
 		; stack: 0 msg' slice:sign+pubKey
 		DUP
 		; stack: 0 msg' slice:sign+pubKey slice:sign+pubKey
@@ -410,7 +419,7 @@
 	
 	; check if message is empty
 	DUP
-	SEMPTY
+	SDEMPTY
 	PUSHCONT {
 		DROP
 		NEWDICT
@@ -428,78 +437,6 @@
     SWAP
     CALL 1      ;public method call
 
-
-	.globl		get_pubkey
-	.type		get_pubkey, @function
-	;; stack=0
-	LOGSTR get_pubkey
-	PUSHINT 0
-	PUSH c5
-	CTOS
-	LDREF
-	NIP
-	LDDICT
-	DROP
-	PUSHINT 256
-	DICTUGET
-	DROP
-	LDU 256
-	DROP ; drop slice itself
-	RET
-
-	.globl		get_msg_sender
-	.type		get_msg_sender, @function
-	;; stack=0
-	LOGSTR get_msg_sender
-	PUSHINT 1
-	PUSH c5
-	CTOS
-	LDREF
-	NIP
-	LDDICT
-	DROP
-	PUSHINT 256
-	DICTUGET
-	DROP
-	LDU 256
-	DROP ; drop slice itself
-	RET
-	
-	.globl		get_msg_balance
-	.type		get_msg_balance, @function
-	;; stack=0
-	LOGSTR get_msg_balance
-	PUSHINT 2
-	PUSH c5
-	CTOS
-	LDREF
-	NIP
-	LDDICT
-	DROP
-	PUSHINT 256
-	DICTUGET
-	DROP
-	LDU 256
-	DROP ; drop slice itself
-	RET
-	
-	.globl		get_contract_balance
-	.type		get_contract_balance, @function
-	;; stack=0
-	LOGSTR get_cnt_balance
-	PUSHINT 3
-	PUSH c5
-	CTOS
-	LDREF
-	NIP
-	LDDICT
-	DROP
-	PUSHINT 256
-	DICTUGET
-	DROP
-	LDU 256
-	DROP ; drop slice itself
-	RET
 
 	.globl		get_src_addr
 	.type		get_src_addr, @function
@@ -551,14 +488,14 @@
 	NEWC STU 256 ENDC CTOS
 	PUSHINT 0
 	NEWDICT
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	; stack: src addr b'' in dict for key 1
 	ROT
 	NEWC STU 256 ENDC CTOS
 	PUSHINT 1
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	; stack: msg balance b''' in dict for key 2
@@ -566,7 +503,7 @@
 	NEWC STU 256 ENDC CTOS
 	PUSHINT 2
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	; stack: gram balance of contract b'''' in dict for key 3
@@ -574,7 +511,7 @@
 	NEWC STU 256 ENDC CTOS
 	PUSHINT 3
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	PUSHINT $parse_smartcontractinfo$
@@ -590,13 +527,13 @@
 	NEWC STU 256 ENDC CTOS
 	PUSHINT 4
 	PUSH s7
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	; put balance into dict for key 5
 	SWAP
 	PUSHINT 5
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	; put rand_seed into dict for key 6
@@ -604,7 +541,7 @@
 	NEWC STU 256 ENDC CTOS
 	PUSHINT 6
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	; put trans_lt into dict for key 7
@@ -612,7 +549,7 @@
 	NEWC STU 64 ENDC CTOS
 	PUSHINT 7
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	; put block_lt into dict for key 8
@@ -620,7 +557,7 @@
 	NEWC STU 64 ENDC CTOS
 	PUSHINT 8
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	; put unixtime into dict for key 9
@@ -628,7 +565,7 @@
 	NEWC STU 32 ENDC CTOS
 	PUSHINT 9
 	PUSH s2
-	PUSHINT 256
+	PUSHINT 8
 	DICTUSET
 	NIP
 	NIP ; drop old dict which was at s6 at start of adding smartcontractinfo
@@ -814,3 +751,397 @@
 				PUSHINT 123
 				DROP
 				RET
+
+
+
+	.globl   build_external_outbound_message
+	.type	 build_external_outbound_message, @function
+	; build external outbound message
+	; s0 - src address : MsgAddressInt
+	; s1 - logical time
+	; s2 - body
+	; returns: msg: cell
+
+	NEWC
+	TWO
+	STONES ; ext_out_msg_info$11
+
+	STSLICE ; store MsgAddressInt
+
+	TWO
+	STZEROES ; addr_none$00
+
+	STU 64  ; created_lt:uint64
+	PUSHINT 0
+	STUR 32  ; created_at:uint32
+
+	ONE
+	STZEROES   ; Maybe StateInit to 0bit
+
+	;check that the result builder can fit
+	;body slice
+	DUP2
+	BREMBITS
+	SWAP
+	SBITS
+	INC         ;include body either bit
+	GEQ
+	PUSHCONT {
+		;builder has enough free bits,
+		;just append body slice to builder
+		ONE
+		STZEROES  ;body Either: left$0
+		STSLICE
+	}
+	PUSHCONT {
+		;builder's remaining bits are not enough
+		;to append body slice, instead append bit 1
+		;and attach body as reference.
+		ONE
+		STONES   ;body Either: right$1
+		SWAP
+		;body is a slice, and we need to convert
+		;it to cell before storing as reference.
+		NEWC
+		STSLICE
+		ENDC
+		STREFR
+	}
+	IFELSE
+
+	ENDC
+
+
+
+	.globl   send_ext_msg
+	.type    send_ext_msg, @function
+	;args: s0 - body: slice
+	;ret: none
+	; load SmartContractInfo
+	PUSHCTR c5
+	CTOS
+	LDREF
+	DROP
+	CTOS
+
+	PUSHINT 160 ; 32 + 16 + 16 + 32 + 64
+	SDSKIPFIRST ; skip tag + actions + msgs_sent + unixtime + block_lt
+	LDU 64      ; load transaction logical time
+
+	PUSHINT 256
+	SDSKIPFIRST ; skip rand_seed
+	PUSHINT $parse_currency_collection$
+	CALL 1
+	NIP
+	; s0 - myself: MsgAddressInt (slice)
+	; s1 - trans_lt: u64
+	PUSHINT $build_external_outbound_message$
+	CALL 1
+	PUSHINT 0
+	SENDRAWMSG
+
+
+	.globl	insert_value_and_inc_key
+	.type	insert_value_and_inc_key, @function
+	; arr key arrValue
+	PUSH2 s1, s2 ; stacktrace: arr key arrValue key arr
+	PUSHINT 32   ; stacktrace: arr key arrValue key arr 32
+	DICTUSET     ; stacktrace: arr key arr
+	POP s2      ; stacktrace: arr key arr
+	INC          ; stacktrace: arr key
+
+
+	.globl	decode_array
+	.type	decode_array, @function
+
+	; Decode array of numbers of given number of bits
+	; args:
+	;   s0 - numBits (integer) - lenght of array's values
+	;   s1 - sl (slice) - encoded array
+	; ret:
+	;   s0 - remaining slice
+	;   s1 - dict represented decoded array
+
+	; Stucture of encoded array
+	; 2 bits put in the cell-data define serialization algorithm.
+	; [00] - array is put into a separate cell. In case of array overflowing the maximum cell-data size it's split into multiple sequential cells.
+	; [10] - bits sequence is put in the cell-data. The next 8 bits (1 byte) define the number of elements of the array. It's followed by the sequence of encoded array elements.
+	; [01]/[11] - reserved.
+
+	; stacktrace: sl numBits
+	SWAP  ; stacktrace: numBits sl
+	LDU 2 ; stacktrace: numBits algo sl
+	SWAP  ; stacktrace: numBits sl algo
+
+	DUP
+	PUSHINT 0
+	EQUAL
+
+	PUSHCONT { ; [00] serialization algorithm
+		;stacktrace: numBits sl algo
+
+		DROP      ; stacktrace: numBits sl
+		LDREF     ; stacktrace: numBits cell sl
+		ROTREV    ; stacktrace: sl numBits cell
+		CTOS      ; stacktrace: sl numBits slData
+		NEWDICT   ; stacktrace: sl numBits slData arr
+		PUSHINT 0 ; stacktrace: sl numBits slData arr key
+
+		PUSHCONT {
+			; stacktrace: numBits slData arr key
+			PUSH s2 ; stacktrace: sl numBits slData arr key slData
+			SBITS   ; stacktrace: sl numBits slData arr key slBits
+			PUSH S4 ; stacktrace: sl numBits slData arr key slBits numBits
+			GEQ     ; stacktrace: sl numBits slData arr key slBits>=numBits
+			PUSHCONT { ; slBits >= numBits
+				; stacktrace: sl numBits slData arr key
+
+				PUSH2 s2, s3 ; stacktrace: sl numBits slData arr key slData numBits
+				LDSLICEX     ; stacktrace: sl numBits slData arr key arrValue slData
+				POP s4       ; stacktrace: sl numBits slData arr key arrValue
+
+				PUSHINT $insert_value_and_inc_key$
+				CALL 1
+				PUSHINT 0    ; stacktrace: sl numBits slData arr key 0
+			}
+			PUSHCONT { ; slBits < numBits
+				; stacktrace: numBits slData arr key
+				PUSH s2   ; stacktrace: sl numBits slData arr key slData
+				SBITS     ; stacktrace: sl numBits slData arr key slBits
+				PUSHINT 0 ; stacktrace: sl numBits slData arr key slBits 0
+				EQUAL     ; stacktrace: sl numBits slData arr key slBits==0
+
+				PUSHCONT { ; slBits == 0
+					; stacktrace: sl numBits slData arr key
+					PUSH  s2  ; stacktrace: sl numBits slData arr key slData
+					SREFS     ; stacktrace: sl numBits slData arr key refCnt
+					PUSHINT 0 ; stacktrace: sl numBits slData arr key refCnt 0
+					EQUAL     ; stacktrace: sl numBits slData arr key refCnt==0
+					PUSHCONT { ; no next cell
+						; stacktrace: sl numBits slData arr key
+						PUSHINT -1 ; stacktrace: sl numBits slData arr key -1
+					}
+					PUSHCONT { ; load next cell
+						; stacktrace: sl numBits slData arr key
+						PUSH  s2   ; stacktrace: sl numBits slData arr key slData
+						LDREF      ; stacktrace: sl numBits slData arr key cell slData
+						DROP       ; stacktrace: sl numBits slData arr key cell
+						CTOS       ; stacktrace: sl numBits slData arr key slData
+						POP s3     ; stacktrace: sl numBits slData arr key
+						PUSHINT 0  ; stacktrace: sl numBits slData arr key -1
+					}
+					IFELSE
+				}
+				PUSHCONT { ; merge value from two cells
+					; stacktrace: sl numBits slData arr key
+
+					; load part 1 (arrValue0)
+					PUSH s2   ; stacktrace: sl numBits slData arr key slData
+					DUP       ; stacktrace: sl numBits slData arr key slData slData
+					SBITS     ; stacktrace: sl numBits slData arr key slData slBits0
+					DUP       ; stacktrace: sl numBits slData arr key slData slBits0 slBits0
+					ROTREV    ; stacktrace: sl numBits slData arr key slBits0 slData slBits0
+					LDSLICEX  ; stacktrace: sl numBits slData arr key slBits0 arrValue0 slData   ;;arrValue0 - is slice!
+
+					; load part 2 (arrValue1)
+					LDREF     ; stacktrace: sl numBits slData arr key slBits0 arrValue0 cell slData
+					DROP      ; stacktrace: sl numBits slData arr key slBits0 arrValue0 cell
+					CTOS      ; stacktrace: sl numBits slData arr key slBits0 arrValue0 slData
+					ROT       ; stacktrace: sl numBits slData arr key arrValue0 slData slBits0
+					PUSH s6   ; stacktrace: sl numBits slData arr key arrValue0 slData slBits0 numBits
+					SWAP      ; stacktrace: sl numBits slData arr key arrValue0 slData numBits slBits0
+					SUB       ; stacktrace: sl numBits slData arr key arrValue0 slData slBits1
+					LDSLICEX  ; stacktrace: sl numBits slData arr key arrValue0 arrValue1 slData
+
+					; merge arrValue0 and arrValue1
+					ROTREV      ; stacktrace: sl numBits slData arr key slData arrValue0 arrValue1
+					NEWC        ; stacktrace: sl numBits slData arr key slData arrValue0 arrValue1 builderArrValue
+					XCHG s1, s2 ; stacktrace: sl numBits slData arr key slData arrValue1 arrValue0 builderArrValue
+					STSLICE     ; stacktrace: sl numBits slData arr key slData arrValue1 builderArrValue
+					STSLICE     ; stacktrace: sl numBits slData arr key slData builderArrValue
+					ENDC        ; stacktrace: sl numBits slData arr key slData cellArrValue
+					CTOS        ; stacktrace: sl numBits slData arr key slData arrValue
+					SWAP        ; stacktrace: sl numBits slData arr key arrValue slData
+					POP s4      ; stacktrace: sl numBits slData arr key arrValue
+
+					PUSHINT $insert_value_and_inc_key$
+					CALL 1
+					PUSHINT 0    ; stacktrace: sl numBits slData arr key 0
+				}
+				IFELSE ; slBits == 0
+			}
+			IFELSE ; slBits >= numBits
+			; stacktrace: sl numBits slData arr key -1/0
+		}
+		UNTIL
+
+		; stacktrace: sl numBits slData arr key
+		XCHG s1, s3 ; stacktrace: sl arr slData numBits key
+		BLKDROP 3   ; stacktrace: sl arr
+		SWAP        ; stacktrace: arr sl
+	}
+	PUSHCONT {
+		DUP
+		PUSHINT 2
+		EQUAL
+
+		PUSHCONT { ; [10] serialization algorithm
+			DROP
+
+			LDU 8 ; load number of elements of the array
+			SWAP
+			; stacktrace: numBits sl arrSz
+
+			NEWDICT
+			PUSHINT 0
+			; stacktrace: numBits sl arrSz arr key
+
+			PUSH s2
+			; stacktrace: numBits sl arrSz arr key arrSz
+			PUSHCONT {
+				; stacktrace: numBits sl arrSz arr key
+
+				PUSH2 s3, s4
+				; stacktrace: numBits sl arrSz arr key sl numBits
+
+				LDSLICEX
+				; stacktrace: numBits sl arrSz arr key arrValue sl
+
+				POP s5
+				; stacktrace: numBits sl arrSz arr key arrValue
+
+				PUSH2 s1, s2
+				PUSHINT 32
+				; stacktrace: numBits sl arrSz arr key arrValue key arr 32
+
+				DICTUSET
+				; stacktrace: numBits sl arrSz arr key arr
+
+				POP s2
+				; stacktrace: numBits sl arrSz arr key
+
+				INC
+				; stacktrace: numBits sl arrSz arr key
+			}
+			REPEAT
+
+			; stacktrace: numBits sl arrSz arr key
+			XCHG s1, s4
+			; stacktrace: arr sl arrSz numBits key
+			BLKDROP 3
+			; stacktrace: arr sl
+		}
+		PUSHCONT {
+			THROW 11 ; unsupported serialization algorithm
+		}
+		IFELSE
+	}
+	IFELSE
+	RET
+
+
+	.globl	encode_array
+	.type	encode_array, @function
+
+	; serialization of array of numbers of given number of bits
+	; args:
+	;   s0 - length of values of array
+	;   s1 - dict represented array
+	;   s2 - builder for storing array
+	; ret:
+	;   s0 - builder
+
+	; TODO
+	RET
+
+
+	.globl		get_contract_balance
+	.type		get_contract_balance, @function
+	;; stack=0
+	LOGSTR get_cnt_balance
+	PUSHINT 3
+	PUSH c5
+	CTOS
+	LDREF
+	NIP
+	LDDICT
+	DROP
+	PUSHINT 8
+	DICTUGET
+	DROP
+	LDU 256
+	DROP ; drop slice itself
+	RET
+
+				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				;;; THE CODE BELOW IS GENERATED. DO NOT CHANGE IT!	
+
+
+.globl	get_pubkey
+.type	get_pubkey, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: get_pubkey
+;; get member pubkey
+;; TvmTempData.pubkey
+PUSHINT 0
+;; tvm_get_tmp_dictionary
+;; stack=1
+PUSH c5
+CTOS
+LDREF
+NIP
+LDDICT
+DROP
+PUSHINT 8
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; return
+RET
+
+.globl	get_msg_sender
+.type	get_msg_sender, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: get_msg_sender
+;; get member msgSender
+;; TvmTempData.msgSender
+PUSHINT 1
+;; tvm_get_tmp_dictionary
+;; stack=1
+PUSH c5
+CTOS
+LDREF
+NIP
+LDDICT
+DROP
+PUSHINT 8
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; return
+RET
+
+.globl	get_msg_balance
+.type	get_msg_balance, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: get_msg_balance
+;; get member msgBalance
+;; TvmTempData.msgBalance
+PUSHINT 2
+;; tvm_get_tmp_dictionary
+;; stack=1
+PUSH c5
+CTOS
+LDREF
+NIP
+LDDICT
+DROP
+PUSHINT 8
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; return
+RET

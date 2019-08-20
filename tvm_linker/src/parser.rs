@@ -33,6 +33,7 @@ impl From<&str> for ObjectType {
 enum DataValue {
     Empty,
     Number((IntegerData, usize)),
+    Slice(SliceData),
 }
 
 impl DataValue {
@@ -40,12 +41,13 @@ impl DataValue {
         let mut b = BuilderData::new();
         match self {
             DataValue::Number(ref intgr) => {
-                let encoding = SignedIntegerBigEndianEncoding::new(256);
+                let encoding = SignedIntegerBigEndianEncoding::new(257);
                 let mut dest_vec = vec![];
                 encoding.try_serialize(&intgr.0).unwrap().into_bitstring_with_completion_tag(&mut dest_vec);
                 b.append_bitstring(&dest_vec[..]).unwrap();
                 b
             },
+            DataValue::Slice(ref slice) => { b.checked_append_references_and_data(slice).unwrap(); b },
             DataValue::Empty => b,
         }
     }
@@ -81,7 +83,6 @@ pub struct ParseEngine {
     aliases: HashMap<String, i32>,
     globals: HashMap<String, Object>,
     internals: HashMap<i32, String>,
-    signed: HashMap<u32, bool>,
     entry_point: String,
     globl_base: Ptr,
     globl_ptr: Ptr,
@@ -99,10 +100,11 @@ const PATTERN_GLBLBASE: &'static str = r"^[\t\s]*\.global-base[\t\s]+([0-9]+)";
 const PATTERN_PERSBASE: &'static str = r"^[\t\s]*\.persistent-base[\t\s]+([0-9]+)";
 const PATTERN_LABEL:    &'static str = r"^[\.a-zA-Z0-9_]+:";
 //const PATTERN_GLOBLSTART: &'static str = r"^([a-zA-Z0-9_]+):";
-const PATTERN_PARAM:    &'static str = r"^[\t\s]+\.([a-zA-Z0-9_]+),?[\t\s]*([a-zA-Z0-9_]+)";
+const PATTERN_PARAM:    &'static str = r#"^[\t\s]+\.([a-zA-Z0-9_]+),?[\t\s]*([a-zA-Z0-9-_\s"]+)"#;
 const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*@([a-zA-Z]+)";
 const PATTERN_SIZE:     &'static str = r"^[\t\s]*\.size[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([\.a-zA-Z0-9_]+)";
 const PATTERN_COMM:     &'static str = r"^[\t\s]*\.comm[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([0-9]+),[\t\s]*([0-9]+)";
+const PATTERN_ASCIZ:    &'static str = r#"^[\t\s]*\.asciz[\t\s]+"(.+)""#;
 const PATTERN_IGNORED:  &'static str = r"^[\t\s]+\.(p2align|align|text|file|ident|section)";
 
 const GLOBL:    &'static str = ".globl";
@@ -112,13 +114,12 @@ const SELECTOR: &'static str = ".selector";
 //const FUNCTION_TYPENAME:&'static str = "function";
 const DATA_TYPENAME:    &'static str = "object";
 
-const FUNC_SUFFIX_AUTH: &'static str = "_authorized";
 const PERSISTENT_DATA_SUFFIX: &'static str = "_persistent";
 
 const PUBKEY_NAME: &'static str = "tvm_public_key";
 const SCI_NAME: &'static str = "tvm_contract_info";
 
-const OFFSET_NEXT_DATA: Ptr = 8;
+const WORD_SIZE: Ptr = 8;
 const OFFSET_GLOBL_DATA: Ptr = 8;
 const OFFSET_PERS_DATA: Ptr = 16;
 
@@ -131,7 +132,6 @@ impl ParseEngine {
             aliases:    HashMap::new(),
             globals:    HashMap::new(), 
             internals:  HashMap::new(),
-            signed:     HashMap::new(),
             entry_point: String::new(),
             globl_base: 0,
             globl_ptr: 0,
@@ -221,11 +221,7 @@ impl ParseEngine {
             }
         })
     }
-
-    pub fn signed(&self) -> &HashMap<u32, bool> {
-        &self.signed
-    }
-
+   
     fn preinit(&mut self) -> Result <(), String> {
         self.globals.insert(
             PUBKEY_NAME.to_string(), 
@@ -371,7 +367,7 @@ impl ParseEngine {
                 let cap = dotted_regex.captures(&l).unwrap();
                 let param = cap.get(1).unwrap().as_str();
                 match param {
-                    "byte" | "long" | "short" | "quad" | "comm" => obj_body.push_str(&l),
+                    "byte" | "long" | "short" | "quad" | "comm" | "bss" | "asciz" => obj_body.push_str(&l),
                     _ => Err(format!("line {}: invalid param \"{}\":{}", lnum, param, l))?,
                 };
             } else {
@@ -399,16 +395,9 @@ impl ParseEngine {
                let item = self.globals.get_mut(func).unwrap();
                 match &mut item.dtype {
                     ObjectType::Function(fparams) => {
-                        let mut signed = false;
-                        if let Some(index) = func.find(FUNC_SUFFIX_AUTH) {
-                            if (index + FUNC_SUFFIX_AUTH.len()) == func.len() {
-                                signed = true;
-                            }
-                        }
                         let func_id = gen_abi_id(abi, func);
                         fparams.0 = func_id;
                         fparams.1 = body.trim_end().to_string();
-                        self.signed.insert(func_id, signed);
                         let prev = self.xrefs.insert(func.to_string(), func_id);
                         if first_pass && prev.is_some() {
                             Err(format!(
@@ -423,7 +412,7 @@ impl ParseEngine {
                             *persistent = true;
                         }
                         Self::update_data(body, func, &mut item.size, values)?;
-                        let offset = (values.len() as Ptr) * OFFSET_NEXT_DATA;
+                        let offset = (values.len() as Ptr) * WORD_SIZE;
                         if *persistent { 
                             *addr = self.persistent_ptr;
                             self.persistent_ptr += offset;
@@ -457,36 +446,53 @@ impl ParseEngine {
         lazy_static! {
             static ref PARAM_RE: Regex = Regex::new(PATTERN_PARAM).unwrap();
             static ref COMM_RE:  Regex = Regex::new(PATTERN_COMM).unwrap();
+            static ref ASCI_RE:  Regex = Regex::new(PATTERN_ASCIZ).unwrap();
         }
         for param in body.lines() {
+            let mut value_len: usize = 0;
             if let Some(cap) = COMM_RE.captures(param) {
+                // .comm <symbol>, <size>, <align>
                 let size_bytes = usize::from_str_radix(
                     cap.get(2).unwrap().as_str(), 
                     10,
-                ).map_err(|_| "invalid \".comm\" 2nd argument".to_string())?;
+                ).map_err(|_| "invalid \".comm\": invalid size".to_string())?;
                 let align = usize::from_str_radix(
                     cap.get(3).unwrap().as_str(),
                     10,
-                ).map_err(|_| "invalid \".comm\" 3rd argument".to_string())?;
-                if (size_bytes == 0) || (align == 0) {
-                    Err("\".comm\" arguments cannot be zero".to_string())?;
+                ).map_err(|_| "\".comm\": invalid align".to_string())?;
+
+                if size_bytes == 0  {
+                    Err("\".comm\": invalid size".to_string())?;
                 }
-                let value_len = (size_bytes + (align - 1)) & !(align - 1);
-                values.push(DataValue::Number((IntegerData::zero(), value_len)));
-                *item_size = 0;
+                if (align == 0) || (align % WORD_SIZE as usize != 0) {
+                    Err("\".comm\": invalid align".to_string())?;
+                }
+                value_len = (size_bytes + (align - 1)) & !(align - 1);
+                for _i in 0..(value_len / WORD_SIZE as usize) {
+                    values.push(DataValue::Number((IntegerData::zero(), WORD_SIZE as usize)));
+                }
+                *item_size = value_len;
+            } else if param.trim() == ".bss" {
+                //ignore this directive
+            } else if let Some(cap) = ASCI_RE.captures(param) {
+                // .asciz "string"
+                let mut str_bytes = cap.get(1).unwrap().as_str().as_bytes().to_vec();
+                //include 1 byte for termination zero, assume that it is C string
+                value_len = str_bytes.len() + 1;
+                (0..(WORD_SIZE - (str_bytes.len() as Ptr % WORD_SIZE))).for_each(|_| str_bytes.push(0));
+                for chunk in str_bytes.chunks(WORD_SIZE as usize) {
+                    let slice: SliceData = BuilderData::with_raw(chunk.to_vec(), WORD_SIZE as usize * 8).into();
+                    values.push(DataValue::Slice(slice));
+                }
             } else if let Some(cap) = PARAM_RE.captures(param) {
                 let pname = cap.get(1).unwrap().as_str();
-                let value_len = match pname {
+                value_len = match pname {
                     "byte"  => 1,
                     "long"  => 4,
                     "short" => 2,
                     "quad"  => 8,
-                    _ => Err(format!("invalid parameter: \"{}\":", param))?,
+                    _ => Err(format!("invalid parameter: \"{}\"", param))?,
                 };
-                if *item_size < value_len {
-                    Err(format!("global object {} has invalid .size parameter: too small", name))?;
-                }
-                *item_size -= value_len;
                 let value = cap.get(2).map_or("", |m| m.as_str()).trim();
                 values.push(DataValue::Number((
                     IntegerData::from_str_radix(value, 10)
@@ -494,9 +500,13 @@ impl ParseEngine {
                     value_len,
                 )));
             }
+            if *item_size < value_len {
+                Err(format!("global object {} has invalid .size parameter: too small", name))?;
+            }
+            *item_size -= value_len;
         }
         if *item_size > 0 {
-            Err(format!("global object {} has invalid \".size\" value: bigger than defined values", name))?;
+            Err(format!("global object {} has invalid \".size\" value: real size = {}", name, *item_size))?;
         }
         ok!()
     }
@@ -518,7 +528,7 @@ impl ParseEngine {
                 let mut ptr = item.0.clone();
                 for subitem in item.1 {
                     dict.set(ptr_to_builder(ptr).unwrap().into(), subitem.write().into()).unwrap();
-                    ptr += OFFSET_NEXT_DATA;
+                    ptr += WORD_SIZE;
                 }
             }
             dict
@@ -559,7 +569,7 @@ impl ParseEngine {
         println!("Entry point:\n{}\n{}\n{}", line, self.entry(), line);
         println!("General-purpose functions:\n{}", line);
         for (k, v) in &self.xrefs {
-            println! ("Function {:30}: id={:08X}, sign-check={:?}", k, v, self.signed.get(&v).unwrap());
+            println! ("Function {:30}: id={:08X}", k, v);
         }
         for (k, v) in self.globals() {
             println! ("Function {:08X}\n{}\n{}\n{}", k, line, v, line);
@@ -663,7 +673,7 @@ mod tests {
             BLKDROP 2
         ", 
         base = 1000000,
-        offset = OFFSET_NEXT_DATA,
+        offset = WORD_SIZE,
         ))
         .with_stack(
             Stack::new()
@@ -699,8 +709,16 @@ mod tests {
     #[test]
     fn test_parser_var_with_comm() {
         let mut parser = ParseEngine::new();
-        let source_file = File::open("./tests/comm-test.s").unwrap();
+        let source_file = File::open("./tests/comm_test1.s").unwrap();
         let lib_file = File::open("./stdlib.tvm").unwrap();
         assert_eq!(parser.parse(source_file, vec![lib_file], None), ok!());
+    }
+
+    #[test]
+    fn test_parser_bss() {
+        let mut parser = ParseEngine::new();
+        let source = File::open("./tests/bss_test1.s").unwrap();
+        let lib = File::open("./stdlib.tvm").unwrap();
+        assert_eq!(parser.parse(source, vec![lib], None), ok!());
     }     
 }

@@ -25,6 +25,7 @@ mod methdict;
 mod testcall;
 
 use abi::build_abi_body;
+use clap::ArgMatches;
 use keyman::KeypairManager;
 use parser::ParseEngine;
 use program::Program;
@@ -32,8 +33,9 @@ use real_ton::{ decode_boc, compile_message };
 use resolver::resolve_name;
 use std::fs::File;
 use std::io::{BufReader, Read};
+use std::sync::Arc;
 use testcall::perform_contract_call;
-use tvm::stack::BuilderData;
+use tvm::stack::{BuilderData, CellData};
 
 fn main() {
     if let Err(err_str) = linker_main() {
@@ -74,6 +76,9 @@ fn linker_main() -> Result<(), String> {
             (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
             (@arg INTERNAL: --internal +takes_value "Emulates inbound internal message with value instead of external message")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
+            (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
+            (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[BODY] "Supplies the name of the calling contract method")
+            (@arg ABI_PARAMS: -p --("abi-params") +takes_value conflicts_with[BODY] "Supplies ABI arguments for the contract method")
         )
         (@subcommand message =>
             (about: "generate external inbound message for the blockchain")
@@ -85,14 +90,39 @@ fn linker_main() -> Result<(), String> {
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[DATA] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[DATA] "Supplies the name of the calling contract method")
             (@arg ABI_PARAMS: -p --("abi-params") +takes_value conflicts_with[DATA] "Supplies ABI arguments for the contract method")
-            (@arg SETKEY: --setkey +takes_value "Loads existing keypair from the file")
+            (@arg SIGN: --setkey +takes_value "Loads existing keypair from the file")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name")
         )
         (@setting SubcommandRequired)
     ).get_matches();
 
+    let build_body = |matches: &ArgMatches| {
+        let mut mask = 0u8;
+        let abi_file = matches.value_of("ABI_JSON").map(|m| {mask |= 1; m });
+        let method_name = matches.value_of("ABI_METHOD").map(|m| {mask |= 2; m });
+        let params = matches.value_of("ABI_PARAMS").map(|m| {mask |= 4; m });
+        if mask == 0x7 {
+            let key_file = matches.value_of("SIGN").map(|path| {
+                let pair = KeypairManager::from_secret_file(path);
+                pair.drain()
+            });
+            println!("key_file.is_none = {}", key_file.is_none());
+            let body: Arc<CellData> = build_abi_body(
+                abi_file.unwrap(), 
+                method_name.unwrap(), 
+                params.unwrap(), 
+                key_file
+            )?.into();
+            Ok(Some(body))
+        } else if mask == 0 {
+            Ok(None)
+        } else {
+            Err("All ABI parameters must be supplied: ABI_JSON, ABI_METHOD, ABI_PARAMS".to_string())
+        }
+    };
+
     if let Some(test_matches) = matches.subcommand_matches("test") {
-        let body = match test_matches.value_of("BODY") {
+        let (body, sign) = match test_matches.value_of("BODY") {
             Some(hex_str) => {
                 let mut hex_str = hex_str.to_string();
                 let mut parser = ParseEngine::new();
@@ -109,16 +139,16 @@ fn linker_main() -> Result<(), String> {
 
                 let buf = hex::decode(&hex_str).map_err(|_| format!("body {} is invalid hex string", hex_str))?;
                 let buf_bits = buf.len() * 8;
-                Some(BuilderData::with_raw(buf, buf_bits).into())
+                (Some(BuilderData::with_raw(buf, buf_bits).into()), Some(test_matches.value_of("SIGN")))
             },
-            None => None,
+            None => (build_body(test_matches)?, None),
         };
         
         println!("TEST STARTED\nbody = {:?}", body);
         perform_contract_call(
             test_matches.value_of("INPUT").unwrap(), 
             body, 
-            test_matches.value_of("SIGN"), 
+            sign, 
             test_matches.is_present("TRACE"), 
             test_matches.is_present("DECODEC6"),
             test_matches.value_of("INTERNAL"),
@@ -150,22 +180,7 @@ fn linker_main() -> Result<(), String> {
                 Some(BuilderData::with_raw(buf, len).into())
             },
             None => {
-                let mut mask = 0u8;
-                let abi_file = msg_matches.value_of("ABI_JSON").map(|m| {mask |= 1; m });
-                let method_name = msg_matches.value_of("ABI_METHOD").map(|m| {mask |= 2; m });
-                let params = msg_matches.value_of("ABI_PARAMS").map(|m| {mask |= 4; m });
-                if mask == 0x7 {
-                    let key_file = msg_matches.value_of("SETKEY").map(|path| {
-                        let pair = KeypairManager::from_secret_file(path);
-                        pair.drain()
-                    });
-                    println!("key_file.is_none = {}", key_file.is_none());
-                    Some(build_abi_body(abi_file.unwrap(), method_name.unwrap(), params.unwrap(), key_file)?.into())
-                } else if mask == 0 {
-                    None
-                } else {
-                    return Err("All ABI parameters must be supplied: ABI_JSON, ABI_METHOD, ABI_PARAMS".to_string());
-                }
+                build_body(msg_matches)?
             },
         };
         
