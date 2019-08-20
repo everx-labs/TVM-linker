@@ -139,7 +139,7 @@ def expect_output(regex):
 			return
 	assert False, regex
 
-	'''
+	# '''
 
 compile1('test_factorial.code', 'stdlib_sol.tvm')
 expect_success('constructor', "", "", "")
@@ -231,8 +231,6 @@ expect_success("main", "", "0", "--internal 0")
 #check tvm_rand_seed
 compile1('test_tvm_rand_seed.code', 'stdlib_sol.tvm')
 expect_success("main", "", "0", "--internal 0")
-
-'''
 
 #check array length change
 compile1('test_array_size.code', 'stdlib_sol.tvm')
