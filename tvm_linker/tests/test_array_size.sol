@@ -2,7 +2,7 @@ pragma solidity ^0.5.0;
 
 contract Test28 {
 
-    uint[] arr;
+    uint8[] arr;
 
     function main(uint required_len) public payable returns (uint) {
         arr[0] = 2;
