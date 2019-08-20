@@ -175,6 +175,38 @@
 	; s5 - unixtime
 	RET
 
+	.globl		change_array_length
+	.type		change_array_length, @function
+	;; s0 - old len
+	;; s1 - new len
+	;; s2 - array
+	LOGSTR change_arr_len
+	PUSHCONT {
+		;; old len
+		DUP
+		;; new len
+		PUSH s2
+		;; >
+		GREATER
+		NOT DUP IFRET DROP
+		;; m_isUntil = 1
+		;; old len
+		DUP
+		DEC
+		;; assign old len
+		NIP
+		DUP
+		PUSH s3
+		PUSHINT 32
+		DICTUDEL
+		POP s3
+		FALSE
+	}
+	UNTIL
+	DROP
+	DROP
+	RET
+
 	.globl		get_address
 	.type		get_address, @function
 	;; stack=0

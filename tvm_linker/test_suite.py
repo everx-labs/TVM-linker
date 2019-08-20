@@ -139,7 +139,7 @@ def expect_output(regex):
 			return
 	assert False, regex
 
-	# '''
+	'''
 
 compile1('test_factorial.code', 'stdlib_sol.tvm')
 expect_success('constructor', "", "", "")
@@ -201,8 +201,6 @@ expect_success("main", "", "15000000000", "--internal 15000000000")
 compile1('test_balance.code', 'stdlib_sol.tvm')
 expect_success("main", "", "100000000000", "--internal 0")
 
-	# '''
-
 compile2('contract09-a')
 expect_success('sendMoneyAndNumber', ("12" * 32) + ("7" * 16), None, "--internal 0 --decode-c6")
 expect_output(r"destination : 0:12121212")
@@ -233,5 +231,11 @@ expect_success("main", "", "0", "--internal 0")
 #check tvm_rand_seed
 compile1('test_tvm_rand_seed.code', 'stdlib_sol.tvm')
 expect_success("main", "", "0", "--internal 0")
+
+'''
+
+#check array length change
+compile1('test28.code', 'stdlib_sol.tvm')
+expect_success("main", "02", "2", "--internal 0")
 
 cleanup()
