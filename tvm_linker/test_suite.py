@@ -236,6 +236,6 @@ expect_success("main", "", "0", "--internal 0")
 
 #check array length change
 compile1('test_array_size.code', 'stdlib_sol.tvm')
-expect_success("main", "02", "2", "--internal 0")
+expect_success("main", "0000000000000000000000000000000000000000000000000000000000000002", "2", "--internal 0")
 
 cleanup()

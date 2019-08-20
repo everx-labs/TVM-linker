@@ -199,12 +199,12 @@
 		PUSH s3
 		PUSHINT 32
 		DICTUDEL
+		DROP
 		POP s3
 		FALSE
 	}
 	UNTIL
-	DROP
-	DROP
+	BLKDROP 2
 	RET
 
 	.globl		get_address
