@@ -378,6 +378,16 @@
 	; s5 - gram balance of msg: int
 	; s6 - gram balance of contract: int
 	
+	; msgbody:slice contract_balance msg_balance addr signature
+	PUSH s4
+	; msgbody:slice contract_balance msg_balance addr signature msgbody:slice 
+	LDREF
+	; msgbody:slice contract_balance msg_balance addr signature signature_cell msgbody:slice 
+	POP s6
+	; msgbody:slice' contract_balance msg_balance addr signature signature_cell
+	DROP
+	; msgbody:slice' contract_balance msg_balance addr signature
+	
 	PUSHINT $store_signature$
 	CALL 1
 	NIP
@@ -550,6 +560,10 @@
     ; s2 - gram balance of msg: int
     ; s3 - gram balance of contract: int
 	LOGSTR main_internal
+	
+	LDREF	; skip empty cell with signature
+	NIP
+	
 	PUSH s3
 	PUSH s3
 	; s0 - gram balance of msg: int
@@ -832,8 +846,11 @@
 
 	; Stucture of encoded array
 	; 2 bits put in the cell-data define serialization algorithm.
-	; [00] - array is put into a separate cell. In case of array overflowing the maximum cell-data size it's split into multiple sequential cells.
-	; [10] - bits sequence is put in the cell-data. The next 8 bits (1 byte) define the number of elements of the array. It's followed by the sequence of encoded array elements.
+	; [00] - array is put into a separate cell. In case of array overflowing 
+	;        the maximum cell-data size it's split into multiple sequential cells.
+	; [10] - bits sequence is put in the cell-data. The next 8 bits (1 byte) define 
+	;        the number of elements of the array. It's followed by the sequence of 
+	; 		 encoded array elements.
 	; [01]/[11] - reserved.
 
 	; stacktrace: sl numBits
@@ -848,6 +865,8 @@
 	PUSHCONT { ; [00] serialization algorithm
 		;stacktrace: numBits sl algo
 
+		LOGSTR decode_array00
+			
 		DROP      ; stacktrace: numBits sl
 		LDREF     ; stacktrace: numBits cell sl
 		ROTREV    ; stacktrace: sl numBits cell
@@ -955,6 +974,8 @@
 
 		PUSHCONT { ; [10] serialization algorithm
 			DROP
+			
+			LOGSTR decode_array10
 
 			LDU 8 ; load number of elements of the array
 			SWAP
