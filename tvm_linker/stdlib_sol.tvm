@@ -181,29 +181,46 @@
 	;; s1 - new len
 	;; s2 - array
 	LOGSTR change_arr_len
+	DUP
+	PUSH s2
+	;; >=
+	GEQ
 	PUSHCONT {
-		;; old len
-		DUP
-		;; new len
-		PUSH s2
-		;; >
-		GREATER
-		NOT DUP IFRET DROP
-		;; m_isUntil = 1
-		;; old len
-		DUP
-		DEC
-		;; assign old len
-		NIP
-		DUP
-		PUSH s3
-		PUSHINT 32
-		DICTUDEL
-		DROP
-		POP s3
-		FALSE
+		PUSHCONT {
+			;; old len
+			DUP
+			;; new len
+			PUSH s2
+			;; >
+			GREATER
+			NOT DUP IFRET DROP
+			;; old len
+			DUP
+			DEC
+			;; assign old len
+			NIP
+			DUP
+			PUSH s3
+			PUSHINT 32
+			DICTUDEL
+			DROP
+			POP s3
+			FALSE
+		}
+		UNTIL
+		; while end
 	}
-	UNTIL
+	PUSHCONT {
+		PUSHINT 0
+		NEWC STU 256 ENDC CTOS
+		PUSH s2
+		DEC
+		PUSH s4
+		PUSHINT 32
+		DICTUSET
+		POP s3
+	}
+	IFELSE
 	BLKDROP 2
 	RET
 

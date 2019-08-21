@@ -277,7 +277,7 @@ def testOld2():
 	
 	#check array length change
 	compile1('test_array_size.code', 'stdlib_sol.tvm')
-	expect_success("main", "0000000000000000000000000000000000000000000000000000000000000002", "2", "--internal 0")
+	expect_success("main", "0002", "12", "--internal 0")
 
 def testArrays():
 	linker_options = "--internal 0"
