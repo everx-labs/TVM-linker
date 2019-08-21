@@ -7,19 +7,19 @@ contract Test28 {
 
     uint[] arr;
 
-    function main(uint16 required_len) public payable returns (uint) {
+    function main(uint16 starting_len, uint16 new_len) public payable returns (uint) {
         tvm_init_storage();
-        arr[0] = 2;
-        arr[1] = 3;
-        arr[2] = 3;
-        arr[3] = 3;
-        arr[4] = 3;
-        arr[5] = 3;
-        arr[6] = 3;
-        arr.length = required_len;
-        require(arr[6] == 0);
-        arr.length = required_len + 10;
-        require(arr[required_len + 10 - 1] == 0);
+        for (uint i = 0; i < starting_len; i++) {
+            arr[i] = i + 1;
+        }
+        require(arr.length == starting_len);
+        arr.length = new_len;
+        require(arr.length == new_len);
+        if (new_len < starting_len) {
+            for (uint i = new_len; i < starting_len; i++) {
+                require(arr[i] == 0);
+            }
+        }
         return arr.length;
     }
 }

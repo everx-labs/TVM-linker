@@ -275,9 +275,13 @@ def testOld2():
 	compile1('test_tvm_rand_seed.code', 'stdlib_sol.tvm')
 	expect_success("main", "", "0", "--internal 0")
 	
-	#check array length change
+	#check array length enlargement
 	compile1('test_array_size.code', 'stdlib_sol.tvm')
-	expect_success("main", "0002", "12", "--internal 0")
+	expect_success("main", "0006000C", "12", "--internal 0")
+
+	#check array length shrink
+	compile1('test_array_size.code', 'stdlib_sol.tvm')
+	expect_success("main", "000C0006", "6", "--internal 0")
 
 def testArrays():
 	linker_options = "--internal 0"
