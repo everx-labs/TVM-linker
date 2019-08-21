@@ -142,8 +142,10 @@ pub fn perform_contract_call(
         Some(b) => b.into(),
         None => BuilderData::new().into(),
     };
-
-    key_file.map(|key| sign_body(&mut body, key));
+    
+    if !is_internal {
+        key_file.map(|key| sign_body(&mut body, key));
+    }
 
     if !log_enabled!(Error) {
         init_logger(debug);

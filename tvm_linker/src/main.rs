@@ -35,7 +35,7 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::sync::Arc;
 use testcall::perform_contract_call;
-use tvm::stack::{BuilderData, CellData};
+use tvm::stack::{BuilderData, SliceData, CellData};
 
 fn main() {
     if let Err(err_str) = linker_main() {
@@ -107,12 +107,22 @@ fn linker_main() -> Result<(), String> {
                 pair.drain()
             });
             println!("key_file.is_none = {}", key_file.is_none());
-            let body: Arc<CellData> = build_abi_body(
+            let mut body: SliceData = build_abi_body(
                 abi_file.unwrap(), 
                 method_name.unwrap(), 
                 params.unwrap(), 
                 key_file
             )?.into();
+            let body: Arc<CellData> = if matches.is_present("INTERNAL") {
+                //internal messages are unsigned: drop signature cell
+                body.drain_reference();
+                BuilderData::new()
+                    .checked_append_references_and_data(&body)
+                    .unwrap()
+                    .into()
+            } else {
+                body.cell()
+            };
             Ok(Some(body))
         } else if mask == 0 {
             Ok(None)
