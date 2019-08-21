@@ -17,7 +17,7 @@ import time
         - add contract02 support
 '''
 
-cfgFile_name = __file__.replace('.py','') + '.json'
+cfgFile_name = 'test_suite.json'
 script_path = os.path.dirname(os.path.abspath(__file__))
 print('Script folder {}'.format(script_path))
 print('Loading config file ' + cfgFile_name)
@@ -150,6 +150,7 @@ def runTLC(args:str):
     if args!=None:
         cmd = cmd + ' ' + args
     _args = cmd.split(" ")
+    # print(cmd)
     proc = subprocess.Popen(_args, \
         cwd = cfg.get('tlc').get('work_dir', './'), \
         universal_newlines=True, \
@@ -320,6 +321,7 @@ class SoliditySuite(unittest.TestCase):
         subprocess.call('rm -f ./log/output.log', shell=True)
         subprocess.call('rm -rf ./workchains', shell=True)
         cmd = self.cfg['node'].get('cmd')
+        # print(cmd)
         self.node = None
         self.node = subprocess.Popen(cmd, shell=True)
         
@@ -581,7 +583,6 @@ class SoliditySuite(unittest.TestCase):
         waitForBalanceInRange(address2, 12599714, 12699714, 5000)
         waitFor(runTLCAccount,[address2], 5000, r'x\{00000000000000406_\}')
         waitFor(runTLCAccount,[address2], 5000, r'x\{00000000000000000000000000000000000000000000000000000000000B71AFA_\}')
-
 
 if __name__ == '__main__':
     unittest.main()
