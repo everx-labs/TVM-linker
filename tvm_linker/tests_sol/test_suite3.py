@@ -158,7 +158,10 @@ def runTLC(args:str):
         stderr = subprocess.STDOUT)
     return(proc)
 
+do_print_output = False
+
 def runTLCAccount(address:str):
+    # print("!!!!!!!!!! runTLCAccount")
     res = {'result': False, 'output': None}
     cmd = '-a 0:{}'
     proc = runTLC(cmd.format(address))
@@ -166,7 +169,7 @@ def runTLCAccount(address:str):
     ec = proc.poll()
     while (ec == None) and (time.time()*1000-st) < 1500:
         ec = proc.poll()
-        time.sleep(0.1)
+        time.sleep(0.5)
     if ec == None:
         print('Process {} is probably hanged. Terminating.'.format(proc.pid))
         proc.terminate()
@@ -197,10 +200,13 @@ def runTLCAccount(address:str):
         #print('Account {} balance {}'.format(res.get('address',None),res['balance']))
 
     # fetching stack
-    tmp = re.findall(r'library\:hme_empty[\)]*[\n\s]*([\d\w\n\{\}\s]*)',res['output'])
-    if len(tmp)>0: res['stack'] = tmp[0].splitlines()
+    if do_print_output: 
+        print(res['output'])
+    tmp = re.findall(r'library\:hme_empty[\)]*[\n\s]*([\d\w\n\{\}\s]*)', res['output'])
+    
+    if len(tmp)>0: 
+        res['stack'] = tmp[0].splitlines()
 
-    # return result
     return res
 
 def runTLCFile(boc_file:str):
@@ -257,6 +263,7 @@ def waitForBalanceInRange(account, min_value, max_value, timeout):
     return(res)        
 
 def waitForStackChanged(account, timeout, prev_stack=None):
+    # print("!!!!!!!!!!!!! waitForStackChanged")
     sdt = int(round(time.time()*1000))
     init_stack=None
     if prev_stack==None:
@@ -271,6 +278,8 @@ def waitForStackChanged(account, timeout, prev_stack=None):
         and (int(round(time.time()*1000))-sdt)<timeout:
         res = runTLCAccount(account)
         c_stack = res.get('stack')
+        if c_stack == None:
+            continue
         stack_eq = init_stack!=None and c_stack!=None
         # if both stacks not None and has the same size compare each element
         if stack_eq and len(c_stack) == len(init_stack):
@@ -306,7 +315,13 @@ def waitForStackChanged(account, timeout, prev_stack=None):
             stack_eq = True
     
     # return result
-    return(res)        
+    return(res)
+    
+def waitForAccountStateContains(address, regexp):
+    return waitFor(runTLCAccount, [address], 10000, regexp)
+    
+def sendFile(filename):
+    waitFor(runTLCFile, [filename], 5000, r'external message status is 1')
 
 class SoliditySuite(unittest.TestCase):
     def setUp(self):
@@ -331,6 +346,9 @@ class SoliditySuite(unittest.TestCase):
         os.chdir(script_path)
         subprocess.call('rm -f *.tvc *.boc *.tmp', shell=True)
         
+        # fetching state of zero account to make sure node is up
+        waitForAccountStateContains("0" * 64, r'state:\(account_active')
+        
     def tearDown(self):
         print('\nFinishing')
         if self.node!=None:
@@ -338,7 +356,10 @@ class SoliditySuite(unittest.TestCase):
             self.node.wait()
         subprocess.call('pkill ton-node', shell=True)
         
-    def deployContract(self, contractName:str, contract_abi:str, amount: str):
+    def deployContract(self, contract):
+        contractName = contract + '.code'
+        contract_abi = contract + '.abi.json'
+        amount = '1000000'
         address = runLinkerCompile(contractName, contract_abi)
         self.assertNotEqual(address,None, \
             'Contract {} hasn\'t been compiled'.format(contractName))
@@ -354,132 +375,95 @@ class SoliditySuite(unittest.TestCase):
             'Expected message file for contract {} wasn\'t been created'.format(contractName))
         #print('Created message file for contract {}:'.format(contractName), msgfile)
 
-        # fetching state of zero account to make sure node is up
-        waitFor(runTLCAccount, ["0" * 64], 5000, r'state:\(account_active')
-
-        waitFor(runTLCFile, [msgfile], 5000, r'external message status is 1')
-        waitFor(runTLCAccount, [address], 5000, r'state:account_uninit')
+        sendFile(msgfile)
+        waitForAccountStateContains(address, r'state:account_uninit')
         
-        waitFor(runTLCFile, [msginit], 5000, r'external message status is 1')
-        waitFor(runTLCAccount, [address], 5000, r'state:\(account_active')
+        sendFile(msginit)
+        waitForAccountStateContains(address, r'state:\(account_active')
         
         return address
     
     def test_01(self):
-        address = self.deployContract('contract01.code', 'contract01.abi.json','1000000')
+        address = self.deployContract('contract01')
     
         msgbody = runLinkerMsgBody(address, 'contract01.abi.json', '{"a":"0x1234"}', 'main_external')
         self.assertNotEqual(msgbody, None, 'No msg body boc file created')
         
-        tmp = waitFor(runTLCAccount, [address], 5000, r'state:\(account_active')
+        tmp = waitForAccountStateContains(address, r'state:\(account_active')
         self.assertEqual(tmp['stack'][len(tmp['stack'])-1] \
             if len(tmp.get('stack',None))>0 else None, " x{4_}")
 
         print("Sending " + msgbody)		
-        waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
+        sendFile(msgbody)
 
         print("Getting account state")		
-        tmp = waitFor(runTLCAccount,[address], 5000, \
-            r'\{D0000001234\}')
+        tmp = waitForAccountStateContains(address, r'\{D0000001234\}')
         self.assertEqual(tmp['stack'][len(tmp['stack'])-1] if len(tmp.get('stack',None))>0 \
             else None, "  x{D0000001234}")
 
     def test_02(self):
-        # prepare contract a
-        address1 = self.deployContract('contract02-a.code', 'contract02-a.abi.json','1000000')
-        
-        # prepare contract b
-        address2 = self.deployContract('contract02-b.code', 'contract02-b.abi.json','1000000')
+        address1 = self.deployContract('contract02-a')
+        address2 = self.deployContract('contract02-b')
         
         # prepare message body for contract a
-        msgbody = runLinkerMsgBody(address1, 'contract02-a.abi.json', '{"anotherContract":"0x' + \
-            address2 + '"}', 'method_external')
+        params = '{"anotherContract":"0x%s"}' % address2
+        msgbody = runLinkerMsgBody(address1, 'contract02-a.abi.json', params, 'method_external')
 
-        # checking initial account state
-        waitFor(runTLCAccount,[address1], 5000, r'(state:\(account_active)')
-        waitFor(runTLCAccount,[address2], 5000, r'(state:\(account_active)')
-        
         # sending body to node
-        waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
+        sendFile(msgbody)
 
-        waitFor(runTLCAccount,[address1], 5000, \
-            r'x\{D000000000000000000000000000000000000000000000000000000000000000001\}')
-        waitFor(runTLCAccount,[address2], 5000, \
-            r'x\{D000000000000000101\}')
+        waitForAccountStateContains(address1, r'x\{D000000000000000000000000000000000000000000000000000000000000000001\}')
+        waitForAccountStateContains(address2, r'x\{D000000000000000101\}')
         
     def test_03(self):
-        # prepare contract a
-        address1 = self.deployContract('contract03-a.code', 'contract03-a.abi.json','1000000')
-        
-        # prepare contract b
-        address2 = self.deployContract('contract03-b.code', 'contract03-b.abi.json','1000000')
+        address1 = self.deployContract('contract03-a')
+        address2 = self.deployContract('contract03-b')
         
         # prepare message body for contract a
         msgbody = runLinkerMsgBody(address1, 'contract03-a.abi.json', '{"anotherContract":"0x' + \
             address2 + '"}', 'method_external')
 
-        # checking initial account state
-        waitFor(runTLCAccount,[address1], 5000, r'(state:\(account_active)')
-        waitFor(runTLCAccount,[address2], 5000, r'(state:\(account_active)')
-        
         # sending body to node
-        waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
+        sendFile(msgbody)
 
-        waitFor(runTLCAccount,[address1], 5000, \
-            r'x\{D000000000000000000000000000000000000000000000000000000000000000001\}')
-        str2expect = r'x\{D00%s\}' % address1
-        waitFor(runTLCAccount,[address2], 5000, str2expect)
+        waitForAccountStateContains(address1, r'x\{D000000000000000000000000000000000000000000000000000000000000000001\}')
+        waitForAccountStateContains(address2, r'x\{D00%s\}' % address1)
         
     def test_04(self):
-        # prepare contract a
-        address1 = self.deployContract('contract04-a.code', 'contract04-a.abi.json','10000000')
-        
-        # prepare contract b
-        address2 = self.deployContract('contract04-b.code', 'contract04-b.abi.json','10000000')
+        address1 = self.deployContract('contract04-a')
+        address2 = self.deployContract('contract04-b')
         
         # prepare message body for contract a
         msgbody = runLinkerMsgBody(address1, 'contract04-a.abi.json', '{"anotherContract":"0x' + \
             address2 + '","amount":"5000000"}', 'method_external')
         
-        # checking initial account state
-        waitFor(runTLCAccount,[address1], 5000, r'state:\(account_active')
-        waitFor(runTLCAccount,[address2], 5000, r'state:\(account_active')
-        
         # sending body to node
-        waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
+        sendFile(msgbody)
 
         # checking account balance changes
         waitForBalanceInRange(address1, 14300000, 15100000, 5000)
         waitForBalanceInRange(address2, 4500000, 5300000, 5000)
 
     def test_05(self):
-        # prepare contract a
-        address1 = self.deployContract('contract05-a.code', 'contract05-a.abi.json','10000000')
-        
-        # prepare contract b
-        address2 = self.deployContract('contract05-b.code', 'contract05-b.abi.json','10000000')
+        address1 = self.deployContract('contract05-a')
+        address2 = self.deployContract('contract05-b')
         
         # prepare message body for contract a
         msgbody = runLinkerMsgBody(address1, 'contract05-a.abi.json', '{"anotherContract":"0x' + \
             address2 + '","x":"257"}', 'method_external')
 
-        # checking initial account state
-        waitFor(runTLCAccount,[address1], 5000, r'state:\(account_active')
-        waitFor(runTLCAccount,[address2], 5000, r'state:\(account_active')
-        
         # sending body to node
-        waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
+        sendFile(msgbody)
 
         # checking account balance changes
-        waitFor(runTLCAccount,[address2], 5000, r'x\{D000101\}')
-        waitFor(runTLCAccount,[address1], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000001010\}')
+        waitForAccountStateContains(address2, r'x\{D000101\}')
+        waitForAccountStateContains(address1, r'x\{D000000000000000000000000000000000000000000000000000000000000001010\}')
 
     def test_06(self):
-        # prepare contract a
-        address1 = self.deployContract('contract06-a.code', 'contract06-a.abi.json','10000000')
+        global do_print_output
         
-        # prepare contract b
-        address2 = self.deployContract('contract06-b.code', 'contract06-b.abi.json','10000000')
+        address1 = self.deployContract('contract06-a')
+        address2 = self.deployContract('contract06-b')
         
         # prepare message body for contract1
         msgbody1 = runLinkerMsgBody(address1, 'contract06-a.abi.json', '{"anotherContract":"0x' + \
@@ -489,22 +473,20 @@ class SoliditySuite(unittest.TestCase):
         msgbody2 = runLinkerMsgBody(address2, 'contract06-b.abi.json', '{"bank":"0x' + \
             address1 + '"}', 'getMyCredit_external')
         
-        waitFor(runTLCAccount,[address1], 5000, r'state:\(account_active')
-
-        # checking initial account state
-        a1 = waitFor(runTLCAccount,[address1], 5000, r'state:\(account_active')
-        a2 = waitFor(runTLCAccount,[address2], 5000, r'state:\(account_active')
+        a1 = waitForAccountStateContains(address1, r'state:\(account_active')
+        a2 = waitForAccountStateContains(address2, r'state:\(account_active')
         
         # sending contract1 message body to node
-        waitFor(runTLCFile, [msgbody1], 5000, r'external message status is 1')
+        sendFile(msgbody1)
 
         # checking account stack changes
-        waitForStackChanged(address1, 5000, a1.get('stack'))
+        waitForStackChanged(address1, 10000, a1.get('stack'))
 
         # sending contract2 message body to node
-        waitFor(runTLCFile, [msgbody2], 5000, r'external message status is 1')
+        sendFile(msgbody2)
 
         # checking account stack changes
+        # do_print_output = True
         tmp = waitForStackChanged(address2, 5000, a2.get('stack'))
         last_rec = tmp['stack'][len(tmp['stack'])-1] if len(tmp.get('stack'))>0 else None
         self.assertEqual(last_rec.strip(),\
@@ -513,21 +495,20 @@ class SoliditySuite(unittest.TestCase):
 
     def test_07(self):
         # prepare contract a
-        address1 = self.deployContract('contract07-a.code', 'contract07-a.abi.json','1000000')
+        address1 = self.deployContract('contract07-a')
         
         # prepare contract b
-        address2 = self.deployContract('contract07-b.code', 'contract07-b.abi.json','1000000')
+        address2 = self.deployContract('contract07-b')
         
         # prepare message body for contract a
         msgbody = runLinkerMsgBody(address1, 'contract07-a.abi.json', '{"anotherContract":"0x' + \
             address2 + '"}', 'method_external')
 
         # checking initial account state
-        waitFor(runTLCAccount,[address1], 5000, r'(state:\(account_active)').get('balance')
-        b2 = waitFor(runTLCAccount,[address2], 5000, r'(state:\(account_active)').get('balance')
+        b2 = waitForAccountStateContains(address2, r'(state:\(account_active)').get('balance')
         
         # sending body to node
-        waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
+        sendFile(msgbody)
 
         s1 = waitForStackChanged(address1, 5000).get('stack')
         s1 = re.findall(r'D0([0-9]*)',s1[len(s1)-1])[0]
@@ -539,50 +520,38 @@ class SoliditySuite(unittest.TestCase):
         self.assertTrue(v2 > b2 and v2 < 1000000, 'Unexpected stack value for balance')
     
     def test_08(self):
-        # prepare contract a
-        address1 = self.deployContract('contract08-a.code', 'contract08-a.abi.json','10000000')
-        
-        # prepare contract b
-        address2 = self.deployContract('contract08-b.code', 'contract08-b.abi.json','10000000')
+        address1 = self.deployContract('contract08-a')
+        address2 = self.deployContract('contract08-b')
         
         # prepare message body for contract a
         msgbody = runLinkerMsgBody(address1, 'contract08-a.abi.json', '{"anotherContract":"0x' + \
             address2 + '"}', 'method_external')
 
-        # checking initial account state
-        waitFor(runTLCAccount,[address1], 5000, r'state:\(account_active')
-        waitFor(runTLCAccount,[address2], 5000, r'state:\(account_active')
-        
         # sending body to node
-        waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
+        sendFile(msgbody)
 
         # checking account balance changes
-        waitFor(runTLCAccount,[address1], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000001\}')
-        waitFor(runTLCAccount,[address2], 5000, r'x\{D000000000000000000000000000000000000000000000000000000000000000000\}')
+        waitForAccountStateContains(address1, r'x\{D000000000000000000000000000000000000000000000000000000000000000001\}')
+        waitForAccountStateContains(address2, r'x\{D000000000000000000000000000000000000000000000000000000000000000000\}')
 
     def test_09(self):
         # prepare contract a
-        address1 = self.deployContract('contract09-a.code', 'contract09-a.abi.json','10000000')
+        address1 = self.deployContract('contract09-a')
         
         # prepare contract b
-        address2 = self.deployContract('contract09-b.code', 'contract09-b.abi.json','10000000')
+        address2 = self.deployContract('contract09-b')
         
         # prepare message body for contract a
         msgbody = runLinkerMsgBody(address1, 'contract09-a.abi.json', '{"remote":"0x' + \
             address2 + '","number":"257"}', 'sendMoneyAndNumber_external')
 
-        # checking initial account state
-        waitFor(runTLCAccount,[address1], 5000, r'state:\(account_active')
-        waitFor(runTLCAccount,[address2], 5000, r'state:\(account_active')
-        
         # sending body to node
-        waitFor(runTLCFile, [msgbody], 5000, r'external message status is 1')
+        sendFile(msgbody)
 
         # checking account changes
         waitForBalanceInRange(address1, 6445936, 6545936, 5000)
         waitForBalanceInRange(address2, 12599714, 12699714, 5000)
-        waitFor(runTLCAccount,[address2], 5000, r'x\{00000000000000406_\}')
-        waitFor(runTLCAccount,[address2], 5000, r'x\{00000000000000000000000000000000000000000000000000000000000B71AFA_\}')
+        waitForAccountStateContains(address2, r'x\{00000000000000406_\}')
+        waitForAccountStateContains(address2, r'x\{00000000000000000000000000000000000000000000000000000000000B71AFA_\}')
 
-if __name__ == '__main__':
-    unittest.main()
+unittest.main()
