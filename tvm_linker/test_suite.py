@@ -276,7 +276,8 @@ def testOld2():
 	expect_success("main", "", "0", "--internal 0")
 
 def testArrays():
-	linker_options = "--internal 0"
+	#it maybe '--sign key1' or '--internal 0' - test will work correctly
+	linker_options = ""
 	compile2('test_arrays', 'tests')
 
 	expect_success2("test_arrays", "at32_external", '{"idx": 0, "arr": []}', "0", linker_options)
@@ -287,7 +288,7 @@ def testArrays():
 	expect_success2("test_arrays", "at32_external", '{"idx": 2, "arr": [2, 3, 5, 7]}', "5", linker_options)
 	# expect_success2("test_arrays", "at32_external", '{"idx": 3, "arr": [2, 3, 5, 7]}', "7", linker_options)
 	expect_success2("test_arrays", "at32_external", '{"idx": 4, "arr": [2, 3, 5, 7]}', "0", linker_options)
-
+	
 	expect_success2("test_arrays", "at256_external", '{"idx": "0", "arr": [2, 3, 5, 7, 11, 13, 17]}', "2", linker_options)
 	# expect_success2("test_arrays", "at256_external", '{"idx": "1", "arr": [2, 3, 5, 7, 11, 13, 17]}', "3", linker_options)
 	# expect_success2("test_arrays", "at256_external", '{"idx": "2", "arr": [2, 3, 5, 7, 11, 13, 17]}', "5", linker_options)

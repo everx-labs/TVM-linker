@@ -377,6 +377,16 @@
 	; s4 - msg body: slice
 	; s5 - gram balance of msg: int
 	; s6 - gram balance of contract: int
+
+	PUSH s4		;push body
+	DUP
+	SREMPTY
+	PUSHCONT {
+		LDREF		;detach signature cell from body
+		POP s6		;rewrite original body with remaining body slice
+	}
+	IFNOT
+	DROP			;drop body or signature cell
 	
 	PUSHINT $store_signature$
 	CALL 1
