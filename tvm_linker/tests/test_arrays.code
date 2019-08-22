@@ -33,6 +33,56 @@ POP s1
 POP s1
 RET
 
+.globl	pair64_external
+.type	pair64_external, @function
+PUSHINT 64
+PUSHINT $decode_array$
+CALL 1
+PUSHINT 64
+PUSHINT $decode_array$
+CALL 1
+DROP
+PUSHINT $pair64$
+CALL 1
+
+.globl	pair64
+.type	pair64, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: pair64
+;; param: arr1
+;; param: arr2
+;; arr1
+;; stack=2
+LOGSTR pair64
+PUSH s1
+PUSHINT 0
+;; index
+SWAP
+PUSHINT 32
+DICTUGET
+PUSHCONT { LDU 64 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; arr2
+;; stack=3
+PUSH s1
+PUSHINT 0
+;; index
+SWAP
+PUSHINT 32
+DICTUGET
+PUSHCONT { LDU 64 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; +
+ADD
+;; return
+POP s1
+POP s1
+;; uint64
+UFITS 64
+RET
+
 .globl	at256_external
 .type	at256_external, @function
 LDU 8
