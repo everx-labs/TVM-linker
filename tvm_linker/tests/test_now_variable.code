@@ -1,0 +1,21 @@
+
+.globl	main_external
+.type	main_external, @function
+DROP
+PUSHINT $main$
+CALL 1
+
+.globl	main
+.type	main, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: main
+;; now
+;; stack=0
+PUSHINT $get_unixtime$
+CALL 1
+PUSHINT 0
+;; >
+GREATER
+;; require
+;; stack=1
+THROWIFNOT 100

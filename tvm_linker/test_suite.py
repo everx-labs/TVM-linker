@@ -258,6 +258,12 @@ def testOld2():
 	#check tvm_now
 	compile1('test_now.code', 'stdlib_sol.tvm')
 	# expect_success("main", "", "1564090968", "--internal 0")
+	
+	# TODO: cannot predict value of now, need to test it somehow
+	#check now global variable
+	compile1('test_now_variable.code', 'stdlib_sol.tvm')
+	expect_success("main", "", "", "--internal 0")
+	
 
 	#check tvm_address
 	compile1('test_tvm_address.code', 'stdlib_sol.tvm')
