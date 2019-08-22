@@ -279,7 +279,9 @@ def testArrays():
 	#it maybe '--sign key1' or '--internal 0' - test will work correctly
 	linker_options = ""
 	compile2('test_arrays', 'tests')
-
+	ar1 = '1,'*500 + "1";
+	ar2 = '2,'*500 + "2";
+	expect_success2("test_arrays", "pair8_external", '{"arr1": [' + ar1 + '], "arr2": [' + ar2 + ']}', "3", linker_options)
 	expect_success2("test_arrays", "pair64_external", '{"arr1": [1,2,3,4,5,6,7,8,9,10], "arr2": [1,2,3,4,5,6]}', "2", linker_options)
 	expect_success2("test_arrays", "at32_external", '{"idx": 0, "arr": []}', "0", linker_options)
 	expect_success2("test_arrays", "at32_external", '{"idx": 1, "arr": []}', "0", linker_options)
@@ -337,9 +339,22 @@ def testFailing():
 	compile2('test_arrays', 'tests')
 	expect_success2("test_arrays", "at256_external", '{"idx": "0", "arr": [2, 3, 5, 7, 11, 13, 17]}', "2", linker_options)
 
+def testCall():
+	linker_options = "--sign key1 --decode-c6"
+	compile2('test_call1', 'tests')
+
+	expect_success2('test_call1', 'constructor', '{}', '', linker_options)
+	addr = '1'*64
+	expect_success2('test_call1', 'send_external', '{"a": "0x' + addr + '"}', \
+		'7719472615821079694904732333912527190217998977709370935963838933860875309329', linker_options)
+	expect_output(r"destination : 0:1111111111111111111111111111111111111111111111111111111111111111")
+	expect_output(r"body_hex: 00852d5aea")
+
+
 testOld()
 testOld2()
 testArrays()
+testCall()
 #testFailing()
 
 '''

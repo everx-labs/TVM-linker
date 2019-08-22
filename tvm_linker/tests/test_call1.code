@@ -1,0 +1,58 @@
+
+.globl	constructor
+.type	constructor, @function
+DROP
+PUSHINT $constructor_internal$
+CALL 1
+
+.globl	constructor_internal
+.type	constructor_internal, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: constructor
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
+
+.globl	send_external
+.type	send_external, @function
+LDU 256
+DROP
+PUSHINT $send$
+CALL 1
+
+.globl	send
+.type	send, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: send
+;; param: a
+;; a
+;; stack=1
+DUP
+;; IContract
+;; stack=2
+;; IContract.request
+;; c
+PUSHINT 3
+;; b
+PUSHINT 2
+;; a
+PUSHINT 1
+PUSHINT $request_external$
+PUSHINT 0
+NEWC
+STU 8
+STU 32
+;; a
+STU 256
+;; b
+STU 256
+;; c
+STU 256
+ENDC CTOS
+PUSHINT $send_int_msg_2$
+CALL 1
+DROP
+
+.globl	request_external
+.type	request_external, @function
+RET
