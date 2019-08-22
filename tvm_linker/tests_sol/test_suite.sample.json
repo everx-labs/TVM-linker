@@ -13,7 +13,7 @@
         "bin_path": "/home/neon/TON/sdk-emulator/target/debug/create-msg"
     },
     "node": {
-        "cmd": "./target/debug/ton-node --config dumy --localhost > /dev/null",
+        "cmd": "./target/release/ton-node --config dumy --localhost > /dev/null",
         "work_dir": "/home/neon/TON/sdk-emulator"
     }
 }

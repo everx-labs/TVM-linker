@@ -295,7 +295,7 @@ def testArrays():
 	# expect_success2("test_arrays", "at256_external", '{"idx": "3", "arr": [2, 3, 5, 7, 11, 13, 17]}', "7", linker_options)
 	expect_success2("test_arrays", "at256_external", '{"idx": "4", "arr": [2, 3, 5, 7, 11, 13, 17]}', "11", linker_options)
 	# expect_success2("test_arrays", "at256_external", '{"idx": "5", "arr": [2, 3, 5, 7, 11, 13, 17]}', "13", linker_options)
-	# expect_success2("test_arrays", "at256_external", '{"idx": "6", "arr": [2, 3, 5, 7, 11, 13, 17]}', "17", linker_options)
+	expect_success2("test_arrays", "at256_external", '{"idx": "6", "arr": [2, 3, 5, 7, 11, 13, 17]}', "17", linker_options)
 	expect_success2("test_arrays", "at256_external", '{"idx": "7", "arr": [2, 3, 5, 7, 11, 13, 17]}', "0", linker_options)
 
 	## https://oeis.org/A000040/list
