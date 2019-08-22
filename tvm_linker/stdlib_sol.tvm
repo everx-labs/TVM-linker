@@ -180,6 +180,7 @@
 	;; s0 - old len
 	;; s1 - new len
 	;; s2 - array
+	;; s3 - 0 slice size of numBits
 	LOGSTR change_arr_len
 	DUP
 	PUSH s2
@@ -211,8 +212,7 @@
 		; while end
 	}
 	PUSHCONT {
-		PUSHINT 0
-		NEWC STU 256 ENDC CTOS
+		PUSH s3
 		PUSH s2
 		DEC
 		PUSH s4
@@ -222,6 +222,7 @@
 	}
 	IFELSE
 	BLKDROP 2
+	NIP
 	RET
 
 	.globl		get_address

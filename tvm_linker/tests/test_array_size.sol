@@ -2,7 +2,6 @@ pragma solidity ^0.5.0;
 
 contract Test28 {
 
-    function tvm_logstr(bytes32 logstr) private {}
     function tvm_init_storage() private {}
 
     uint[] arr;

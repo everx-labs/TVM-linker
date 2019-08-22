@@ -90,8 +90,10 @@ EQUAL
 ;; require
 ;; stack=3
 THROWIFNOT 100
+PUSHINT 0
+NEWC STU 256 ENDC CTOS
 ;; arr
-;; stack=2
+;; stack=3
 PUSHINT 0
 PUSHROOT CTOS
 PUSHINT 256
@@ -99,11 +101,11 @@ DICTUGET
 PUSHCONT { NEWDICT }
 IFNOT
 ;; new_len
-;; stack=3
-PUSH s1
+;; stack=4
+PUSH s2
 ;; get member length
 ;; arr
-;; stack=4
+;; stack=5
 PUSHINT 0
 PUSHROOT CTOS
 PUSHINT 256

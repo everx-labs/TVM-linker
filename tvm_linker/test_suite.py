@@ -1,8 +1,8 @@
 import re
 import os
 
-TVM_PATH = './target/release/tvm_linker'
-# TVM_PATH = './target/debug/tvm_linker'
+#TVM_PATH = './target/release/tvm_linker'
+TVM_PATH = './target/debug/tvm_linker'
 
 def getFunctions():
 	global functions
@@ -238,6 +238,7 @@ def testOld():
 	expect_success("main", "", "100000000000", "--internal 0")
 
 def testOld2():
+	'''
 	compile2('contract09-a')
 	expect_success('sendMoneyAndNumber', ("12" * 32) + ("7" * 16), None, "--internal 0 --decode-c6")
 	expect_output(r"destination : 0:12121212")
@@ -274,7 +275,7 @@ def testOld2():
 	#check tvm_rand_seed
 	compile1('test_tvm_rand_seed.code', 'stdlib_sol.tvm')
 	expect_success("main", "", "0", "--internal 0")
-	
+	'''
 	#check array length enlargement
 	compile1('test_array_size.code', 'stdlib_sol.tvm')
 	expect_success("main", "0006000C", "12", "--internal 0")
@@ -343,11 +344,11 @@ def testFailing():
 	compile2('test_arrays', 'tests')
 	expect_success2("test_arrays", "at256_external", '{"idx": "0", "arr": [2, 3, 5, 7, 11, 13, 17]}', "2", linker_options)
 
-testOld()
+#testOld()
 testOld2()
-testArrays()
+#testArrays()
 # testFailing()
-
+'''
 SIGN = 'key1'
 compile1('hello.code', 'stdlib_c.tvm')
 expect_success("hello", "", "1", "")
@@ -357,5 +358,5 @@ SIGN = None
 compile1('hello.code', 'stdlib_c.tvm')
 expect_success("hello", "", "1", "")
 expect_output(r"Hello")
-
+'''
 cleanup()
