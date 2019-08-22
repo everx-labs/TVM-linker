@@ -5,6 +5,10 @@
 		"inputs": [{"name": "idx", "type": "uint8"}, {"name": "arr", "type": "uint32[]"}],
 		"outputs": []
 	}, {
+		"name": "pair64_external",
+		"inputs": [{"name": "arr1", "type": "uint64[]"}, {"name": "arr2", "type": "uint64[]"}],
+		"outputs": []
+	}, {
 		"name": "at256_external",
 		"inputs": [{"name": "idx", "type": "uint8"}, {"name": "arr", "type": "uint256[]"}],
 		"outputs": []
