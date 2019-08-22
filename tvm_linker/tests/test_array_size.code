@@ -103,20 +103,6 @@ IFNOT
 ;; new_len
 ;; stack=4
 PUSH s2
-;; get member length
-;; arr
-;; stack=5
-PUSHINT 0
-PUSHROOT CTOS
-PUSHINT 256
-DICTUGET
-PUSHCONT { NEWDICT }
-IFNOT
-PUSHINT 32
-DICTUMAX
-PUSHCONT { POP s1 INC }
-PUSHCONT { PUSHINT 0 }
-IFELSE
 PUSHINT $change_array_length$
 CALL 1
 ;; assign arr

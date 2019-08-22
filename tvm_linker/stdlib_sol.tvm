@@ -177,11 +177,20 @@
 
 	.globl		change_array_length
 	.type		change_array_length, @function
+	;; s0 - new len
+	;; s1 - array
+	;; s2 - 0 slice size of numBits
+	LOGSTR change_arr_len
+	PUSH s1
+	PUSHINT 32
+	DICTUMAX
+	PUSHCONT { POP s1 INC }
+	PUSHCONT { PUSHINT 0 }
+	IFELSE
 	;; s0 - old len
 	;; s1 - new len
 	;; s2 - array
 	;; s3 - 0 slice size of numBits
-	LOGSTR change_arr_len
 	DUP
 	PUSH s2
 	;; >=
