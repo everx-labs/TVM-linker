@@ -13,9 +13,30 @@ CALL 1
 ;; stack=0
 PUSHINT $get_unixtime$
 CALL 1
-PUSHINT 0
+PUSHINT 1566494745
 ;; >
 GREATER
+;; now
+;; stack=1
+PUSHINT $get_unixtime$
+CALL 1
+PUSHINT 1566494745
+PUSHINT 60
+PUSHINT 60
+;; *
+MUL
+PUSHINT 24
+;; *
+MUL
+PUSHINT 356
+;; *
+MUL
+;; +
+ADD
+;; <
+LESS
+;; &&
+AND
 ;; require
 ;; stack=1
 THROWIFNOT 100
