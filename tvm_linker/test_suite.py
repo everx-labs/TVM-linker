@@ -1,8 +1,8 @@
 import re
 import os
 
-TVM_PATH = './target/release/tvm_linker'
-# TVM_PATH = './target/debug/tvm_linker'
+#TVM_PATH = './target/release/tvm_linker'
+TVM_PATH = './target/debug/tvm_linker'
 
 def getFunctions():
 	global functions
@@ -238,6 +238,7 @@ def testOld():
 	expect_success("main", "", "100000000000", "--internal 0")
 
 def testOld2():
+	
 	compile2('contract09-a')
 	expect_success('sendMoneyAndNumber', ("12" * 32) + ("7" * 16), None, "--internal 0 --decode-c6")
 	expect_output(r"destination : 0:12121212")
@@ -280,6 +281,14 @@ def testOld2():
 	#check tvm_rand_seed
 	compile1('test_tvm_rand_seed.code', 'stdlib_sol.tvm')
 	expect_success("main", "", "0", "--internal 0")
+	
+	#check array length enlargement
+	compile1('test_array_size.code', 'stdlib_sol.tvm')
+	expect_success("main", "0006000C", "12", "--internal 0")
+
+	#check array length shrink
+	compile1('test_array_size.code', 'stdlib_sol.tvm')
+	expect_success("main", "000C0006", "6", "--internal 0")
 
 def testArrays():
 	#it maybe '--sign key1' or '--internal 0' - test will work correctly
@@ -353,6 +362,7 @@ compile1('hello.code', 'stdlib_c.tvm')
 expect_success("hello", "", "1", "")
 expect_output(r"Hello")
 SIGN = None
+
 compile1('hello.code', 'stdlib_c.tvm')
 expect_success("hello", "", "1", "")
 expect_output(r"Hello")
