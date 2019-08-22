@@ -280,6 +280,7 @@ def testArrays():
 	linker_options = ""
 	compile2('test_arrays', 'tests')
 
+	expect_success2("test_arrays", "pair64_external", '{"arr1": [1,2,3,4,5,6,7,8,9,10], "arr2": [1,2,3,4,5,6]}', "2", linker_options)
 	expect_success2("test_arrays", "at32_external", '{"idx": 0, "arr": []}', "0", linker_options)
 	expect_success2("test_arrays", "at32_external", '{"idx": 1, "arr": []}', "0", linker_options)
 
@@ -339,7 +340,7 @@ def testFailing():
 testOld()
 testOld2()
 testArrays()
-# testFailing()
+#testFailing()
 
 '''
 TODO: uncomment tests when stdlib_c.tvm will support new spec

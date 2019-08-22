@@ -6,6 +6,10 @@ contract TestArray {
         return arr[idx];
     }
 
+    function pair64(uint64[] memory arr1, uint64[] memory arr2) public pure returns (uint64) {
+        return arr1[0] + arr2[0];
+    }
+
     function at256(uint8 idx, uint256[] memory arr) public pure returns (uint256) {
         return arr[idx];
     }

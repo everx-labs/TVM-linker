@@ -295,7 +295,6 @@
 	; s2 - gram balance of msg: int
 	; s3 - gram balance of contract: int
 	LOGSTR main_external
-	DUMP 0
 	PUSH s3
 	PUSH s3
 	; s0 - gram balance of msg: int
@@ -748,7 +747,7 @@
 	.globl	decode_array
 	.type	decode_array, @function
 	LOGSTR	decode_array0
-	DUMPSTK
+	
 	; Decode array of numbers of given number of bits
 	; args:
 	;   s0 - numBits (integer) - lenght of array's values
@@ -774,7 +773,7 @@
 
 	PUSHCONT { ; [00] serialization algorithm
 		;stacktrace: numBits sl algo
-
+		LOGSTR decode_array00
 		DROP      ; stacktrace: numBits sl
 		LDREF     ; stacktrace: numBits cell sl
 		ROTREV    ; stacktrace: sl numBits cell
@@ -881,8 +880,7 @@
 		EQUAL
 
 		PUSHCONT { ; [10] serialization algorithm
-			LOGSTR	decode_array1
-			DUMPSTK
+			LOGSTR	decode_array10
 			DROP
 
 			LDU 8 ; load number of elements of the array
@@ -896,14 +894,42 @@
 			PUSH s2
 			; stacktrace: numBits sl arrSz arr key arrSz
 			PUSHCONT {
-				LOGSTR	decode_array2
+				LOGSTR	decode_array102
 				; stacktrace: numBits sl arrSz arr key
 
-				PUSH2 s3, s4
-				; stacktrace: numBits sl arrSz arr key sl numBits
-
-				LDSLICEX
-				; stacktrace: numBits sl arrSz arr key arrValue sl
+				PUSH2 s4, s3
+				; stacktrace: numBits sl arrSz arr key numBits sl
+				SBITS
+				; stacktrace: numBits sl arrSz arr key numBits sl_bits
+				SUB
+				; stacktrace: numBits sl arrSz arr key diff_bits
+				DUP ISPOS
+				PUSHCONT {
+					; stacktrace: numBits sl arrSz arr key diff_bits
+					PUSH s4
+					DUP SBITS
+					LDSLICEX 
+					LDREFRTOS NIP
+					; stacktrace: numBits sl arrSz arr key diff_bits sl_remain sl_ref0
+					ROT
+					LDSLICEX
+					; stacktrace: numBits sl arrSz arr key sl_remain sl sl_tail
+					XCHG s2
+					NEWC
+					STSLICE 
+					STSLICE
+					ENDC CTOS
+					SWAP
+					; stacktrace: numBits sl arrSz arr key arrValue sl 
+				}
+				PUSHCONT {
+					; stacktrace: numBits sl arrSz arr key diff_bits
+					DROP
+					PUSH2 s3, s4
+					LDSLICEX
+					; stacktrace: numBits sl arrSz arr key arrValue sl
+				}
+				IFELSE
 
 				POP s5
 				; stacktrace: numBits sl arrSz arr key arrValue
@@ -935,8 +961,7 @@
 		IFELSE
 	}
 	IFELSE
-	LOGSTR	decode_array2
-	DUMPSTK
+	LOGSTR	decode_array3
 	RET
 
 
