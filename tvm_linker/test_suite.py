@@ -350,11 +350,6 @@ def testArrays():
 	# expect_success2("test_arrays", "at32_external", '{"idx":  "53", ' + abi_params + '}', "1000001099", linker_options)
 	expect_success2("test_arrays", "at32_external", '{"idx":  "54", ' + abi_params + '}', "1000001137", linker_options)
 
-def testFailing():
-	linker_options = "--trace"
-	compile2('test_arrays', 'tests')
-	expect_success2("test_arrays", "at256_external", '{"idx": "0", "arr": [2, 3, 5, 7, 11, 13, 17]}', "2", linker_options)
-
 def testCall():
 	linker_options = "--sign key1 --decode-c6"
 	compile2('test_call1', 'tests')
@@ -366,12 +361,31 @@ def testCall():
 	expect_output(r"destination : 0:1111111111111111111111111111111111111111111111111111111111111111")
 	expect_output(r"body_hex: 00852d5aea")
 
+def testContract10():
+    compile2('contract10-a')
+    # simulate deploy (empty input) to initialize storage
+    expect_success(None, "", None, "")	
+
+    expect_success('send_uint64', ("12" * 32) + "0000000000000003", None, "--decode-c6")
+    expect_output(r"destination : 0:12121212")
+    expect_output(r"body_hex: .*00000000000000040000000000000008000000000000000c")
+
+    expect_success('send_uint64', ("12" * 32) + "0000000000000009", None, "--decode-c6")
+    expect_output(r"body.*0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 128,.*, 2, 96\]")
+
+    expect_success('send_uint64', ("12" * 32) + "0000000000000011", None, "--decode-c6")
+    expect_output(r"body.*references: \[CellData \{.*, 0, 0, 3, 224\]")
+
+    expect_success('send_uint64', ("12" * 32) + "0000000000000064", None, "--decode-c6")
+    expect_output(r"body.*references: \[CellData \{.*, 0, 0, 3, 224\]")
+
 
 testOld()
 testOld2()
 testArrays()
 testCall()
-#testFailing()
+testContract10()
+
 
 '''
 TODO: uncomment tests when stdlib_c.tvm will support new spec

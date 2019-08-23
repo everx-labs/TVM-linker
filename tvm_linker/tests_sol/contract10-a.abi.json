@@ -1,0 +1,12 @@
+{
+	"ABI version": 0,
+	"functions": [{
+		"name": "on_uint64_external",
+		"inputs": [{"name": "arr", "type": "uint64[]"}],
+		"outputs": []
+	}, {
+		"name": "send_uint64_external",
+		"inputs": [{"name": "receiver", "type": "uint256"}, {"name": "count", "type": "uint64"}],
+		"outputs": []
+	}]
+}
