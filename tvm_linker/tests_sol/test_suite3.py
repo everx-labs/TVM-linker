@@ -332,7 +332,7 @@ class SoliditySuite(unittest.TestCase):
         if wd != None: 
             self.assertTrue(os.access(wd, os.R_OK), 'No node workdir found')
             os.chdir(wd)
-        subprocess.call('pkill ton-node', shell=True)
+        subprocess.call('pkill ton_node_local', shell=True)
         subprocess.call('rm -f ./log/output.log', shell=True)
         subprocess.call('rm -rf ./workchains', shell=True)
         cmd = self.cfg['node'].get('cmd')
@@ -354,7 +354,7 @@ class SoliditySuite(unittest.TestCase):
         if self.node!=None:
             self.node.terminate()
             self.node.wait()
-        subprocess.call('pkill ton-node', shell=True)
+        subprocess.call('pkill ton_node_local', shell=True)
         
     def deployContract(self, contract):
         contractName = contract + '.code'

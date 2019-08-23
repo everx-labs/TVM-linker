@@ -17,10 +17,10 @@ DUP
 ;; assign m_value
 NEWC STU 16 ENDC CTOS
 PUSHINT 0
-PUSHROOT CTOS
+PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
 PUSHINT 256
 DICTUSET
-NEWC STSLICE ENDC
+NEWC STDICT ENDC
 POPROOT
 ;; get member sender
 PUSHINT $get_msg_sender$
@@ -46,7 +46,7 @@ ENDC CTOS
 PUSHINT $send_int_msg_2$
 CALL 1
 ;; return
-BLKDROP 2
+DROP
 RET
 
 .globl	remoteMethodCallback_external
