@@ -33,7 +33,7 @@ use resolver::resolve_name;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use testcall::perform_contract_call;
-use tvm::stack::{BuilderData, SliceData, CellData};
+use tvm::stack::{BuilderData, SliceData};
 
 fn main() {
     if let Err(err_str) = linker_main() {
@@ -111,16 +111,13 @@ fn linker_main() -> Result<(), String> {
                 params.unwrap(), 
                 key_file
             )?.into();
-            let body: Arc<CellData> = if matches.is_present("INTERNAL") {
+            if matches.is_present("INTERNAL") {
                 //internal messages are unsigned: drop signature cell
-                body.drain_reference();
-                BuilderData::new()
-                    .checked_append_references_and_data(&body)
-                    .unwrap()
-                    .into()
-            } else {
-                body.cell()
-            };
+                body.checked_drain_reference().unwrap();
+                let mut tempbody = BuilderData::new();
+                tempbody.checked_append_references_and_data(&body).unwrap();
+                body = tempbody.into();
+            }
             Ok(Some(body))
         } else if mask == 0 {
             Ok(None)

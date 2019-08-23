@@ -70,7 +70,7 @@ impl Program {
 
     pub fn compile_to_state(&self) -> Result<StateInit, String> {
         let mut state = StateInit::default();
-        state.set_code(self.compile_asm()?.cell());
+        state.set_code(self.compile_asm()?.cell().clone());
         state.set_data(self.data()?.into());
         Ok(state)
     }
