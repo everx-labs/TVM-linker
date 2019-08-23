@@ -238,6 +238,7 @@ def testOld():
 	expect_success("main", "", "100000000000", "--internal 0")
 
 def testOld2():
+	
 	compile2('contract09-a')
 	expect_success('sendMoneyAndNumber', ("12" * 32) + ("7" * 16), None, "--internal 0 --decode-c6")
 	expect_output(r"destination : 0:12121212")
@@ -258,6 +259,12 @@ def testOld2():
 	#check tvm_now
 	compile1('test_now.code', 'stdlib_sol.tvm')
 	# expect_success("main", "", "1564090968", "--internal 0")
+	
+	# TODO: cannot predict value of now, need to test it somehow
+	#check now global variable
+	compile1('test_now_variable.code', 'stdlib_sol.tvm')
+	expect_success("main", "", "", "--internal 0")
+	
 
 	#check tvm_address
 	compile1('test_tvm_address.code', 'stdlib_sol.tvm')
@@ -274,6 +281,14 @@ def testOld2():
 	#check tvm_rand_seed
 	compile1('test_tvm_rand_seed.code', 'stdlib_sol.tvm')
 	expect_success("main", "", "0", "--internal 0")
+	
+	#check array length enlargement
+	compile1('test_array_size.code', 'stdlib_sol.tvm')
+	expect_success("main", "0006000C", "12", "--internal 0")
+
+	#check array length shrink
+	compile1('test_array_size.code', 'stdlib_sol.tvm')
+	expect_success("main", "000C0006", "6", "--internal 0")
 
 def testArrays():
 	#it maybe '--sign key1' or '--internal 0' - test will work correctly
@@ -282,6 +297,7 @@ def testArrays():
 	ar1 = '1,'*500 + "1";
 	ar2 = '2,'*500 + "2";
 	expect_success2("test_arrays", "pair8_external", '{"arr1": [' + ar1 + '], "arr2": [' + ar2 + ']}', "3", linker_options)
+	expect_success2("test_arrays", "pair64_external", '{"arr1": [1,2,3,4,5,6,7,8,9,10], "arr2": [1,2,3,4,5,6]}', "2", linker_options)
 	expect_success2("test_arrays", "pair64_external", '{"arr1": [1,2,3,4,5,6,7,8,9,10], "arr2": [1,2,3,4,5,6]}', "2", linker_options)
 	expect_success2("test_arrays", "at32_external", '{"idx": 0, "arr": []}', "0", linker_options)
 	expect_success2("test_arrays", "at32_external", '{"idx": 1, "arr": []}', "0", linker_options)
@@ -298,7 +314,7 @@ def testArrays():
 	# expect_success2("test_arrays", "at256_external", '{"idx": "3", "arr": [2, 3, 5, 7, 11, 13, 17]}', "7", linker_options)
 	expect_success2("test_arrays", "at256_external", '{"idx": "4", "arr": [2, 3, 5, 7, 11, 13, 17]}', "11", linker_options)
 	# expect_success2("test_arrays", "at256_external", '{"idx": "5", "arr": [2, 3, 5, 7, 11, 13, 17]}', "13", linker_options)
-	# expect_success2("test_arrays", "at256_external", '{"idx": "6", "arr": [2, 3, 5, 7, 11, 13, 17]}', "17", linker_options)
+	expect_success2("test_arrays", "at256_external", '{"idx": "6", "arr": [2, 3, 5, 7, 11, 13, 17]}', "17", linker_options)
 	expect_success2("test_arrays", "at256_external", '{"idx": "7", "arr": [2, 3, 5, 7, 11, 13, 17]}', "0", linker_options)
 
 	## https://oeis.org/A000040/list
@@ -364,6 +380,7 @@ compile1('hello.code', 'stdlib_c.tvm')
 expect_success("hello", "", "1", "")
 expect_output(r"Hello")
 SIGN = None
+
 compile1('hello.code', 'stdlib_c.tvm')
 expect_success("hello", "", "1", "")
 expect_output(r"Hello")

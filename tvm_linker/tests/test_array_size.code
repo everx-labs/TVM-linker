@@ -1,0 +1,214 @@
+
+.globl	main_external
+.type	main_external, @function
+LDU 16
+LDU 16
+DROP
+PUSHINT $main$
+CALL 1
+
+.globl	main
+.type	main, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: main
+;; param: starting_len
+;; param: new_len
+;; tvm_init_storage
+;; stack=2
+NEWDICT
+NEWC STSLICE ENDC
+POPROOT
+; for statement
+PUSHINT 0
+;; decl: i
+PUSHCONT {
+	;; i
+	;; stack=3
+	DUP
+	;; starting_len
+	;; stack=4
+	PUSH s3
+	;; <
+	LESS
+	NOT DUP IFRET DROP
+	;; m_isUntil = 1
+	;; fetch arr
+	PUSHINT 0
+	PUSHROOT CTOS
+	PUSHINT 256
+	DICTUGET
+	PUSHCONT { NEWDICT }
+	IFNOT
+	;; i
+	;; stack=4
+	PUSH s1
+	SWAP
+	;; i
+	;; stack=5
+	PUSH s2
+	PUSHINT 1
+	;; +
+	ADD
+	NEWC STU 256 ENDC CTOS
+	ROTREV
+	PUSHINT 32
+	DICTUSET
+	;; assign arr
+	PUSHINT 0
+	PUSHROOT CTOS
+	PUSHINT 256
+	DICTUSET
+	NEWC STSLICE ENDC
+	POPROOT
+	;; ++
+	INC
+	FALSE
+}
+UNTIL
+; erase i
+DROP
+; for end
+;; get member length
+;; arr
+;; stack=2
+PUSHINT 0
+PUSHROOT CTOS
+PUSHINT 256
+DICTUGET
+PUSHCONT { NEWDICT }
+IFNOT
+PUSHINT 32
+DICTUMAX
+PUSHCONT { POP s1 INC }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; starting_len
+;; stack=3
+PUSH s2
+;; ==
+EQUAL
+;; require
+;; stack=3
+THROWIFNOT 100
+PUSHINT 0
+NEWC STU 256 ENDC CTOS
+;; arr
+;; stack=3
+PUSHINT 0
+PUSHROOT CTOS
+PUSHINT 256
+DICTUGET
+PUSHCONT { NEWDICT }
+IFNOT
+;; new_len
+;; stack=4
+PUSH s2
+PUSHINT $change_array_length$
+CALL 1
+;; assign arr
+PUSHINT 0
+PUSHROOT CTOS
+PUSHINT 256
+DICTUSET
+NEWC STSLICE ENDC
+POPROOT
+;; get member length
+;; arr
+;; stack=2
+PUSHINT 0
+PUSHROOT CTOS
+PUSHINT 256
+DICTUGET
+PUSHCONT { NEWDICT }
+IFNOT
+PUSHINT 32
+DICTUMAX
+PUSHCONT { POP s1 INC }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; new_len
+;; stack=3
+PUSH s1
+;; ==
+EQUAL
+;; require
+;; stack=3
+THROWIFNOT 100
+;; if
+;; new_len
+;; stack=2
+DUP
+;; starting_len
+;; stack=3
+PUSH s2
+;; <
+LESS
+PUSHCONT {
+	; for statement
+	;; new_len
+	;; stack=2
+	DUP
+	;; decl: i
+	PUSHCONT {
+		;; i
+		;; stack=3
+		DUP
+		;; starting_len
+		;; stack=4
+		PUSH s3
+		;; <
+		LESS
+		NOT DUP IFRET DROP
+		;; m_isUntil = 1
+		;; arr
+		;; stack=3
+		PUSHINT 0
+		PUSHROOT CTOS
+		PUSHINT 256
+		DICTUGET
+		PUSHCONT { NEWDICT }
+		IFNOT
+		;; i
+		;; stack=4
+		PUSH s1
+		;; index
+		SWAP
+		PUSHINT 32
+		DICTUGET
+		PUSHCONT { LDU 256 ENDS }
+		PUSHCONT { PUSHINT 0 }
+		IFELSE
+		PUSHINT 0
+		;; ==
+		EQUAL
+		;; require
+		;; stack=4
+		THROWIFNOT 100
+		;; ++
+		INC
+		FALSE
+	}
+	UNTIL
+	; erase i
+	DROP
+	; for end
+}
+IF
+;; get member length
+;; arr
+;; stack=2
+PUSHINT 0
+PUSHROOT CTOS
+PUSHINT 256
+DICTUGET
+PUSHCONT { NEWDICT }
+IFNOT
+PUSHINT 32
+DICTUMAX
+PUSHCONT { POP s1 INC }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; return
+POP s1
+POP s1
+RET

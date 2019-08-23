@@ -1,14 +1,8 @@
 pragma solidity ^0.5.0;
 
+import contract06;
+
 // A sample contract demontrating signatures, mappings, structures and intercontract communtications
-
-contract IMyContract {
-	function getCredit() public;
-}
-
-contract IMyContractCallback {
-	function getCreditCallback(uint64 balance) public;
-}
 
 contract MyContract is IMyContract {
 
