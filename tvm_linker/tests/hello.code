@@ -3,4 +3,4 @@
 hello_external:
     BLKDROP 5
     PUSHINT 1
-    LOGSTR Hello
+    PRINTSTR Hello
