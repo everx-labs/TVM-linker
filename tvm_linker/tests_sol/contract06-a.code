@@ -67,17 +67,16 @@ CALL 1
 ;; get member allowed
 ;; ContractInfo.allowed
 PUSHINT 0
+;; get member sender
+PUSHINT $get_msg_sender$
+CALL 1
 ;; m_allowed
-;; stack=2
+;; stack=3
 PUSHINT 0
 PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
 PUSHINT 256
 DICTUGETOPTREF
-;; get member sender
-PUSHINT $get_msg_sender$
-CALL 1
 ;; index
-SWAP
 PUSHINT 256
 DICTUGETOPTREF
 PUSHINT 8

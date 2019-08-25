@@ -13,7 +13,6 @@ CALL 1
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: on_uint64
 ;; param: arr
-PRINTSTR on_uint64
 PUSHINT 0
 ;; decl: sum
 ;; get member length
@@ -49,7 +48,6 @@ PUSHCONT {
 	;; index
 	PUSHINT 32
 	DICTUGET
-	PRINTSTR on_dictuget
 	PUSHCONT { LDU 64 ENDS }
 	PUSHCONT { PUSHINT 0 }
 	IFELSE
