@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.0.0-experimental
+
 FROM rust:1.37 as build-ton-compiler
 USER root
 RUN apt-get -y update
