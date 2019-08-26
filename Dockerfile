@@ -13,7 +13,7 @@ COPY . TVM-linker
 WORKDIR /home/user/TVM-linker/tvm_linker
 RUN --mount=type=ssh cargo build --release
 
-FROM frolvlad/alpine-glibc
+FROM alpine
 COPY --from=build-linker /home/user/TVM-linker/tvm_linker/stdlib_c.tvm /usr/bin/stdlib_c.tvm
 COPY --from=build-linker /home/user/TVM-linker/tvm_linker/stdlib_sol.tvm /usr/bin/stdlib_sol.tvm
 COPY --from=build-linker /home/user/TVM-linker/tvm_linker/stdlib_arg.tvm /usr/bin/stdlib_arg.tvm
