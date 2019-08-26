@@ -48,8 +48,12 @@ fn main() {
 }
 
 fn linker_main() -> Result<(), String> {
+    let build_info = match option_env!("BUILD_INFO") {
+        Some(s) => s,
+        None => "",
+    };
     let matches = clap_app! (tvm_loader =>
-        (version: "0.1")
+        (version: &*format!("0.1 ({})", build_info))
         (author: "tonlabs")
         (about: "Links TVM assembler file, loads and executes it in testing environment")
         (@subcommand decode => 

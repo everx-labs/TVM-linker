@@ -1,8 +1,12 @@
 import re
 import os
+import argparse
 
-TVM_PATH = './target/release/tvm_linker'
-# TVM_PATH = './target/debug/tvm_linker'
+args_parser = argparse.ArgumentParser()
+args_parser.add_argument("--linker-path", default="./target/release/tvm_linker")
+args = args_parser.parse_args()
+
+TVM_PATH = args.linker_path
 
 def getFunctions():
 	global functions
@@ -106,6 +110,12 @@ def exec_and_parse(cmd, expected_ec):
 	# os.remove("exec_log.tmp")
 
 	ec = getExitCode()
+
+	if ec != expected_ec:
+		print cmd
+		with open('exec_log.tmp', 'r') as f:
+			print(f.read())
+
 	assert ec == expected_ec, "ec = {}".format(ec)
 
 def build_cmd_exec_and_parse(method, params, expected_ec, options):
@@ -165,6 +175,10 @@ def expect_output(regex):
 		if match:
 			print "> ", match.group(0)
 			return
+
+	with open('exec_log.tmp', 'r') as f:
+		print(f.read())
+
 	assert False, regex
 
 def testOld():
