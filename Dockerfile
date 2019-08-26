@@ -18,3 +18,4 @@ COPY --from=build-linker /home/user/TVM-linker/tvm_linker/stdlib_c.tvm /usr/bin/
 COPY --from=build-linker /home/user/TVM-linker/tvm_linker/stdlib_sol.tvm /usr/bin/stdlib_sol.tvm
 COPY --from=build-linker /home/user/TVM-linker/tvm_linker/stdlib_arg.tvm /usr/bin/stdlib_arg.tvm
 COPY --from=build-linker /home/user/TVM-linker/tvm_linker/target/release/tvm_linker /usr/bin/tvm_linker
+COPY --from=build-linker /home/user/TVM-linker/prerequesites.sh /usr/bin/prerequesites.sh
