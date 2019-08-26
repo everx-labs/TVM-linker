@@ -352,6 +352,7 @@ tonstdlib_get_smart_contract_info:
     PUSH c7
     SECOND
     CTOS
+    PLDDICT
     PUSHINT 64
     DICTIGET               ; ( addr dict key-width -- smart_contract_info_slice flag )
     THROWIFNOT 60          ; ( smart_contract_info_cell )

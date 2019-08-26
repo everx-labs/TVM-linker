@@ -68,11 +68,10 @@ def compile1(source_file, lib_file):
 	CONTRACT_ADDRESS = getContractAddress()
 	# print functions, CONTRACT_ADDRESS
 
-def compile2(source_name, directory = "tests_sol"):
+def compile2(source_name, directory = "tests_sol", lib_file = "stdlib_sol.tvm"):
 	cleanup()
 	global lines, functions, CONTRACT_ADDRESS
 	print("Compiling " + source_name + "...")
-	lib_file = "stdlib_sol.tvm"
 	source_file = "./" + directory + "/{}.code".format(source_name)
 	abi_file = "./" + directory + "/{}.abi.json".format(source_name)
 	
@@ -379,6 +378,14 @@ def testContract10():
     expect_success('send_uint64', ("12" * 32) + "0000000000000064", None, "--decode-c6")
     expect_output(r"body.*references: \[CellData \{.*, 0, 0, 3, 224\]")
 
+def testLlvmPiggyBank():
+	#it maybe '--sign key1' or '--internal 0' - test will work correctly
+	linker_options = "--sign key1 --decode-c6"
+	compile2('piggybank', 'tests', lib_file = "stdlib_c.tvm")
+	expect_success2("piggybank", "initialize_target", '{"target": 100}', None, linker_options)
+	expect_success2("piggybank", "transfer", '{"destination_account": 2147483649}', None, linker_options)
+	expect_output(r"destination : 0:0000000000000000000000000000000000000000000000000000000080000001")
+	expect_output(r"value       : CurrencyCollection: Grams vui16\[len = 5, value = 99990000000\], other curencies:")
 
 testOld()
 testOld2()
@@ -386,6 +393,7 @@ testArrays()
 testCall()
 testContract10()
 
+testLlvmPiggyBank()
 
 
 SIGN = 'key1'
