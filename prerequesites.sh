@@ -1,11 +1,4 @@
-apk add perl
-wget https://ftp.gnu.org/gnu/glibc/glibc-2.30.tar.gz
-tar -xzf glibc-2.30.tar.gz
-cd glibc-2.30
-mkdir glibc-build
-cd glibc-build
-apk add --no-cache make gcc gawk bison linux-headers libc-dev
-../configure --prefix=/usr\--disable-profile --enable-add-ons\--libexecdir=/usr/lib --with-headers=/usr/include\--without-cvs --enable-static-pie
-cat >/etc/ld.so.conf << "EOF" # Begin/etc/ld.so.conf/usr/local/lib/opt/lib/usr/lib/usr/lib64/usr/libexeС# End/etc/ld.so.conf EOF
-make
-make install
+apk --no-cache add ca-certificates wget
+wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub
+wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.30-r0/glibc-2.30-r0.apk
+apk add glibc-2.30-r0.apk
