@@ -1,1 +1,1 @@
-apk add libgcc
+apk add --no-cache libgcc
