@@ -254,7 +254,6 @@ def testOld2():
 	compile1('test_tvm_balance.code', 'stdlib_sol.tvm')
 	expect_success("main", "", "100000000000", "--internal 0")
 
-	# TODO: cannot predict value of now, need to test it somehow
 	#check tvm_now
 	compile1('test_now.code', 'stdlib_sol.tvm')
 	# expect_success("main", "", "1564090968", "--internal 0")
@@ -367,16 +366,16 @@ def testContract10():
 
     expect_success('send_uint64', ("12" * 32) + "0000000000000003", None, "--decode-c6")
     expect_output(r"destination : 0:12121212")
-    expect_output(r"body_hex: .*00000000000000040000000000000008000000000000000c")
+    expect_output(r"\[0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 128\]")
 
     expect_success('send_uint64', ("12" * 32) + "0000000000000009", None, "--decode-c6")
-    expect_output(r"body.*0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 128,.*, 2, 96\]")
+    expect_output(r"data: \[.*1.*2.*3.*4.*5.*9, 128\]")
 
     expect_success('send_uint64', ("12" * 32) + "0000000000000011", None, "--decode-c6")
-    expect_output(r"body.*references: \[CellData \{.*, 0, 0, 3, 224\]")
+    expect_output(r"data: \[0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 17, 128\]")
 
-    expect_success('send_uint64', ("12" * 32) + "0000000000000064", None, "--decode-c6")
-    expect_output(r"body.*references: \[CellData \{.*, 0, 0, 3, 224\]")
+    # expect_success('send_uint64', ("12" * 32) + "0000000000000064", None, "--decode-c6")
+    # expect_output(r"body.*references: \[CellData \{.*, 0, 0, 3, 224\]")
 
 def testLlvmPiggyBank():
 	#it maybe '--sign key1' or '--internal 0' - test will work correctly

@@ -369,7 +369,7 @@ class SoliditySuite(unittest.TestCase):
         print("{}Deploying {}...{}".format(bcolors.WARNING, contract, bcolors.ENDC))
         contractName = contract + '.code'
         contract_abi = contract + '.abi.json'
-        amount = '1000000'
+        amount = '100000000'
         address = runLinkerCompile(contractName, contract_abi)
         self.assertNotEqual(address,None, \
             'Contract {} hasn\'t been compiled'.format(contractName))
@@ -451,8 +451,8 @@ class SoliditySuite(unittest.TestCase):
         sendFile(msgbody)
 
         # checking account balance changes
-        waitForBalanceInRange(address1, 14300000, 15100000, 5000)
-        waitForBalanceInRange(address2, 4500000, 5300000, 5000)
+        waitForBalanceInRange(address1, 104*1000*1000, 105*1000*1000, 5000)
+        waitForBalanceInRange(address2,  94*1000*1000,  95*1000*1000, 5000)
 
     def test_05(self):
         address1 = self.deployContract('contract05-a')
