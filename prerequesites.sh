@@ -1,1 +1,1 @@
-apk add --no-cache libgcc
+apk add --update alpine-sdk
