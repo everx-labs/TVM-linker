@@ -387,8 +387,7 @@ testCall()
 testContract10()
 
 
-'''
-TODO: uncomment tests when stdlib_c.tvm will support new spec
+
 SIGN = 'key1'
 compile1('hello.code', 'stdlib_c.tvm')
 expect_success("hello", "", "1", "")
@@ -398,5 +397,5 @@ SIGN = None
 compile1('hello.code', 'stdlib_c.tvm')
 expect_success("hello", "", "1", "")
 expect_output(r"Hello")
-'''
+
 cleanup()
