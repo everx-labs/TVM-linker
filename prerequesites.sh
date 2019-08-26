@@ -1,7 +1,7 @@
 apk add perl
-wget https://ftp.gnu.org/gnu/glibc/glibc-2.28.tar.gz
-tar -xzf glibc-2.28.tar.gz
-cd glibc-2.28
+wget https://ftp.gnu.org/gnu/glibc/glibc-2.30.tar.gz
+tar -xzf glibc-2.30.tar.gz
+cd glibc-2.30
 mkdir glibc-build
 cd glibc-build
 apk add --no-cache make gcc gawk bison linux-headers libc-dev
