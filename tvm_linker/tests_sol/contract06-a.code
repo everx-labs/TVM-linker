@@ -1,4 +1,4 @@
-
+ 
 .globl	setAllowance_external
 .type	setAllowance_external, @function
 LDU 256
@@ -6,7 +6,8 @@ LDU 64
 DROP
 PUSHINT $setAllowance$
 CALL 1
-
+RET
+ 
 .globl	setAllowance
 .type	setAllowance, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -15,7 +16,7 @@ CALL 1
 ;; param: amount
 ;; fetch m_allowed
 PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUGETOPTREF
 ;; anotherContract
@@ -40,19 +41,20 @@ PUSHINT 256
 DICTUSETREF
 ;; assign m_allowed
 PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUSETREF
 NEWC STDICT ENDC
 POPROOT
 BLKDROP 2
-
+ 
 .globl	getCredit_external
 .type	getCredit_external, @function
 DROP
 PUSHINT $getCredit$
 CALL 1
-
+RET
+ 
 .globl	getCredit
 .type	getCredit, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -73,7 +75,7 @@ CALL 1
 ;; m_allowed
 ;; stack=3
 PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUGETOPTREF
 ;; index
@@ -84,11 +86,11 @@ DICTUGET
 PUSHCONT { LDU 64 ENDS }
 PUSHCONT { PUSHINT 0 }
 IFELSE
-PUSHINT $getCreditCallback_external$
-PUSHINT 0
 NEWC
-STU 8
-STU 32
+PUSHINT 0
+STUR 8
+PUSHINT $getCreditCallback_external$
+STUR 32
 ;; balance
 STU 64
 ENDC CTOS

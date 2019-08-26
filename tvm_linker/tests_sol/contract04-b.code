@@ -1,11 +1,12 @@
-
+ 
 .globl	remoteMethod_external
 .type	remoteMethod_external, @function
 LDU 256
 DROP
 PUSHINT $remoteMethod$
 CALL 1
-
+RET
+ 
 .globl	remoteMethod
 .type	remoteMethod, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -27,7 +28,7 @@ CALL 1
 ;; m_counter
 ;; stack=1
 PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUGET
 PUSHCONT { LDU 256 ENDS }
@@ -39,7 +40,7 @@ ADD
 ;; assign m_counter
 NEWC STU 256 ENDC CTOS
 PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUSET
 NEWC STDICT ENDC

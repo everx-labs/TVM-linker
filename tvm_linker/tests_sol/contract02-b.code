@@ -1,11 +1,12 @@
-
+ 
 .globl	remoteMethod_external
 .type	remoteMethod_external, @function
 LDU 64
 DROP
 PUSHINT $remoteMethod$
 CALL 1
-
+RET
+ 
 .globl	remoteMethod
 .type	remoteMethod, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -17,7 +18,7 @@ DUP
 ;; assign m_value
 NEWC STU 64 ENDC CTOS
 PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUSET
 NEWC STDICT ENDC

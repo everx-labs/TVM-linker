@@ -1,4 +1,4 @@
-
+ 
 .globl	send_uint64_external
 .type	send_uint64_external, @function
 LDU 256
@@ -6,7 +6,8 @@ LDU 64
 DROP
 PUSHINT $send_uint64$
 CALL 1
-
+RET
+ 
 .globl	send_uint64
 .type	send_uint64, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -80,11 +81,11 @@ PUSH s2
 ;; arr
 ;; stack=4
 PUSH s1
-PUSHINT $on_uint64_external$
-PUSHINT 0
 NEWC
-STU 8
-STU 32
+PUSHINT 0
+STUR 8
+PUSHINT $on_uint64_external$
+STUR 32
 ;; arr
 SWAP
 PUSHINT 64
@@ -96,7 +97,7 @@ CALL 1
 ;; m_counter
 ;; stack=3
 PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUGET
 PUSHCONT { LDU 256 ENDS }
@@ -106,7 +107,7 @@ INC
 ;; assign m_counter
 NEWC STU 256 ENDC CTOS
 PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUSET
 NEWC STDICT ENDC
