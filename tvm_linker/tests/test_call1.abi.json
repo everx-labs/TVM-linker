@@ -1,0 +1,16 @@
+{
+	"ABI version": 0,
+	"functions": [{
+		"name": "request_external",
+		"inputs": [{"name": "a", "type": "uint256"}, {"name": "b", "type": "uint256"}, {"name": "c", "type": "uint256"}],
+		"outputs": []
+	}, {
+		"name": "constructor",
+		"inputs": [],
+		"outputs": []
+	}, {
+		"name": "send_external",
+		"inputs": [{"name": "a", "type": "uint256"}],
+		"outputs": []
+	}]
+}

@@ -1,6 +1,6 @@
 pragma solidity ^0.5.0;
 
-import contract06;
+import "contract06.sol";
 
 // A sample contract demontrating signatures, mappings, structures and intercontract communtications
 

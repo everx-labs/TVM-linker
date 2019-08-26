@@ -3,7 +3,7 @@ use std::io::Cursor;
 use std::io::Write;
 use std::sync::Arc;
 use methdict::*;
-use ton_block::*;
+use tvm::block::*;
 use tvm::assembler::compile_code;
 use tvm::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use tvm::stack::*;
@@ -39,7 +39,9 @@ impl Program {
         let mut data_dict = HashmapE::with_data(64, self.engine.data());
         data_dict.set(
             ptr_to_builder(self.engine.persistent_base)?.into(),
-            BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8).into(),
+            &BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8)
+                .map_err(|e| format!("failed to pack pubkey to data dictionary: {}", e))?
+                .into(),
         ).unwrap();
         Ok(data_dict.get_data().into_cell())
     }
@@ -58,7 +60,7 @@ impl Program {
                 format_compilation_error_string(e.1, &name, &code)
             })?;
         let key = 1i32.write_to_new_cell().unwrap();
-        method_dict.set(key.into(), methods).unwrap();
+        method_dict.set(key.into(), &methods).unwrap();
         Ok(method_dict.get_data())
     }
    
@@ -68,7 +70,7 @@ impl Program {
 
     pub fn compile_to_state(&self) -> Result<StateInit, String> {
         let mut state = StateInit::default();
-        state.set_code(self.compile_asm()?.cell());
+        state.set_code(self.compile_asm()?.cell().clone());
         state.set_data(self.data()?.into());
         Ok(state)
     }
@@ -101,11 +103,11 @@ impl Program {
 }
 
 pub fn save_to_file(state: StateInit, name: Option<&str>) -> Result<String, String> {
-    let root_slice = SliceData::from(
-        state.write_to_new_cell().map_err(|e| format!("Serialization failed: {}", e))?
-    );
+    let root_cell = state.write_to_new_cell()
+        .map_err(|e| format!("Serialization failed: {}", e))?
+        .into();
     let mut buffer = vec![]; 
-    BagOfCells::with_root(root_slice).write_to(&mut buffer, false)
+    BagOfCells::with_root(&root_cell).write_to(&mut buffer, false)
         .map_err(|e| format!("BOC failed: {}", e))?;
 
     let mut print_filename = false;
@@ -133,7 +135,7 @@ pub fn load_from_file(contract_file: &str) -> StateInit {
 fn format_compilation_error_string(err: CompileError, func_name: &str, func_code: &str) -> String {
     let line_num = match err {
         CompileError::Syntax(position @ _, _) => position.line,
-        CompileError::UnknownOperation(position @ _) => position.line,
+        CompileError::UnknownOperation(position @ _, _) => position.line,
         CompileError::Operation(position @ _, _, _) => position.line,
     };
     format!("compilation failed: \"{}\":{}:\"{}\"", 
@@ -159,7 +161,7 @@ mod tests {
         let body = {
             let buf = hex::decode("002E695F78").unwrap();
             let buf_bits = buf.len() * 8;
-            Some(BuilderData::with_raw(buf, buf_bits).into())
+            Some(BuilderData::with_raw(buf, buf_bits).unwrap().into())
         };
         let contract_file = prog.compile_to_file().unwrap();
         let name = contract_file.split('.').next().unwrap();
@@ -177,7 +179,7 @@ mod tests {
         let body = {
             let buf = hex::decode("000D6E4079").unwrap();
             let buf_bits = buf.len() * 8;
-            Some(BuilderData::with_raw(buf, buf_bits).into())
+            Some(BuilderData::with_raw(buf, buf_bits).unwrap().into())
         };
         let contract_file = prog.compile_to_file().unwrap();
         let name = contract_file.split('.').next().unwrap();
@@ -195,7 +197,7 @@ mod tests {
         let body = {
             let buf = hex::decode("000D6E4079").unwrap();
             let buf_bits = buf.len() * 8;
-            Some(BuilderData::with_raw(buf, buf_bits).into())
+            Some(BuilderData::with_raw(buf, buf_bits).unwrap().into())
         };
         let contract_file = prog.compile_to_file().unwrap();
         let name = contract_file.split('.').next().unwrap();
@@ -212,7 +214,7 @@ mod tests {
         let body = {
             let buf = hex::decode("000D6E4079").unwrap();
             let buf_bits = buf.len() * 8;
-            Some(BuilderData::with_raw(buf, buf_bits).into())
+            Some(BuilderData::with_raw(buf, buf_bits).unwrap().into())
         };
         let contract_file = prog.compile_to_file().unwrap();
         let name = contract_file.split('.').next().unwrap();
@@ -231,7 +233,7 @@ mod tests {
         let body = {
             let buf = hex::decode("000D6E4079").unwrap();
             let buf_bits = buf.len() * 8;
-            Some(BuilderData::with_raw(buf, buf_bits).into())
+            Some(BuilderData::with_raw(buf, buf_bits).unwrap().into())
         };
         let contract_file = prog.compile_to_file().unwrap();
         let name = contract_file.split('.').next().unwrap();

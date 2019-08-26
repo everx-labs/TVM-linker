@@ -40,11 +40,10 @@ impl DataValue {
     pub fn write(&self) -> BuilderData {
         let mut b = BuilderData::new();
         match self {
-            DataValue::Number(ref intgr) => {
+            DataValue::Number(ref integer) => {
                 let encoding = SignedIntegerBigEndianEncoding::new(257);
-                let mut dest_vec = vec![];
-                encoding.try_serialize(&intgr.0).unwrap().into_bitstring_with_completion_tag(&mut dest_vec);
-                b.append_bitstring(&dest_vec[..]).unwrap();
+                let bitstring = encoding.try_serialize(&integer.0).unwrap();
+                b.append_builder(&bitstring).unwrap();
                 b
             },
             DataValue::Slice(ref slice) => { b.checked_append_references_and_data(slice).unwrap(); b },
@@ -481,7 +480,9 @@ impl ParseEngine {
                 value_len = str_bytes.len() + 1;
                 (0..(WORD_SIZE - (str_bytes.len() as Ptr % WORD_SIZE))).for_each(|_| str_bytes.push(0));
                 for chunk in str_bytes.chunks(WORD_SIZE as usize) {
-                    let slice: SliceData = BuilderData::with_raw(chunk.to_vec(), WORD_SIZE as usize * 8).into();
+                    let slice: SliceData = BuilderData::with_raw(chunk.to_vec(), WORD_SIZE as usize * 8)
+                        .map_err(|e| format!(".asciz: failed to build cell for string chunk: {}", e))?
+                        .into();
                     values.push(DataValue::Slice(slice));
                 }
             } else if let Some(cap) = PARAM_RE.captures(param) {
@@ -527,7 +528,7 @@ impl ParseEngine {
             for item in data_vec {
                 let mut ptr = item.0.clone();
                 for subitem in item.1 {
-                    dict.set(ptr_to_builder(ptr).unwrap().into(), subitem.write().into()).unwrap();
+                    dict.set(ptr_to_builder(ptr).unwrap().into(), &subitem.write().into()).unwrap();
                     ptr += WORD_SIZE;
                 }
             }
@@ -539,7 +540,7 @@ impl ParseEngine {
 
         pers_dict.set(
             ptr_to_builder(self.persistent_base + 8).unwrap().into(), 
-            globl_dict.get_data(),
+            &globl_dict.get_data(),
         ).unwrap();
 
         pers_dict.get_data()
@@ -588,6 +589,7 @@ impl ParseEngine {
 mod tests {
     use super::*;
     use std::fs::File;
+    use std::sync::Arc;
     use tvm::test_framework::*;
     use tvm::stack::*;
 

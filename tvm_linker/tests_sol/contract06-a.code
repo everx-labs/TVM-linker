@@ -1,4 +1,4 @@
-
+ 
 .globl	setAllowance_external
 .type	setAllowance_external, @function
 LDU 256
@@ -6,7 +6,8 @@ LDU 64
 DROP
 PUSHINT $setAllowance$
 CALL 1
-
+RET
+ 
 .globl	setAllowance
 .type	setAllowance, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -15,20 +16,16 @@ CALL 1
 ;; param: amount
 ;; fetch m_allowed
 PUSHINT 0
-PUSHROOT CTOS
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
-DICTUGET
-PUSHCONT { NEWDICT }
-IFNOT
+DICTUGETOPTREF
 ;; anotherContract
 ;; stack=3
 PUSH s2
 SWAP
 OVER OVER
 PUSHINT 256
-DICTUGET
-PUSHCONT { NEWDICT }
-IFNOT
+DICTUGETOPTREF
 ;; ContractInfo.allowed
 PUSHINT 0
 SWAP
@@ -41,21 +38,23 @@ PUSHINT 8
 DICTUSET
 ROTREV
 PUSHINT 256
-DICTUSET
+DICTUSETREF
 ;; assign m_allowed
 PUSHINT 0
-PUSHROOT CTOS
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
-DICTUSET
-NEWC STSLICE ENDC
+DICTUSETREF
+NEWC STDICT ENDC
 POPROOT
-
+BLKDROP 2
+ 
 .globl	getCredit_external
 .type	getCredit_external, @function
 DROP
 PUSHINT $getCredit$
 CALL 1
-
+RET
+ 
 .globl	getCredit
 .type	getCredit, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -70,40 +69,34 @@ CALL 1
 ;; get member allowed
 ;; ContractInfo.allowed
 PUSHINT 0
-;; m_allowed
-;; stack=2
-PUSHINT 0
-PUSHROOT CTOS
-PUSHINT 256
-DICTUGET
-PUSHCONT { NEWDICT }
-IFNOT
 ;; get member sender
 PUSHINT $get_msg_sender$
 CALL 1
-;; index
-SWAP
+;; m_allowed
+;; stack=3
+PUSHINT 0
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
-DICTUGET
-PUSHCONT { NEWDICT }
-IFNOT
+DICTUGETOPTREF
+;; index
+PUSHINT 256
+DICTUGETOPTREF
 PUSHINT 8
 DICTUGET
 PUSHCONT { LDU 64 ENDS }
 PUSHCONT { PUSHINT 0 }
 IFELSE
-PUSHINT $getCreditCallback_external$
-PUSHINT 0
 NEWC
-STU 8
-STU 32
+PUSHINT 0
+STUR 8
+PUSHINT $getCreditCallback_external$
+STUR 32
 ;; balance
 STU 64
 ENDC CTOS
 PUSHINT $send_int_msg_2$
 CALL 1
 ;; return
-DROP
 RET
 
 .globl	getCreditCallback_external

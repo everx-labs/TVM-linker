@@ -1,11 +1,12 @@
-
+ 
 .globl	method_external
 .type	method_external, @function
 LDU 256
 DROP
 PUSHINT $method$
 CALL 1
-
+RET
+ 
 .globl	method
 .type	method, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -15,18 +16,18 @@ CALL 1
 ;; stack=1
 DUP
 ;; MyContract.remoteMethod
-PUSHINT $remoteMethod_external$
-PUSHINT 0
 NEWC
-STU 8
-STU 32
+PUSHINT 0
+STUR 8
+PUSHINT $remoteMethod_external$
+STUR 32
 ENDC CTOS
 PUSHINT $send_int_msg_2$
 CALL 1
 ;; m_counter
 ;; stack=1
 PUSHINT 0
-PUSHROOT CTOS
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUGET
 PUSHCONT { LDU 256 ENDS }
@@ -38,21 +39,22 @@ ADD
 ;; assign m_counter
 NEWC STU 256 ENDC CTOS
 PUSHINT 0
-PUSHROOT CTOS
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUSET
-NEWC STSLICE ENDC
+NEWC STDICT ENDC
 POPROOT
 ;; return
 DROP
 RET
-
+ 
 .globl	remoteMethod_external
 .type	remoteMethod_external, @function
 DROP
 PUSHINT $remoteMethod$
 CALL 1
-
+RET
+ 
 .globl	remoteMethod
 .type	remoteMethod, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -1,4 +1,4 @@
-
+ 
 .globl	method_external
 .type	method_external, @function
 LDU 256
@@ -6,7 +6,8 @@ LDU 16
 DROP
 PUSHINT $method$
 CALL 1
-
+RET
+ 
 .globl	method
 .type	method, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -23,27 +24,28 @@ PUSH s1
 ;; x
 ;; stack=3
 PUSH s1
-PUSHINT $remoteMethod_external$
-PUSHINT 0
 NEWC
-STU 8
-STU 32
+PUSHINT 0
+STUR 8
+PUSHINT $remoteMethod_external$
+STUR 32
 ;; x
 STU 16
 ENDC CTOS
 PUSHINT $send_int_msg_2$
 CALL 1
 ;; return
-BLKDROP 3
+BLKDROP 2
 RET
-
+ 
 .globl	remoteMethodCallback_external
 .type	remoteMethodCallback_external, @function
 LDU 16
 DROP
 PUSHINT $remoteMethodCallback$
 CALL 1
-
+RET
+ 
 .globl	remoteMethodCallback
 .type	remoteMethodCallback, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -55,10 +57,10 @@ DUP
 ;; assign m_result
 NEWC STU 256 ENDC CTOS
 PUSHINT 0
-PUSHROOT CTOS
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUSET
-NEWC STSLICE ENDC
+NEWC STDICT ENDC
 POPROOT
 ;; return
 DROP

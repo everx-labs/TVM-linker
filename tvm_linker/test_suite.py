@@ -1,8 +1,8 @@
 import re
 import os
 
-#TVM_PATH = './target/release/tvm_linker'
-TVM_PATH = './target/debug/tvm_linker'
+TVM_PATH = './target/release/tvm_linker'
+# TVM_PATH = './target/debug/tvm_linker'
 
 def getFunctions():
 	global functions
@@ -68,11 +68,10 @@ def compile1(source_file, lib_file):
 	CONTRACT_ADDRESS = getContractAddress()
 	# print functions, CONTRACT_ADDRESS
 
-def compile2(source_name, directory = "tests_sol"):
+def compile2(source_name, directory = "tests_sol", lib_file = "stdlib_sol.tvm"):
 	cleanup()
 	global lines, functions, CONTRACT_ADDRESS
 	print("Compiling " + source_name + "...")
-	lib_file = "stdlib_sol.tvm"
 	source_file = "./" + directory + "/{}.code".format(source_name)
 	abi_file = "./" + directory + "/{}.abi.json".format(source_name)
 	
@@ -197,25 +196,25 @@ def testOld():
 	compile1('test_send_int_msg.tvm', 'stdlib_sol.tvm')
 	expect_success(None, "", None, "")	# check empty input (deploy)
 	expect_success('main', "", None, "--internal 0 --decode-c6")
-	expect_output(r"destination : 0:0+007F")
+	expect_output(r"destination : 0:0+007f")
 	expect_output(r"CurrencyCollection: Grams.*value = 1000]")
 
 	compile1('test_send_ext_msg.tvm', 'stdlib_sol.tvm')
 	expect_success(None, "", None, "")	# check empty input (deploy)
 	expect_success('main', "", None, "--internal 0 --decode-c6")
 	expect_output(r"destination : AddrNone")
-	expect_output(r"data: \[0, 0, 48, 57, 128\]")
+	expect_output(r"body_hex: 00003039")
 
 	compile1('test_send_int_msg.tvm', 'stdlib_sol.tvm')
 	expect_success('main', "", None, "--decode-c6")
-	expect_output(r"destination : 0:0+007F")
+	expect_output(r"destination : 0:0+007f")
 	expect_output(r"CurrencyCollection: Grams.*value = 1000]")
 		
 	compile1('test_send_msg.code', 'stdlib_sol.tvm')
 	expect_success(None, "", None, "")	# check empty input (deploy)
 	expect_success('get_allowance', "1122334455660000000000000000000000000000000000000000005544332211", None, "--internal 0 --decode-c6 --trace")
 	expect_output(r"destination : 0:1122334455660000000000000000000000000000000000000000005544332211")
-	expect_output(r"body  : .* data: \[0, 26, 11, 86, 135, 0, 0, 0, 0, 0, 0, 0, 0, ")
+	expect_output(r"body_hex: 001a0b56870000000000000000")
 
 		# '''
 	compile1('test_msg_sender.code', None)
@@ -253,9 +252,8 @@ def testOld2():
 
 	#check tvm_balance
 	compile1('test_tvm_balance.code', 'stdlib_sol.tvm')
-	expect_success("main", "", "10000", "--internal 0")
+	expect_success("main", "", "100000000000", "--internal 0")
 
-	# TODO: cannot predict value of now, need to test it somehow
 	#check tvm_now
 	compile1('test_now.code', 'stdlib_sol.tvm')
 	# expect_success("main", "", "1564090968", "--internal 0")
@@ -294,7 +292,10 @@ def testArrays():
 	#it maybe '--sign key1' or '--internal 0' - test will work correctly
 	linker_options = ""
 	compile2('test_arrays', 'tests')
-
+	ar1 = '1,'*500 + "1";
+	ar2 = '2,'*500 + "2";
+	expect_success2("test_arrays", "pair8_external", '{"arr1": [' + ar1 + '], "arr2": [' + ar2 + ']}', "3", linker_options)
+	expect_success2("test_arrays", "pair64_external", '{"arr1": [1,2,3,4,5,6,7,8,9,10], "arr2": [1,2,3,4,5,6]}', "2", linker_options)
 	expect_success2("test_arrays", "pair64_external", '{"arr1": [1,2,3,4,5,6,7,8,9,10], "arr2": [1,2,3,4,5,6]}', "2", linker_options)
 	expect_success2("test_arrays", "at32_external", '{"idx": 0, "arr": []}', "0", linker_options)
 	expect_success2("test_arrays", "at32_external", '{"idx": 1, "arr": []}', "0", linker_options)
@@ -347,15 +348,52 @@ def testArrays():
 	# expect_success2("test_arrays", "at32_external", '{"idx":  "53", ' + abi_params + '}', "1000001099", linker_options)
 	expect_success2("test_arrays", "at32_external", '{"idx":  "54", ' + abi_params + '}', "1000001137", linker_options)
 
-def testFailing():
-	linker_options = "--trace"
-	compile2('test_arrays', 'tests')
-	expect_success2("test_arrays", "at256_external", '{"idx": "0", "arr": [2, 3, 5, 7, 11, 13, 17]}', "2", linker_options)
+def testCall():
+	linker_options = "--sign key1 --decode-c6"
+	compile2('test_call1', 'tests')
+
+	expect_success2('test_call1', 'constructor', '{}', '', linker_options)
+	addr = '1'*64
+	expect_success2('test_call1', 'send_external', '{"a": "0x' + addr + '"}', \
+		'7719472615821079694904732333912527190217998977709370935963838933860875309329', linker_options)
+	expect_output(r"destination : 0:1111111111111111111111111111111111111111111111111111111111111111")
+	expect_output(r"body_hex: 00852d5aea")
+
+def testContract10():
+    compile2('contract10-a')
+    # simulate deploy (empty input) to initialize storage
+    expect_success(None, "", None, "")	
+
+    expect_success('send_uint64', ("12" * 32) + "0000000000000003", None, "--decode-c6")
+    expect_output(r"destination : 0:12121212")
+    expect_output(r"\[0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 128\]")
+
+    expect_success('send_uint64', ("12" * 32) + "0000000000000009", None, "--decode-c6")
+    expect_output(r"data: \[.*1.*2.*3.*4.*5.*9, 128\]")
+
+    expect_success('send_uint64', ("12" * 32) + "0000000000000011", None, "--decode-c6")
+    expect_output(r"data: \[0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 17, 128\]")
+
+    # expect_success('send_uint64', ("12" * 32) + "0000000000000064", None, "--decode-c6")
+    # expect_output(r"body.*references: \[CellData \{.*, 0, 0, 3, 224\]")
+
+def testLlvmPiggyBank():
+	#it maybe '--sign key1' or '--internal 0' - test will work correctly
+	linker_options = "--sign key1 --decode-c6"
+	compile2('piggybank', 'tests', lib_file = "stdlib_c.tvm")
+	expect_success2("piggybank", "initialize_target", '{"target": 100}', None, linker_options)
+	expect_success2("piggybank", "transfer", '{"destination_account": 2147483649}', None, linker_options)
+	expect_output(r"destination : 0:0000000000000000000000000000000000000000000000000000000080000001")
+	expect_output(r"value       : CurrencyCollection: Grams vui16\[len = 5, value = 99990000000\], other curencies:")
 
 testOld()
 testOld2()
 testArrays()
-#testFailing()
+testCall()
+testContract10()
+
+testLlvmPiggyBank()
+
 
 SIGN = 'key1'
 compile1('hello.code', 'stdlib_c.tvm')

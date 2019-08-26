@@ -1,7 +1,7 @@
 {
     "tvm_linker": {
         "work_dir": "/home/neon/TON/TVM-linker/tvm_linker/tests_sol",
-        "bin_path": "/home/neon/TON/TVM-linker/tvm_linker/target/debug/tvm_linker",
+        "bin_path": "/home/neon/TON/TVM-linker/tvm_linker/target/release/tvm_linker",
         "lib_path": "../stdlib_sol.tvm"
     },
     "tlc": {
@@ -10,10 +10,10 @@
     },
     "sdk": {
         "work_dir": "/home/neon/TON/sdk-emulator",
-        "bin_path": "/home/neon/TON/sdk-emulator/target/debug/create-msg"
+        "bin_path": "/home/neon/TON/sdk-emulator/target/release/create-msg"
     },
     "node": {
-        "cmd": "./target/release/ton-node --config dumy --localhost > /dev/null",
+        "cmd": "./target/release/ton_node_local >/dev/null",
         "work_dir": "/home/neon/TON/sdk-emulator"
     }
 }

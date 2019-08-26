@@ -1,0 +1,119 @@
+ 
+.globl	send_uint64_external
+.type	send_uint64_external, @function
+LDU 256
+LDU 64
+DROP
+PUSHINT $send_uint64$
+CALL 1
+RET
+ 
+.globl	send_uint64
+.type	send_uint64, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: send_uint64
+;; param: receiver
+;; param: count
+;; new uint64[] memory
+PUSHINT 0
+NEWC STU 64 ENDC CTOS
+;; count
+;; stack=3
+PUSH s1
+DUP
+PUSHCONT {
+	DEC
+	NEWDICT
+	PUSHINT 32
+	DICTUSET
+	;; stack=5
+}
+PUSHCONT { DROP DROP NEWDICT }
+IFELSE
+;; decl: arr
+; for statement
+PUSHINT 0
+;; decl: i
+PUSHCONT {
+	;; i
+	;; stack=4
+	DUP
+	;; count
+	;; stack=5
+	PUSH s3
+	;; <
+	LESS
+	NOT DUP IFRET DROP
+	;; m_isUntil = 1
+	;; fetch arr
+	PUSH s1
+	;; i
+	;; stack=5
+	PUSH s1
+	SWAP
+	;; i
+	;; stack=6
+	PUSH s2
+	PUSHINT 1
+	;; +
+	ADD
+	NEWC STU 64 ENDC CTOS
+	ROTREV
+	PUSHINT 32
+	DICTUSET
+	;; assign arr
+	POP s2
+	;; ++
+	INC
+	FALSE
+}
+UNTIL
+; erase i
+DROP
+; for end
+;; receiver
+;; stack=3
+PUSH s2
+;; IReceiver
+;; stack=4
+;; IReceiver.on_uint64
+;; arr
+;; arr
+;; stack=4
+PUSH s1
+NEWC
+PUSHINT 0
+STUR 8
+PUSHINT $on_uint64_external$
+STUR 32
+;; arr
+SWAP
+PUSHINT 64
+PUSHINT $encode_array$
+CALL 1
+PUSHINT $send_int_msg_2$
+CALL 1
+;; ++
+;; m_counter
+;; stack=3
+PUSHINT 0
+PUSHROOT CTOS PLDDICT
+PUSHINT 256
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+INC
+;; assign m_counter
+NEWC STU 256 ENDC CTOS
+PUSHINT 0
+PUSHROOT CTOS PLDDICT
+PUSHINT 256
+DICTUSET
+NEWC STDICT ENDC
+POPROOT
+BLKDROP 3
+
+.globl	on_uint64_external
+.type	on_uint64_external, @function
+RET

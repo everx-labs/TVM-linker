@@ -1,11 +1,12 @@
-
+ 
 .globl	getMyCredit_external
 .type	getMyCredit_external, @function
 LDU 256
 DROP
 PUSHINT $getMyCredit$
 CALL 1
-
+RET
+ 
 .globl	getMyCredit
 .type	getMyCredit, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -15,25 +16,26 @@ CALL 1
 ;; stack=1
 DUP
 ;; IMyContract.getCredit
-PUSHINT $getCredit_external$
-PUSHINT 0
 NEWC
-STU 8
-STU 32
+PUSHINT 0
+STUR 8
+PUSHINT $getCredit_external$
+STUR 32
 ENDC CTOS
 PUSHINT $send_int_msg_2$
 CALL 1
 ;; return
 DROP
 RET
-
+ 
 .globl	getCreditCallback_external
 .type	getCreditCallback_external, @function
 LDU 64
 DROP
 PUSHINT $getCreditCallback$
 CALL 1
-
+RET
+ 
 .globl	getCreditCallback
 .type	getCreditCallback, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -45,11 +47,12 @@ DUP
 ;; assign m_credit
 NEWC STU 64 ENDC CTOS
 PUSHINT 0
-PUSHROOT CTOS
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUSET
-NEWC STSLICE ENDC
+NEWC STDICT ENDC
 POPROOT
+DROP
 
 .globl	getCredit_external
 .type	getCredit_external, @function

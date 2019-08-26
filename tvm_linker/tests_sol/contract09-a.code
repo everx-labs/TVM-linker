@@ -1,4 +1,4 @@
-
+ 
 .globl	sendMoneyAndNumber_external
 .type	sendMoneyAndNumber_external, @function
 LDU 256
@@ -6,7 +6,8 @@ LDU 64
 DROP
 PUSHINT $sendMoneyAndNumber$
 CALL 1
-
+RET
+ 
 .globl	sendMoneyAndNumber
 .type	sendMoneyAndNumber, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -24,11 +25,11 @@ PUSH s2
 ;; number
 ;; stack=4
 PUSH s2
-PUSHINT $acceptMoneyAndNumber_external$
-PUSHINT 0
 NEWC
-STU 8
-STU 32
+PUSHINT 0
+STUR 8
+PUSHINT $acceptMoneyAndNumber_external$
+STUR 32
 ;; number
 STU 64
 ENDC CTOS

@@ -1,6 +1,6 @@
 pragma solidity ^0.5.0;
 
-import contract06;
+import "contract06.sol";
 
 contract RemoteContract is IMyContractCallback {
 
