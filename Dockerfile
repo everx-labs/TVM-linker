@@ -10,13 +10,13 @@ RUN mkdir -m 700 ~/.ssh; \
     ssh-keyscan github.com > ~/.ssh/known_hosts
 
 WORKDIR /home/user
-WORKDIR /home/user/TVM-linker/tvm_linker
 RUN apt-get update; \
     apt-get install -y musl; \
     apt-get install -y musl-dev; \
     apt-get install -y musl-tools
 RUN rustup target add $TARGET
 COPY . TVM-linker
+WORKDIR /home/user/TVM-linker/tvm_linker
 RUN --mount=type=ssh cargo build --release --target $TARGET
 
 RUN chmod a+x /home/user/TVM-linker/tvm_linker/stdlib_c.tvm
