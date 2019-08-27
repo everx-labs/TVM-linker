@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1.0.0-experimental
 
 FROM rust:1.37 as build-ton-compiler
+ARG TARGET="x86_64-unknown-linux-musl"
 USER root
 RUN apt-get -y update
 RUN apt-get -y install cmake
@@ -11,7 +12,8 @@ RUN mkdir -m 700 ~/.ssh; \
 WORKDIR /home/user
 COPY . TVM-linker
 WORKDIR /home/user/TVM-linker/tvm_linker
-RUN --mount=type=ssh cargo build --release
+RUN rustup target add $TARGET
+RUN --mount=type=ssh cargo build --release --target $TARGET
 
 RUN chmod a+x /home/user/TVM-linker/tvm_linker/stdlib_c.tvm
 RUN chmod a+x /home/user/TVM-linker/tvm_linker/stdlib_sol.tvm
