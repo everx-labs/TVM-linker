@@ -36,6 +36,12 @@ use testcall::perform_contract_call;
 use tvm::stack::{BuilderData, SliceData};
 
 fn main() {
+    println!("TVM linker {}\nCOMMIT_ID: {}\nBUILD_DATE: {}\nCOMMIT_DATE: {}\nGIT_BRANCH: {}",
+            env!("CARGO_PKG_VERSION"),
+            env!("BUILD_GIT_COMMIT"),
+            env!("BUILD_TIME") ,
+            env!("BUILD_GIT_DATE"),
+            env!("BUILD_GIT_BRANCH"));
     if let Err(err_str) = linker_main() {
         println!("error: {}", err_str);
     }
