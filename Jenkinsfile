@@ -42,7 +42,6 @@ pipeline {
                 script {
                     G_dockerimage = "tonlabs/tvm_linker:${GIT_COMMIT}"
                     docker.image(G_dockerimage).inside("-u root") {
-                        sh 'ldd /usr/bin/tvm_linker'
                         sh 'tvm_linker --version'
                     }
                 }
