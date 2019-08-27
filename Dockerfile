@@ -12,7 +12,9 @@ RUN mkdir -m 700 ~/.ssh; \
 WORKDIR /home/user
 WORKDIR /home/user/TVM-linker/tvm_linker
 RUN apt-get update; \
-    apt-get install -y musl
+    apt-get install -y musl; \
+    apt-get install -y musl-dev; \
+    apt-get install -y musl-tools
 RUN rustup target add $TARGET
 COPY . TVM-linker
 RUN --mount=type=ssh cargo build --release --target $TARGET
