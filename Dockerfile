@@ -18,15 +18,13 @@ RUN rustup target add $TARGET
 COPY . TVM-linker
 WORKDIR /home/user/TVM-linker/tvm_linker
 RUN --mount=type=ssh cargo build --release --target $TARGET
-
-RUN chmod a+x /home/user/TVM-linker/tvm_linker/stdlib_c.tvm
-RUN chmod a+x /home/user/TVM-linker/tvm_linker/stdlib_sol.tvm
-RUN chmod a+x /home/user/TVM-linker/tvm_linker/stdlib_arg.tvm
-RUN chmod a+x /home/user/TVM-linker/tvm_linker/target/release/tvm_linker
+RUN mkdir -p /app
+RUN mv /home/user/TVM-linker/tvm_linker/stdlib_c.tvm /app
+RUN mv /home/user/TVM-linker/tvm_linker/stdlib_sol.tvm /app
+RUN mv /home/user/TVM-linker/tvm_linker/stdlib_arg.tvm /app
+RUN mv /home/user/TVM-linker/tvm_linker/target/${TARGET}/release/tvm_linker /app
+RUN chmod a+x /app/tvm_linker
 
 
 FROM alpine
-COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/stdlib_c.tvm /usr/bin/
-COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/stdlib_sol.tvm /usr/bin/
-COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/stdlib_arg.tvm /usr/bin/
-COPY --from=build-ton-compiler /home/user/TVM-linker/tvm_linker/target/release/tvm_linker /usr/bin/tvm_linker
+COPY --from=build-ton-compiler /app/ /usr/bin/
