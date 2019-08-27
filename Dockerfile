@@ -13,7 +13,7 @@ WORKDIR /home/user
 COPY . TVM-linker
 WORKDIR /home/user/TVM-linker/tvm_linker
 RUN apt-get update; \
-    apt-get install -y musl-gcc
+    apt-get install -y musl
 RUN rustup target add $TARGET
 RUN --mount=type=ssh cargo build --release --target $TARGET
 
