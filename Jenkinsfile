@@ -57,7 +57,7 @@ pipeline {
             }
             steps {
                 script {
-                    sh 'apk add libgcc gcompat libc6-compat python'
+                    sh 'apk add python'
                     sh '/usr/bin/tvm_linker --version'
                     sh 'cd tvm_linker && python test_suite.py --linker-path=/usr/bin/tvm_linker'
                 }
