@@ -67,7 +67,7 @@ fn initialize_registers(data: SliceData) -> SaveList {
     let mut ctrls = SaveList::new();
     let mut info = SmartContractInfo::with_myself(MsgAddressInt::with_standart(None, 0, AccountId::from([0u8; 32])).unwrap());
     *info.balance_remaining_mut() = CurrencyCollection::with_grams(100_000_000_000u64);
-
+    *info.unix_time_mut() = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32;
     ctrls.put(4, &mut StackItem::Cell(data.into_cell())).unwrap();
     ctrls.put(7, &mut info.into_temp_data().unwrap()).unwrap();
     ctrls
@@ -206,10 +206,13 @@ impl fmt::Display for MsgPrinter {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "message header\n{}init  : {:?}\nbody  : {:?}\nbody_hex: {}\n",
+            "message header\n{}init  : {:?}\nbody  : {}\nbody_hex: {}\n",
             print_msg_header(&self.msg.header()),
             self.msg.state_init(),
-            self.msg.body(),
+            match self.msg.body() {
+                Some(b) => format!("{:.2}", Arc::<CellData>::from(BuilderData::from_slice(&b))),
+                None => "None".to_string(),
+            },
             if self.msg.body().is_some() { hex::encode(self.msg.body().unwrap().get_bytestring(0)) } else { "None".to_string() },
         )
     }    

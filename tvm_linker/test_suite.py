@@ -242,13 +242,13 @@ def testOld2():
 	expect_success('sendMoneyAndNumber', ("12" * 32) + ("7" * 16), None, "--internal 0 --decode-c6")
 	expect_output(r"destination : 0:12121212")
 	expect_output(r"CurrencyCollection: Grams.*value = 3000000]")
-	expect_output(r"body.*119, 119, 119, 119, 119, 119, 119, 119, 128\]")
+	expect_output(r"body.*7777777777777777")
 
 	compile2('test20', 'tests')
 	expect_success('test19', "0000007F000000FF", None, "--internal 0 --decode-c6")
-	expect_output(r"body.*0, 0, 0, 127, 0, 0, 0, 255, 128\]")
+	expect_output(r"body.*0000007f000000ff")
 	expect_success('test19', "1122334455667788", None, "--internal 0 --decode-c6")
-	expect_output(r"body.*17, 34, 51, 68, 85, 102, 119, 136, 128\]")
+	expect_output(r"body.*1122334455667788")
 
 	#check tvm_balance
 	compile1('test_tvm_balance.code', 'stdlib_sol.tvm')
@@ -290,7 +290,7 @@ def testOld2():
 
 def testArrays():
 	#it maybe '--sign key1' or '--internal 0' - test will work correctly
-	linker_options = ""
+	linker_options = "--trace --decode-c6"
 	compile2('test_arrays', 'tests')
 	ar1 = '1,'*500 + "1";
 	ar2 = '2,'*500 + "2";
@@ -366,20 +366,24 @@ def testContract10():
 
     expect_success('send_uint64', ("12" * 32) + "0000000000000003", None, "--decode-c6")
     expect_output(r"destination : 0:12121212")
-    expect_output(r"\[0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 128\]")
-
+    expect_output(r"bits: 192   refs: 0   data: 000000000000000100000000000000020000000000000003")
     expect_success('send_uint64', ("12" * 32) + "0000000000000009", None, "--decode-c6")
-    expect_output(r"data: \[.*1.*2.*3.*4.*5.*9, 128\]")
-
+    res = "data: "
+    for i in range(1,10):
+	    res += '{0:016}'.format(i)
+    expect_output(res)
     expect_success('send_uint64', ("12" * 32) + "0000000000000011", None, "--decode-c6")
-    expect_output(r"data: \[0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 17, 128\]")
+    res = "data: "
+    for i in range(1,16):
+	    res += '{0:016x}'.format(i)
+    expect_output(res)
 
     # expect_success('send_uint64', ("12" * 32) + "0000000000000064", None, "--decode-c6")
     # expect_output(r"body.*references: \[CellData \{.*, 0, 0, 3, 224\]")
 
 def testLlvmPiggyBank():
 	#it maybe '--sign key1' or '--internal 0' - test will work correctly
-	linker_options = "--sign key1 --decode-c6"
+	linker_options = "--sign key1 --decode-c6 --trace"
 	compile2('piggybank', 'tests', lib_file = "stdlib_c.tvm")
 	expect_success2("piggybank", "initialize_target", '{"target": 100}', None, linker_options)
 	expect_success2("piggybank", "transfer", '{"destination_account": 2147483649}', None, linker_options)
@@ -394,7 +398,6 @@ testContract10()
 
 testLlvmPiggyBank()
 
-
 SIGN = 'key1'
 compile1('hello.code', 'stdlib_c.tvm')
 expect_success("hello", "", "1", "")
@@ -404,5 +407,4 @@ SIGN = None
 compile1('hello.code', 'stdlib_c.tvm')
 expect_success("hello", "", "1", "")
 expect_output(r"Hello")
-
 cleanup()
