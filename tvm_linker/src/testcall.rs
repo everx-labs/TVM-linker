@@ -206,10 +206,13 @@ impl fmt::Display for MsgPrinter {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "message header\n{}init  : {:?}\nbody  : {:?}\nbody_hex: {}\n",
+            "message header\n{}init  : {:?}\nbody  : {}\nbody_hex: {}\n",
             print_msg_header(&self.msg.header()),
             self.msg.state_init(),
-            self.msg.body(),
+            match self.msg.body() {
+                Some(b) => format!("{:.2}", Arc::<CellData>::from(BuilderData::from_slice(&b))),
+                None => "None".to_string(),
+            },
             if self.msg.body().is_some() { hex::encode(self.msg.body().unwrap().get_bytestring(0)) } else { "None".to_string() },
         )
     }    
