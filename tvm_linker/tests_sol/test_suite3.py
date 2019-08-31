@@ -527,7 +527,7 @@ class SoliditySuite(unittest.TestCase):
         s2 = runTLCAccount(address2).get('stack')
         s2 = re.findall(r'D0([0-9A-Z]*)',s2[len(s2)-1])[0]
         v2 = int(s2, base=16)
-        self.assertTrue(v2 > b2 and v2 < 1000000, 'Unexpected stack value for balance')
+        self.assertTrue(v2 > b2 and v2 < 100000000, 'Unexpected stack value for balance: v2=' + str(v2) + " b2=" + str(b2))
 
     def test_08(self):
         address1 = self.deployContract('contract08-a')
@@ -559,8 +559,8 @@ class SoliditySuite(unittest.TestCase):
         sendFile(msgbody)
 
         # checking account changes
-        waitForBalanceInRange(address1, 6445936, 6545936, 5000)
-        waitForBalanceInRange(address2, 12599714, 12699714, 5000)
+        waitForBalanceInRange(address1, 95579956, 97579956, 5000)
+        waitForBalanceInRange(address2, 92712634, 112712634, 5000)
         waitForAccountStateContains(address2, r'x\{00000000000000406_\}')
         waitForAccountStateContains(address2, r'x\{00000000000000000000000000000000000000000000000000000000000B71AFA_\}')
 
@@ -583,5 +583,26 @@ class SoliditySuite(unittest.TestCase):
         send(18)
         waitForAccountStateContains(address1, r'x\{D000000000000000000000000000000000000000000000000000000000000000003\}')
         waitForAccountStateContains(address2, r'x\{D0000000000000000000000000000000000000000000000000000000000000000AB\}')
+
+        def send_uint64_two(n):
+            print("n =", n)
+            params = '{"receiver":"0x%s","count":%d}' % (address2, n)
+            msgbody = runLinkerMsgBody(address1, 'contract10-a.abi.json', params, 'send_uint64_two_external')
+            sendFile(msgbody)
+
+        send_uint64_two(3)
+        waitForAccountStateContains(address1, r'x\{D000000000000000000000000000000000000000000000000000000000000000004\}')
+        waitForAccountStateContains(address2, r'x\{0000000000000000000000000000000000000000000000000000000000000001A_\}')
+        waitForAccountStateContains(address2, r'x\{000000000000000000000000000000000000000000000000000000000000004CA_\}')
+        send_uint64_two(9)
+        waitForAccountStateContains(address1, r'x\{D000000000000000000000000000000000000000000000000000000000000000005\}')
+        waitForAccountStateContains(address2, r'x\{000000000000000000000000000000000000000000000000000000000000000B6_\}')
+        waitForAccountStateContains(address2, r'x\{00000000000000000000000000000000000000000000000000000000000000EC6_\}')
+        send_uint64_two(18)
+        waitForAccountStateContains(address1, r'x\{D000000000000000000000000000000000000000000000000000000000000000006\}')
+        waitForAccountStateContains(address2, r'x\{000000000000000000000000000000000000000000000000000000000000002AE_\}')
+        waitForAccountStateContains(address2, r'x\{00000000000000000000000000000000000000000000000000000000000001ECE_\}')
+
+
 
 unittest.main()

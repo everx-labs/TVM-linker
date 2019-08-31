@@ -1,4 +1,3 @@
- 
 .globl	getMyCredit_external
 .type	getMyCredit_external, @function
 LDU 256
@@ -6,7 +5,7 @@ DROP
 PUSHINT $getMyCredit$
 CALL 1
 RET
- 
+
 .globl	getMyCredit
 .type	getMyCredit, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -27,7 +26,7 @@ CALL 1
 ;; return
 DROP
 RET
- 
+
 .globl	getCreditCallback_external
 .type	getCreditCallback_external, @function
 LDU 64
@@ -35,7 +34,7 @@ DROP
 PUSHINT $getCreditCallback$
 CALL 1
 RET
- 
+
 .globl	getCreditCallback
 .type	getCreditCallback, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -53,6 +52,7 @@ DICTUSET
 NEWC STDICT ENDC
 POPROOT
 DROP
+
 
 .globl	getCredit_external
 .type	getCredit_external, @function

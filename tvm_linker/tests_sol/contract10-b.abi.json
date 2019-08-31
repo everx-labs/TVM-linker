@@ -2,7 +2,18 @@
 	"ABI version": 0,
 	"functions": [{
 		"name": "on_uint64_external",
-		"inputs": [{"name": "arr", "type": "uint64[]"}],
-		"outputs": []
+		"inputs": [
+			{"name":"arr","type":"uint64[]"}
+		],
+		"outputs": [
+		]
+	}, {
+		"name": "on_two_uint64_external",
+		"inputs": [
+			{"name":"arr0","type":"uint64[]"},
+			{"name":"arr1","type":"uint64[]"}
+		],
+		"outputs": [
+		]
 	}]
 }

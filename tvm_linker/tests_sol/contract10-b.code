@@ -1,4 +1,3 @@
- 
 .globl	on_uint64_external
 .type	on_uint64_external, @function
 PUSHINT 64
@@ -8,7 +7,7 @@ DROP
 PUSHINT $on_uint64$
 CALL 1
 RET
- 
+
 .globl	on_uint64
 .type	on_uint64, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -79,3 +78,161 @@ DICTUSET
 NEWC STDICT ENDC
 POPROOT
 BLKDROP 3
+
+.globl	on_two_uint64_external
+.type	on_two_uint64_external, @function
+PUSHINT 64
+PUSHINT $decode_array$
+CALL 1
+PUSHINT 64
+PUSHINT $decode_array$
+CALL 1
+DROP
+PUSHINT $on_two_uint64$
+CALL 1
+RET
+
+.globl	on_two_uint64
+.type	on_two_uint64, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: on_two_uint64
+;; param: arr0
+;; param: arr1
+PUSHINT 0
+;; assign m_counter
+NEWC STU 256 ENDC CTOS
+PUSHINT 0
+PUSHROOT CTOS PLDDICT
+PUSHINT 256
+DICTUSET
+NEWC STDICT ENDC
+POPROOT
+; for statement
+PUSHINT 0
+;; decl: i
+PUSHCONT {
+	;; i
+	;; stack=3
+	DUP
+	;; get member length
+	;; arr0
+	;; stack=4
+	PUSH s3
+	PUSHINT 32
+	DICTUMAX
+	PUSHCONT { POP s1 INC }
+	PUSHCONT { PUSHINT 0 }
+	IFELSE
+	;; <
+	LESS
+	NOT DUP IFRET DROP
+	;; m_isUntil = 1
+	;; i
+	;; stack=3
+	DUP
+	;; arr0
+	;; stack=4
+	PUSH s3
+	;; index
+	PUSHINT 32
+	DICTUGET
+	PUSHCONT { LDU 64 ENDS }
+	PUSHCONT { PUSHINT 0 }
+	IFELSE
+	;; m_counter
+	;; stack=4
+	PUSHINT 0
+	PUSHROOT CTOS PLDDICT
+	PUSHINT 256
+	DICTUGET
+	PUSHCONT { LDU 256 ENDS }
+	PUSHCONT { PUSHINT 0 }
+	IFELSE
+	SWAP
+	ADD
+	;; assign m_counter
+	NEWC STU 256 ENDC CTOS
+	PUSHINT 0
+	PUSHROOT CTOS PLDDICT
+	PUSHINT 256
+	DICTUSET
+	NEWC STDICT ENDC
+	POPROOT
+	;; ++
+	INC
+	FALSE
+}
+UNTIL
+; erase i
+DROP
+; for end
+PUSHINT 0
+;; assign m_sum1
+NEWC STU 256 ENDC CTOS
+PUSHINT 1
+PUSHROOT CTOS PLDDICT
+PUSHINT 256
+DICTUSET
+NEWC STDICT ENDC
+POPROOT
+; for statement
+PUSHINT 0
+;; decl: i
+PUSHCONT {
+	;; i
+	;; stack=3
+	DUP
+	;; get member length
+	;; arr1
+	;; stack=4
+	PUSH s2
+	PUSHINT 32
+	DICTUMAX
+	PUSHCONT { POP s1 INC }
+	PUSHCONT { PUSHINT 0 }
+	IFELSE
+	;; <
+	LESS
+	NOT DUP IFRET DROP
+	;; m_isUntil = 1
+	;; i
+	;; stack=3
+	DUP
+	;; arr1
+	;; stack=4
+	PUSH s2
+	;; index
+	PUSHINT 32
+	DICTUGET
+	PUSHCONT { LDU 64 ENDS }
+	PUSHCONT { PUSHINT 0 }
+	IFELSE
+	;; m_sum1
+	;; stack=4
+	PUSHINT 1
+	PUSHROOT CTOS PLDDICT
+	PUSHINT 256
+	DICTUGET
+	PUSHCONT { LDU 256 ENDS }
+	PUSHCONT { PUSHINT 0 }
+	IFELSE
+	SWAP
+	ADD
+	;; assign m_sum1
+	NEWC STU 256 ENDC CTOS
+	PUSHINT 1
+	PUSHROOT CTOS PLDDICT
+	PUSHINT 256
+	DICTUSET
+	NEWC STDICT ENDC
+	POPROOT
+	;; ++
+	INC
+	FALSE
+}
+UNTIL
+; erase i
+DROP
+; for end
+BLKDROP 2
+

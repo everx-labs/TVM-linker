@@ -2,15 +2,23 @@
 	"ABI version": 0,
 	"functions": [{
 		"name": "getCredit_external",
-		"inputs": [],
-		"outputs": []
+		"inputs": [
+		],
+		"outputs": [
+		]
 	}, {
 		"name": "getCreditCallback_external",
-		"inputs": [{"name": "balance", "type": "uint64"}],
-		"outputs": []
+		"inputs": [
+			{"name":"balance","type":"uint64"}
+		],
+		"outputs": [
+		]
 	}, {
 		"name": "getMyCredit_external",
-		"inputs": [{"name": "bank", "type": "uint256"}],
-		"outputs": []
+		"inputs": [
+			{"name":"bank","type":"uint256"}
+		],
+		"outputs": [
+		]
 	}]
 }

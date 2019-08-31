@@ -2,11 +2,18 @@
 	"ABI version": 0,
 	"functions": [{
 		"name": "remoteMethod_external",
-		"inputs": [{"name": "value", "type": "uint256"}],
-		"outputs": []
+		"inputs": [
+			{"name":"value","type":"uint256"}
+		],
+		"outputs": [
+		]
 	}, {
 		"name": "method_external",
-		"inputs": [{"name": "anotherContract", "type": "uint256"}, {"name": "amount", "type": "uint256"}],
-		"outputs": []
+		"inputs": [
+			{"name":"anotherContract","type":"uint256"},
+			{"name":"amount","type":"uint256"}
+		],
+		"outputs": [
+		]
 	}]
 }

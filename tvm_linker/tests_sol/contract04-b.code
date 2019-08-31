@@ -1,4 +1,3 @@
- 
 .globl	remoteMethod_external
 .type	remoteMethod_external, @function
 LDU 256
@@ -6,13 +5,13 @@ DROP
 PUSHINT $remoteMethod$
 CALL 1
 RET
- 
+
 .globl	remoteMethod
 .type	remoteMethod, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: remoteMethod
 ;; param: value
-LOGSTR SendMoney
+PRINTSTR SendMoney
 ;; get member sender
 PUSHINT $get_msg_sender$
 CALL 1
@@ -48,3 +47,4 @@ POPROOT
 ;; return
 DROP
 RET
+

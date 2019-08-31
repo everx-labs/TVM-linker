@@ -1,4 +1,3 @@
- 
 .globl	method_external
 .type	method_external, @function
 LDU 256
@@ -7,7 +6,7 @@ DROP
 PUSHINT $method$
 CALL 1
 RET
- 
+
 .globl	method
 .type	method, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -20,24 +19,23 @@ PUSH s1
 ;; IRemoteContract
 ;; stack=3
 ;; IRemoteContract.remoteMethod
-;; x
-;; x
-;; stack=3
-PUSH s1
 NEWC
 PUSHINT 0
 STUR 8
 PUSHINT $remoteMethod_external$
 STUR 32
 ;; x
-STU 16
+;; x
+;; stack=4
+PUSH s2
+STUR 16
 ENDC CTOS
 PUSHINT $send_int_msg_2$
 CALL 1
 ;; return
 BLKDROP 2
 RET
- 
+
 .globl	remoteMethodCallback_external
 .type	remoteMethodCallback_external, @function
 LDU 16
@@ -45,7 +43,7 @@ DROP
 PUSHINT $remoteMethodCallback$
 CALL 1
 RET
- 
+
 .globl	remoteMethodCallback
 .type	remoteMethodCallback, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -65,6 +63,7 @@ POPROOT
 ;; return
 DROP
 RET
+
 
 .globl	remoteMethod_external
 .type	remoteMethod_external, @function

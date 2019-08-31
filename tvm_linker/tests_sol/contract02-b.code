@@ -1,4 +1,3 @@
- 
 .globl	remoteMethod_external
 .type	remoteMethod_external, @function
 LDU 64
@@ -6,7 +5,7 @@ DROP
 PUSHINT $remoteMethod$
 CALL 1
 RET
- 
+
 .globl	remoteMethod
 .type	remoteMethod, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -26,3 +25,4 @@ POPROOT
 ;; return
 DROP
 RET
+

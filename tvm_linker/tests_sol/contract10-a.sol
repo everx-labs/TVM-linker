@@ -17,4 +17,16 @@ contract Sender {
 		m_counter++;
 	}
 	
+	function send_uint64_two(address receiver, uint64 count) public {
+		uint64[] memory arr0 = new uint64[](count);
+		for (uint64 i = 0; i < count; i++) {
+			arr0[i] = i+1;
+		}
+		uint64[] memory arr1 = new uint64[](count);
+		for (uint64 i = 0; i < count; i++) {
+			arr1[i] = 100 + i+1;
+		}
+		IReceiver(receiver).on_two_uint64(arr0, arr1);
+		m_counter++;
+	}
 }

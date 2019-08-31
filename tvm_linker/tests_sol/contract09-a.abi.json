@@ -2,11 +2,18 @@
 	"ABI version": 0,
 	"functions": [{
 		"name": "acceptMoneyAndNumber_external",
-		"inputs": [{"name": "number", "type": "uint64"}],
-		"outputs": []
+		"inputs": [
+			{"name":"number","type":"uint64"}
+		],
+		"outputs": [
+		]
 	}, {
 		"name": "sendMoneyAndNumber_external",
-		"inputs": [{"name": "remote", "type": "uint256"}, {"name": "number", "type": "uint64"}],
-		"outputs": []
+		"inputs": [
+			{"name":"remote","type":"uint256"},
+			{"name":"number","type":"uint64"}
+		],
+		"outputs": [
+		]
 	}]
 }
