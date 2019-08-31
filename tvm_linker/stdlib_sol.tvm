@@ -1056,7 +1056,6 @@
 	INDEX 7
 	FIRST
 	RET
-
 				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 				;;; THE CODE BELOW IS GENERATED. DO NOT CHANGE IT!	
 
@@ -1082,6 +1081,7 @@ IFELSE
 ;; return
 RET
 
+
 .globl	get_msg_sender
 .type	get_msg_sender, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1102,6 +1102,7 @@ PUSHCONT { PUSHINT 0 }
 IFELSE
 ;; return
 RET
+
 
 .globl	get_msg_balance
 .type	get_msg_balance, @function
@@ -1124,6 +1125,7 @@ IFELSE
 ;; return
 RET
 
+
 .globl	encode_array_rec
 .type	encode_array_rec, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1133,6 +1135,7 @@ RET
 ;; param: nbits
 ;; param: len
 ;; param: idx
+PRINTSTR encode_array_r
 ; while statement
 PUSHCONT {
 	;; idx
@@ -1155,7 +1158,7 @@ PUSHCONT {
 	BCHKBITSQ
 	PUSHCONT {
 		;; m_addReturnFlag = 1
-		PRINTSTR BCHKBITS_1
+		PRINTSTR encode_array_r0
 		;; idx
 		;; stack=5
 		DUP
@@ -1187,7 +1190,7 @@ PUSHCONT {
 	}
 	PUSHCONT {
 		;; m_addReturnFlag = 1
-		PRINTSTR BCHKBITS_0
+		PRINTSTR encode_array_r1
 		;; tvm_newc
 		;; stack=5
 		NEWC
@@ -1205,6 +1208,9 @@ PUSHCONT {
 		PUSH s4
 		PUSHINT $encode_array_rec$
 		CALL 1
+		;; tvm_endc
+		;; stack=6
+		ENDC
 		;; decl: tail
 		;; tail
 		;; stack=6
@@ -1238,13 +1244,11 @@ UNTIL
 ;; builder
 ;; stack=5
 PUSH s4
-;; tvm_endc
-;; stack=6
-ENDC
 ;; return
 XCHG s5
 BLKDROP 5
 RET
+
 
 .globl	encode_array
 .type	encode_array, @function
@@ -1253,7 +1257,7 @@ RET
 ;; param: builder
 ;; param: array
 ;; param: nbits
-LOGSTR encode_array
+PRINTSTR encode_array
 ;; array
 ;; stack=3
 PUSH s1
@@ -1264,8 +1268,59 @@ PUSHCONT { PUSHINT 0 }
 IFELSE
 ;; decl: n
 ;; if
-FALSE
+;; n
+;; stack=4
+DUP
+PUSHINT 0
+;; ==
+EQUAL
 PUSHCONT {
+	PUSHINT 2
+	;; builder
+	;; stack=5
+	PUSH s4
+	STU 2
+	POP s4
+	;; n
+	;; stack=4
+	DUP
+	;; builder
+	;; stack=5
+	PUSH s4
+	STU 8
+	POP s4
+	;; builder
+	;; stack=4
+	PUSH s3
+	;; return
+	XCHG s4
+	BLKDROP 4
+	RET
+}
+IFJMP
+;; if
+;; builder
+;; stack=4
+PUSH s3
+BREMBITS ; tvm_brembits
+PUSHINT 2
+PUSHINT 8
+;; +
+ADD
+;; n
+;; stack=6
+PUSH s2
+;; nbits
+;; stack=7
+PUSH s4
+;; *
+MUL
+;; +
+ADD
+;; >=
+GEQ
+PUSHCONT {
+	PRINTSTR encode_array01
 	PUSHINT 2
 	;; builder
 	;; stack=5
@@ -1295,50 +1350,141 @@ PUSHCONT {
 	PUSHINT 0
 	PUSHINT $encode_array_rec$
 	CALL 1
-	CTOS
+	;; assign builder
+	POP s4
+	;; builder
+	;; stack=4
+	PUSH s3
 	;; return
 	XCHG s4
 	BLKDROP 4
 	RET
 }
-PUSHCONT {
-	PUSHINT 0
-	;; builder
-	;; stack=5
-	PUSH s4
-	STU 2
-	POP s4
-	;; tvm_newc
-	;; stack=4
-	NEWC
-	;; array
-	;; stack=5
-	PUSH s3
-	;; nbits
-	;; stack=6
-	PUSH s3
-	;; n
-	;; stack=7
-	PUSH s3
-	PUSHINT 0
-	PUSHINT $encode_array_rec$
-	CALL 1
-	;; builder
-	;; stack=5
-	PUSH s4
-	STREF
-	POP s4
-	;; builder
-	;; stack=4
-	PUSH s3
-	;; tvm_endc
-	;; stack=5
-	ENDC
-	CTOS
-	;; return
-	XCHG s4
-	BLKDROP 4
-	RET
-}
-IFELSE
+IFJMP
+PUSHINT 0
+;; builder
+;; stack=5
+PUSH s4
+STU 2
+POP s4
+;; tvm_newc
+;; stack=4
+NEWC
+;; array
+;; stack=5
+PUSH s3
+;; nbits
+;; stack=6
+PUSH s3
+;; n
+;; stack=7
+PUSH s3
+PUSHINT 0
+PUSHINT $encode_array_rec$
+CALL 1
+;; tvm_endc
+;; stack=5
+ENDC
+;; builder
+;; stack=5
+PUSH s4
+STREF
+POP s4
+PRINTSTR encode_array_ok
+;; builder
+;; stack=4
+PUSH s3
+;; return
+XCHG s4
+BLKDROP 4
 RET
+
+
+.globl	abi_decode
+.type	abi_decode, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: abi_decode
+;; param: array
+PUSHINT 8
+;; decl: bitSizeOfArrayElement
+;; tvm_newc
+;; stack=2
+NEWC
+;; decl: builderRet
+;; array
+;; stack=3
+PUSH s2
+PUSHINT 32
+DICTUMAX
+PUSHCONT { POP s1 INC }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; decl: arraySize
+; for statement
+PUSHINT 0
+;; decl: idx
+PUSHCONT {
+	;; idx
+	;; stack=5
+	DUP
+	;; arraySize
+	;; stack=6
+	PUSH s2
+	;; <
+	LESS
+	NOT DUP IFRET DROP
+	;; m_isUntil = 1
+	;; bitSizeOfArrayElement
+	;; stack=5
+	PUSH s3
+	;; idx
+	;; stack=6
+	PUSH s1
+	;; array
+	;; stack=7
+	PUSH s6
+	PUSHINT 32
+	DICTUGET
+	PUSHCONT { 
+		NIP
+	}
+	PUSHCONT {
+		NEWC      ; valueBits builder
+		PUSHINT 0 ; valueBits builder 0
+		XCHG S2   ; 0 builder valueBits
+		STUX      ; builder
+		ENDC      ; cell
+		CTOS      ; default_value
+	}
+	IFELSE
+	;; decl: data_slice
+	;; data_slice
+	;; stack=6
+	DUP
+	;; builderRet
+	;; stack=7
+	PUSH s4
+	STSLICE
+	POP s4
+	;; drop locals
+	DROP
+	;; ++
+	INC
+	FALSE
+}
+UNTIL
+; erase idx
+DROP
+; for end
+;; builderRet
+;; stack=4
+PUSH s1
+;; tvm_endc
+;; stack=5
+ENDC
+CTOS
+;; return
+XCHG s4
+BLKDROP 4
+RET
+

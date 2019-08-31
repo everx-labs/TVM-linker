@@ -1,4 +1,3 @@
- 
 .globl	method_external
 .type	method_external, @function
 LDU 256
@@ -6,7 +5,7 @@ DROP
 PUSHINT $method$
 CALL 1
 RET
- 
+
 .globl	method
 .type	method, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -16,15 +15,14 @@ RET
 ;; stack=1
 DUP
 ;; AnotherContract.remoteMethod
-;; value
-PUSHINT 257
 NEWC
 PUSHINT 0
 STUR 8
 PUSHINT $remoteMethod_external$
 STUR 32
 ;; value
-STU 64
+PUSHINT 257
+STUR 64
 ENDC CTOS
 PUSHINT $send_int_msg_2$
 CALL 1
@@ -51,6 +49,7 @@ POPROOT
 ;; return
 DROP
 RET
+
 
 .globl	remoteMethod_external
 .type	remoteMethod_external, @function
