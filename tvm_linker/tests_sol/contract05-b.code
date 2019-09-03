@@ -48,7 +48,7 @@ CALL 1
 DROP
 RET
 
-
 .globl	remoteMethodCallback_external
 .type	remoteMethodCallback_external, @function
 RET
+

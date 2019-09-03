@@ -817,243 +817,6 @@
 	SENDRAWMSG
 
 
-	.globl	insert_value_and_inc_key
-	.type	insert_value_and_inc_key, @function
-	; arr key arrValue
-	PRINTSTR insert_value
-	PUSH2 s1, s2 ; stacktrace: arr key arrValue key arr
-	PUSHINT 32   ; stacktrace: arr key arrValue key arr 32
-	DICTUSET     ; stacktrace: arr key arr
-	POP s2      ; stacktrace: arr key arr
-	INC          ; stacktrace: arr key
-
-
-	.globl	decode_array
-	.type	decode_array, @function
-	PRINTSTR	decode_array0
-	
-	; Decode array of numbers of given number of bits
-	; args:
-	;   s0 - numBits (integer) - lenght of array's values
-	;   s1 - sl (slice) - encoded array
-	; ret:
-	;   s0 - remaining slice
-	;   s1 - dict represented decoded array
-
-	; Stucture of encoded array
-	; 2 bits put in the cell-data define serialization algorithm.
-	; [00] - array is put into a separate cell. In case of array overflowing 
-	;        the maximum cell-data size it's split into multiple sequential cells.
-	; [10] - bits sequence is put in the cell-data. The next 8 bits (1 byte) define 
-	;        the number of elements of the array. It's followed by the sequence of 
-	; 		 encoded array elements.	
-	; [01]/[11] - reserved.
-
-	; stacktrace: sl numBits
-	SWAP                ; stacktrace: numBits sl
-	PUSHINT 2           ; stacktrace: numBits sl 2
-	PUSHINT $smart_ldu$
-	CALL 1              ; stacktrace: numBits algo sl
-	SWAP                ; stacktrace: numBits sl algo
-
-	DUP
-	PUSHINT 0
-	EQUAL
-
-	PUSHCONT { ; [00] serialization algorithm
-		;stacktrace: numBits sl algo
-		PRINTSTR decode_array00
-		DROP      ; stacktrace: numBits sl
-		LDREF     ; stacktrace: numBits cell sl
-		ROTREV    ; stacktrace: sl numBits cell
-		CTOS      ; stacktrace: sl numBits slData
-		NEWDICT   ; stacktrace: sl numBits slData arr
-		PUSHINT 0 ; stacktrace: sl numBits slData arr key
-
-		PUSHCONT {
-			PRINTSTR cycle_start
-			; stacktrace: numBits slData arr key
-			PUSH s2 ; stacktrace: sl numBits slData arr key slData
-			SBITS   ; stacktrace: sl numBits slData arr key slBits
-			PUSH S4 ; stacktrace: sl numBits slData arr key slBits numBits
-			GEQ     ; stacktrace: sl numBits slData arr key slBits>=numBits
-			PUSHCONT { ; slBits >= numBits
-				; stacktrace: sl numBits slData arr key
-
-				PUSH2 s2, s3 ; stacktrace: sl numBits slData arr key slData numBits
-				LDSLICEX     ; stacktrace: sl numBits slData arr key arrValue slData
-				POP s4       ; stacktrace: sl numBits slData arr key arrValue
-
-				PUSHINT $insert_value_and_inc_key$
-				CALL 1
-				PUSHINT 0    ; stacktrace: sl numBits slData arr key 0
-			}
-			PUSHCONT { ; slBits < numBits
-				; stacktrace: numBits slData arr key
-				PUSH s2   ; stacktrace: sl numBits slData arr key slData
-				SBITS     ; stacktrace: sl numBits slData arr key slBits
-				PUSHINT 0 ; stacktrace: sl numBits slData arr key slBits 0
-				EQUAL     ; stacktrace: sl numBits slData arr key slBits==0
-
-				PUSHCONT { ; slBits == 0
-					; stacktrace: sl numBits slData arr key
-					PUSH  s2  ; stacktrace: sl numBits slData arr key slData
-					SREFS     ; stacktrace: sl numBits slData arr key refCnt
-					PUSHINT 0 ; stacktrace: sl numBits slData arr key refCnt 0
-					EQUAL     ; stacktrace: sl numBits slData arr key refCnt==0
-					PUSHCONT { ; no next cell
-						; stacktrace: sl numBits slData arr key
-						PUSHINT -1 ; stacktrace: sl numBits slData arr key -1
-					}
-					PUSHCONT { ; load next cell
-						; stacktrace: sl numBits slData arr key
-						PUSH  s2   ; stacktrace: sl numBits slData arr key slData
-						LDREF      ; stacktrace: sl numBits slData arr key cell slData
-						DROP       ; stacktrace: sl numBits slData arr key cell
-						CTOS       ; stacktrace: sl numBits slData arr key slData
-						POP s3     ; stacktrace: sl numBits slData arr key
-						PUSHINT 0  ; stacktrace: sl numBits slData arr key -1
-					}
-					IFELSE
-				}
-				PUSHCONT { ; merge value from two cells
-					; stacktrace: sl numBits slData arr key
-
-					; load part 1 (arrValue0)
-					PUSH s2   ; stacktrace: sl numBits slData arr key slData
-					DUP       ; stacktrace: sl numBits slData arr key slData slData
-					SBITS     ; stacktrace: sl numBits slData arr key slData slBits0
-					DUP       ; stacktrace: sl numBits slData arr key slData slBits0 slBits0
-					ROTREV    ; stacktrace: sl numBits slData arr key slBits0 slData slBits0
-					LDSLICEX  ; stacktrace: sl numBits slData arr key slBits0 arrValue0 slData   ;;arrValue0 - is slice!
-
-					; load part 2 (arrValue1)
-					LDREF     ; stacktrace: sl numBits slData arr key slBits0 arrValue0 cell slData
-					DROP      ; stacktrace: sl numBits slData arr key slBits0 arrValue0 cell
-					CTOS      ; stacktrace: sl numBits slData arr key slBits0 arrValue0 slData
-					ROT       ; stacktrace: sl numBits slData arr key arrValue0 slData slBits0
-					PUSH s6   ; stacktrace: sl numBits slData arr key arrValue0 slData slBits0 numBits
-					SWAP      ; stacktrace: sl numBits slData arr key arrValue0 slData numBits slBits0
-					SUB       ; stacktrace: sl numBits slData arr key arrValue0 slData slBits1
-					LDSLICEX  ; stacktrace: sl numBits slData arr key arrValue0 arrValue1 slData
-
-					; merge arrValue0 and arrValue1
-					ROTREV      ; stacktrace: sl numBits slData arr key slData arrValue0 arrValue1
-					NEWC        ; stacktrace: sl numBits slData arr key slData arrValue0 arrValue1 builderArrValue
-					XCHG s1, s2 ; stacktrace: sl numBits slData arr key slData arrValue1 arrValue0 builderArrValue
-					STSLICE     ; stacktrace: sl numBits slData arr key slData arrValue1 builderArrValue
-					STSLICE     ; stacktrace: sl numBits slData arr key slData builderArrValue
-					ENDC        ; stacktrace: sl numBits slData arr key slData cellArrValue
-					CTOS        ; stacktrace: sl numBits slData arr key slData arrValue
-					SWAP        ; stacktrace: sl numBits slData arr key arrValue slData
-					POP s4      ; stacktrace: sl numBits slData arr key arrValue
-
-					PUSHINT $insert_value_and_inc_key$
-					CALL 1
-					PUSHINT 0    ; stacktrace: sl numBits slData arr key 0
-				}
-				IFELSE ; slBits == 0
-			}
-			IFELSE ; slBits >= numBits
-			; stacktrace: sl numBits slData arr key -1/0
-		}
-		UNTIL
-
-		; stacktrace: sl numBits slData arr key
-		XCHG s1, s3 ; stacktrace: sl arr slData numBits key
-		BLKDROP 3   ; stacktrace: sl arr
-		SWAP        ; stacktrace: arr sl
-	}
-	PUSHCONT {
-		DUP
-		PUSHINT 2
-		EQUAL
-
-		PUSHCONT { ; [10] serialization algorithm
-			PRINTSTR	decode_array10
-			DROP
-
-			LDU 8 ; load number of elements of the array
-			SWAP
-			; stacktrace: numBits sl arrSz
-
-			NEWDICT
-			PUSHINT 0
-			; stacktrace: numBits sl arrSz arr key
-
-			PUSH s2
-			; stacktrace: numBits sl arrSz arr key arrSz
-			PUSHCONT {
-				PRINTSTR	decode_array102
-				; stacktrace: numBits sl arrSz arr key
-
-				PUSH2 s4, s3
-				; stacktrace: numBits sl arrSz arr key numBits sl
-				SBITS
-				; stacktrace: numBits sl arrSz arr key numBits sl_bits
-				SUB
-				; stacktrace: numBits sl arrSz arr key diff_bits
-				DUP ISPOS
-				PUSHCONT {
-					; stacktrace: numBits sl arrSz arr key diff_bits
-					PUSH s4
-					DUP SBITS
-					LDSLICEX 
-					LDREFRTOS NIP
-					; stacktrace: numBits sl arrSz arr key diff_bits sl_remain sl_ref0
-					ROT
-					LDSLICEX
-					; stacktrace: numBits sl arrSz arr key sl_remain sl sl_tail
-					XCHG s2
-					NEWC
-					STSLICE 
-					STSLICE
-					ENDC CTOS
-					SWAP
-					; stacktrace: numBits sl arrSz arr key arrValue sl 
-				}
-				PUSHCONT {
-					; stacktrace: numBits sl arrSz arr key diff_bits
-					DROP
-					PUSH2 s3, s4
-					LDSLICEX
-					; stacktrace: numBits sl arrSz arr key arrValue sl
-				}
-				IFELSE
-
-				POP s5
-				; stacktrace: numBits sl arrSz arr key arrValue
-
-				PUSH2 s1, s2
-				PUSHINT 32
-				; stacktrace: numBits sl arrSz arr key arrValue key arr 32
-
-				DICTUSET
-				; stacktrace: numBits sl arrSz arr key arr
-
-				POP s2
-				; stacktrace: numBits sl arrSz arr key
-
-				INC
-				; stacktrace: numBits sl arrSz arr key
-			}
-			REPEAT
-
-			; stacktrace: numBits sl arrSz arr key
-			XCHG s1, s4
-			; stacktrace: arr sl arrSz numBits key
-			BLKDROP 3
-			; stacktrace: arr sl
-		}
-		PUSHCONT {
-			THROW 11 ; unsupported serialization algorithm
-		}
-		IFELSE
-	}
-	IFELSE
-	PRINTSTR	decode_array3
-	RET
-
 
 	.globl		get_contract_balance
 	.type		get_contract_balance, @function
@@ -1233,13 +996,8 @@ PUSHCONT {
 	DUP
 	PUSHINT 2
 	EQUAL
-	PUSHCONT {
-		DROP
-		TRUE TRUE
-	}
-	PUSHCONT { FALSE }
-	IFELSE
-	IFRET
+	PUSHCONT { DROP TRUE }
+	IFJMP
 	THROWIF 99
 	FALSE
 }
@@ -1400,6 +1158,416 @@ PUSH s3
 ;; return
 XCHG s4
 BLKDROP 4
+RET
+
+.globl	load_slice_from_two_cell
+.type	load_slice_from_two_cell, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: load_slice_from_two_cell
+;; param: slice
+;; param: bitQty0
+;; param: bitQty1
+;; slice
+;; stack=3
+PUSH s2
+;; bitQty0
+;; stack=4
+PUSH s2
+LDSLICEX
+POP s4
+;; decl: sliceValue0
+;; slice
+;; stack=4
+PUSH s3
+LDREF
+POP s5
+;; decl: nextCell
+;; slice
+;; stack=5
+PUSH s4
+ENDS
+NULL
+POP s5
+;; nextCell
+;; stack=5
+DUP
+CTOS
+;; assign slice
+POP s5
+;; slice
+;; stack=5
+PUSH s4
+;; bitQty1
+;; stack=6
+PUSH s3
+LDSLICEX
+POP s6
+;; decl: sliceValue1
+;; tvm_newc
+;; stack=6
+NEWC
+;; decl: numberBuilder
+;; sliceValue0
+;; stack=7
+PUSH s3
+;; numberBuilder
+;; stack=8
+PUSH s1
+STSLICE
+NIP
+;; sliceValue1
+;; stack=7
+PUSH s1
+;; numberBuilder
+;; stack=8
+PUSH s1
+STSLICE
+NIP
+;; numberBuilder
+;; stack=7
+DUP
+;; tvm_endc
+;; stack=8
+ENDC
+CTOS
+;; slice
+;; stack=8
+PUSH s7
+;; return
+BLKSWAP 7, 2
+BLKDROP 7
+RET
+
+.globl	decode_array
+.type	decode_array, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: decode_array
+;; param: slice
+;; param: valueBits
+NEWDICT
+;; decl: array
+;; slice
+;; stack=3
+PUSH s2
+PUSHINT 2
+PUSHINT $smart_ldu$
+CALL 1
+;; decl: decode_algo
+;; decl: tmp
+;; tmp
+;; stack=5
+DUP
+;; assign slice
+POP s5
+;; if
+;; decode_algo
+;; stack=5
+PUSH s1
+PUSHINT 0
+;; ==
+EQUAL
+PUSHCONT {
+	;; m_addReturnFlag = 1
+	;; slice
+	;; stack=5
+	PUSH s4
+	LDREF
+	POP s6
+	CTOS
+	;; decl: arraySlice
+	; for statement
+	PUSHINT 0
+	;; decl: i
+	PUSHCONT {
+		;; m_isUntil = 1
+		;; arraySlice
+		;; stack=7
+		PUSH s1
+		SBITS ; tvm_sbits
+		;; decl: restBits
+		;; if
+		;; restBits
+		;; stack=8
+		DUP
+		;; valueBits
+		;; stack=9
+		PUSH s7
+		;; >=
+		GEQ
+		PUSHCONT {
+			;; m_addReturnFlag = 1
+			;; arraySlice
+			;; stack=8
+			PUSH s2
+			;; valueBits
+			;; stack=9
+			PUSH s7
+			LDSLICEX
+			POP s4
+			;; decl: sliceValue
+			;; sliceValue
+			;; stack=9
+			DUP
+			;; i
+			;; stack=10
+			PUSH s3
+			;; array
+			;; stack=11
+			PUSH s8
+			PUSHINT 32
+			DICTUSET
+			POP s7
+			;; drop locals
+			DROP
+			FALSE
+		}
+		PUSHCONT {
+			;; m_addReturnFlag = 1
+			;; if
+			;; restBits
+			;; stack=8
+			DUP
+			PUSHINT 0
+			;; ==
+			EQUAL
+			PUSHCONT {
+				;; m_addReturnFlag = 1
+				;; if
+				;; arraySlice
+				;; stack=8
+				PUSH s2
+				SREFS ; tvm_srefs
+				PUSHINT 0
+				;; ==
+				EQUAL
+				PUSHCONT {
+					;; m_addReturnFlag = 1
+					;; break
+					; erase restBits
+					DROP
+					PUSHINT 2 ; break
+				}
+				PUSHCONT { FALSE }
+				IFELSE
+				DUP
+				IFRET
+				DROP
+				FALSE
+			}
+			PUSHCONT { FALSE }
+			IFELSE
+			DUP
+			IFRET
+			DROP
+			;; arraySlice
+			;; stack=8
+			PUSH s2
+			;; restBits
+			;; stack=9
+			PUSH s1
+			;; valueBits
+			;; stack=10
+			PUSH s8
+			;; restBits
+			;; stack=11
+			PUSH s3
+			;; -
+			SUB
+			PUSHINT $load_slice_from_two_cell$
+			CALL 1
+			;; decl: value
+			;; decl: restSlice
+			;; value
+			;; stack=10
+			PUSH s1
+			;; i
+			;; stack=11
+			PUSH s4
+			;; array
+			;; stack=12
+			PUSH s9
+			PUSHINT 32
+			DICTUSET
+			POP s8
+			;; restSlice
+			;; stack=10
+			DUP
+			;; assign arraySlice
+			POP s5
+			;; drop locals
+			BLKDROP 2
+			FALSE
+		}
+		IFELSE
+		DUP
+		PUSHINT 2
+		EQUAL
+		PUSHCONT { DROP TRUE }
+		IFJMP
+		THROWIF 99
+		;; drop locals
+		DROP
+		;; ++
+		INC
+		FALSE
+	}
+	UNTIL
+	; erase i
+	DROP
+	; for end
+	;; drop locals
+	DROP
+	FALSE
+}
+PUSHCONT {
+	;; m_addReturnFlag = 1
+	;; if
+	;; decode_algo
+	;; stack=5
+	PUSH s1
+	PUSHINT 2
+	;; ==
+	EQUAL
+	PUSHCONT {
+		;; m_addReturnFlag = 1
+		;; slice
+		;; stack=5
+		PUSH s4
+		LDU 8
+		POP s6
+		;; decl: arrSize
+		; for statement
+		PUSHINT 0
+		;; decl: i
+		PUSHCONT {
+			;; i
+			;; stack=7
+			DUP
+			;; arrSize
+			;; stack=8
+			PUSH s2
+			;; <
+			LESS
+			NOT DUP IFRET DROP
+			;; m_isUntil = 1
+			;; slice
+			;; stack=7
+			PUSH s6
+			SBITS ; tvm_sbits
+			;; decl: restBits
+			;; if
+			;; restBits
+			;; stack=8
+			DUP
+			;; valueBits
+			;; stack=9
+			PUSH s7
+			;; >=
+			GEQ
+			PUSHCONT {
+				;; slice
+				;; stack=8
+				PUSH s7
+				;; valueBits
+				;; stack=9
+				PUSH s7
+				LDSLICEX
+				POP s9
+				;; decl: sliceValue
+				;; sliceValue
+				;; stack=9
+				DUP
+				;; i
+				;; stack=10
+				PUSH s3
+				;; array
+				;; stack=11
+				PUSH s8
+				PUSHINT 32
+				DICTUSET
+				POP s7
+				;; drop locals
+				DROP
+			}
+			PUSHCONT {
+				;; slice
+				;; stack=8
+				PUSH s7
+				;; restBits
+				;; stack=9
+				PUSH s1
+				;; valueBits
+				;; stack=10
+				PUSH s8
+				;; restBits
+				;; stack=11
+				PUSH s3
+				;; -
+				SUB
+				PUSHINT $load_slice_from_two_cell$
+				CALL 1
+				;; decl: value
+				;; decl: restSlice
+				;; value
+				;; stack=10
+				PUSH s1
+				;; i
+				;; stack=11
+				PUSH s4
+				;; array
+				;; stack=12
+				PUSH s9
+				PUSHINT 32
+				DICTUSET
+				POP s8
+				;; restSlice
+				;; stack=10
+				DUP
+				;; assign slice
+				POP s10
+				;; drop locals
+				BLKDROP 2
+			}
+			IFELSE
+			;; drop locals
+			DROP
+			;; ++
+			INC
+			FALSE
+		}
+		UNTIL
+		; erase i
+		DROP
+		; for end
+		;; drop locals
+		DROP
+		FALSE
+	}
+	PUSHCONT {
+		;; m_addReturnFlag = 1
+		FALSE
+		;; require
+		;; stack=6
+		THROWIFNOT 100
+		FALSE
+	}
+	IFELSE
+	DUP
+	IFRET
+	DROP
+	FALSE
+}
+IFELSE
+IFRET
+;; array
+;; stack=5
+PUSH s2
+;; slice
+;; stack=6
+PUSH s5
+;; return
+BLKSWAP 5, 2
+BLKDROP 5
 RET
 
 .globl	abi_decode

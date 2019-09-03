@@ -54,7 +54,7 @@ POPROOT
 BLKDROP 2
 RET
 
-
 .globl	remoteMethod_external
 .type	remoteMethod_external, @function
 RET
+

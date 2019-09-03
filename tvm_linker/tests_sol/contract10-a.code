@@ -293,7 +293,6 @@ NEWC STDICT ENDC
 POPROOT
 BLKDROP 4
 
-
 .globl	on_two_uint64_external
 .type	on_two_uint64_external, @function
 RET
@@ -301,3 +300,4 @@ RET
 .globl	on_uint64_external
 .type	on_uint64_external, @function
 RET
+
