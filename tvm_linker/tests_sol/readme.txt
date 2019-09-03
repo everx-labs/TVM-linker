@@ -19,7 +19,8 @@ cp ../../../sdk-emulator/config/log_cfg.yml ../../../sdk-emulator/
 5) Update stdlib_sol.tvm
 cp ../../../sol2tvm/tests2/stdlib_sol.tvm ../stdlib_sol.tvm
 
-6) run compile_all.sh to regenerate contracts
+6) recompile contracts
+SOLC_PATH=../../../sol2tvm/build/solc/ bash ./compile_all.sh
 
 7) For run all tests
 python3 test_suite3.py
