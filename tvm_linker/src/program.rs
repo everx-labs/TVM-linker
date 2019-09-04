@@ -152,24 +152,6 @@ mod tests {
     use testcall::perform_contract_call;
 
     #[test]
-    fn test_pbank_call() {
-        let mut parser = ParseEngine::new();
-        let pbank_file = File::open("./tests/pbank.s").unwrap();
-        let test_file = File::open("./stdlib.tvm").unwrap();
-        parser.parse(pbank_file, vec![test_file], None).unwrap();
-        let prog = Program::new(parser);
-        let body = {
-            let buf = hex::decode("002E695F78").unwrap();
-            let buf_bits = buf.len() * 8;
-            Some(BuilderData::with_raw(buf, buf_bits).unwrap().into())
-        };
-        let contract_file = prog.compile_to_file().unwrap();
-        let name = contract_file.split('.').next().unwrap();
-
-        assert_eq!(perform_contract_call(name, body, Some(None), false, false, None), 0);
-    }
-
-    #[test]
     fn test_sum_global_array() {
         let mut parser = ParseEngine::new();
         let pbank_file = File::open("./tests/sum-global-array.s").unwrap();

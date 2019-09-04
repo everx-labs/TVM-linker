@@ -62,12 +62,12 @@ fn linker_main() -> Result<(), String> {
             (about: "compile contract")
             (version: "0.1")
             (author: "tonlabs")
-            (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
-            (@arg LIB: --lib +takes_value "Standard library source file")
+            (@arg INPUT: +required +takes_value "TVM assembler source file")
+            (@arg LIB: --lib +takes_value ... "Standard library source file")
+            (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids")
             (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file")
             (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
-            (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids")
-            (@arg INPUT: +required +takes_value "TVM assembler source file")
+            (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
         )
         (@subcommand test =>
             (about: "execute contract in test environment")
@@ -221,17 +221,18 @@ fn linker_main() -> Result<(), String> {
             } else { 
                 None 
             };
-        parser.parse(
-            File::open(compile_matches.value_of("INPUT").unwrap())
-                .map_err(|e| format!("cannot open source file: {}", e))?,
-            compile_matches.value_of("LIB")
-                .map(|val| vec![val])
-                .unwrap_or(vec![])
-                .iter().map(|lib| File::open(lib).map_err(|e| format!("cannot open library file: {}", e)).expect("error"))
-                .collect(),
-            abi_json,
-        )?;
+            let libs = compile_matches.values_of("LIB")
+                .unwrap_or_default()
+                .map(|lib| {
+                    File::open(lib)
+                        .map_err(|e| format!("cannot open library file: {}", e))
+                        .expect("error")
+                })
+                .collect();
+            let source = File::open(compile_matches.value_of("INPUT").unwrap())
+                .map_err(|e| format!("cannot open source file: {}", e))?;
 
+        parser.parse(source, libs, abi_json)?;
         let mut prog = Program::new(parser);
 
         match compile_matches.value_of("GENKEY") {
