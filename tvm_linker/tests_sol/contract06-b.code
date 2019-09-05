@@ -53,7 +53,7 @@ NEWC STDICT ENDC
 POPROOT
 DROP
 
-
 .globl	getCredit_external
 .type	getCredit_external, @function
 RET
+

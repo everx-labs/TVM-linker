@@ -499,6 +499,7 @@ class SoliditySuite(unittest.TestCase):
         # do_print_output = True
         tmp = waitForStackChanged(address2, 5000, a2.get('stack'))
         last_rec = tmp['stack'][len(tmp['stack'])-1] if len(tmp.get('stack'))>0 else None
+        print(last_rec)
         self.assertEqual(last_rec.strip(),\
             'x{D000000000012345678}',\
             'Unexpected allowance value for contract2')
@@ -542,7 +543,8 @@ class SoliditySuite(unittest.TestCase):
 
         # checking account balance changes
         waitForAccountStateContains(address1, r'x\{D000000000000000000000000000000000000000000000000000000000000000001\}')
-        waitForAccountStateContains(address2, r'x\{D000000000000000000000000000000000000000000000000000000000000000000\}')
+        #waitForAccountStateContains(address2, r'x\{D000000000000000000000000000000000000000000000000000000000000000000\}')
+        waitForAccountStateContains(address2, r'x\{D00000000000000000000000000000000000000000000000000000000000000270E\}') #  in stdlib in .selector we do ACCEPT
 
     def test_09(self):
         # prepare contract a
@@ -558,11 +560,11 @@ class SoliditySuite(unittest.TestCase):
         # sending body to node
         sendFile(msgbody)
 
-        # checking account changes
-        waitForBalanceInRange(address1, 95579956, 97579956, 5000)
+#         checking account changes
+        waitForBalanceInRange(address1, 95000000, 105000000, 5000)
         waitForBalanceInRange(address2, 92712634, 112712634, 5000)
-        waitForAccountStateContains(address2, r'x\{00000000000000406_\}')
-        waitForAccountStateContains(address2, r'x\{00000000000000000000000000000000000000000000000000000000000B71AFA_\}')
+        waitForAccountStateContains(address2, r'x\{00000000000000406_\}') # 257
+        waitForAccountStateContains(address2, r'x\{00000000000000000000000000000000000000000000000000000000000B71AFA_\}') # 2_999_998
 
     def test_10(self):
         address1 = self.deployContract('contract10-a')

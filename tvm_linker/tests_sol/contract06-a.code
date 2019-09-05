@@ -97,7 +97,7 @@ CALL 1
 ;; return
 RET
 
-
 .globl	getCreditCallback_external
 .type	getCreditCallback_external, @function
 RET
+
