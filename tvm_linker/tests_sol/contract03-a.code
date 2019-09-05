@@ -47,7 +47,7 @@ POPROOT
 DROP
 RET
 
-
 .globl	remoteMethod_external
 .type	remoteMethod_external, @function
 RET
+
