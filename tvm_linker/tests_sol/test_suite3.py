@@ -499,6 +499,7 @@ class SoliditySuite(unittest.TestCase):
         # do_print_output = True
         tmp = waitForStackChanged(address2, 5000, a2.get('stack'))
         last_rec = tmp['stack'][len(tmp['stack'])-1] if len(tmp.get('stack'))>0 else None
+        print(last_rec)
         self.assertEqual(last_rec.strip(),\
             'x{D000000000012345678}',\
             'Unexpected allowance value for contract2')

@@ -33,8 +33,9 @@ STUR 64
 ENDC CTOS
 PUSHINT $send_grams$
 CALL 1
+;; stack=2
 ;; return
-BLKDROP 3
+BLKDROP 2
 RET
 
 .globl	acceptMoneyAndNumber_external

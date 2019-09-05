@@ -666,80 +666,12 @@
 		PUSHINT 10000	;; transfer grams value: integer
 		
 		PUSHINT $send_int_msg$
-;		RET
 		CALL 1
 		
-		POP s1
-		POP s1
+		DROP
+		DROP
 		RET
 	
-	.globl	send_int_msg
-	.type	send_int_msg, @function
-	;; taken from TON-Wallet
-			;args: 
-			; s0 - transfer grams value: integer
-			; s1 - dst account address: integer
-			; s2 - body: slice
-			; s3 - next msg logical time
-			;ret: none
-			
-			PRINTSTR send_int_msg
-
-			SWAP
-					
-			;args: s0 - address: integer u256
-			;ret: s0 - slice
-				NEWC
-				;tag$10 + $0 (anycast is NULL) + $00000000 (workchain_id 0i8)
-				STSLICECONST x801_
-;				STSLICECONST x9FF_
-				STU 256
-				ENDC
-				CTOS
-					; load SmartContractInfo 
-					NOW			; unixtime		
-					PUSHINT 0   ; push msg lt
-					PUSHCTR c7
-					FIRST
-					INDEX 8
-
-					; s0 - myself: MsgAddressInt (slice) 
-					; s1 - trans_lt: u64
-					; s2 - tr unixtime: u32
-					; s3 - transfer grams value: integer
-					; s4 - dst account address: integer
-					; s5 - body: slice
-					ROTREV
-					PUSHINT 0   ; fwd_fee
-					PUSHINT 0   ; ihr_fee
-					BLKSWAP 3, 4
-
-					;stack trace:
-					; s0 - myself: MsgAddressInt (slice) 
-					; s1 - dst account address: integer
-					; s2 - transfer grams value: integer
-					; s3 - ihr_fee
-					; s4 - fwd_fee
-					; s5 - trans_lt: u64
-					; s6 - tr unixtime: u32
-					; s7 - body: slice
-
-					PUSHINT 1   ; bounce flag
-					PUSHINT 0   ; reset ihr_disabled flag
-				
-					PRINTSTR build_int_msg
-			
-					CALL $:build_internal_outbound_message$
-					PUSHINT 0
-					SENDRAWMSG
-					
-			PRINTSTR send_int_msg2
-			
-			DROP	; next msg logical time
-			
-				RET
-
-
 
 	.globl   build_external_outbound_message
 	.type	 build_external_outbound_message, @function
@@ -1267,7 +1199,6 @@ PUSHINT 0
 ;; ==
 EQUAL
 PUSHCONT {
-	;; m_addReturnFlag = 1
 	;; slice
 	;; stack=5
 	PUSH s4
@@ -1417,10 +1348,8 @@ PUSHCONT {
 	; for end
 	;; drop locals
 	DROP
-	FALSE
 }
 PUSHCONT {
-	;; m_addReturnFlag = 1
 	;; if
 	;; decode_algo
 	;; stack=5
@@ -1429,7 +1358,6 @@ PUSHCONT {
 	;; ==
 	EQUAL
 	PUSHCONT {
-		;; m_addReturnFlag = 1
 		;; slice
 		;; stack=5
 		PUSH s4
@@ -1541,24 +1469,16 @@ PUSHCONT {
 		; for end
 		;; drop locals
 		DROP
-		FALSE
 	}
 	PUSHCONT {
-		;; m_addReturnFlag = 1
 		FALSE
 		;; require
 		;; stack=6
 		THROWIFNOT 100
-		FALSE
 	}
 	IFELSE
-	DUP
-	IFRET
-	DROP
-	FALSE
 }
 IFELSE
-IFRET
 ;; array
 ;; stack=5
 PUSH s2
@@ -1919,4 +1839,72 @@ PUSH s4
 BLKSWAP 9, 2
 BLKDROP 9
 RET
+
+.globl	send_int_msg
+.type	send_int_msg, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: send_int_msg
+;; param: logical_time
+;; param: body_slice
+;; param: dst_account
+;; param: grams_value
+PRINTSTR startSendMsg
+;; tvm_newc
+;; stack=4
+NEWC
+;; decl: builder
+PUSHINT 2
+;; builder
+;; stack=6
+PUSH s1
+STU 2
+NIP
+PUSHINT 0
+;; builder
+;; stack=6
+PUSH s1
+STU 1
+NIP
+PUSHINT 0
+;; builder
+;; stack=6
+PUSH s1
+STU 8
+NIP
+;; dst_account
+;; stack=5
+PUSH s2
+;; builder
+;; stack=6
+PUSH s1
+STU 256
+NIP
+;; builder
+;; stack=5
+DUP
+;; tvm_endc
+;; stack=6
+ENDC
+CTOS
+;; assign builder
+NIP
+POP s2
+PUSHCTR c7
+FIRST
+INDEX 8
+;; decl: snd_addr
+NOW
+;; decl: linux_time
+PRINTSTR callBuild
+ZERO
+ZERO
+ZERO
+BLKSWAP 3, 4
+XCHG s1,s2
+ONE
+ZERO
+CALL $:build_internal_outbound_message$
+PUSHINT 0
+SENDRAWMSG
+POP s0
 
