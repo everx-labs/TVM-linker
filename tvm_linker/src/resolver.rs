@@ -26,7 +26,7 @@ pub fn resolve_name<F, T>(text: &str, get: F) -> Result<String, String>
                 if off_str.starts_with('-') { 0 - off } else { off }
             }).unwrap_or(0);
 
-        let mut id = get(name).ok_or(format!("name ({}) not found", name))?;
+        let mut id = get(name).ok_or(format!("name \"{}\" not found", name))?;
         id += T::try_from(offset).map_err(|_| "symbol offset is too big".to_string())?;
 
         let len = match cap.name("len") {

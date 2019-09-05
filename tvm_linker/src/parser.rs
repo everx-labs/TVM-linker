@@ -146,14 +146,16 @@ impl ParseEngine {
         }
 
         self.preinit()?;
-
-        for lib_buf in libs {
-            let mut reader = BufReader::new(lib_buf);
-            self.parse_code(&mut reader, true)?;
-            reader.seek(SeekFrom::Start(0))
-                .map_err(|e| format!("error while seeking lib file: {}", e))?;
-            self.parse_code(&mut reader, false)?;
+        let mut libs: Vec<_> = libs.into_iter().map(|buf| BufReader::new(buf)).collect();
+        for lib in &mut libs {
+            self.parse_code(lib, true)?;
+            lib.seek(SeekFrom::Start(0))
+                .map_err(|e| format!("error while seeking lib file: {}", e))?;            
         }
+        for lib in &mut libs {
+            self.parse_code(lib, false)?;
+        }
+
         let mut reader = BufReader::new(source);
         self.parse_code(&mut reader, true)?;
         reader.seek(SeekFrom::Start(0))
@@ -370,8 +372,11 @@ impl ParseEngine {
                     _ => Err(format!("line {}: invalid param \"{}\":{}", lnum, param, l))?,
                 };
             } else {
-                let l_with_numbers = if first_pass { l.to_owned() } else { self.replace_labels(&l) };
-                obj_body.push_str(&l_with_numbers);
+                let resolved_line = match first_pass { 
+                    true  => l.to_owned(),
+                    false => self.replace_labels(&l).map_err(|e| format!("line {}: cannot resolve label: {}", lnum, e))?, 
+                };
+                obj_body.push_str(&resolved_line);
             }
             l.clear();
         }
@@ -395,8 +400,7 @@ impl ParseEngine {
                 match &mut item.dtype {
                     ObjectType::Function(fparams) => {
                         let func_id = gen_abi_id(abi, func);
-                        fparams.0 = func_id;
-                        fparams.1 = body.trim_end().to_string();
+                        *fparams = (func_id, body.trim_end().to_string());
                         let prev = self.xrefs.insert(func.to_string(), func_id);
                         if first_pass && prev.is_some() {
                             Err(format!(
@@ -546,23 +550,22 @@ impl ParseEngine {
         pers_dict.get_data()
     }
 
-    fn replace_labels(&mut self, line: &str) -> String {
+    fn replace_labels(&mut self, line: &str) -> Result<String, String> {
         resolve_name(line, |name| self.xrefs.get(name).map(|id| id.clone()))
-        .or_else(|_| resolve_name(line, |name| self.intrefs.get(name).map(|id| id.clone())))
-        .or_else(|_| resolve_name(line, |name| self.globals.get(name).and_then(|obj| {
-            match &obj.dtype {
-                ObjectType::Data { addr, values: _, persistent: _ } => Some(addr.clone()),
-                _ => None,
-            }           
-        })))
-        .or_else(|_| resolve_name(line, |name| {
-            match name {
-                "global-base" => Some(self.globl_base.clone()),
-                "persistent-base" => Some(self.persistent_base.clone()),
-                _ => None,
-            }
-         }))
-        .unwrap_or(line.to_string())
+            .or_else(|_| resolve_name(line, |name| self.intrefs.get(name).map(|id| id.clone())))
+            .or_else(|_| resolve_name(line, |name| self.globals.get(name).and_then(|obj| {
+                match &obj.dtype {
+                    ObjectType::Data { addr, values: _, persistent: _ } => Some(addr.clone()),
+                    _ => None,
+                }           
+            })))
+            .or_else(|_| resolve_name(line, |name| {
+                match name {
+                    "global-base" => Some(self.globl_base.clone()),
+                    "persistent-base" => Some(self.persistent_base.clone()),
+                    _ => None,
+                }
+            }))        
     }
 
     pub fn debug_print(&self) {
@@ -596,14 +599,12 @@ mod tests {
     #[test]
     fn test_parser_testlib() {
         let mut parser = ParseEngine::new();
-        let pbank_file = File::open("./tests/pbank.s").unwrap();
-        let test_file = File::open("./tests/test.tvm").unwrap();
-        assert_eq!(parser.parse(pbank_file, vec![test_file], None), ok!());  
-        parser.debug_print();
-
+        let source = File::open("./tests/test.tvm").unwrap();
+        assert_eq!(parser.parse(source, vec![], None), ok!());  
+        tvm::logger::init();
         test_case(&format!("
         ;s0 - persistent data dictionary
-
+            PLDDICT
         ;read public key from persistent_base index,
         ;it must be empty slice
             PUSHINT {base}
@@ -622,6 +623,7 @@ mod tests {
             PUSHINT 64
             DICTIGET
             THROWIFNOT 100
+            PLDDICT
             
         ;read 4 integers starting with address 8 from global dict
             DUP
@@ -630,7 +632,7 @@ mod tests {
             PUSHINT 64
             DICTIGET
             THROWIFNOT 100
-            LDI 256
+            PUSHINT 257 LDIX
             ENDS
             SWAP
 
@@ -639,7 +641,7 @@ mod tests {
             PUSHINT 64
             DICTIGET
             THROWIFNOT 100
-            LDI 256
+            PUSHINT 257 LDIX
             ENDS
             SWAP
 
@@ -648,7 +650,7 @@ mod tests {
             PUSHINT 64
             DICTIGET
             THROWIFNOT 100
-            LDI 256
+            PUSHINT 257 LDIX
             ENDS
             SWAP
             
@@ -657,7 +659,7 @@ mod tests {
             PUSHINT 64
             DICTIGET
             THROWIFNOT 100
-            LDI 256
+            PUSHINT 257 LDIX
             ENDS
             NIP
             
@@ -668,7 +670,7 @@ mod tests {
             PUSHINT 64
             DICTIGET
             THROWIFNOT 100
-            LDI 256
+            PUSHINT 257 LDIX
             ENDS
 
             BLKSWAP 2, 5
@@ -693,14 +695,6 @@ mod tests {
     }
 
     #[test]
-    fn test_parser_stdlib() {
-        let mut parser = ParseEngine::new();
-        let pbank_file = File::open("./tests/pbank.s").unwrap();
-        let test_file = File::open("./stdlib.tvm").unwrap();
-        assert_eq!(parser.parse(pbank_file, vec![test_file], None), ok!());
-    }    
-
-    #[test]
     fn test_parser_var_without_globl() {
         let mut parser = ParseEngine::new();
         let source_file = File::open("./tests/local_global_var.code").unwrap();
@@ -722,5 +716,14 @@ mod tests {
         let source = File::open("./tests/bss_test1.s").unwrap();
         let lib = File::open("./stdlib.tvm").unwrap();
         assert_eq!(parser.parse(source, vec![lib], None), ok!());
+    }
+
+    #[test]
+    fn test_multilibs() {
+        let mut parser = ParseEngine::new();
+        let lib1 = File::open("./tests/testlib1.tvm").unwrap();
+        let lib2 = File::open("./tests/testlib2.tvm").unwrap();
+        let source = File::open("./tests/hello.code").unwrap();
+        assert_eq!(parser.parse(source, vec![lib1, lib2], None), ok!());
     }     
 }

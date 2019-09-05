@@ -15,6 +15,7 @@
     ; s1.. - other data
     SETCP0
     PUSHREFSLICE        ; dictionary of methods in first reference
+    PLDDICT
     OVER
     NEQINT 1
     PUSHCONT {          ; if func_id negative or zero - direct call to method
@@ -23,7 +24,7 @@
     }
     PUSHCONT {          ; get dictionary with methods
         PUSHINT 32
-        DICTIGET
+        DICTIGETREF
         THROWIFNOT 52   ; no dictionary of methods
         PUSHINT 32
         DICTUGETJMP     ; execute method and return
@@ -65,35 +66,32 @@
 
     .internal   :init_stack
     ;1) get global data dict from persistent dict(c4) with key 8
-    ;2) get SmartContractInfo slice from c5.ref0 
+    ;2) get SmartContractInfo slice from c7.0 
     ;3) set SmartContractInfo slice to global data dictionary at key 'global-base'
-    ;4) put global data dictionary to the register c5 as cell.
-    PUSH c5
-    CTOS LDREFRTOS NIP
-    PUSHINT $global-base$
-    
+    ;4) put global data dictionary to the register c7.1 as cell.
+    PUSHINT $global-base$    
     PUSHINT $persistent-base$
     ADDCONST 8
     PUSHROOT
     CTOS
+    PLDDICT
     PUSHINT 64
     DICTIGET
     THROWIFNOT 100 ;global data dictionary is invalid
-    
+    PLDDICT
     PUSHINT 64
     DICTISET
-    NEWC STSLICE ENDC
-    POP c5
+    NEWC STDICT ENDC
+    PUSH c7 SWAP
+    TPUSH
+    POP c7
 
     .internal :cleanup_stack
     PUSHINT $global-base$
-    PUSH c5 CTOS
-    PUSHINT 64
-    DICTIGET
-    THROWIFNOT 100 ;global data dictionary is invalid
-    NEWC STSLICE ENDC
-    NEWC STREF ENDC
-    POP c5
+    PUSH c7
+    TPOP
+    DROP
+    POP c7
 
     .internal   :main_external
     ; s0 - msg body: slice
@@ -108,10 +106,9 @@
     PUSH s1     ;push msg cell on top
     CALL $:parse_msg$    ;assume thar parser returns slice - dictionary with msg fields
 
-    ;initializes global data dictionary in c5
+    ;initializes global data dictionary in c7.1
     CALL $:init_stack$
     
-    SWAP
     ;parse ABI version (1 byte) and load function id (4 bytes)
     LDU 8       ;load ABI version
     SWAP  

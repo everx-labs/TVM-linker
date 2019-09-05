@@ -4,6 +4,8 @@ import os
 TVM_PATH = './target/release/tvm_linker'
 # TVM_PATH = './target/debug/tvm_linker'
 
+STDLIB_SOL = 'stdlib_sol0.tvm stdlib.code'
+
 def getFunctions():
 	global functions
 	for l in lines:
@@ -68,7 +70,7 @@ def compile1(source_file, lib_file):
 	CONTRACT_ADDRESS = getContractAddress()
 	# print functions, CONTRACT_ADDRESS
 
-def compile2(source_name, directory = "tests_sol", lib_file = "stdlib_sol.tvm"):
+def compile2(source_name, directory = "tests_sol", lib_file = STDLIB_SOL):
 	cleanup()
 	global lines, functions, CONTRACT_ADDRESS
 	print("Compiling " + source_name + "...")
@@ -169,13 +171,13 @@ def expect_output(regex):
 
 def testOld():
 	global SIGN
-	compile1('test_factorial.code', 'stdlib_sol.tvm')
+	compile1('test_factorial.code', STDLIB_SOL)
 	expect_success('constructor', "", "", "")
 	expect_output(r"Gas used:.*")
 	expect_success('main', "0003", "6", "")
 	expect_success('main', "0006", "726", "")
 
-	compile1('test_signature.code', 'stdlib_sol.tvm')
+	compile1('test_signature.code', STDLIB_SOL)
 	expect_failure('constructor', "", 100, "")
 	SIGN = "key1"
 	expect_success('constructor', "", "", "--trace")
@@ -193,47 +195,47 @@ def testOld():
 	compile1('test_inbound_int_msg.tvm', None)
 	expect_success("", "", "-1", "--internal 15000000000")
 
-	compile1('test_send_int_msg.tvm', 'stdlib_sol.tvm')
+	compile1('test_send_int_msg.tvm', STDLIB_SOL)
 	expect_success(None, "", None, "")	# check empty input (deploy)
 	expect_success('main', "", None, "--internal 0 --decode-c6")
 	expect_output(r"destination : 0:0+007f")
 	expect_output(r"CurrencyCollection: Grams.*value = 1000]")
 
-	compile1('test_send_ext_msg.tvm', 'stdlib_sol.tvm')
+	compile1('test_send_ext_msg.tvm', STDLIB_SOL)
 	expect_success(None, "", None, "")	# check empty input (deploy)
 	expect_success('main', "", None, "--internal 0 --decode-c6")
 	expect_output(r"destination : AddrNone")
 	expect_output(r"body_hex: 00003039")
 
-	compile1('test_send_int_msg.tvm', 'stdlib_sol.tvm')
+	compile1('test_send_int_msg.tvm', STDLIB_SOL)
 	expect_success('main', "", None, "--decode-c6")
 	expect_output(r"destination : 0:0+007f")
 	expect_output(r"CurrencyCollection: Grams.*value = 1000]")
 		
-	compile1('test_send_msg.code', 'stdlib_sol.tvm')
+	compile1('test_send_msg.code', STDLIB_SOL)
 	expect_success(None, "", None, "")	# check empty input (deploy)
 	expect_success('get_allowance', "1122334455660000000000000000000000000000000000000000005544332211", None, "--internal 0 --decode-c6 --trace")
 	expect_output(r"destination : 0:1122334455660000000000000000000000000000000000000000005544332211")
-	expect_output(r"body_hex: 001a0b56870000000000000000")
+	expect_output(r"body_hex: 00........0000000000000000")
 
 		# '''
 	compile1('test_msg_sender.code', None)
 	expect_success(None, "", None, "--internal 0 --trace")	# check empty input (deploy)
 
 
-	compile1('test_msg_sender2.code', 'stdlib_sol.tvm')
+	compile1('test_msg_sender2.code', STDLIB_SOL)
 	# check internal message
 	expect_success('main', "", "0", "--internal 0")
 	# check external message
 	expect_success('main', "", "0", "")
 
 	#check msg.value
-	compile1('test_msg_value.code', 'stdlib_sol.tvm')
+	compile1('test_msg_value.code', STDLIB_SOL)
 	expect_success("main", "", "15000000000", "--internal 15000000000")
 
 
 	#check msg.sender
-	compile1('test_balance.code', 'stdlib_sol.tvm')
+	compile1('test_balance.code', STDLIB_SOL)
 	expect_success("main", "", "100000000000", "--internal 0")
 
 def testOld2():
@@ -251,41 +253,41 @@ def testOld2():
 	expect_output(r"body.*1122334455667788")
 
 	#check tvm_balance
-	compile1('test_tvm_balance.code', 'stdlib_sol.tvm')
+	compile1('test_tvm_balance.code', STDLIB_SOL)
 	expect_success("main", "", "100000000000", "--internal 0")
 
 	#check tvm_now
-	compile1('test_now.code', 'stdlib_sol.tvm')
+	compile1('test_now.code', STDLIB_SOL)
 	# expect_success("main", "", "1564090968", "--internal 0")
 	
 	# TODO: cannot predict value of now, need to test it somehow
 	#check now global variable
-	compile1('test_now_variable.code', 'stdlib_sol.tvm')
+	compile1('test_now_variable.code', STDLIB_SOL)
 	expect_success("main", "", "", "--internal 0")
 	
 
 	#check tvm_address
-	compile1('test_tvm_address.code', 'stdlib_sol.tvm')
+	compile1('test_tvm_address.code', STDLIB_SOL)
 	expect_success("main", "", "0", "--internal 0")
 
 	#check tvm_block_lt
-	compile1('test_tvm_block_lt.code', 'stdlib_sol.tvm')
+	compile1('test_tvm_block_lt.code', STDLIB_SOL)
 	expect_success("main", "", "0", "--internal 0")
 
 	#check tvm_trans_lt
-	compile1('test_tvm_trans_lt.code', 'stdlib_sol.tvm')
+	compile1('test_tvm_trans_lt.code', STDLIB_SOL)
 	expect_success("main", "", "0", "--internal 0")
 
 	#check tvm_rand_seed
-	compile1('test_tvm_rand_seed.code', 'stdlib_sol.tvm')
+	compile1('test_tvm_rand_seed.code', STDLIB_SOL)
 	expect_success("main", "", "0", "--internal 0")
 	
 	#check array length enlargement
-	compile1('test_array_size.code', 'stdlib_sol.tvm')
+	compile1('test_array_size.code', STDLIB_SOL)
 	expect_success("main", "0006000C", "12", "--internal 0")
 
 	#check array length shrink
-	compile1('test_array_size.code', 'stdlib_sol.tvm')
+	compile1('test_array_size.code', STDLIB_SOL)
 	expect_success("main", "000C0006", "6", "--internal 0")
 
 def testArrays():
@@ -354,8 +356,7 @@ def testCall():
 
 	expect_success2('test_call1', 'constructor', '{}', '', linker_options)
 	addr = '1'*64
-	expect_success2('test_call1', 'send_external', '{"a": "0x' + addr + '"}', \
-		'7719472615821079694904732333912527190217998977709370935963838933860875309329', linker_options)
+	expect_success2('test_call1', 'send_external', '{"a": "0x' + addr + '"}', '', linker_options)
 	expect_output(r"destination : 0:1111111111111111111111111111111111111111111111111111111111111111")
 	expect_output(r"body_hex: 00852d5aea")
 
@@ -366,11 +367,12 @@ def testContract10():
 
     expect_success('send_uint64', ("12" * 32) + "0000000000000003", None, "--decode-c6")
     expect_output(r"destination : 0:12121212")
-    expect_output(r"bits: 192   refs: 0   data: 000000000000000100000000000000020000000000000003")
+    expect_output(r"body  : bits: 242   refs: 0   data: 0027c9716280c00000000000000040000000000000008000000000000000e0_")
     expect_success('send_uint64', ("12" * 32) + "0000000000000009", None, "--decode-c6")
-    res = "data: "
-    for i in range(1,10):
-	    res += '{0:016}'.format(i)
+    # res = "data: "
+    # for i in range(1,10):
+	    # res += '{0:016}'.format(i)
+    res = "data: 0027c9716282400000000000000040000000000000008000000000000000c000000000000001000000000000000140000000000000018000000000000001c000000000000002000000000000000260_"
     expect_output(res)
     expect_success('send_uint64', ("12" * 32) + "0000000000000011", None, "--decode-c6")
     res = "data: "

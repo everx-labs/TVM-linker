@@ -7,9 +7,11 @@ main:                                   ; @main
     ADDCONST 8
     PUSHROOT
     CTOS
+    PLDDICT
     PUSHINT 64
     DICTIGET
     THROWIFNOT 100
+    PLDDICT
     DUP 
     XCHG s1, s2
     PUSHINT 64

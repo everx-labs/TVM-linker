@@ -1,14 +1,14 @@
-
 .globl	constructor
 .type	constructor, @function
 DROP
-PUSHINT $constructor_internal$
+PUSHINT $constructor_TestBody$
 CALL 1
+RET
 
-.globl	constructor_internal
-.type	constructor_internal, @function
+.globl	constructor_TestBody
+.type	constructor_TestBody, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: constructor
+;; Function: constructor_TestBody
 NEWDICT
 NEWC STDICT ENDC
 POPROOT
@@ -19,6 +19,7 @@ LDU 256
 DROP
 PUSHINT $send$
 CALL 1
+RET
 
 .globl	send
 .type	send, @function
@@ -31,23 +32,20 @@ DUP
 ;; IContract
 ;; stack=2
 ;; IContract.request
-;; c
-PUSHINT 3
-;; b
-PUSHINT 2
+NEWC
+PUSHINT 0
+STUR 8
+PUSHINT $request_external$
+STUR 32
 ;; a
 PUSHINT 1
-PUSHINT $request_external$
-PUSHINT 0
-NEWC
-STU 8
-STU 32
-;; a
-STU 256
+STUR 256
 ;; b
-STU 256
+PUSHINT 2
+STUR 256
 ;; c
-STU 256
+PUSHINT 3
+STUR 256
 ENDC CTOS
 PUSHINT $send_int_msg_2$
 CALL 1
@@ -56,3 +54,4 @@ DROP
 .globl	request_external
 .type	request_external, @function
 RET
+
