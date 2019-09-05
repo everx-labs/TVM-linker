@@ -6,6 +6,6 @@ contract IContract {
 contract TestBody {
 	constructor() public {}
 	function send(address a) public {
-        IContract(a).request(1, 2, 3);
+		IContract(a).request(1, 2, 3);
 	}
 }
