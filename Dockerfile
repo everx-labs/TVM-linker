@@ -20,7 +20,8 @@ WORKDIR /home/user/TVM-linker/tvm_linker
 RUN --mount=type=ssh cargo build --release --target $TARGET
 RUN mkdir -p /app
 RUN mv /home/user/TVM-linker/tvm_linker/stdlib_c.tvm /app
-RUN mv /home/user/TVM-linker/tvm_linker/stdlib_sol.tvm /app
+RUN mv /home/user/TVM-linker/tvm_linker/stdlib_sol0.tvm /app
+RUN mv /home/user/TVM-linker/tvm_linker/stdlib.code /app
 RUN mv /home/user/TVM-linker/tvm_linker/stdlib_arg.tvm /app
 RUN mv /home/user/TVM-linker/tvm_linker/target/${TARGET}/release/tvm_linker /app
 RUN chmod a+x /app/tvm_linker
