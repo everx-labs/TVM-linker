@@ -66,8 +66,8 @@ def runLinkerCompile(contract:str, abi_json:str = None):
     if not(os.access(os.path.abspath(contract), os.R_OK)):
         print("Cannot access " + os.path.abspath(contract))
         return(res)
-    cmd = "compile --lib " + cfg.get('tvm_linker').get('lib_path', None) + \
-        " " + os.path.abspath(contract) + \
+    cmd = "compile "+ os.path.abspath(contract) + \
+        " --lib " + cfg.get('tvm_linker').get('lib_path', None) + \
         (" --abi-json " + abi_json if abi_json!=None else "")
     # print(cmd)
     proc = runLinker(cmd)
