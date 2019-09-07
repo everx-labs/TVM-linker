@@ -1,16 +1,27 @@
-.globl	sendMoneyAndNumber_external
-.type	sendMoneyAndNumber_external, @function
-LDU 256
-LDU 64
-DROP
-PUSHINT $sendMoneyAndNumber$
-CALL 1
+.globl	constructor_MyContract
+.type	constructor_MyContract, @function
 RET
+
+.globl	constructor
+.type	constructor, @function
+DROP
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
 
 .globl	sendMoneyAndNumber
 .type	sendMoneyAndNumber, @function
+LDU 256
+LDU 64
+DROP
+PUSHINT $sendMoneyAndNumber_internal$
+CALL 1
+RET
+
+.globl	sendMoneyAndNumber_internal
+.type	sendMoneyAndNumber_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: sendMoneyAndNumber
+;; Function: sendMoneyAndNumber_internal
 ;; param: remote
 ;; param: number
 PUSHINT 3000000
@@ -23,7 +34,7 @@ PUSH s2
 NEWC
 PUSHINT 0
 STUR 8
-PUSHINT $acceptMoneyAndNumber_external$
+PUSHINT $acceptMoneyAndNumber$
 STUR 32
 ;; number
 ;; number
@@ -38,7 +49,7 @@ CALL 1
 BLKDROP 2
 RET
 
-.globl	acceptMoneyAndNumber_external
-.type	acceptMoneyAndNumber_external, @function
+.globl	acceptMoneyAndNumber
+.type	acceptMoneyAndNumber, @function
 RET
 

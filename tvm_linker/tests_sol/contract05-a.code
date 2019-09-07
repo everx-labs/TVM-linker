@@ -1,16 +1,35 @@
-.globl	method_external
-.type	method_external, @function
-LDU 256
-LDU 16
-DROP
-PUSHINT $method$
+.globl	constructor_IRemoteContractCallback
+.type	constructor_IRemoteContractCallback, @function
+RET
+
+.globl	constructor_MyContract
+.type	constructor_MyContract, @function
+PUSHINT $constructor_IRemoteContractCallback$
 CALL 1
 RET
 
+.globl	constructor
+.type	constructor, @function
+DROP
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
+PUSHINT $constructor_IRemoteContractCallback$
+CALL 1
+
 .globl	method
 .type	method, @function
+LDU 256
+LDU 16
+DROP
+PUSHINT $method_internal$
+CALL 1
+RET
+
+.globl	method_internal
+.type	method_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: method
+;; Function: method_internal
 ;; param: anotherContract
 ;; param: x
 ;; anotherContract
@@ -22,7 +41,7 @@ PUSH s1
 NEWC
 PUSHINT 0
 STUR 8
-PUSHINT $remoteMethod_external$
+PUSHINT $remoteMethod$
 STUR 32
 ;; x
 ;; x
@@ -36,18 +55,18 @@ CALL 1
 BLKDROP 2
 RET
 
-.globl	remoteMethodCallback_external
-.type	remoteMethodCallback_external, @function
+.globl	remoteMethodCallback
+.type	remoteMethodCallback, @function
 LDU 16
 DROP
-PUSHINT $remoteMethodCallback$
+PUSHINT $remoteMethodCallback_internal$
 CALL 1
 RET
 
-.globl	remoteMethodCallback
-.type	remoteMethodCallback, @function
+.globl	remoteMethodCallback_internal
+.type	remoteMethodCallback_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: remoteMethodCallback
+;; Function: remoteMethodCallback_internal
 ;; param: x
 ;; x
 ;; stack=1
@@ -64,7 +83,7 @@ POPROOT
 DROP
 RET
 
-.globl	remoteMethod_external
-.type	remoteMethod_external, @function
+.globl	remoteMethod
+.type	remoteMethod, @function
 RET
 

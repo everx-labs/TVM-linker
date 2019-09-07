@@ -1,14 +1,33 @@
-.globl	remoteMethod_external
-.type	remoteMethod_external, @function
-DROP
-PUSHINT $remoteMethod$
+.globl	constructor_AnotherContract
+.type	constructor_AnotherContract, @function
+RET
+
+.globl	constructor_MyContract
+.type	constructor_MyContract, @function
+PUSHINT $constructor_AnotherContract$
 CALL 1
 RET
 
+.globl	constructor
+.type	constructor, @function
+DROP
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
+PUSHINT $constructor_AnotherContract$
+CALL 1
+
 .globl	remoteMethod
 .type	remoteMethod, @function
+DROP
+PUSHINT $remoteMethod_internal$
+CALL 1
+RET
+
+.globl	remoteMethod_internal
+.type	remoteMethod_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: remoteMethod
+;; Function: remoteMethod_internal
 ;; get member sender
 PUSHINT $get_msg_sender$
 CALL 1

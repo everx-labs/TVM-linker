@@ -1,16 +1,22 @@
 {
 	"ABI version": 0,
 	"functions": [{
-		"name": "remoteMethod_external",
+		"name": "remoteMethod",
 		"inputs": [
 			{"name":"x","type":"uint16"}
 		],
 		"outputs": [
 		]
 	}, {
-		"name": "remoteMethodCallback_external",
+		"name": "remoteMethodCallback",
 		"inputs": [
 			{"name":"x","type":"uint16"}
+		],
+		"outputs": [
+		]
+	}, {
+		"name": "constructor",
+		"inputs": [
 		],
 		"outputs": [
 		]

@@ -396,7 +396,7 @@ class SoliditySuite(unittest.TestCase):
     def test_01(self):
         address = self.deployContract('contract01')
 
-        msgbody = runLinkerMsgBody(address, 'contract01.abi.json', '{"a":"0x1234"}', 'main_external')
+        msgbody = runLinkerMsgBody(address, 'contract01.abi.json', '{"a":"0x1234"}', 'main')
         self.assertNotEqual(msgbody, None, 'No msg body boc file created')
 
         tmp = waitForAccountStateContains(address, r'state:\(account_active')
@@ -417,7 +417,7 @@ class SoliditySuite(unittest.TestCase):
 
         # prepare message body for contract a
         params = '{"anotherContract":"0x%s"}' % address2
-        msgbody = runLinkerMsgBody(address1, 'contract02-a.abi.json', params, 'method_external')
+        msgbody = runLinkerMsgBody(address1, 'contract02-a.abi.json', params, 'method')
 
         # sending body to node
         sendFile(msgbody)
@@ -431,7 +431,7 @@ class SoliditySuite(unittest.TestCase):
 
         # prepare message body for contract a
         msgbody = runLinkerMsgBody(address1, 'contract03-a.abi.json', '{"anotherContract":"0x' + \
-            address2 + '"}', 'method_external')
+            address2 + '"}', 'method')
 
         # sending body to node
         sendFile(msgbody)
@@ -445,7 +445,7 @@ class SoliditySuite(unittest.TestCase):
 
         # prepare message body for contract a
         msgbody = runLinkerMsgBody(address1, 'contract04-a.abi.json', '{"anotherContract":"0x' + \
-            address2 + '","amount":"5000000"}', 'method_external')
+            address2 + '","amount":"5000000"}', 'method')
 
         # sending body to node
         sendFile(msgbody)
@@ -460,7 +460,7 @@ class SoliditySuite(unittest.TestCase):
 
         # prepare message body for contract a
         msgbody = runLinkerMsgBody(address1, 'contract05-a.abi.json', '{"anotherContract":"0x' + \
-            address2 + '","x":"257"}', 'method_external')
+            address2 + '","x":"257"}', 'method')
 
         # sending body to node
         sendFile(msgbody)
@@ -477,11 +477,11 @@ class SoliditySuite(unittest.TestCase):
 
         # prepare message body for contract1
         msgbody1 = runLinkerMsgBody(address1, 'contract06-a.abi.json', '{"anotherContract":"0x' + \
-            address2 + '","amount":"0x12345678"}', 'setAllowance_external')
+            address2 + '","amount":"0x12345678"}', 'setAllowance')
 
         # prepare message body for contract2
         msgbody2 = runLinkerMsgBody(address2, 'contract06-b.abi.json', '{"bank":"0x' + \
-            address1 + '"}', 'getMyCredit_external')
+            address1 + '"}', 'getMyCredit')
 
         a1 = waitForAccountStateContains(address1, r'state:\(account_active')
         a2 = waitForAccountStateContains(address2, r'state:\(account_active')
@@ -513,7 +513,7 @@ class SoliditySuite(unittest.TestCase):
 
         # prepare message body for contract a
         msgbody = runLinkerMsgBody(address1, 'contract07-a.abi.json', '{"anotherContract":"0x' + \
-            address2 + '"}', 'method_external')
+            address2 + '"}', 'method')
 
         # checking initial account state
         b2 = waitForAccountStateContains(address2, r'(state:\(account_active)').get('balance')
@@ -536,7 +536,7 @@ class SoliditySuite(unittest.TestCase):
 
         # prepare message body for contract a
         msgbody = runLinkerMsgBody(address1, 'contract08-a.abi.json', '{"anotherContract":"0x' + \
-            address2 + '"}', 'method_external')
+            address2 + '"}', 'method')
 
         # sending body to node
         sendFile(msgbody)
@@ -555,7 +555,7 @@ class SoliditySuite(unittest.TestCase):
 
         # prepare message body for contract a
         msgbody = runLinkerMsgBody(address1, 'contract09-a.abi.json', '{"remote":"0x' + \
-            address2 + '","number":"257"}', 'sendMoneyAndNumber_external')
+            address2 + '","number":"257"}', 'sendMoneyAndNumber')
 
         # sending body to node
         sendFile(msgbody)
@@ -573,7 +573,7 @@ class SoliditySuite(unittest.TestCase):
         def send(n):
             print("n =", n)
             params = '{"receiver":"0x%s","count":%d}' % (address2, n)
-            msgbody = runLinkerMsgBody(address1, 'contract10-a.abi.json', params, 'send_uint64_external')
+            msgbody = runLinkerMsgBody(address1, 'contract10-a.abi.json', params, 'send_uint64')
             sendFile(msgbody)
 
         send(3)
@@ -589,7 +589,7 @@ class SoliditySuite(unittest.TestCase):
         def send_uint64_two(n):
             print("n =", n)
             params = '{"receiver":"0x%s","count":%d}' % (address2, n)
-            msgbody = runLinkerMsgBody(address1, 'contract10-a.abi.json', params, 'send_uint64_two_external')
+            msgbody = runLinkerMsgBody(address1, 'contract10-a.abi.json', params, 'send_uint64_two')
             sendFile(msgbody)
 
         send_uint64_two(3)

@@ -1,9 +1,15 @@
 {
 	"ABI version": 0,
 	"functions": [{
-		"name": "acceptMoneyAndNumber_external",
+		"name": "acceptMoneyAndNumber",
 		"inputs": [
 			{"name":"number","type":"uint64"}
+		],
+		"outputs": [
+		]
+	}, {
+		"name": "constructor",
+		"inputs": [
 		],
 		"outputs": [
 		]

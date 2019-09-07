@@ -1,15 +1,34 @@
-.globl	acceptMoneyAndNumber_external
-.type	acceptMoneyAndNumber_external, @function
-LDU 64
-DROP
-PUSHINT $acceptMoneyAndNumber$
+.globl	constructor_IRemoteContract
+.type	constructor_IRemoteContract, @function
+RET
+
+.globl	constructor_RemoteContract
+.type	constructor_RemoteContract, @function
+PUSHINT $constructor_IRemoteContract$
 CALL 1
 RET
 
+.globl	constructor
+.type	constructor, @function
+DROP
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
+PUSHINT $constructor_IRemoteContract$
+CALL 1
+
 .globl	acceptMoneyAndNumber
 .type	acceptMoneyAndNumber, @function
+LDU 64
+DROP
+PUSHINT $acceptMoneyAndNumber_internal$
+CALL 1
+RET
+
+.globl	acceptMoneyAndNumber_internal
+.type	acceptMoneyAndNumber_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: acceptMoneyAndNumber
+;; Function: acceptMoneyAndNumber_internal
 ;; param: number
 ;; number
 ;; stack=1
