@@ -56,6 +56,20 @@ pipeline {
                 }
             }
             post {
+                failure {script{G_buildstatus = "failure"}}
+            }
+        }
+        stage('Test in compiler-kit') {
+            steps {
+                script {
+                    G_dockerimage = "tonlabs/tvm_linker:${GIT_COMMIT}"
+                    def params = [
+                      [$class: 'StringParameterValue', name: 'dockerimage_tvm_linker', value: "${G_dockerimage}"]
+                    ]
+                    build job : "Infrastructure/compilers/master", parameters : params
+                }
+            }
+            post {
                 success {
                     script{
                         G_buildstatus = "success"
@@ -63,7 +77,7 @@ pipeline {
                 }
                 failure {script{G_buildstatus = "failure"}}
             }
-        } 
+        }
         stage ('Tag as latest') {
             when {
                 expression {
