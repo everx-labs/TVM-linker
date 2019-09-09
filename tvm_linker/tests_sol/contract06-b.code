@@ -1,15 +1,34 @@
-.globl	getMyCredit_external
-.type	getMyCredit_external, @function
-LDU 256
-DROP
-PUSHINT $getMyCredit$
+.globl	constructor_IMyContractCallback
+.type	constructor_IMyContractCallback, @function
+RET
+
+.globl	constructor_RemoteContract
+.type	constructor_RemoteContract, @function
+PUSHINT $constructor_IMyContractCallback$
 CALL 1
 RET
 
+.globl	constructor
+.type	constructor, @function
+DROP
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
+PUSHINT $constructor_IMyContractCallback$
+CALL 1
+
 .globl	getMyCredit
 .type	getMyCredit, @function
+LDU 256
+DROP
+PUSHINT $getMyCredit_internal$
+CALL 1
+RET
+
+.globl	getMyCredit_internal
+.type	getMyCredit_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: getMyCredit
+;; Function: getMyCredit_internal
 ;; param: bank
 ;; bank
 ;; stack=1
@@ -18,7 +37,7 @@ DUP
 NEWC
 PUSHINT 0
 STUR 8
-PUSHINT $getCredit_external$
+PUSHINT $getCredit$
 STUR 32
 ENDC CTOS
 PUSHINT $send_int_msg_2$
@@ -27,18 +46,18 @@ CALL 1
 DROP
 RET
 
-.globl	getCreditCallback_external
-.type	getCreditCallback_external, @function
+.globl	getCreditCallback
+.type	getCreditCallback, @function
 LDU 64
 DROP
-PUSHINT $getCreditCallback$
+PUSHINT $getCreditCallback_internal$
 CALL 1
 RET
 
-.globl	getCreditCallback
-.type	getCreditCallback, @function
+.globl	getCreditCallback_internal
+.type	getCreditCallback_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: getCreditCallback
+;; Function: getCreditCallback_internal
 ;; param: balance
 ;; balance
 ;; stack=1
@@ -53,7 +72,7 @@ NEWC STDICT ENDC
 POPROOT
 DROP
 
-.globl	getCredit_external
-.type	getCredit_external, @function
+.globl	getCredit
+.type	getCredit, @function
 RET
 

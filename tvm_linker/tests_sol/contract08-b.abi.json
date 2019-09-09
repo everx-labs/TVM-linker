@@ -1,7 +1,13 @@
 {
 	"ABI version": 0,
 	"functions": [{
-		"name": "remoteMethod_external",
+		"name": "remoteMethod",
+		"inputs": [
+		],
+		"outputs": [
+		]
+	}, {
+		"name": "constructor",
 		"inputs": [
 		],
 		"outputs": [

@@ -1,15 +1,26 @@
-.globl	main_external
-.type	main_external, @function
-LDU 32
-DROP
-PUSHINT $main$
-CALL 1
+.globl	constructor_Test01
+.type	constructor_Test01, @function
 RET
+
+.globl	constructor
+.type	constructor, @function
+DROP
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
 
 .globl	main
 .type	main, @function
+LDU 32
+DROP
+PUSHINT $main_internal$
+CALL 1
+RET
+
+.globl	main_internal
+.type	main_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: main
+;; Function: main_internal
 ;; param: a
 ;; m_accumulator
 ;; stack=1

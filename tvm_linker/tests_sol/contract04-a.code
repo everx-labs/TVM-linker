@@ -1,16 +1,27 @@
-.globl	method_external
-.type	method_external, @function
-LDU 256
-LDU 256
-DROP
-PUSHINT $method$
-CALL 1
+.globl	constructor_MyContract
+.type	constructor_MyContract, @function
 RET
+
+.globl	constructor
+.type	constructor, @function
+DROP
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
 
 .globl	method
 .type	method, @function
+LDU 256
+LDU 256
+DROP
+PUSHINT $method_internal$
+CALL 1
+RET
+
+.globl	method_internal
+.type	method_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: method
+;; Function: method_internal
 ;; param: anotherContract
 ;; param: amount
 ;; anotherContract
@@ -20,7 +31,7 @@ PUSH s1
 NEWC
 PUSHINT 0
 STUR 8
-PUSHINT $remoteMethod_external$
+PUSHINT $remoteMethod$
 STUR 32
 ;; value
 ;; amount
@@ -54,7 +65,7 @@ POPROOT
 BLKDROP 2
 RET
 
-.globl	remoteMethod_external
-.type	remoteMethod_external, @function
+.globl	remoteMethod
+.type	remoteMethod, @function
 RET
 

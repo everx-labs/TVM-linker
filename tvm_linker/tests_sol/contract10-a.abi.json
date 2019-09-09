@@ -1,14 +1,14 @@
 {
 	"ABI version": 0,
 	"functions": [{
-		"name": "on_uint64_external",
+		"name": "on_uint64",
 		"inputs": [
 			{"name":"arr","type":"uint64[]"}
 		],
 		"outputs": [
 		]
 	}, {
-		"name": "on_two_uint64_external",
+		"name": "on_two_uint64",
 		"inputs": [
 			{"name":"arr0","type":"uint64[]"},
 			{"name":"arr1","type":"uint64[]"}
@@ -16,7 +16,7 @@
 		"outputs": [
 		]
 	}, {
-		"name": "send_uint64_external",
+		"name": "send_uint64",
 		"inputs": [
 			{"name":"receiver","type":"uint256"},
 			{"name":"count","type":"uint64"}
@@ -24,10 +24,16 @@
 		"outputs": [
 		]
 	}, {
-		"name": "send_uint64_two_external",
+		"name": "send_uint64_two",
 		"inputs": [
 			{"name":"receiver","type":"uint256"},
 			{"name":"count","type":"uint64"}
+		],
+		"outputs": [
+		]
+	}, {
+		"name": "constructor",
+		"inputs": [
 		],
 		"outputs": [
 		]

@@ -1,14 +1,20 @@
 {
 	"ABI version": 0,
 	"functions": [{
-		"name": "method_external",
+		"name": "method",
 		"inputs": [
 			{"name":"anotherContract","type":"uint256"}
 		],
 		"outputs": [
 		]
 	}, {
-		"name": "remoteMethod_external",
+		"name": "remoteMethod",
+		"inputs": [
+		],
+		"outputs": [
+		]
+	}, {
+		"name": "constructor",
 		"inputs": [
 		],
 		"outputs": [

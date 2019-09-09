@@ -1,16 +1,35 @@
-.globl	setAllowance_external
-.type	setAllowance_external, @function
-LDU 256
-LDU 64
-DROP
-PUSHINT $setAllowance$
+.globl	constructor_IMyContract
+.type	constructor_IMyContract, @function
+RET
+
+.globl	constructor_MyContract
+.type	constructor_MyContract, @function
+PUSHINT $constructor_IMyContract$
 CALL 1
 RET
 
+.globl	constructor
+.type	constructor, @function
+DROP
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
+PUSHINT $constructor_IMyContract$
+CALL 1
+
 .globl	setAllowance
 .type	setAllowance, @function
+LDU 256
+LDU 64
+DROP
+PUSHINT $setAllowance_internal$
+CALL 1
+RET
+
+.globl	setAllowance_internal
+.type	setAllowance_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: setAllowance
+;; Function: setAllowance_internal
 ;; param: anotherContract
 ;; param: amount
 ;; fetch m_allowed
@@ -47,17 +66,17 @@ NEWC STDICT ENDC
 POPROOT
 BLKDROP 2
 
-.globl	getCredit_external
-.type	getCredit_external, @function
+.globl	getCredit
+.type	getCredit, @function
 DROP
-PUSHINT $getCredit$
+PUSHINT $getCredit_internal$
 CALL 1
 RET
 
-.globl	getCredit
-.type	getCredit, @function
+.globl	getCredit_internal
+.type	getCredit_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: getCredit
+;; Function: getCredit_internal
 ;; get member sender
 PUSHINT $get_msg_sender$
 CALL 1
@@ -67,7 +86,7 @@ CALL 1
 NEWC
 PUSHINT 0
 STUR 8
-PUSHINT $getCreditCallback_external$
+PUSHINT $getCreditCallback$
 STUR 32
 ;; balance
 ;; get member allowed
@@ -97,7 +116,7 @@ CALL 1
 ;; return
 RET
 
-.globl	getCreditCallback_external
-.type	getCreditCallback_external, @function
+.globl	getCreditCallback
+.type	getCreditCallback, @function
 RET
 

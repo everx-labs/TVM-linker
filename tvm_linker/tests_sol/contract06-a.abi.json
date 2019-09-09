@@ -1,23 +1,29 @@
 {
 	"ABI version": 0,
 	"functions": [{
-		"name": "getCredit_external",
+		"name": "getCredit",
 		"inputs": [
 		],
 		"outputs": [
 		]
 	}, {
-		"name": "getCreditCallback_external",
+		"name": "getCreditCallback",
 		"inputs": [
 			{"name":"balance","type":"uint64"}
 		],
 		"outputs": [
 		]
 	}, {
-		"name": "setAllowance_external",
+		"name": "setAllowance",
 		"inputs": [
 			{"name":"anotherContract","type":"uint256"},
 			{"name":"amount","type":"uint64"}
+		],
+		"outputs": [
+		]
+	}, {
+		"name": "constructor",
+		"inputs": [
 		],
 		"outputs": [
 		]

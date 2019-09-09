@@ -1,17 +1,36 @@
-.globl	on_uint64_external
-.type	on_uint64_external, @function
+.globl	constructor_IReceiver
+.type	constructor_IReceiver, @function
+RET
+
+.globl	constructor_Receiver
+.type	constructor_Receiver, @function
+PUSHINT $constructor_IReceiver$
+CALL 1
+RET
+
+.globl	constructor
+.type	constructor, @function
+DROP
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
+PUSHINT $constructor_IReceiver$
+CALL 1
+
+.globl	on_uint64
+.type	on_uint64, @function
 PUSHINT 64
 PUSHINT $decode_array$
 CALL 1
 DROP
-PUSHINT $on_uint64$
+PUSHINT $on_uint64_internal$
 CALL 1
 RET
 
-.globl	on_uint64
-.type	on_uint64, @function
+.globl	on_uint64_internal
+.type	on_uint64_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: on_uint64
+;; Function: on_uint64_internal
 ;; param: arr
 PUSHINT 0
 ;; decl: sum
@@ -79,8 +98,8 @@ NEWC STDICT ENDC
 POPROOT
 BLKDROP 3
 
-.globl	on_two_uint64_external
-.type	on_two_uint64_external, @function
+.globl	on_two_uint64
+.type	on_two_uint64, @function
 PUSHINT 64
 PUSHINT $decode_array$
 CALL 1
@@ -88,14 +107,14 @@ PUSHINT 64
 PUSHINT $decode_array$
 CALL 1
 DROP
-PUSHINT $on_two_uint64$
+PUSHINT $on_two_uint64_internal$
 CALL 1
 RET
 
-.globl	on_two_uint64
-.type	on_two_uint64, @function
+.globl	on_two_uint64_internal
+.type	on_two_uint64_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: on_two_uint64
+;; Function: on_two_uint64_internal
 ;; param: arr0
 ;; param: arr1
 PUSHINT 0
