@@ -30,10 +30,28 @@ impl From<&str> for ObjectType {
         }
     }
 }
+
+const WORD_SIZE: Ptr = 1;
+const OFFSET_GLOBL_DATA: Ptr = 8;
+const OFFSET_PERS_DATA: Ptr = 16;
+
+#[allow(dead_code)]
 enum DataValue {
     Empty,
     Number((IntegerData, usize)),
     Slice(SliceData),
+}
+impl std::fmt::Display for DataValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        
+        match self {
+            DataValue::Number(ref integer) => {
+                write!(f, "(int {})", integer.0)
+            },
+            DataValue::Slice(ref _slice) => { write!(f, "(slice)") },
+            DataValue::Empty => { write!(f, "(empty)") },
+        }
+    }
 }
 
 impl DataValue {
@@ -48,6 +66,13 @@ impl DataValue {
             },
             DataValue::Slice(ref slice) => { b.checked_append_references_and_data(slice).unwrap(); b },
             DataValue::Empty => b,
+        }
+    }
+    pub fn size(&self) -> Ptr {
+        match self {
+            DataValue::Number(ref integer) => integer.1 as Ptr * WORD_SIZE,
+            DataValue::Slice(ref _slice) => WORD_SIZE,
+            DataValue::Empty => WORD_SIZE,
         }
     }
 }
@@ -117,10 +142,6 @@ const PERSISTENT_DATA_SUFFIX: &'static str = "_persistent";
 
 const PUBKEY_NAME: &'static str = "tvm_public_key";
 const SCI_NAME: &'static str = "tvm_contract_info";
-
-const WORD_SIZE: Ptr = 8;
-const OFFSET_GLOBL_DATA: Ptr = 8;
-const OFFSET_PERS_DATA: Ptr = 16;
 
 impl ParseEngine {
 
@@ -482,12 +503,9 @@ impl ParseEngine {
                 let mut str_bytes = cap.get(1).unwrap().as_str().as_bytes().to_vec();
                 //include 1 byte for termination zero, assume that it is C string
                 value_len = str_bytes.len() + 1;
-                (0..(WORD_SIZE - (str_bytes.len() as Ptr % WORD_SIZE))).for_each(|_| str_bytes.push(0));
-                for chunk in str_bytes.chunks(WORD_SIZE as usize) {
-                    let slice: SliceData = BuilderData::with_raw(chunk.to_vec(), WORD_SIZE as usize * 8)
-                        .map_err(|e| format!(".asciz: failed to build cell for string chunk: {}", e))?
-                        .into();
-                    values.push(DataValue::Slice(slice));
+                str_bytes.push(0);
+                for cur_char in str_bytes {
+                    values.push(DataValue::Number((IntegerData::from(cur_char).unwrap(), 1)));
                 }
             } else if let Some(cap) = PARAM_RE.captures(param) {
                 let pname = cap.get(1).unwrap().as_str();
@@ -533,7 +551,7 @@ impl ParseEngine {
                 let mut ptr = item.0.clone();
                 for subitem in item.1 {
                     dict.set(ptr_to_builder(ptr).unwrap().into(), &subitem.write().into()).unwrap();
-                    ptr += WORD_SIZE;
+                    ptr += subitem.size();
                 }
             }
             dict
@@ -543,7 +561,7 @@ impl ParseEngine {
         let mut pers_dict = build_dict(&pers_data_vec);
 
         pers_dict.set(
-            ptr_to_builder(self.persistent_base + 8).unwrap().into(), 
+            ptr_to_builder(self.persistent_base + OFFSET_GLOBL_DATA).unwrap().into(), 
             &globl_dict.get_data(),
         ).unwrap();
 
@@ -636,7 +654,7 @@ mod tests {
             ENDS
             SWAP
 
-            PUSHINT 16
+            PUSHINT 12
             OVER
             PUSHINT 64
             DICTIGET
@@ -645,7 +663,7 @@ mod tests {
             ENDS
             SWAP
 
-            PUSHINT 24
+            PUSHINT 16
             OVER
             PUSHINT 64
             DICTIGET
@@ -654,7 +672,7 @@ mod tests {
             ENDS
             SWAP
             
-            PUSHINT 32
+            PUSHINT 20
             OVER
             PUSHINT 64
             DICTIGET
@@ -677,7 +695,7 @@ mod tests {
             BLKDROP 2
         ", 
         base = 1000000,
-        offset = WORD_SIZE,
+        offset = OFFSET_GLOBL_DATA,
         ))
         .with_stack(
             Stack::new()
