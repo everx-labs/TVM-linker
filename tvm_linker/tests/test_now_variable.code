@@ -1,25 +1,34 @@
+.globl	constructor_TestNow
+.type	constructor_TestNow, @function
+RET
 
-.globl	main_external
-.type	main_external, @function
+.globl	constructor
+.type	constructor, @function
 DROP
-PUSHINT $main$
-CALL 1
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
 
 .globl	main
 .type	main, @function
+DROP
+PUSHINT $main_internal$
+CALL 1
+RET
+
+.globl	main_internal
+.type	main_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: main
+;; Function: main_internal
 ;; now
 ;; stack=0
-PUSHINT $get_unixtime$
-CALL 1
+NOW
 PUSHINT 1566494745
 ;; >
 GREATER
 ;; now
 ;; stack=1
-PUSHINT $get_unixtime$
-CALL 1
+NOW
 PUSHINT 1566494745
 PUSHINT 60
 PUSHINT 60
@@ -40,3 +49,4 @@ AND
 ;; require
 ;; stack=1
 THROWIFNOT 100
+

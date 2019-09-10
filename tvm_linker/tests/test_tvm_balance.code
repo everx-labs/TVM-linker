@@ -1,15 +1,38 @@
+.globl	constructor_TestNow
+.type	constructor_TestNow, @function
+RET
 
-.globl	main_external
-.type	main_external, @function
+.globl	constructor
+.type	constructor, @function
 DROP
-PUSHINT $main$
-CALL 1
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
 
 .globl	main
 .type	main, @function
+DROP
+PUSHINT $main_internal$
+CALL 1
+;; emitting 1 value(s)
+NEWC
+PUSHINT 0
+STUR 8
+PUSHINT $main$
+STUR 32
+PUSH s1
+STUR 16
+ENDC CTOS
+PUSHINT $send_ext_msg$
+CALL 1
+RET
+
+.globl	main_internal
+.type	main_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: main
-PUSHINT $get_balance$
+;; Function: main_internal
+PUSHINT $get_contract_balance$
 CALL 1
 ;; return
 RET
+

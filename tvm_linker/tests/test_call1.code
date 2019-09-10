@@ -13,29 +13,29 @@ NEWDICT
 NEWC STDICT ENDC
 POPROOT
 
-.globl	send_external
-.type	send_external, @function
+.globl	send
+.type	send, @function
 LDU 256
 DROP
-PUSHINT $send$
+PUSHINT $send_internal$
 CALL 1
 RET
 
-.globl	send
-.type	send, @function
+.globl	send_internal
+.type	send_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: send
+;; Function: send_internal
 ;; param: a
+;; IContract.request
 ;; a
 ;; stack=1
 DUP
 ;; IContract
 ;; stack=2
-;; IContract.request
 NEWC
 PUSHINT 0
 STUR 8
-PUSHINT $request_external$
+PUSHINT $request$
 STUR 32
 ;; a
 PUSHINT 1
@@ -51,7 +51,7 @@ PUSHINT $send_int_msg_2$
 CALL 1
 DROP
 
-.globl	request_external
-.type	request_external, @function
+.globl	request
+.type	request, @function
 RET
 
