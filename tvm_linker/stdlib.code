@@ -113,8 +113,7 @@ PUSHCONT {
 		STSLICE
 		POP s6
 		;; ++
-		;; idx
-		;; stack=6
+		;; fetch idx
 		PUSH s1
 		INC
 		;; assign idx
@@ -1080,7 +1079,7 @@ RET
 .type	send_int_msg, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: send_int_msg
-;; param: logical_time
+;; param: 
 ;; param: body_slice
 ;; param: dst_account
 ;; param: grams_value
@@ -1129,14 +1128,552 @@ FIRST
 INDEX 8
 ;; decl: snd_addr
 NOW
-;; decl: linux_time
-PRINTSTR callBuild
-CALL $:call_build_internal$
+;; decl: unixtime
+;; body_slice
+;; stack=7
+PUSH s5
+;; unixtime
+;; stack=8
+PUSH s1
+PUSHINT 0
+PUSHINT 0
+PUSHINT 0
+;; grams_value
+;; stack=12
+PUSH s8
+;; builder
+;; stack=13
+PUSH s8
+;; snd_addr
+;; stack=14
+PUSH s8
+PUSHINT 1
+PUSHINT 0
+PUSHINT $build_internal_outbound_message$
+CALL 1
 ;; decl: cell
 ;; cell
-;; stack=3
+;; stack=8
 DUP
 PUSHINT 0
 SENDRAWMSG
-BLKDROP 3
+BLKDROP 8
+
+.globl	build_internal_outbound_message
+.type	build_internal_outbound_message, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: build_internal_outbound_message
+;; param: body_slice
+;; param: unixtime
+;; param: logical_time
+;; param: fwd_fee
+;; param: ihr_fee
+;; param: value
+;; param: dst_addr_slice
+;; param: src_addr_slice
+;; param: bounce
+;; param: ihr_disabled
+PRINTSTR buildmsg
+;; tvm_newc
+;; stack=10
+NEWC
+;; decl: builder
+PUSHINT 0
+;; builder
+;; stack=12
+PUSH s1
+STU 1
+NIP
+;; ihr_disabled
+;; stack=11
+PUSH s1
+;; builder
+;; stack=12
+PUSH s1
+STU 1
+NIP
+;; bounce
+;; stack=11
+PUSH s2
+;; builder
+;; stack=12
+PUSH s1
+STU 1
+NIP
+PUSHINT 0
+;; builder
+;; stack=12
+PUSH s1
+STU 1
+NIP
+;; src_addr_slice
+;; stack=11
+PUSH s3
+;; builder
+;; stack=12
+PUSH s1
+STSLICE
+NIP
+;; dst_addr_slice
+;; stack=11
+PUSH s4
+;; builder
+;; stack=12
+PUSH s1
+STSLICE
+NIP
+;; builder
+;; stack=11
+DUP
+;; value
+;; stack=12
+PUSH s6
+PUSHINT $encode_grams$
+CALL 1
+;; assign builder
+NIP
+PUSHINT 0
+;; builder
+;; stack=12
+PUSH s1
+STU 1
+NIP
+;; builder
+;; stack=11
+DUP
+;; ihr_fee
+;; stack=12
+PUSH s7
+PUSHINT $encode_grams$
+CALL 1
+;; assign builder
+NIP
+;; builder
+;; stack=11
+DUP
+;; fwd_fee
+;; stack=12
+PUSH s8
+PUSHINT $encode_grams$
+CALL 1
+;; assign builder
+NIP
+;; logical_time
+;; stack=11
+PUSH s8
+;; builder
+;; stack=12
+PUSH s1
+STU 64
+NIP
+;; unixtime
+;; stack=11
+PUSH s9
+;; builder
+;; stack=12
+PUSH s1
+STU 32
+NIP
+PUSHINT 0
+;; builder
+;; stack=12
+PUSH s1
+STU 1
+NIP
+;; builder
+;; stack=11
+DUP
+BREMBITS ; tvm_brembits
+;; decl: bits
+;; body_slice
+;; stack=12
+PUSH s11
+SBITS ; tvm_sbits
+PUSHINT 1
+;; +
+ADD
+;; decl: body_bits
+;; if
+;; bits
+;; stack=13
+PUSH s1
+;; body_bits
+;; stack=14
+PUSH s1
+;; >
+GREATER
+PUSHCONT {
+	PUSHINT 0
+	;; builder
+	;; stack=14
+	PUSH s3
+	STU 1
+	POP s3
+	;; body_slice
+	;; stack=13
+	PUSH s12
+	;; builder
+	;; stack=14
+	PUSH s3
+	STSLICE
+	POP s3
+}
+PUSHCONT {
+	PUSHINT 1
+	;; builder
+	;; stack=14
+	PUSH s3
+	STU 1
+	POP s3
+	;; tvm_newc
+	;; stack=13
+	NEWC
+	;; decl: builder2
+	;; body_slice
+	;; stack=14
+	PUSH s13
+	;; builder2
+	;; stack=15
+	PUSH s1
+	STSLICE
+	NIP
+	;; builder2
+	;; stack=14
+	DUP
+	;; tvm_endc
+	;; stack=15
+	ENDC
+	;; builder
+	;; stack=15
+	PUSH s4
+	STREF
+	POP s4
+	;; drop locals
+	DROP
+}
+IFELSE
+;; builder
+;; stack=13
+PUSH s2
+;; tvm_endc
+;; stack=14
+ENDC
+;; return
+XCHG s13
+BLKDROP 13
+RET
+
+.globl	encode_grams
+.type	encode_grams, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: encode_grams
+;; param: builder
+;; param: value
+PRINTSTR encodegrams
+;; if
+;; value
+;; stack=2
+DUP
+PUSHINT 0
+;; !=
+NEQ
+PUSHCONT {
+	;; value
+	;; stack=2
+	DUP
+	UBITSIZE
+	PUSHINT 7
+	;; +
+	ADD
+	PUSHINT 8
+	;; /
+	DIV
+	;; decl: byteLen
+	;; byteLen
+	;; stack=3
+	DUP
+	;; builder
+	;; stack=4
+	PUSH s3
+	STU 4
+	POP s3
+	;; value
+	;; stack=3
+	PUSH s1
+	;; builder
+	;; stack=4
+	PUSH s3
+	;; byteLen
+	;; stack=5
+	PUSH s2
+	PUSHINT 8
+	;; *
+	MUL
+	STUX
+	POP s3
+	;; drop locals
+	DROP
+}
+PUSHCONT {
+	PUSHINT 0
+	;; builder
+	;; stack=3
+	PUSH s2
+	STU 4
+	POP s2
+}
+IFELSE
+;; builder
+;; stack=2
+PUSH s1
+;; return
+POP s1
+POP s1
+RET
+
+.globl	put_in_dictionary_as_slice
+.type	put_in_dictionary_as_slice, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: put_in_dictionary_as_slice
+;; param: data
+;; param: key
+;; param: dictionary
+;; param: bits
+;; param: dataSize
+;; tvm_newc
+;; stack=5
+NEWC
+;; decl: builder
+;; data
+;; stack=6
+PUSH s5
+;; builder
+;; stack=7
+PUSH s1
+;; dataSize
+;; stack=8
+PUSH s3
+STUX
+NIP
+;; builder
+;; stack=6
+DUP
+;; tvm_endc
+;; stack=7
+ENDC
+CTOS
+;; assign builder
+NIP
+;; builder
+;; stack=6
+DUP
+;; key
+;; stack=7
+PUSH s5
+;; dictionary
+;; stack=8
+PUSH s5
+;; bits
+;; stack=9
+PUSH s5
+DICTUSET
+POP s4
+;; dictionary
+;; stack=6
+PUSH s3
+;; return
+XCHG s6
+BLKDROP 6
+RET
+
+.globl	store_signature
+.type	store_signature, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: store_signature
+;; param: gram_balance
+;; param: msg_balance
+;; param: src_addr
+;; param: sign
+PRINTSTR store_signature
+NEWDICT
+;; decl: dict
+;; sign
+;; stack=5
+PUSH s1
+PUSHINT 0
+;; dict
+;; stack=7
+PUSH s2
+PUSHINT 8
+PUSHINT 256
+PUSHINT $put_in_dictionary_as_slice$
+CALL 1
+;; assign dict
+NIP
+;; src_addr
+;; stack=5
+PUSH s2
+PUSHINT 1
+;; dict
+;; stack=7
+PUSH s2
+PUSHINT 8
+PUSHINT 256
+PUSHINT $put_in_dictionary_as_slice$
+CALL 1
+;; assign dict
+NIP
+;; msg_balance
+;; stack=5
+PUSH s3
+PUSHINT 2
+;; dict
+;; stack=7
+PUSH s2
+PUSHINT 8
+PUSHINT 256
+PUSHINT $put_in_dictionary_as_slice$
+CALL 1
+;; assign dict
+NIP
+;; gram_balance
+;; stack=5
+PUSH s4
+PUSHINT 3
+;; dict
+;; stack=7
+PUSH s2
+PUSHINT 8
+PUSHINT 256
+PUSHINT $put_in_dictionary_as_slice$
+CALL 1
+;; assign dict
+NIP
+PUSHCTR c7
+FIRST
+;; decl: firstOfC7
+;; firstOfC7
+;; stack=6
+DUP
+INDEX 6
+;; decl: rand_seed
+;; firstOfC7
+;; stack=7
+PUSH s1
+INDEX 7
+FIRST
+;; decl: nanograms
+;; tvm_newc
+;; stack=8
+NEWC
+;; decl: balance
+;; nanograms
+;; stack=9
+PUSH s1
+;; balance
+;; stack=10
+PUSH s1
+STU 128
+NIP
+;; balance
+;; stack=9
+DUP
+;; tvm_endc
+;; stack=10
+ENDC
+CTOS
+;; assign balance
+NIP
+;; firstOfC7
+;; stack=9
+PUSH s3
+INDEX 8
+;; decl: msgaddress
+;; msgaddress
+;; stack=10
+DUP
+PUSHINT 11
+SDSKIPFIRST
+;; assign msgaddress
+NIP
+;; msgaddress
+;; stack=10
+DUP
+LDU 256
+POP s2
+;; assign msgaddress
+NIP
+;; msgaddress
+;; stack=10
+DUP
+PUSHINT 4
+;; dict
+;; stack=12
+PUSH s7
+PUSHINT 8
+PUSHINT 256
+PUSHINT $put_in_dictionary_as_slice$
+CALL 1
+;; assign dict
+POP s6
+;; balance
+;; stack=10
+PUSH s1
+PUSHINT 5
+;; dict
+;; stack=12
+PUSH s7
+PUSHINT 8
+DICTUSET
+POP s6
+;; rand_seed
+;; stack=10
+PUSH s3
+PUSHINT 6
+;; dict
+;; stack=12
+PUSH s7
+PUSHINT 8
+PUSHINT 256
+PUSHINT $put_in_dictionary_as_slice$
+CALL 1
+;; assign dict
+POP s6
+;; tvm_newc
+;; stack=10
+NEWC
+;; decl: builder
+;; dict
+;; stack=11
+PUSH s6
+;; builder
+;; stack=12
+PUSH s1
+STDICT
+;; assign builder
+NIP
+;; builder
+;; stack=11
+DUP
+;; tvm_endc
+;; stack=12
+ENDC
+;; assign builder
+NIP
+PUSHCTR c7
+;; decl: c7
+;; c7
+;; stack=12
+DUP
+;; builder
+;; stack=13
+PUSH s2
+TPUSH
+;; assign c7
+NIP
+;; c7
+;; stack=12
+DUP
+POPCTR c7
+BLKDROP 12
 

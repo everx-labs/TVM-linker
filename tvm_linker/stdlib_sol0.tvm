@@ -1,10 +1,7 @@
 	.internal-alias :main_external,     -1
 	.internal-alias :main_internal,     0
 	.internal-alias :general_purpose,   1
-	.internal-alias :encode_grams,      2
-	.internal-alias :parse_grams,       3
-	.internal-alias :build_internal_outbound_message,       4
-	.internal-alias :call_build_internal,       5
+	.internal-alias :parse_grams,       2
 
 	.selector
 	; s0 - func_id
@@ -31,99 +28,6 @@
 	}
 	IFELSE
 
-
-	.internal   :encode_grams
-	;s0 - value: integer (u64)
-	;s1 - builder
-	DUP
-	PUSHCONT {
-		DUP
-		UBITSIZE    ; bit count used by integer
-		PUSHINT 8
-		DIVC        ; calculate number of bytes needed for integer
-		DUP
-		PUSH s3     ; push builder
-		STU 4       ; store len (bytes)
-		SWAP
-		PUSHINT 8
-		MUL         ; calculate bits for integer (rounded to byte)
-		STUX        ; store value
-		NIP
-	}
-	PUSHCONT {
-		DROP
-		PUSHINT 0
-		STUR 4
-	}
-	IFELSE
-
-
-	.internal :build_internal_outbound_message
-	; build internal outbound message
-	; s0 - ihr_disabled: integer (1 or 0)
-	; s1 - bounce: integer (1 or 0)
-	; s2 - src address : slice (MsgAddressInt)
-	; s3 - dst address : slice (MsgAddressInt)
-	; s4 - value: integer
-	; s5 - ihr_fee: integer
-	; s6 - fwd_fee: integer
-	; s7 - logical time: integer (u64)
-	; s8 - unixtime: integer (u32)
-	; s9 - body: slice
-	; returns: msg: cell
-	NEWC
-	STSLICECONST 0 ; int_msg_info$0
-	STU 1 ; ihr_disabled
-	STU 1 ; bounce
-	STSLICECONST 0 ; bounced
-	STSLICE
-	STSLICE
-	SWAP
-
-	;s0 - value: integer (u64)
-	;s1 - builder
-	CALL $:encode_grams$
-
-	STSLICECONST 0
-
-	SWAP
-
-	;s0 - value: integer (u64)
-	;s1 - builder
-	CALL $:encode_grams$
-	; store ihr_fee
-	SWAP
-
-	;s0 - value: integer (u64)
-	;s1 - builder
-	CALL $:encode_grams$
-	; store fwd_fee
-	STU 64        ; store logical time
-	STU 32        ; store unixtime
-
-	STSLICECONST 0 ; (Maybe StateInit) to 0bit
-	
-	DUP
-	BREMBITS		;remaining data bits in builder
-	PUSH s2			;push body
-	SBITS			;used data bits in body
-	INC
-	GEQ
-	PUSHCONT {
-		STSLICECONST 0  ; (body Either) to left$0
-		STSLICE     	; store body
-
-	}
-	PUSHCONT {
-		STSLICECONST 1  ; (body Either) to right$1
-		SWAP			; body to the top
-		NEWC STSLICE ENDCST	; pack body to new builder
-	}
-	IFELSE
-	ENDC
-	
-	RET
-	
 	.internal   :parse_grams
 	;parses Grams type (VarInteger 16)
 	;args: s0 - slice
@@ -153,50 +57,6 @@
 	CTOS
 	SWAP
 
-
-	.globl	parse_currency_collection
-	.type	parse_currency_collection, @function
-	;parses CurrencyCollection type
-	;args: s0 - slice
-	;ret:
-	;   s0 - remaining slice
-	;   s1 - grams: slice
-	CALL $:parse_grams$
-	; skip HashmapE with currencies.
-	SKIPDICT
-
-	.globl	parse_smartcontractinfo
-	.type	parse_smartcontractinfo, @function
-	;; stack=0
-	PRINTSTR parse_continfo
-	NOW		; put unixtime field on stack
-	BLOCKLT ; put block_lt field on stack
-	LTIME	; put trans_lt field on stack
-	PUSHCTR c7
-	FIRST
-	INDEX 6 ; put rand_seed field on stack
-	PUSHCTR c7
-	FIRST
-	INDEX 7 ; put balance remaining on stack
-	FIRST	; put nanograms integer
-	NEWC STU 128 ENDC CTOS
-
-	; parse MsgAddressInt
-	PUSHCTR c7
-	FIRST
-	INDEX 8
-	PUSHINT 11 
-	SDSKIPFIRST ; skip anycast: + workchain_id
-	LDU 256 ; put address on stack
-	DROP
-	
-	; s0 - address
-	; s1 - balance
-	; s2 - rand_seed
-	; s3 - trans_lt
-	; s4 - block_lt
-	; s5 - unixtime
-	RET
 
 	.globl		change_array_length
 	.type		change_array_length, @function
@@ -244,13 +104,19 @@
 		; while end
 	}
 	PUSHCONT {
+		; TODO: Fix an issue#2 with arr.length
 		PUSH s3
-		PUSH s2
-		DEC
-		PUSH s4
-		PUSHINT 32
-		DICTUSET
-		POP s3
+		ISNULL
+		PUSHCONT {
+			PUSH s3
+			PUSH s2
+			DEC
+			PUSH s4
+			PUSHINT 32
+			DICTUSET
+			POP s3
+		}
+		IFNOT
 	}
 	IFELSE
 	BLKDROP 2
@@ -261,26 +127,16 @@
 	.type		get_address, @function
 	;; stack=0
 	PRINTSTR get_address
-	
+
 	PUSHCTR c7
 	FIRST
 	INDEX 8
-	PUSHINT 11 
+	PUSHINT 11
 	SDSKIPFIRST ; skip anycast: + workchain_id
 	LDU 256
 	DROP
 	RET
-	
-	.globl		get_balance
-	.type		get_balance, @function
-	;; stack=0
-	PRINTSTR get_balance
-	PUSHCTR c7
-	FIRST
-	INDEX 7
-	FIRST
-	RET
-	
+
 	.globl		get_rand_seed
 	.type		get_rand_seed, @function
 	;; stack=0
@@ -288,27 +144,6 @@
 	PUSH c7
 	FIRST
 	INDEX 6
-	RET
-	
-	.globl		get_trans_lt
-	.type		get_trans_lt, @function
-	;; stack=0
-	PRINTSTR get_trans_lt
-	LTIME
-	RET
-	
-	.globl		get_block_lt
-	.type		get_block_lt, @function
-	;; stack=0
-	PRINTSTR get_block_lt
-	BLOCKLT
-	RET
-	
-	.globl		get_unixtime
-	.type		get_unixtime, @function
-	;; stack=0
-	PRINTSTR get_unixtime
-	NOW
 	RET
 
 	.globl	get_msg_pubkey
@@ -327,7 +162,7 @@
 	PUSHCONT {
 		;;;; Checks the signature of a given message and returns sender's public key
 		;;;; Throws exception 40 if signature is invalid
-		
+
 		; stack: msg
 		ZERO SWAP
 		; stack: 0 msg
@@ -354,7 +189,7 @@
 		POP s4
 		; stack: pubKey msg' slice:sign+pubKey pubKey
 		ROT
-		; stack: pubKey slice:sign+pubKey pubKey msg' 
+		; stack: pubKey slice:sign+pubKey pubKey msg'
 		HASHSU
 		; stack: pubKey slice:sign+pubKey pubKey msg-hash
 		ROTREV
@@ -365,7 +200,7 @@
 	}
 	IFELSE
 	RET
-	
+
 	.internal   :main_external
 	; s0 - msg body: slice
 	; s1 - msg: cell
@@ -380,7 +215,7 @@
 	; s3 - msg: cell
 	; s4 - gram balance of msg: int
 	; s5 - gram balance of contract: int
-	
+
 	PUSH s3
 	PUSHINT $get_src_addr$
 	CALL 1
@@ -394,7 +229,7 @@
 	; s3 - msg body: slice
 	; s4 - gram balance of msg: int
 	; s5 - gram balance of contract: int
-	
+
 	PUSH s3
 	PUSHINT $get_msg_pubkey$
 	CALL 1
@@ -415,14 +250,14 @@
 	}
 	IFNOT
 	DROP			;drop body or signature cell
-	
+
 	PUSHINT $store_signature$
 	CALL 1
 	NIP
 	NIP
-	
+
 	; s0 - msg body: slice
-	
+
 	; check if message is empty
 	DUP
 	SDEMPTY
@@ -435,10 +270,10 @@
 		RET
 	}
 	IFJMP
-	
+
 	;parse ABI version (1 byte) and load function id (4 bytes)
 	LDU 8       ;load ABI version
-	SWAP  
+	SWAP
 	THROWIF 55  ; only version 0 is supported now
 	LDU 32      ;load func id
 	SWAP
@@ -458,120 +293,16 @@
 		RET
 	}
 	IFJMP
-	
+
 	PUSHINT 3
 	SDSKIPFIRST ; skip ihr_disabled + bounce + bounced
-	
+
 	;; here we parse src : MsgIntAddress
-	
+
 	PUSHINT 11
 	SDSKIPFIRST ; skip anycast: + workchain_id
 	LDU 256
 	DROP ; drop slice itself
-	RET
-
-
-	.globl		store_signature
-	.type		store_signature, @function
-	; stack: sign
-	PRINTSTR store_signature
-
-	; stack: sign 
-	NEWC
-	; stack: sign b' in dict for key 0
-	SWAP
-	NEWC STU 256 ENDC CTOS
-	PUSHINT 0
-	NEWDICT
-	PUSHINT 8
-	DICTUSET
-	; stack: src addr b'' in dict for key 1
-	ROT
-	NEWC STU 256 ENDC CTOS
-	PUSHINT 1
-	PUSH s2
-	PUSHINT 8
-	DICTUSET
-	NIP
-	; stack: msg balance b''' in dict for key 2
-	ROT
-	NEWC STU 256 ENDC CTOS
-	PUSHINT 2
-	PUSH s2
-	PUSHINT 8
-	DICTUSET
-	NIP
-	; stack: gram balance of contract b'''' in dict for key 3
-	ROT
-	NEWC STU 256 ENDC CTOS
-	PUSHINT 3
-	PUSH s2
-	PUSHINT 8
-	DICTUSET
-	NIP
-	PUSHINT $parse_smartcontractinfo$
-	CALL 1 ; get additional values from smartcontractinfo
-	; s0 - address
-	; s1 - balance
-	; s2 - rand_seed
-	; s3 - trans_lt
-	; s4 - block_lt
-	; s5 - unixtime
-	; s6 - dict
-	; put address into dict for key 4
-	NEWC STU 256 ENDC CTOS
-	PUSHINT 4
-	PUSH s7
-	PUSHINT 8
-	DICTUSET
-	; put balance into dict for key 5
-	SWAP
-	PUSHINT 5
-	PUSH s2
-	PUSHINT 8
-	DICTUSET
-	NIP
-	; put rand_seed into dict for key 6
-	SWAP
-	NEWC STU 256 ENDC CTOS
-	PUSHINT 6
-	PUSH s2
-	PUSHINT 8
-	DICTUSET
-	NIP
-	; put trans_lt into dict for key 7
-	SWAP
-	NEWC STU 64 ENDC CTOS
-	PUSHINT 7
-	PUSH s2
-	PUSHINT 8
-	DICTUSET
-	NIP
-	; put block_lt into dict for key 8
-	SWAP
-	NEWC STU 64 ENDC CTOS
-	PUSHINT 8
-	PUSH s2
-	PUSHINT 8
-	DICTUSET
-	NIP
-	; put unixtime into dict for key 9
-	SWAP
-	NEWC STU 32 ENDC CTOS
-	PUSHINT 9
-	PUSH s2
-	PUSHINT 8
-	DICTUSET
-	NIP
-	NIP ; drop old dict which was at s6 at start of adding smartcontractinfo
-	; stack: dict with values
-	SWAP
-	STDICT
-	ENDC
-	PUSHCTR c7
-	SWAP
-	TPUSH
-	POP c7
 	RET
 
 	.internal   :main_internal
@@ -588,7 +319,7 @@
 	; s3 - msg: cell
 	; s4 - gram balance of msg: int
 	; s5 - gram balance of contract: int
-	
+
 	PUSH s3
 	PUSHINT $get_src_addr$
 	CALL 1
@@ -602,7 +333,7 @@
 	; s3 - msg body: slice
 	; s4 - gram balance of msg: int
 	; s5 - gram balance of contract: int
-	
+
 	PUSHINT 0 ; put 0 instead of signature
 	; s0 - 0 as signature
 	; s1 - addr
@@ -611,22 +342,22 @@
 	; s4 - msg body: slice
 	; s5 - gram balance of msg: int
 	; s6 - gram balance of contract: int
-	
+
 	PUSHINT $store_signature$
 	CALL 1
 	NIP
 	NIP
-	
+
 	; s0 - msg body: slice
-	
+
 	; protection against empty message
 	DUP
 	SEMPTY
 	IFRET
-	
+
 	;parse ABI version (1 byte) and load function id (4 bytes)
 	LDU 8       ;load ABI version
-	SWAP  
+	SWAP
 	THROWIF 55  ; only version 0 is supported now
 	LDU 32      ;load func id
 	SWAP
@@ -648,7 +379,7 @@
 		PUSH s5	;; transfer grams value: integer
 		PUSHINT $send_int_msg$
 		CALL 1
-		
+
 		POP s1
 		POP s1
 		POP s1
@@ -656,52 +387,21 @@
 
 	.globl	send_int_msg_2
 	.type	send_int_msg_2, @function
-		;args: 
+		;args:
 		; s0 - body: slice
 		; s1 - dst account address: integer
 		;ret: none
-		
+
 		PUSHINT 0	;; next msg logical time
 		PUSH s1		;; body: slice
 		PUSH s3		;; dst account address: integer
 		PUSHINT 10000	;; transfer grams value: integer
-		
+
 		PUSHINT $send_int_msg$
 		CALL 1
-		
+
 		DROP
 		DROP
-		RET
-
-		.internal :call_build_internal
-		;args:
-		; s0 unixtime
-		; s1 snd addr
-		; s2 dst addr
-		; s3 value
-		; s4 dst addr pure
-		; s5 body slice
-		;ret: msg: cell
-		XCHG s4, s5
-		ZERO
-		ZERO
-		ZERO
-		BLKSWAP 3, 4
-		ONE
-		ZERO
-		; s0 ihr_disabled	0
-		; s1 bounce		1
-		; s2 src addr
-		; s3 dst addr
-		; s4 value
-		; s5 ihr_fee		0
-		; s6 fwd_fee		0
-		; s7 logical time	0
-		; s8 unixtime
-		; s9 body slice
-		; s10 dst addr pure
-
-		CALL $:build_internal_outbound_message$
 		RET
 
 	.globl   build_external_outbound_message
@@ -791,5 +491,5 @@
 	FIRST
 	RET
 				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-				;;; THE CODE BELOW IS GENERATED. DO NOT CHANGE IT!	
+				;;; THE CODE BELOW IS GENERATED. DO NOT CHANGE IT!
 
