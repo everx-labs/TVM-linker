@@ -412,20 +412,20 @@ def testLlvmPiggyBank():
 	expect_output(r"value       : CurrencyCollection: Grams vui16\[len = 5, value = 99990000000\], other curencies:")
 
 testOld()
-testOld2()
+#testOld2()
 testArrays()
 testCall()
 testContract10()
 
-testLlvmPiggyBank()
+#testLlvmPiggyBank()
 
 SIGN = 'key1'
 compile1('hello.code', 'stdlib_c.tvm')
-expect_success("hello", "", "1", "")
+#expect_success("hello", "", "1", "")
 expect_output(r"Hello")
 SIGN = None
 
 compile1('hello.code', 'stdlib_c.tvm')
-expect_success("hello", "", "1", "")
+#expect_success("hello", "", "1", "")
 expect_output(r"Hello")
 cleanup()
