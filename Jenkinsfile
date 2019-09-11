@@ -37,16 +37,6 @@ pipeline {
                 }
             }
         }
-        stage('Test') {
-            steps {
-                script {
-                    G_dockerimage = "tonlabs/tvm_linker:${GIT_COMMIT}"
-                    docker.image(G_dockerimage).inside("-u root") {
-                        sh 'tvm_linker --version'
-                    }
-                }
-            }
-        }
         stage ('Test') {
             agent {
                 docker {
