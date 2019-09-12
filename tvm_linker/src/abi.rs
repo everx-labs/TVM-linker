@@ -22,9 +22,10 @@ pub fn build_abi_body(abi_file: &str, method: &str, params: &str, keypair: Optio
 pub fn gen_abi_id(mut abi: Option<Contract>, func_name: &str) -> u32 {
     let signature = 
     if let Some(ref mut contract) = abi {
-        let mut functions = contract.functions();
-        functions.find(|f| f.name == func_name)
-            .and_then(|f| Some(f.get_function_signature()))
+        let functions = contract.functions();
+        let events = contract.events();
+        functions.get(func_name).map(|f| f.get_function_signature())           
+            .or_else(|| events.get(func_name).map(|e| e.get_function_signature()))
             .unwrap_or(func_name.to_string())
     } else {
         func_name.to_string()

@@ -1,0 +1,93 @@
+.globl	constructor
+.type	constructor, @function
+DROP
+PUSHINT $constructor_Test$
+CALL 1
+RET
+
+.globl	constructor_Test
+.type	constructor_Test, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: constructor_Test
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
+
+.globl	emitValue
+.type	emitValue, @function
+LDU 256
+DROP
+PUSHINT $emitValue_internal$
+CALL 1
+RET
+
+.globl	emitValue_internal
+.type	emitValue_internal, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: emitValue_internal
+;; param: id
+;; emit EventThrown
+NEWC
+PUSHINT 0
+STUR 8
+PUSHINT $EventThrown$
+STUR 32
+;; id
+;; id
+;; stack=2
+PUSH s1
+STUR 256
+ENDC CTOS
+PUSHINT $send_ext_msg$
+CALL 1
+DROP
+
+.globl	returnValue
+.type	returnValue, @function
+LDU 256
+DROP
+PUSHINT $returnValue_internal$
+CALL 1
+;; emitting 1 value(s)
+NEWC
+PUSHINT 0
+STUR 8
+PUSHINT $returnValue$
+STUR 32
+PUSH s1
+STUR 256
+ENDC CTOS
+PUSHINT $send_ext_msg$
+CALL 1
+RET
+
+.globl	returnValue_internal
+.type	returnValue_internal, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: returnValue_internal
+;; param: id
+;; emit EventThrown
+NEWC
+PUSHINT 0
+STUR 8
+PUSHINT $EventThrown$
+STUR 32
+;; id
+;; id
+;; stack=2
+PUSH s1
+STUR 256
+ENDC CTOS
+PUSHINT $send_ext_msg$
+CALL 1
+;; id
+;; stack=1
+DUP
+;; return
+POP s1
+RET
+
+.globl	EventThrown
+.type	EventThrown, @function
+RET
+
