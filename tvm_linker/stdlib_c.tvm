@@ -179,8 +179,7 @@ tvm_sender_pubkey:
     ;load smart_contract_info tuple and pack to slice
     PUSH c7
     FIRST
-    EXPLODE 9   ;unpack tuple
-    DROP        ;drop number of items
+    UNPACKFIRST 9   ;unpack tuple
     REVERSE 9, 0
     NEWC
     STU 32      ;magic
