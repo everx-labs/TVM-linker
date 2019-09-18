@@ -411,11 +411,22 @@ def testLlvmPiggyBank():
 	expect_output(r"destination : 0:0000000000000000000000000000000000000000000000000000000080000001")
 	expect_output(r"value       : CurrencyCollection: Grams vui16\[len = 5, value = 99990000000\], other curencies:")
 
+def testEvents():
+	linker_options = "--sign key1 --decode-c6"
+	compile2('event', 'tests')
+	expect_success2("event", "constructor", '{}', None, linker_options)
+	expect_success2("event", "emitValue", '{"id":"0x1234"}', None, linker_options)
+	expect_output(r"data: 006886dac2")
+	expect_success2("event", "returnValue", '{"id":"0x1234"}', None, linker_options)
+	expect_output(r"data: 006886dac2")
+	expect_output(r"data: 00e92ce792")
+
 testOld()
 #testOld2()
 testArrays()
 testCall()
 testContract10()
+testEvents()
 
 #testLlvmPiggyBank()
 
