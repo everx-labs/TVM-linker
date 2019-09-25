@@ -167,22 +167,17 @@ impl ParseEngine {
         }
 
         self.preinit()?;
-        let mut libs: Vec<_> = libs.into_iter().map(|buf| BufReader::new(buf)).collect();
-        for lib in &mut libs {
+        let mut sources: Vec<_> = libs.into_iter().map(|buf| BufReader::new(buf)).collect();
+        sources.push(BufReader::new(source));
+        for lib in &mut sources {
             self.parse_code(lib, true)?;
             lib.seek(SeekFrom::Start(0))
-                .map_err(|e| format!("error while seeking lib file: {}", e))?;            
+                .map_err(|e| format!("error while seeking source file: {}", e))?;            
         }
-        for lib in &mut libs {
+        for lib in &mut sources {
             self.parse_code(lib, false)?;
         }
-
-        let mut reader = BufReader::new(source);
-        self.parse_code(&mut reader, true)?;
-        reader.seek(SeekFrom::Start(0))
-            .map_err(|e| format!("error while seeking source file: {}", e))?;
-        self.parse_code(&mut reader, false)?;
-
+        
         if self.entry_point.is_empty() {
             return Err("Selector not found".to_string());
         }
@@ -743,5 +738,13 @@ mod tests {
         let lib2 = File::open("./tests/testlib2.tvm").unwrap();
         let source = File::open("./tests/hello.code").unwrap();
         assert_eq!(parser.parse(source, vec![lib1, lib2], None), ok!());
-    }     
+    }
+
+        #[test]
+    fn test_external_linking() {
+        let mut parser = ParseEngine::new();
+        let lib1 = File::open("./tests/test_extlink_lib.tvm").unwrap();
+        let source = File::open("./tests/test_extlink_source.s").unwrap();
+        assert_eq!(parser.parse(source, vec![lib1], None), ok!());
+    }   
 }
