@@ -18,5 +18,10 @@
 	DROP
 
 	RET
+
+	.globl	fallback
+	.type	fallback, @function
+	DROP
+	RET
 	
 

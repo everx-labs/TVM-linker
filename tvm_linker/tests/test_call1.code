@@ -15,6 +15,14 @@ POPROOT
 
 .globl	send
 .type	send, @function
+DUP
+SDEMPTY
+PUSHCONT {
+LDREF
+DROP
+CTOS
+}
+IF ; load_new_cell
 LDU 256
 DROP
 PUSHINT $send_internal$
@@ -26,30 +34,39 @@ RET
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: send_internal
 ;; param: a
-;; IContract.request
+;; Remote call IContract.request
 ;; a
 ;; stack=1
 DUP
-;; IContract
-;; stack=2
 NEWC
 PUSHINT 0
 STUR 8
 PUSHINT $request$
 STUR 32
+NEWC
 ;; a
 PUSHINT 1
 STUR 256
+NEWC
 ;; b
 PUSHINT 2
 STUR 256
+NEWC
 ;; c
 PUSHINT 3
 STUR 256
+STBREFR
+STBREFR
+STBREFR
 ENDC CTOS
 PUSHINT $send_int_msg_2$
 CALL 1
 DROP
+
+.globl	fallback
+.type	fallback, @function
+DROP
+RET
 
 .globl	request
 .type	request, @function

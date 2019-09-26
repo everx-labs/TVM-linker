@@ -1,0 +1,17 @@
+{
+	"ABI version": 0,
+	"functions": [{
+		"name": "main",
+		"inputs": [
+		],
+		"outputs": [
+			{"name":"value0","type":"uint256"}
+		]
+	}, {
+		"name": "constructor",
+		"inputs": [
+		],
+		"outputs": [
+		]
+	}]
+}

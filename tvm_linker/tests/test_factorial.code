@@ -103,3 +103,8 @@ IFELSE
 ;; return
 POP s1
 RET
+
+.globl	fallback
+.type	fallback, @function
+DROP
+RET

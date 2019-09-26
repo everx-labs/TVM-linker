@@ -13,3 +13,8 @@
 	CALL 1
 
 	RET
+
+	.globl	fallback
+	.type	fallback, @function
+	DROP
+	RET
