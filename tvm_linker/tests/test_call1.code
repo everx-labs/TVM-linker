@@ -15,15 +15,9 @@ POPROOT
 
 .globl	send
 .type	send, @function
-DUP
-SDEMPTY
-PUSHCONT {
-LDREF
-DROP
-CTOS
-}
-IF ; load_new_cell
-LDU 256
+PUSHINT 256
+PUSHINT $smart_ldu$
+CALL 1
 DROP
 PUSHINT $send_internal$
 CALL 1

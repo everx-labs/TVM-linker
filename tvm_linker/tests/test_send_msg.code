@@ -11,15 +11,9 @@ POPROOT
 
 .globl	get_allowance
 .type	get_allowance, @function
-DUP
-SDEMPTY
-PUSHCONT {
-LDREF
-DROP
-CTOS
-}
-IF ; load_new_cell
-LDU 256
+PUSHINT 256
+PUSHINT $smart_ldu$
+CALL 1
 DROP
 PUSHINT $get_allowance_internal$
 CALL 1
