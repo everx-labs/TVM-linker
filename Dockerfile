@@ -17,6 +17,7 @@ RUN apt-get update; \
 RUN rustup target add $TARGET
 COPY . TVM-linker
 WORKDIR /home/user/TVM-linker/tvm_linker
+RUN --mount=type=ssh cargo update
 RUN --mount=type=ssh cargo build --release --target $TARGET
 RUN mkdir -p /app
 RUN mv /home/user/TVM-linker/tvm_linker/stdlib_c.tvm /app

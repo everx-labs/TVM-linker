@@ -1,36 +1,53 @@
+.globl	constructor_Test20
+.type	constructor_Test20, @function
+RET
 
-.globl	test19_external
-.type	test19_external, @function
-LDU 32
-LDU 32
+.globl	constructor
+.type	constructor, @function
 DROP
-PUSHINT $test19$
-CALL 1
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
 
 .globl	test19
 .type	test19, @function
+PUSHINT 32
+PUSHINT $smart_ldu$
+CALL 1
+PUSHINT 32
+PUSHINT $smart_ldu$
+CALL 1
+DROP
+PUSHINT $test19_internal$
+CALL 1
+RET
+
+.globl	test19_internal
+.type	test19_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: test19
+;; Function: test19_internal
 ;; param: a
 ;; param: b
 ;; emit TestEvent
-;; bbb
-;; b
-;; stack=2
-DUP
+NEWC
+PUSHINT 0
+STUR 8
+PUSHINT $TestEvent$
+STUR 32
+NEWC
 ;; aaa
 ;; a
-;; stack=3
-PUSH s2
-PUSHINT $TestEvent_event$
-PUSHINT 0
+;; stack=4
+PUSH s3
+STUR 32
 NEWC
-STU 8
-STU 32
-;; aaa
-STU 32
 ;; bbb
-STU 32
+;; b
+;; stack=5
+PUSH s3
+STUR 32
+STBREFR
+STBREFR
 ENDC CTOS
 PUSHINT $send_ext_msg$
 CALL 1
@@ -38,6 +55,12 @@ CALL 1
 BLKDROP 2
 RET
 
-.globl	TestEvent_event
-.type	TestEvent_event, @function
+.globl	fallback
+.type	fallback, @function
+DROP
 RET
+
+.globl	TestEvent
+.type	TestEvent, @function
+RET
+

@@ -1,34 +1,47 @@
-.globl	get_allowance_external
-.type	get_allowance_external, @function
-LDU 256
-DROP
-PUSHINT $get_allowance$
-CALL 1
+.globl	constructor_MyContract
+.type	constructor_MyContract, @function
 RET
+
+.globl	constructor
+.type	constructor, @function
+DROP
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
 
 .globl	get_allowance
 .type	get_allowance, @function
+PUSHINT 256
+PUSHINT $smart_ldu$
+CALL 1
+DROP
+PUSHINT $get_allowance_internal$
+CALL 1
+RET
+
+.globl	get_allowance_internal
+.type	get_allowance_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: get_allowance
+;; Function: get_allowance_internal
 ;; param: requester
 ;; requester
 ;; stack=1
 DUP
-;; RemoteContract
-;; stack=2
 ;; decl: r
+;; Remote call RemoteContract.on_get_allowance
 ;; r
 ;; stack=2
 DUP
-;; RemoteContract.on_get_allowance
 NEWC
 PUSHINT 0
 STUR 8
-PUSHINT $on_get_allowance_external$
+PUSHINT $on_get_allowance$
 STUR 32
+NEWC
 ;; amount
 PUSHINT 0
 STUR 64
+STBREFR
 ENDC CTOS
 PUSHINT $send_int_msg_2$
 CALL 1
@@ -36,15 +49,17 @@ PUSHINT 1000
 ;; r
 ;; stack=3
 PUSH s1
-;; RemoteContract.on_get_allowance
+;; Remote call RemoteContract.on_get_allowance
 NEWC
 PUSHINT 0
 STUR 8
-PUSHINT $on_get_allowance_external$
+PUSHINT $on_get_allowance$
 STUR 32
+NEWC
 ;; amount
 PUSHINT 0
 STUR 64
+STBREFR
 ENDC CTOS
 PUSHINT $send_grams$
 CALL 1
@@ -53,7 +68,12 @@ CALL 1
 BLKDROP 2
 RET
 
-.globl	on_get_allowance_external
-.type	on_get_allowance_external, @function
+.globl	fallback
+.type	fallback, @function
+DROP
+RET
+
+.globl	on_get_allowance
+.type	on_get_allowance, @function
 RET
 

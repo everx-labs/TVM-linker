@@ -15,7 +15,9 @@ POPROOT
 
 .globl	emitValue
 .type	emitValue, @function
-LDU 256
+PUSHINT 256
+PUSHINT $smart_ldu$
+CALL 1
 DROP
 PUSHINT $emitValue_internal$
 CALL 1
@@ -32,11 +34,13 @@ PUSHINT 0
 STUR 8
 PUSHINT $EventThrown$
 STUR 32
+NEWC
 ;; id
 ;; id
-;; stack=2
-PUSH s1
+;; stack=3
+PUSH s2
 STUR 256
+STBREFR
 ENDC CTOS
 PUSHINT $send_ext_msg$
 CALL 1
@@ -44,7 +48,9 @@ DROP
 
 .globl	returnValue
 .type	returnValue, @function
-LDU 256
+PUSHINT 256
+PUSHINT $smart_ldu$
+CALL 1
 DROP
 PUSHINT $returnValue_internal$
 CALL 1
@@ -54,8 +60,10 @@ PUSHINT 0
 STUR 8
 PUSHINT $returnValue$
 STUR 32
-PUSH s1
+NEWC
+PUSH s2
 STUR 256
+STBREFR
 ENDC CTOS
 PUSHINT $send_ext_msg$
 CALL 1
@@ -72,11 +80,13 @@ PUSHINT 0
 STUR 8
 PUSHINT $EventThrown$
 STUR 32
+NEWC
 ;; id
 ;; id
-;; stack=2
-PUSH s1
+;; stack=3
+PUSH s2
 STUR 256
+STBREFR
 ENDC CTOS
 PUSHINT $send_ext_msg$
 CALL 1
@@ -85,6 +95,11 @@ CALL 1
 DUP
 ;; return
 POP s1
+RET
+
+.globl	fallback
+.type	fallback, @function
+DROP
 RET
 
 .globl	EventThrown

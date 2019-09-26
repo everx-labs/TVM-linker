@@ -14,3 +14,8 @@ PUSHINT $get_msg_sender$
 CALL 1
 ;; return
 RET
+
+.globl	fallback
+.type	fallback, @function
+DROP
+RET

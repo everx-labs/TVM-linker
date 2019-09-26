@@ -46,7 +46,10 @@ ADD
 LESS
 ;; &&
 AND
-;; require
-;; stack=1
 THROWIFNOT 100
+
+.globl	fallback
+.type	fallback, @function
+DROP
+RET
 

@@ -1,7 +1,6 @@
 	.internal-alias :main_external,     -1
 	.internal-alias :main_internal,     0
 	.internal-alias :general_purpose,   1
-
 	.selector
 	; s0 - func_id
 	; s1.. - other data
@@ -29,142 +28,17 @@
 
 
 	.internal   :main_external
-	; s0 - msg body: slice
-	; s1 - msg: cell
-	; s2 - gram balance of msg: int
-	; s3 - gram balance of contract: int
-	PRINTSTR main_external
-	PUSH s3
-	PUSH s3
-	; s0 - gram balance of msg: int
-	; s1 - gram balance of contract: int
-	; s2 - msg body: slice
-	; s3 - msg: cell
-	; s4 - gram balance of msg: int
-	; s5 - gram balance of contract: int
-
-	PUSH s3
-	PUSHINT $get_src_addr$
+	PUSHINT $main_external_body$
 	CALL 1
-	POP s4
-	XCHG s2, s3
-	XCHG s1, s2
-	XCHG s0, s1
-	; s0 - addr
-	; s1 - gram balance of msg: int
-	; s2 - gram balance of contract: int
-	; s3 - msg body: slice
-	; s4 - gram balance of msg: int
-	; s5 - gram balance of contract: int
-
-	PUSH s3
-	PUSHINT $get_msg_pubkey$
-	CALL 1
-	; s0 - pubkey
-	; s1 - addr
-	; s2 - gram balance of msg: int
-	; s3 - gram balance of contract: int
-	; s4 - msg body: slice
-	; s5 - gram balance of msg: int
-	; s6 - gram balance of contract: int
-
-	PUSH s4		;push body
-	DUP
-	SREMPTY
-	PUSHCONT {
-		LDREF		;detach signature cell from body
-		POP s6		;rewrite original body with remaining body slice
-	}
-	IFNOT
-	DROP			;drop body or signature cell
-
-	PUSHINT $store_signature$
-	CALL 1
-	NIP
-	NIP
-
-	; s0 - msg body: slice
-
-	; check if message is empty
-	DUP
-	SDEMPTY
-	PUSHCONT {
-		PRINTSTR msg_is_empty
-		DROP
-		NEWDICT
-		NEWC STDICT ENDC
-		POPROOT
-		RET
-	}
-	IFJMP
-
-	;parse ABI version (1 byte) and load function id (4 bytes)
-	LDU 8       ;load ABI version
-	SWAP
-	THROWIF 55  ; only version 0 is supported now
-	LDU 32      ;load func id
-	SWAP
-	CALL 1      ;public method call
+	IFRET
+	CALL 1 ;public method call
 
 
 	.internal   :main_internal
-	; s0 - msg body: slice
-	; s1 - msg: cell
-	; s2 - gram balance of msg: int
-	; s3 - gram balance of contract: int
-	PRINTSTR main_internal
-	PUSH s3
-	PUSH s3
-	; s0 - gram balance of msg: int
-	; s1 - gram balance of contract: int
-	; s2 - msg body: slice
-	; s3 - msg: cell
-	; s4 - gram balance of msg: int
-	; s5 - gram balance of contract: int
-
-	PUSH s3
-	PUSHINT $get_src_addr$
+	PUSHINT $main_internal_body$
 	CALL 1
-	POP s4
-	XCHG s2, s3
-	XCHG s1, s2
-	XCHG s0, s1
-	; s0 - addr
-	; s1 - gram balance of msg: int
-	; s2 - gram balance of contract: int
-	; s3 - msg body: slice
-	; s4 - gram balance of msg: int
-	; s5 - gram balance of contract: int
-
-	PUSHINT 0 ; put 0 instead of signature
-	; s0 - 0 as signature
-	; s1 - addr
-	; s2 - gram balance of msg: int
-	; s3 - gram balance of contract: int
-	; s4 - msg body: slice
-	; s5 - gram balance of msg: int
-	; s6 - gram balance of contract: int
-
-	PUSHINT $store_signature$
-	CALL 1
-	NIP
-	NIP
-
-	; s0 - msg body: slice
-
-	; protection against empty message
-	DUP
-	SEMPTY
 	IFRET
-
-	;parse ABI version (1 byte) and load function id (4 bytes)
-	LDU 8       ;load ABI version
-	SWAP
-	THROWIF 55  ; only version 0 is supported now
-	LDU 32      ;load func id
-	SWAP
-	CALL 1      ;public method call
-
+	CALL 1 ;public method call
 	RET
 
 				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -178,7 +52,6 @@
 ;; Index of TvmTempData.pubkey
 PUSHINT 0
 ;; tvm_get_tmp_dictionary
-;; stack=1
 PUSH c7
 SECOND
 CTOS
@@ -199,7 +72,6 @@ RET
 ;; Index of TvmTempData.msgSender
 PUSHINT 1
 ;; tvm_get_tmp_dictionary
-;; stack=1
 PUSH c7
 SECOND
 CTOS
@@ -220,7 +92,6 @@ RET
 ;; Index of TvmTempData.msgBalance
 PUSHINT 2
 ;; tvm_get_tmp_dictionary
-;; stack=1
 PUSH c7
 SECOND
 CTOS
@@ -233,131 +104,20 @@ IFELSE
 ;; return
 RET
 
-.globl	encode_array_rec
-.type	encode_array_rec, @function
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: encode_array_rec
-;; param: builder
-;; param: array
-;; param: nbits
-;; param: len
-;; param: idx
-PRINTSTR encode_array_r
-; while statement
-PUSHCONT {
-	;; idx
-	;; stack=5
-	DUP
-	;; len
-	;; stack=6
-	PUSH s2
-	;; <
-	LESS
-	NOT DUP IFRET DROP
-	;; m_isUntil = 1
-	;; if
-	;; builder
-	;; stack=5
-	PUSH s4
-	;; nbits
-	;; stack=6
-	PUSH s3
-	BCHKBITSQ
-	PUSHCONT {
-		;; m_addReturnFlag = 1
-		PRINTSTR encode_array_r0
-		;; idx
-		;; stack=5
-		DUP
-		;; array
-		;; stack=6
-		PUSH s4
-		PUSHINT 32
-		DICTUGET
-		THROWIFNOT 100
-		;; decl: data_slice
-		;; data_slice
-		;; stack=6
-		DUP
-		;; builder
-		;; stack=7
-		PUSH s6
-		STSLICE
-		POP s6
-		;; ++
-		;; fetch idx
-		PUSH s1
-		INC
-		;; assign idx
-		POP s2
-		;; drop locals
-		DROP
-		FALSE
-	}
-	PUSHCONT {
-		;; m_addReturnFlag = 1
-		PRINTSTR encode_array_r1
-		;; tvm_newc
-		;; stack=5
-		NEWC
-		;; array
-		;; stack=6
-		PUSH s4
-		;; nbits
-		;; stack=7
-		PUSH s4
-		;; len
-		;; stack=8
-		PUSH s4
-		;; idx
-		;; stack=9
-		PUSH s4
-		PUSHINT $encode_array_rec$
-		CALL 1
-		;; tvm_endc
-		;; stack=6
-		ENDC
-		;; decl: tail
-		;; tail
-		;; stack=6
-		DUP
-		;; builder
-		;; stack=7
-		PUSH s6
-		STREF
-		POP s6
-		;; break
-		; erase tail
-		DROP
-		PUSHINT 2 ; break
-	}
-	IFELSE
-	DUP
-	PUSHINT 2
-	EQUAL
-	PUSHCONT { DROP TRUE }
-	IFJMP
-	THROWIF 99
-	FALSE
-}
-UNTIL
-; while end
-;; builder
-;; stack=5
-PUSH s4
-;; return
-XCHG s5
-BLKDROP 5
-RET
-
 .globl	encode_array
 .type	encode_array, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: encode_array
 ;; param: builder
 ;; param: array
-;; param: nbits
+;; param: 
 PRINTSTR encode_array
+PUSHINT 1
+;; builder
+;; stack=4
+PUSH s3
+STU 2
+POP s3
 ;; array
 ;; stack=3
 PUSH s1
@@ -366,137 +126,114 @@ DICTUMAX
 PUSHCONT { POP s1 INC }
 PUSHCONT { PUSHINT 0 }
 IFELSE
-;; decl: n
-;; if
-;; n
+;; decl: len
+;; len
 ;; stack=4
 DUP
-PUSHINT 0
-;; ==
-EQUAL
-PUSHCONT {
-	PUSHINT 2
-	;; builder
-	;; stack=5
-	PUSH s4
-	STU 2
-	POP s4
-	;; n
-	;; stack=4
-	DUP
-	;; builder
-	;; stack=5
-	PUSH s4
-	STU 8
-	POP s4
-	;; builder
-	;; stack=4
-	PUSH s3
-	;; return
-	XCHG s4
-	BLKDROP 4
-	RET
-}
-IFJMP
-;; if
-;; builder
-;; stack=4
-PUSH s3
-BREMBITS ; tvm_brembits
-PUSHINT 2
-PUSHINT 8
-;; +
-ADD
-;; n
-;; stack=6
-PUSH s2
-;; nbits
-;; stack=7
-PUSH s4
-;; *
-MUL
-;; +
-ADD
-;; >=
-GEQ
-PUSHCONT {
-	PRINTSTR encode_array01
-	PUSHINT 2
-	;; builder
-	;; stack=5
-	PUSH s4
-	STU 2
-	POP s4
-	;; n
-	;; stack=4
-	DUP
-	;; builder
-	;; stack=5
-	PUSH s4
-	STU 8
-	POP s4
-	;; builder
-	;; stack=4
-	PUSH s3
-	;; array
-	;; stack=5
-	PUSH s3
-	;; nbits
-	;; stack=6
-	PUSH s3
-	;; n
-	;; stack=7
-	PUSH s3
-	PUSHINT 0
-	PUSHINT $encode_array_rec$
-	CALL 1
-	;; assign builder
-	POP s4
-	;; builder
-	;; stack=4
-	PUSH s3
-	;; return
-	XCHG s4
-	BLKDROP 4
-	RET
-}
-IFJMP
-PUSHINT 0
 ;; builder
 ;; stack=5
 PUSH s4
-STU 2
+STU 32
 POP s4
-;; tvm_newc
-;; stack=4
-NEWC
 ;; array
-;; stack=5
-PUSH s3
-;; nbits
-;; stack=6
-PUSH s3
-;; n
-;; stack=7
-PUSH s3
-PUSHINT 0
-PUSHINT $encode_array_rec$
-CALL 1
-;; tvm_endc
-;; stack=5
-ENDC
+;; stack=4
+PUSH s2
 ;; builder
 ;; stack=5
 PUSH s4
-STREF
+STDICT
+;; assign builder
 POP s4
-PRINTSTR encode_array_ok
 ;; builder
 ;; stack=4
 PUSH s3
 ;; return
 XCHG s4
 BLKDROP 4
+RET
+
+.globl	decode_array
+.type	decode_array, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: decode_array
+;; param: slice
+;; param: 
+PRINTSTR decode_array
+;; if
+;; slice
+;; stack=2
+PUSH s1
+SDEMPTY
+PUSHCONT {
+	;; slice
+	;; stack=2
+	PUSH s1
+	LDREF
+	POP s3
+	;; decl: refcell
+	;; refcell
+	;; stack=3
+	DUP
+	CTOS
+	;; assign slice
+	POP s3
+	;; drop locals
+	DROP
+}
+IF
+;; slice
+;; stack=2
+PUSH s1
+LDU 2
+POP s3
+;; decl: dec_alg
+;; dec_alg
+;; stack=3
+DUP
+PUSHINT 1
+;; ==
+EQUAL
+THROWIFNOT 100
+;; slice
+;; stack=3
+PUSH s2
+LDU 32
+POP s4
+;; decl: len
+;; slice
+;; stack=4
+PUSH s3
+LDDICT
+;; decl: array
+;; decl: restSlice
+;; array
+;; stack=6
+PUSH s1
+PUSHINT 32
+DICTUMAX
+PUSHCONT { POP s1 INC }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; decl: len_actual
+;; len
+;; stack=7
+PUSH s3
+;; len_actual
+;; stack=8
+PUSH s1
+;; ==
+EQUAL
+THROWIFNOT 100
+PRINTSTR decode_array_ok
+;; array
+;; stack=7
+PUSH s2
+;; restSlice
+;; stack=8
+PUSH s2
+;; return
+BLKSWAP 7, 2
+BLKDROP 7
 RET
 
 .globl	load_slice_from_two_cell
@@ -542,8 +279,6 @@ PUSH s3
 LDSLICEX
 POP s6
 ;; decl: sliceValue1
-;; tvm_newc
-;; stack=6
 NEWC
 ;; decl: numberBuilder
 ;; sliceValue0
@@ -565,8 +300,6 @@ NIP
 ;; numberBuilder
 ;; stack=7
 DUP
-;; tvm_endc
-;; stack=8
 ENDC
 CTOS
 ;; slice
@@ -577,340 +310,16 @@ BLKSWAP 7, 2
 BLKDROP 7
 RET
 
-.globl	decode_array
-.type	decode_array, @function
+.globl	abi_encode_packed
+.type	abi_encode_packed, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: decode_array
-;; param: slice
-;; param: valueBits
-NEWDICT
-;; decl: array
-;; slice
-;; stack=3
-PUSH s2
-PUSHINT 2
-PUSHINT $smart_ldu$
-CALL 1
-;; decl: decode_algo
-;; decl: tmp
-;; tmp
-;; stack=5
-DUP
-;; assign slice
-POP s5
-;; if
-;; decode_algo
-;; stack=5
-PUSH s1
-PUSHINT 0
-;; ==
-EQUAL
-PUSHCONT {
-	;; slice
-	;; stack=5
-	PUSH s4
-	LDREF
-	POP s6
-	CTOS
-	;; decl: arraySlice
-	; for statement
-	PUSHINT 0
-	;; decl: i
-	PUSHCONT {
-		;; m_isUntil = 1
-		;; arraySlice
-		;; stack=7
-		PUSH s1
-		SBITS ; tvm_sbits
-		;; decl: restBits
-		;; if
-		;; restBits
-		;; stack=8
-		DUP
-		;; valueBits
-		;; stack=9
-		PUSH s7
-		;; >=
-		GEQ
-		PUSHCONT {
-			;; m_addReturnFlag = 1
-			;; arraySlice
-			;; stack=8
-			PUSH s2
-			;; valueBits
-			;; stack=9
-			PUSH s7
-			LDSLICEX
-			POP s4
-			;; decl: sliceValue
-			;; sliceValue
-			;; stack=9
-			DUP
-			;; i
-			;; stack=10
-			PUSH s3
-			;; array
-			;; stack=11
-			PUSH s8
-			PUSHINT 32
-			DICTUSET
-			POP s7
-			;; drop locals
-			DROP
-			FALSE
-		}
-		PUSHCONT {
-			;; m_addReturnFlag = 1
-			;; if
-			;; restBits
-			;; stack=8
-			DUP
-			PUSHINT 0
-			;; ==
-			EQUAL
-			PUSHCONT {
-				;; m_addReturnFlag = 1
-				;; if
-				;; arraySlice
-				;; stack=8
-				PUSH s2
-				SREFS ; tvm_srefs
-				PUSHINT 0
-				;; ==
-				EQUAL
-				PUSHCONT {
-					;; m_addReturnFlag = 1
-					;; break
-					; erase restBits
-					DROP
-					PUSHINT 2 ; break
-				}
-				PUSHCONT { FALSE }
-				IFELSE
-				DUP
-				IFRET
-				DROP
-				FALSE
-			}
-			PUSHCONT { FALSE }
-			IFELSE
-			DUP
-			IFRET
-			DROP
-			;; arraySlice
-			;; stack=8
-			PUSH s2
-			;; restBits
-			;; stack=9
-			PUSH s1
-			;; valueBits
-			;; stack=10
-			PUSH s8
-			;; restBits
-			;; stack=11
-			PUSH s3
-			;; -
-			SUB
-			PUSHINT $load_slice_from_two_cell$
-			CALL 1
-			;; decl: value
-			;; decl: restSlice
-			;; value
-			;; stack=10
-			PUSH s1
-			;; i
-			;; stack=11
-			PUSH s4
-			;; array
-			;; stack=12
-			PUSH s9
-			PUSHINT 32
-			DICTUSET
-			POP s8
-			;; restSlice
-			;; stack=10
-			DUP
-			;; assign arraySlice
-			POP s5
-			;; drop locals
-			BLKDROP 2
-			FALSE
-		}
-		IFELSE
-		DUP
-		PUSHINT 2
-		EQUAL
-		PUSHCONT { DROP TRUE }
-		IFJMP
-		THROWIF 99
-		;; drop locals
-		DROP
-		;; ++
-		INC
-		FALSE
-	}
-	UNTIL
-	; erase i
-	DROP
-	; for end
-	;; drop locals
-	DROP
-}
-PUSHCONT {
-	;; if
-	;; decode_algo
-	;; stack=5
-	PUSH s1
-	PUSHINT 2
-	;; ==
-	EQUAL
-	PUSHCONT {
-		;; slice
-		;; stack=5
-		PUSH s4
-		LDU 8
-		POP s6
-		;; decl: arrSize
-		; for statement
-		PUSHINT 0
-		;; decl: i
-		PUSHCONT {
-			;; i
-			;; stack=7
-			DUP
-			;; arrSize
-			;; stack=8
-			PUSH s2
-			;; <
-			LESS
-			NOT DUP IFRET DROP
-			;; m_isUntil = 1
-			;; slice
-			;; stack=7
-			PUSH s6
-			SBITS ; tvm_sbits
-			;; decl: restBits
-			;; if
-			;; restBits
-			;; stack=8
-			DUP
-			;; valueBits
-			;; stack=9
-			PUSH s7
-			;; >=
-			GEQ
-			PUSHCONT {
-				;; slice
-				;; stack=8
-				PUSH s7
-				;; valueBits
-				;; stack=9
-				PUSH s7
-				LDSLICEX
-				POP s9
-				;; decl: sliceValue
-				;; sliceValue
-				;; stack=9
-				DUP
-				;; i
-				;; stack=10
-				PUSH s3
-				;; array
-				;; stack=11
-				PUSH s8
-				PUSHINT 32
-				DICTUSET
-				POP s7
-				;; drop locals
-				DROP
-			}
-			PUSHCONT {
-				;; slice
-				;; stack=8
-				PUSH s7
-				;; restBits
-				;; stack=9
-				PUSH s1
-				;; valueBits
-				;; stack=10
-				PUSH s8
-				;; restBits
-				;; stack=11
-				PUSH s3
-				;; -
-				SUB
-				PUSHINT $load_slice_from_two_cell$
-				CALL 1
-				;; decl: value
-				;; decl: restSlice
-				;; value
-				;; stack=10
-				PUSH s1
-				;; i
-				;; stack=11
-				PUSH s4
-				;; array
-				;; stack=12
-				PUSH s9
-				PUSHINT 32
-				DICTUSET
-				POP s8
-				;; restSlice
-				;; stack=10
-				DUP
-				;; assign slice
-				POP s10
-				;; drop locals
-				BLKDROP 2
-			}
-			IFELSE
-			;; drop locals
-			DROP
-			;; ++
-			INC
-			FALSE
-		}
-		UNTIL
-		; erase i
-		DROP
-		; for end
-		;; drop locals
-		DROP
-	}
-	PUSHCONT {
-		FALSE
-		;; require
-		;; stack=6
-		THROWIFNOT 100
-	}
-	IFELSE
-}
-IFELSE
-;; array
-;; stack=5
-PUSH s2
-;; slice
-;; stack=6
-PUSH s5
-;; return
-BLKSWAP 5, 2
-BLKDROP 5
-RET
-
-.globl	abi_decode
-.type	abi_decode, @function
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: abi_decode
+;; Function: abi_encode_packed
+;; param: builder
 ;; param: array
-PUSHINT 8
-;; decl: bitSizeOfArrayElement
-;; tvm_newc
-;; stack=2
-NEWC
-;; decl: builderRet
+;; param: bitSizeOfArrayElement
 ;; array
 ;; stack=3
-PUSH s2
+PUSH s1
 PUSHINT 32
 DICTUMAX
 PUSHCONT { POP s1 INC }
@@ -933,13 +342,13 @@ PUSHCONT {
 	;; m_isUntil = 1
 	;; bitSizeOfArrayElement
 	;; stack=5
-	PUSH s3
+	PUSH s2
 	;; idx
 	;; stack=6
 	PUSH s1
 	;; array
 	;; stack=7
-	PUSH s6
+	PUSH s5
 	PUSHINT 32
 	DICTUGET
 	PUSHCONT { 
@@ -958,11 +367,11 @@ PUSHCONT {
 	;; data_slice
 	;; stack=6
 	DUP
-	;; builderRet
+	;; builder
 	;; stack=7
-	PUSH s4
+	PUSH s6
 	STSLICE
-	POP s4
+	POP s6
 	;; drop locals
 	DROP
 	;; ++
@@ -973,13 +382,9 @@ UNTIL
 ; erase idx
 DROP
 ; for end
-;; builderRet
+;; builder
 ;; stack=4
-PUSH s1
-;; tvm_endc
-;; stack=5
-ENDC
-CTOS
+PUSH s3
 ;; return
 XCHG s4
 BLKDROP 4
@@ -1067,8 +472,6 @@ SUB
 LDSLICEX
 POP s2
 ;; decl: sliceVal1
-;; tvm_newc
-;; stack=7
 NEWC
 ;; decl: numberBuilderOrSlice
 ;; sliceVal0
@@ -1090,8 +493,6 @@ NIP
 ;; numberBuilderOrSlice
 ;; stack=8
 DUP
-;; tvm_endc
-;; stack=9
 ENDC
 CTOS
 ;; assign numberBuilderOrSlice
@@ -1198,8 +599,6 @@ SUB
 LDSLICEX
 POP s2
 ;; decl: sliceVal1
-;; tvm_newc
-;; stack=7
 NEWC
 ;; decl: numberBuilderOrSlice
 ;; sliceVal0
@@ -1221,8 +620,6 @@ NIP
 ;; numberBuilderOrSlice
 ;; stack=8
 DUP
-;; tvm_endc
-;; stack=9
 ENDC
 CTOS
 ;; assign numberBuilderOrSlice
@@ -1255,9 +652,7 @@ RET
 ;; param: body_slice
 ;; param: dst_account
 ;; param: grams_value
-PRINTSTR startSendMsg
-;; tvm_newc
-;; stack=4
+PRINTSTR send_int_msg
 NEWC
 ;; decl: builder
 PUSHINT 2
@@ -1289,8 +684,6 @@ NIP
 ;; builder
 ;; stack=5
 DUP
-;; tvm_endc
-;; stack=6
 ENDC
 CTOS
 ;; assign builder
@@ -1345,8 +738,6 @@ BLKDROP 8
 ;; param: bounce
 ;; param: ihr_disabled
 PRINTSTR buildmsg
-;; tvm_newc
-;; stack=10
 NEWC
 ;; decl: builder
 PUSHINT 0
@@ -1496,8 +887,6 @@ PUSHCONT {
 	PUSH s3
 	STU 1
 	POP s3
-	;; tvm_newc
-	;; stack=13
 	NEWC
 	;; decl: builder2
 	;; body_slice
@@ -1511,8 +900,6 @@ PUSHCONT {
 	;; builder2
 	;; stack=14
 	DUP
-	;; tvm_endc
-	;; stack=15
 	ENDC
 	;; builder
 	;; stack=15
@@ -1526,8 +913,6 @@ IFELSE
 ;; builder
 ;; stack=13
 PUSH s2
-;; tvm_endc
-;; stack=14
 ENDC
 ;; return
 XCHG s13
@@ -1611,8 +996,6 @@ RET
 ;; param: dictionary
 ;; param: bits
 ;; param: dataSize
-;; tvm_newc
-;; stack=5
 NEWC
 ;; decl: builder
 ;; data
@@ -1629,8 +1012,6 @@ NIP
 ;; builder
 ;; stack=6
 DUP
-;; tvm_endc
-;; stack=7
 ENDC
 CTOS
 ;; assign builder
@@ -1726,8 +1107,6 @@ CALL 1
 PUSHINT $get_contract_balance$
 CALL 1
 ;; decl: nanograms
-;; tvm_newc
-;; stack=7
 NEWC
 ;; decl: balance
 ;; nanograms
@@ -1741,8 +1120,6 @@ NIP
 ;; balance
 ;; stack=8
 DUP
-;; tvm_endc
-;; stack=9
 ENDC
 CTOS
 ;; assign balance
@@ -1786,8 +1163,6 @@ PUSHINT $put_in_dictionary_as_slice$
 CALL 1
 ;; assign dict
 POP s5
-;; tvm_newc
-;; stack=9
 NEWC
 ;; decl: builder
 ;; dict
@@ -1802,8 +1177,6 @@ NIP
 ;; builder
 ;; stack=10
 DUP
-;; tvm_endc
-;; stack=11
 ENDC
 ;; assign builder
 NIP
@@ -1832,8 +1205,6 @@ BLKDROP 11
 ;; param: logical_time
 ;; param: src_address
 PRINTSTR build_ext_msg
-;; tvm_newc
-;; stack=3
 NEWC
 ;; decl: builder
 PUSHINT 3
@@ -1921,8 +1292,6 @@ PUSHCONT {
 	PUSH s3
 	STU 1
 	POP s3
-	;; tvm_newc
-	;; stack=6
 	NEWC
 	;; decl: builder2
 	;; body
@@ -1936,8 +1305,6 @@ PUSHCONT {
 	;; builder2
 	;; stack=7
 	DUP
-	;; tvm_endc
-	;; stack=8
 	ENDC
 	;; builder
 	;; stack=8
@@ -1951,8 +1318,6 @@ IFELSE
 ;; builder
 ;; stack=6
 PUSH s2
-;; tvm_endc
-;; stack=7
 ENDC
 ;; return
 XCHG s6
@@ -2198,10 +1563,10 @@ FIRST
 ;; return
 RET
 
-.globl	get_src_addr
-.type	get_src_addr, @function
+.globl	get_src_addr_and_bounce
+.type	get_src_addr_and_bounce, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: get_src_addr
+;; Function: get_src_addr_and_bounce
 ;; param: msg_cell
 PRINTSTR get_src_addr
 ;; msg_cell
@@ -2224,8 +1589,10 @@ PUSHINT 0
 NEQ
 PUSHCONT {
 	PUSHINT 0
+	PUSHINT 0
+	PUSHINT 0
 	;; return
-	XCHG s3
+	BLKSWAP 3, 3
 	BLKDROP 3
 	RET
 }
@@ -2233,19 +1600,41 @@ IFJMP
 ;; msg_slice
 ;; stack=3
 PUSH s1
-PUSHINT 3
+PUSHINT 1
 SDSKIPFIRST
 ;; assign msg_slice
 POP s2
 ;; msg_slice
 ;; stack=3
 PUSH s1
+LDU 1
+POP s3
+;; decl: bounce
+;; msg_slice
+;; stack=4
+PUSH s2
+LDU 1
+POP s4
+;; decl: bounced
+;; msg_slice
+;; stack=5
+PUSH s3
 PUSHINT 11
 PUSHINT $get_address_from_slice$
 CALL 1
+;; decl: addr
+;; bounce
+;; stack=6
+PUSH s2
+;; bounced
+;; stack=7
+PUSH s2
+;; addr
+;; stack=8
+PUSH s2
 ;; return
-XCHG s3
-BLKDROP 3
+BLKSWAP 6, 3
+BLKDROP 6
 RET
 
 .globl	get_msg_pubkey
@@ -2333,5 +1722,231 @@ DUP
 ;; return
 POP s1
 POP s1
+RET
+
+.globl	main_internal_body
+.type	main_internal_body, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: main_internal_body
+;; param: contract_balance
+;; param: msg_balance
+;; param: msg_cell
+;; param: msg_body_slice
+PRINTSTR main_internal
+;; msg_cell
+;; stack=4
+PUSH s1
+PUSHINT $get_src_addr_and_bounce$
+CALL 1
+;; decl: bounce
+;; decl: bounced
+;; decl: src_addr
+;; contract_balance
+;; stack=7
+PUSH s6
+;; msg_balance
+;; stack=8
+PUSH s6
+;; src_addr
+;; stack=9
+PUSH s2
+PUSHINT 0
+PUSHINT $store_signature$
+CALL 1
+;; if
+;; msg_body_slice
+;; stack=7
+PUSH s3
+SEMPTY
+PUSHCONT {
+	;; if
+	;; bounced
+	;; stack=7
+	PUSH s1
+	PUSHINT 0
+	;; ==
+	EQUAL
+	PUSHCONT {
+		PUSHINT $fallback$
+		;; decl: id_fun
+		PUSHINT 0
+		;; id_fun
+		;; stack=9
+		PUSH s1
+		PUSHINT 0
+		;; return
+		BLKSWAP 8, 3
+		BLKDROP 8
+		RET
+	}
+	IFJMP
+	PUSHINT 0
+	PUSHINT 0
+	PUSHINT 1
+	;; return
+	BLKSWAP 7, 3
+	BLKDROP 7
+	RET
+}
+IFJMP
+;; msg_body_slice
+;; stack=7
+PUSH s3
+PUSHINT $parse_abi_and_load_func_id$
+CALL 1
+;; decl: rest_body_slice
+;; decl: func_id
+;; rest_body_slice
+;; stack=9
+PUSH s1
+;; func_id
+;; stack=10
+PUSH s1
+PUSHINT 0
+;; return
+BLKSWAP 9, 3
+BLKDROP 9
+RET
+
+.globl	main_external_body
+.type	main_external_body, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: main_external_body
+;; param: contract_balance
+;; param: msg_balance
+;; param: msg_cell
+;; param: msg_body_slice
+PRINTSTR main_external
+;; msg_cell
+;; stack=4
+PUSH s1
+PUSHINT $get_src_addr_and_bounce$
+CALL 1
+;; decl: bounce
+;; decl: bounced
+;; decl: src_addr
+;; msg_body_slice
+;; stack=7
+PUSH s3
+PUSHINT $get_msg_pubkey$
+CALL 1
+;; decl: pubKey
+;; if
+;; !
+;; msg_body_slice
+;; stack=8
+PUSH s4
+SREMPTY
+NOT
+PUSHCONT {
+	;; msg_body_slice
+	;; stack=8
+	PUSH s4
+	LDREF
+	NIP
+	;; assign msg_body_slice
+	POP s5
+}
+IF
+;; contract_balance
+;; stack=8
+PUSH s7
+;; msg_balance
+;; stack=9
+PUSH s7
+;; src_addr
+;; stack=10
+PUSH s3
+;; pubKey
+;; stack=11
+PUSH s3
+PUSHINT $store_signature$
+CALL 1
+;; if
+;; msg_body_slice
+;; stack=8
+PUSH s4
+SDEMPTY
+PUSHCONT {
+	PRINTSTR msg_is_empty
+	NEWDICT
+	;; decl: dict
+	NEWC
+	;; decl: builder
+	;; dict
+	;; stack=10
+	PUSH s1
+	;; builder
+	;; stack=11
+	PUSH s1
+	STDICT
+	ENDC
+	;; assign builder
+	NIP
+	;; builder
+	;; stack=10
+	DUP
+	POPCTR c4
+	PUSHINT 0
+	PUSHINT 0
+	PUSHINT 1
+	;; return
+	BLKSWAP 10, 3
+	BLKDROP 10
+	RET
+}
+IFJMP
+;; msg_body_slice
+;; stack=8
+PUSH s4
+PUSHINT $parse_abi_and_load_func_id$
+CALL 1
+;; decl: rest_body_slice
+;; decl: func_id
+;; rest_body_slice
+;; stack=10
+PUSH s1
+;; func_id
+;; stack=11
+PUSH s1
+PUSHINT 0
+;; return
+BLKSWAP 10, 3
+BLKDROP 10
+RET
+
+.globl	parse_abi_and_load_func_id
+.type	parse_abi_and_load_func_id, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: parse_abi_and_load_func_id
+;; param: msg_body_slice
+;; msg_body_slice
+;; stack=1
+DUP
+LDU 8
+POP s2
+;; decl: abi_version
+;; abi_version
+;; stack=2
+DUP
+PUSHINT 0
+;; ==
+EQUAL
+THROWIFNOT 55
+;; msg_body_slice
+;; stack=2
+PUSH s1
+LDU 32
+POP s3
+;; decl: func_id
+;; msg_body_slice
+;; stack=3
+PUSH s2
+;; func_id
+;; stack=4
+PUSH s1
+;; return
+BLKSWAP 3, 2
+BLKDROP 3
 RET
 

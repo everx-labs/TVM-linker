@@ -20,8 +20,10 @@ PUSHINT 0
 STUR 8
 PUSHINT $main$
 STUR 32
-PUSH s1
+NEWC
+PUSH s2
 STUR 64
+STBREFR
 ENDC CTOS
 PUSHINT $send_ext_msg$
 CALL 1
@@ -33,5 +35,10 @@ RET
 ;; Function: main_internal
 BLOCKLT
 ;; return
+RET
+
+.globl	fallback
+.type	fallback, @function
+DROP
 RET
 

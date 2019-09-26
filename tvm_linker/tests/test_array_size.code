@@ -1,20 +1,46 @@
+.globl	constructor_Test28
+.type	constructor_Test28, @function
+RET
 
-.globl	main_external
-.type	main_external, @function
-LDU 16
-LDU 16
+.globl	constructor
+.type	constructor, @function
 DROP
-PUSHINT $main$
-CALL 1
+NEWDICT
+NEWC STDICT ENDC
+POPROOT
 
 .globl	main
 .type	main, @function
+PUSHINT 16
+PUSHINT $smart_ldu$
+CALL 1
+PUSHINT 16
+PUSHINT $smart_ldu$
+CALL 1
+DROP
+PUSHINT $main_internal$
+CALL 1
+;; emitting 1 value(s)
+NEWC
+PUSHINT 0
+STUR 8
+PUSHINT $main$
+STUR 32
+NEWC
+PUSH s2
+STUR 256
+STBREFR
+ENDC CTOS
+PUSHINT $send_ext_msg$
+CALL 1
+RET
+
+.globl	main_internal
+.type	main_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: main
+;; Function: main_internal
 ;; param: starting_len
 ;; param: new_len
-;; tvm_init_storage
-;; stack=2
 NEWDICT
 NEWC STDICT ENDC
 POPROOT
@@ -34,7 +60,7 @@ PUSHCONT {
 	;; m_isUntil = 1
 	;; fetch arr
 	PUSHINT 0
-	PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+	PUSHROOT CTOS PLDDICT
 	PUSHINT 256
 	DICTUGETOPTREF
 	;; i
@@ -53,9 +79,9 @@ PUSHCONT {
 	DICTUSET
 	;; assign arr
 	PUSHINT 0
-	PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+	PUSHROOT CTOS PLDDICT
 	PUSHINT 256
-	DICTUSETREF
+	DICTUSETGETOPTREF DROP
 	NEWC STDICT ENDC
 	POPROOT
 	;; ++
@@ -70,7 +96,7 @@ DROP
 ;; arr
 ;; stack=2
 PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUGETOPTREF
 PUSHINT 32
@@ -83,17 +109,15 @@ IFELSE
 PUSH s2
 ;; ==
 EQUAL
-;; require
-;; stack=3
 THROWIFNOT 100
+;; fetch arr
 PUSHINT 0
-NEWC STU 256 ENDC CTOS
-;; arr
-;; stack=3
-PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUGETOPTREF
+PUSHINT 0
+NEWC STU 256 ENDC CTOS
+SWAP
 ;; new_len
 ;; stack=4
 PUSH s2
@@ -101,16 +125,16 @@ PUSHINT $change_array_length$
 CALL 1
 ;; assign arr
 PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
-DICTUSETREF
+DICTUSETGETOPTREF DROP
 NEWC STDICT ENDC
 POPROOT
 ;; get member length
 ;; arr
 ;; stack=2
 PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUGETOPTREF
 PUSHINT 32
@@ -123,8 +147,6 @@ IFELSE
 PUSH s1
 ;; ==
 EQUAL
-;; require
-;; stack=3
 THROWIFNOT 100
 ;; if
 ;; new_len
@@ -152,17 +174,16 @@ PUSHCONT {
 		LESS
 		NOT DUP IFRET DROP
 		;; m_isUntil = 1
-		;; arr
+		;; i
 		;; stack=3
+		DUP
+		;; arr
+		;; stack=4
 		PUSHINT 0
-		PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+		PUSHROOT CTOS PLDDICT
 		PUSHINT 256
 		DICTUGETOPTREF
-		;; i
-		;; stack=4
-		PUSH s1
 		;; index
-		SWAP
 		PUSHINT 32
 		DICTUGET
 		PUSHCONT { LDU 256 ENDS }
@@ -171,8 +192,6 @@ PUSHCONT {
 		PUSHINT 0
 		;; ==
 		EQUAL
-		;; require
-		;; stack=4
 		THROWIFNOT 100
 		;; ++
 		INC
@@ -188,7 +207,7 @@ IF
 ;; arr
 ;; stack=2
 PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
+PUSHROOT CTOS PLDDICT
 PUSHINT 256
 DICTUGETOPTREF
 PUSHINT 32
@@ -200,3 +219,9 @@ IFELSE
 POP s1
 POP s1
 RET
+
+.globl	fallback
+.type	fallback, @function
+DROP
+RET
+
