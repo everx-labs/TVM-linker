@@ -185,7 +185,7 @@ impl ParseEngine {
         ok!()
     }
 
-    pub fn data(&self) -> Arc<CellData> {
+    pub fn data(&self) -> Option<Arc<CellData>> {
         self.build_data()
     }
 
@@ -530,7 +530,7 @@ impl ParseEngine {
         ok!()
     }
 
-    fn build_data(&self) -> Arc<CellData> {
+    fn build_data(&self) -> Option<Arc<CellData>> {
         let filter = |is_persistent: bool| self.globals.iter().filter_map(move |item| {
             match &item.1.dtype {
                 ObjectType::Data { addr, values, persistent } => 
@@ -569,9 +569,7 @@ impl ParseEngine {
             &globl_cell.into()
         ).unwrap();
 
-        pers_dict.data()
-            .map(|cell_ptr| cell_ptr.clone())
-            .unwrap_or(Arc::new(CellData::new()))
+        pers_dict.data().map(|cell| cell.clone())
     }
 
     fn replace_labels(&mut self, line: &str) -> Result<String, String> {
@@ -625,6 +623,8 @@ mod tests {
         let mut parser = ParseEngine::new();
         let source = File::open("./tests/test.tvm").unwrap();
         assert_eq!(parser.parse(source, vec![], None), ok!());  
+        let mut data_dict = BuilderData::new();
+        data_dict.append_bit_one().unwrap().checked_append_reference(&parser.data().unwrap()).unwrap();
         tvm::logger::init();
         test_case(&format!("
         ;s0 - persistent data dictionary
@@ -705,7 +705,7 @@ mod tests {
         ))
         .with_stack(
             Stack::new()
-                .push(StackItem::Slice(parser.data().into()))
+                .push(StackItem::Slice(data_dict.into()))
                 .clone()
         )
         .expect_stack(

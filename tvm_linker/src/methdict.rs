@@ -14,8 +14,12 @@ where
         dict.set(pair.0.write_to_new_cell().unwrap().into(), &pair.1).unwrap();
     }
     let mut map_cell = BuilderData::new();
-    map_cell.append_bit_one().unwrap();
-    map_cell.checked_append_reference(dict.data().unwrap()).unwrap();
+    if let Some(cell) = dict.data() {
+        map_cell.append_bit_one().unwrap();
+        map_cell.checked_append_reference(cell).unwrap();
+    } else {
+        map_cell.append_bit_zero().unwrap();
+    }
     map_cell.into()
 }
 

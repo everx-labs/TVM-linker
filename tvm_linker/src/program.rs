@@ -1,7 +1,6 @@
 use ed25519_dalek::{Keypair, PUBLIC_KEY_LENGTH};
 use std::io::Cursor;
 use std::io::Write;
-use std::sync::Arc;
 use methdict::*;
 use tvm::block::*;
 use tvm::assembler::compile_code;
@@ -28,7 +27,7 @@ impl Program {
         self.keypair = Some(pair);        
     }
 
-    pub fn data(&self) -> Result<Arc<CellData>, String> {
+    pub fn data(&self) -> Result<SliceData, String> {
         let bytes = 
             if let Some(ref pair) = self.keypair {
                 pair.public.to_bytes()
@@ -36,14 +35,18 @@ impl Program {
                 [0u8; PUBLIC_KEY_LENGTH]
             };
             
-        let mut data_dict = HashmapE::with_data(64, self.engine.data().into());
+        let mut data_dict = HashmapE::with_hashmap(64, self.engine.data().as_ref());
         data_dict.set(
             ptr_to_builder(self.engine.persistent_base)?.into(),
             &BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8)
                 .map_err(|e| format!("failed to pack pubkey to data dictionary: {}", e))?
                 .into(),
         ).unwrap();
-        Ok(data_dict.data().unwrap().clone())
+        let mut data_cell = BuilderData::new();
+        data_cell
+            .append_bit_one().unwrap()
+            .checked_append_reference(data_dict.data().unwrap()).unwrap();
+        Ok(data_cell.into())
     }
 
     #[allow(dead_code)]
@@ -75,7 +78,7 @@ impl Program {
     pub fn compile_to_state(&self) -> Result<StateInit, String> {
         let mut state = StateInit::default();
         state.set_code(self.compile_asm()?.cell().clone());
-        state.set_data(self.data()?.into());
+        state.set_data(self.data()?.cell().clone());
         Ok(state)
     }
 
