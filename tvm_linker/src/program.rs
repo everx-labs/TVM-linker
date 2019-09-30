@@ -36,14 +36,14 @@ impl Program {
                 [0u8; PUBLIC_KEY_LENGTH]
             };
             
-        let mut data_dict = HashmapE::with_data(64, self.engine.data());
+        let mut data_dict = HashmapE::with_data(64, self.engine.data().into());
         data_dict.set(
             ptr_to_builder(self.engine.persistent_base)?.into(),
             &BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8)
                 .map_err(|e| format!("failed to pack pubkey to data dictionary: {}", e))?
                 .into(),
         ).unwrap();
-        Ok(data_dict.get_data().into_cell())
+        Ok(data_dict.data().unwrap().clone())
     }
 
     #[allow(dead_code)]
@@ -61,7 +61,11 @@ impl Program {
             })?;
         let key = 1i32.write_to_new_cell().unwrap();
         method_dict.set(key.into(), &methods).unwrap();
-        Ok(method_dict.get_data())
+        let mut dict_cell = BuilderData::new();
+        //convert Hashmap to HashmapE
+        dict_cell.append_bit_one().unwrap();
+        dict_cell.checked_append_reference(method_dict.data().unwrap()).unwrap();
+        Ok(dict_cell.into())
     }
    
     pub fn compile_to_file(&self) -> Result<String, String> {
