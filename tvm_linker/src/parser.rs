@@ -4,10 +4,11 @@ use regex::Regex;
 use resolver::resolve_name;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
-use tvm::stack::{BuilderData, IBitstring, IntegerData, SliceData};
+use tvm::stack::{BuilderData, IBitstring, IntegerData, SliceData, CellData};
 use tvm::stack::integer::serialization::{Encoding, SignedIntegerBigEndianEncoding};
 use tvm::stack::serialization::Serializer;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
+use std::sync::Arc;
 pub type Ptr = i64;
 
 pub fn ptr_to_builder(n: Ptr) -> Result<BuilderData, String> {
@@ -184,7 +185,7 @@ impl ParseEngine {
         ok!()
     }
 
-    pub fn data(&self) -> SliceData {
+    pub fn data(&self) -> Option<Arc<CellData>> {
         self.build_data()
     }
 
@@ -529,7 +530,7 @@ impl ParseEngine {
         ok!()
     }
 
-    fn build_data(&self) -> SliceData {
+    fn build_data(&self) -> Option<Arc<CellData>> {
         let filter = |is_persistent: bool| self.globals.iter().filter_map(move |item| {
             match &item.1.dtype {
                 ObjectType::Data { addr, values, persistent } => 
@@ -554,13 +555,21 @@ impl ParseEngine {
         
         let globl_dict = build_dict(&globl_data_vec);
         let mut pers_dict = build_dict(&pers_data_vec);
-
+        let mut globl_cell = BuilderData::new();
+        if let Some(cell) = globl_dict.data() {                
+            globl_cell.append_bit_one()
+                .unwrap()
+                .checked_append_reference(cell)
+                .unwrap();
+        } else {                                        
+            globl_cell.append_bit_zero().unwrap(); 
+        }
         pers_dict.set(
             ptr_to_builder(self.persistent_base + OFFSET_GLOBL_DATA).unwrap().into(), 
-            &globl_dict.get_data(),
+            &globl_cell.into()
         ).unwrap();
 
-        pers_dict.get_data()
+        pers_dict.data().map(|cell| cell.clone())
     }
 
     fn replace_labels(&mut self, line: &str) -> Result<String, String> {
@@ -614,6 +623,8 @@ mod tests {
         let mut parser = ParseEngine::new();
         let source = File::open("./tests/test.tvm").unwrap();
         assert_eq!(parser.parse(source, vec![], None), ok!());  
+        let mut data_dict = BuilderData::new();
+        data_dict.append_bit_one().unwrap().checked_append_reference(&parser.data().unwrap()).unwrap();
         tvm::logger::init();
         test_case(&format!("
         ;s0 - persistent data dictionary
@@ -694,7 +705,7 @@ mod tests {
         ))
         .with_stack(
             Stack::new()
-                .push(StackItem::Slice(parser.data().into()))
+                .push(StackItem::Slice(data_dict.into()))
                 .clone()
         )
         .expect_stack(
