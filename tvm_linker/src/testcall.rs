@@ -176,7 +176,7 @@ pub fn perform_contract_call(
             StackItem::Cell(root_cell) => state_init.data = Some(root_cell),
             _ => panic!("cannot get root data: c4 register is not a cell."),
         };
-        save_to_file(state_init, Some(contract_file)).expect("error");
+        save_to_file(state_init, Some(contract_file), 0).expect("error");
         println!("Contract persistent data updated");
     }
     

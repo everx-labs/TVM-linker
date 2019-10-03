@@ -5,6 +5,7 @@ version = "0.1.0"
 authors = ["tonlabs"]
 
 [dependencies]
+base64 = "0.10.1"
 byteorder = "1.2.7"
 regex = "1"
 clap = "2.32"
@@ -16,6 +17,7 @@ simplelog = "0.5.3"
 rand = "0.6.5"
 sha2 = "0.8.0"
 serde_json = "1.0.40"
+crc16 = "*"
 
 abi_json = { git = "ssh://git@github.com/tonlabs/TON-SDK.git", branch = "master", package = "ton_abi_json" }
 tvm = { git = "ssh://git@github.com/tonlabs/sdk-emulator.git", branch = "feature-dev", package = "tvm" }
