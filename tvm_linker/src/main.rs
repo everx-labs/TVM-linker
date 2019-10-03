@@ -1,6 +1,8 @@
 extern crate abi_json;
+extern crate base64;
 #[macro_use]
 extern crate clap;
+extern crate crc16;
 extern crate ed25519_dalek;
 #[macro_use]
 extern crate lazy_static;
@@ -72,6 +74,7 @@ fn linker_main() -> Result<(), String> {
             (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file")
             (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
             (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
+            (@arg WC: -w +takes_value "Workchain id used to print contract address, -1 by default.")
         )
         (@subcommand test =>
             (about: "execute contract in test environment")
@@ -258,8 +261,12 @@ fn linker_main() -> Result<(), String> {
         if compile_matches.is_present("DEBUG") {
            prog.debug_print();        
         }
+
+        let wc = compile_matches.value_of("WC")
+            .map(|wc| i8::from_str_radix(wc, 10).unwrap_or(-1))
+            .unwrap_or(-1);
          
-        prog.compile_to_file()?;
+        prog.compile_to_file(wc)?;
         return ok!();
     }
 

@@ -1,3 +1,5 @@
+use base64::encode;
+use crc16::*;
 use ed25519_dalek::{Keypair, PUBLIC_KEY_LENGTH};
 use std::io::Cursor;
 use std::io::Write;
@@ -71,8 +73,8 @@ impl Program {
         Ok(dict_cell.into())
     }
    
-    pub fn compile_to_file(&self) -> Result<String, String> {
-        save_to_file(self.compile_to_state()?, None)
+    pub fn compile_to_file(&self, wc: i8) -> Result<String, String> {
+        save_to_file(self.compile_to_state()?, None, wc)
     }
 
     pub fn compile_to_state(&self) -> Result<StateInit, String> {
@@ -109,7 +111,7 @@ impl Program {
     }
 }
 
-pub fn save_to_file(state: StateInit, name: Option<&str>) -> Result<String, String> {
+pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8) -> Result<String, String> {
     let root_cell = state.write_to_new_cell()
         .map_err(|e| format!("Serialization failed: {}", e))?
         .into();
@@ -118,19 +120,36 @@ pub fn save_to_file(state: StateInit, name: Option<&str>) -> Result<String, Stri
         .map_err(|e| format!("BOC failed: {}", e))?;
 
     let mut print_filename = false;
+    let address = state.hash().unwrap();
     let file_name = if name.is_some() {
         format!("{}.tvc", name.unwrap())
     } else {
         print_filename = true;
-        format!("{:x}.tvc", state.hash().unwrap())
+        format!("{:x}.tvc", address)
     };
 
     let mut file = std::fs::File::create(&file_name).unwrap();
     file.write_all(&buffer).map_err(|e| format!("Write to file failed: {}", e))?;
     if print_filename {
         println! ("Saved contract to file {}", &file_name);
+        println!("testnet:");
+        println!("Non-bounceable address (for init): {}", &calc_userfriendly_address(wc, address.as_slice(), false, true));
+        println!("Bounceable address (for later access): {}", &calc_userfriendly_address(wc, address.as_slice(), true, true));
+        println!("mainnet:");
+        println!("Non-bounceable address (for init): {}", &calc_userfriendly_address(wc, address.as_slice(), false, false));
+        println!("Bounceable address (for later access): {}", &calc_userfriendly_address(wc, address.as_slice(), true, false));
     }
     Ok(file_name)
+}
+
+fn calc_userfriendly_address(wc: i8, addr: &[u8], bounce: bool, testnet: bool) -> String {
+    let mut bytes: Vec<u8> = vec![];
+    bytes.push(if bounce { 0x11 } else { 0x51 } + if testnet { 0x80 } else { 0 });
+    bytes.push(wc as u8);
+    bytes.extend_from_slice(addr);
+    let crc = State::<XMODEM>::calculate(&bytes);
+    bytes.extend_from_slice(&crc.to_be_bytes());
+    encode(&bytes)
 }
 
 pub fn load_from_file(contract_file: &str) -> StateInit {
@@ -170,7 +189,7 @@ mod tests {
             let buf_bits = buf.len() * 8;
             Some(BuilderData::with_raw(buf, buf_bits).unwrap().into())
         };
-        let contract_file = prog.compile_to_file().unwrap();
+        let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
 
         assert_eq!(perform_contract_call(name, body, Some(None), false, false, None), 0);
@@ -188,7 +207,7 @@ mod tests {
             let buf_bits = buf.len() * 8;
             Some(BuilderData::with_raw(buf, buf_bits).unwrap().into())
         };
-        let contract_file = prog.compile_to_file().unwrap();
+        let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
         assert_eq!(perform_contract_call(name, body, Some(None), false, false, None), 0);
     }
@@ -205,7 +224,7 @@ mod tests {
             let buf_bits = buf.len() * 8;
             Some(BuilderData::with_raw(buf, buf_bits).unwrap().into())
         };
-        let contract_file = prog.compile_to_file().unwrap();
+        let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
         assert_eq!(perform_contract_call(name, body, Some(None), false, false, None), 0);
     }
@@ -224,9 +243,16 @@ mod tests {
             let buf_bits = buf.len() * 8;
             Some(BuilderData::with_raw(buf, buf_bits).unwrap().into())
         };
-        let contract_file = prog.compile_to_file().unwrap();
+        let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
         
         assert_eq!(perform_contract_call(name, body, Some(Some("key1")), true, false, None), 0);
+    }
+
+    #[test]
+    fn test_bouncable_address() {
+        let addr = hex::decode("fcb91a3a3816d0f7b8c2c76108b8a9bc5a6b7a55bd79f8ab101c52db29232260").unwrap();
+        let addr = calc_userfriendly_address(-1, &addr, true, true);
+        assert_eq!(addr, "kf/8uRo6OBbQ97jCx2EIuKm8Wmt6Vb15+KsQHFLbKSMiYIny");
     }
 }
