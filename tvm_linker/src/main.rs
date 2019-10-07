@@ -38,12 +38,14 @@ use testcall::perform_contract_call;
 use tvm::stack::{BuilderData, SliceData};
 
 fn main() {
-    println!("TVM linker {}\nCOMMIT_ID: {}\nBUILD_DATE: {}\nCOMMIT_DATE: {}\nGIT_BRANCH: {}",
-            env!("CARGO_PKG_VERSION"),
-            env!("BUILD_GIT_COMMIT"),
-            env!("BUILD_TIME") ,
-            env!("BUILD_GIT_DATE"),
-            env!("BUILD_GIT_BRANCH"));
+    println!(
+        "TVM linker {}\nCOMMIT_ID: {}\nBUILD_DATE: {}\nCOMMIT_DATE: {}\nGIT_BRANCH: {}",
+        env!("CARGO_PKG_VERSION"),
+        env!("BUILD_GIT_COMMIT"),
+        env!("BUILD_TIME") ,
+        env!("BUILD_GIT_DATE"),
+        env!("BUILD_GIT_BRANCH")
+    );
     if let Err(err_str) = linker_main() {
         println!("error: {}", err_str);
     }
@@ -86,6 +88,7 @@ fn linker_main() -> Result<(), String> {
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
             (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
             (@arg INTERNAL: --internal +takes_value "Emulates inbound internal message with value instead of external message")
+            (@arg TICKTOCK: --ticktock +takes_value conflicts_with[BODY] "Emulates ticktock transaction in masterchain, 1 for tick and 0 for tock")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[BODY] "Supplies the name of the calling contract method")
@@ -107,6 +110,7 @@ fn linker_main() -> Result<(), String> {
         (@setting SubcommandRequired)
     ).get_matches();
 
+    //helper closure for building ABI body
     let build_body = |matches: &ArgMatches| {
         let mut mask = 0u8;
         let abi_file = matches.value_of("ABI_JSON").map(|m| {mask |= 1; m });
@@ -139,6 +143,7 @@ fn linker_main() -> Result<(), String> {
         }
     };
 
+    //SUBCOMMAND TEST
     if let Some(test_matches) = matches.subcommand_matches("test") {
         let (body, sign) = match test_matches.value_of("BODY") {
             Some(hex_str) => {
@@ -146,16 +151,19 @@ fn linker_main() -> Result<(), String> {
                 let mut parser = ParseEngine::new();
 
                 if let Some(source) = test_matches.value_of("SOURCE") {
-                    let file = File::open(source).map_err(|e| format!("cannot opening source file: {}", e))?;
+                    let file = File::open(source)
+                        .map_err(|e| format!("cannot opening source file: {}", e))?;
                     let mut reader = BufReader::new(file);
                     parser.parse_code(&mut reader, true)?;
                 }
 
                 hex_str = resolve_name(&hex_str, |name| {
                     parser.global_by_name(name).map(|id| id.0)
-                }).map_err(|e| format!("failed to resolve body {}: {}", hex_str, e))?;
+                })
+                .map_err(|e| format!("failed to resolve body {}: {}", hex_str, e))?;
 
-                let buf = hex::decode(&hex_str).map_err(|_| format!("body {} is invalid hex string", hex_str))?;
+                let buf = hex::decode(&hex_str)
+                    .map_err(|_| format!("body {} is invalid hex string", hex_str))?;
                 let buf_bits = buf.len() * 8;
                 let body: SliceData = BuilderData::with_raw(buf, buf_bits)
                     .map_err(|e| format!("failed to pack body in cell: {}", e))?
@@ -164,6 +172,16 @@ fn linker_main() -> Result<(), String> {
             },
             None => (build_body(test_matches)?, None),
         };
+
+        let ticktock = test_matches.value_of("TICKTOCK");
+        if ticktock.is_some() {
+            //check for correct value of ticktock argument
+            let error_msg = "invalid ticktock value: enter 0 for tick and -1 for tock.".to_string();
+            let val = i8::from_str_radix(ticktock.unwrap(), 10).map_err(|_| error_msg.clone())?;
+            if val != 0 && val != -1 {
+                Err(error_msg)?;
+            }
+        }
         
         println!("TEST STARTED\nbody = {:?}", body);
         perform_contract_call(
@@ -173,16 +191,19 @@ fn linker_main() -> Result<(), String> {
             test_matches.is_present("TRACE"), 
             test_matches.is_present("DECODEC6"),
             test_matches.value_of("INTERNAL"),
+            test_matches.value_of("TICKTOCK"),
         );
         println!("TEST COMPLETED");
         return ok!();
     }
 
+    //SUBCOMMAND DECODE
     if let Some(decode_matches) = matches.subcommand_matches("decode") {
         decode_boc(decode_matches.value_of("INPUT").unwrap());
         return ok!();
     }
 
+    //SUBCOMMAND MESSAGE
     if let Some(msg_matches) = matches.subcommand_matches("message") {
         let mut suffix = String::new();
         suffix += "-msg";
@@ -217,6 +238,7 @@ fn linker_main() -> Result<(), String> {
         )
     }
     
+    //SUBCOMMAND COMPILE
     if let Some(compile_matches) = matches.subcommand_matches("compile") {
         let mut parser = ParseEngine::new();
         let abi_json = 
