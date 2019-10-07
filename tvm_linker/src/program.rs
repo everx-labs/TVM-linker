@@ -3,6 +3,7 @@ use crc16::*;
 use ed25519_dalek::{Keypair, PUBLIC_KEY_LENGTH};
 use std::io::Cursor;
 use std::io::Write;
+use std::sync::Arc;
 use methdict::*;
 use tvm::block::*;
 use tvm::assembler::compile_code;
@@ -57,19 +58,31 @@ impl Program {
     }
 
     pub fn method_dict(&self) -> Result<SliceData, String> {
-        let mut method_dict = HashmapE::with_data(32, self.build_toplevel_dict()?);
+        let mut method_dict = HashmapE::with_hashmap(32, self.build_toplevel_dict()?.as_ref());
         let methods = prepare_methods(&self.engine.globals())
             .map_err(|e| {
                 let name = self.engine.global_name(e.0).unwrap();
                 let code = self.engine.global_by_name(&name).unwrap().1;
                 format_compilation_error_string(e.1, &name, &code)
             })?;
-        let key = 1i32.write_to_new_cell().unwrap();
-        method_dict.set(key.into(), &methods).unwrap();
-        let mut dict_cell = BuilderData::new();
+
+        if methods.is_some() {
+            method_dict.setref(
+                1i32.write_to_new_cell().unwrap().into(), 
+                &methods.unwrap()
+            )
+            .map_err(|e| format!("cannot setref to top level dictionary: {}", e))?;
+        }
+        
         //convert Hashmap to HashmapE
-        dict_cell.append_bit_one().unwrap();
-        dict_cell.checked_append_reference(method_dict.data().unwrap()).unwrap();
+        let mut dict_cell = BuilderData::new();
+        match method_dict.data() {
+            Some(cell) => {
+                dict_cell.append_bit_one().unwrap();
+                dict_cell.checked_append_reference(cell).unwrap()
+            },
+            None => dict_cell.append_bit_zero().unwrap(),
+        };
         Ok(dict_cell.into())
     }
    
@@ -91,7 +104,7 @@ impl Program {
         Ok(bytecode)
     }
 
-    fn build_toplevel_dict(&self) -> Result<SliceData, String> {
+    fn build_toplevel_dict(&self) -> Result<Option<Arc<CellData>>, String> {
         let dict = prepare_methods(self.engine.internals())
             .map_err(|e| {
                 let name = self.engine.internal_name(e.0).unwrap();
