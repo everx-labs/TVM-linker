@@ -205,7 +205,7 @@ mod tests {
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
 
-        assert_eq!(perform_contract_call(name, body, Some(None), false, false, None), 0);
+        assert_eq!(perform_contract_call(name, body, Some(None), false, false, None, None), 0);
     }
 
     #[test]
@@ -222,7 +222,7 @@ mod tests {
         };
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
-        assert_eq!(perform_contract_call(name, body, Some(None), false, false, None), 0);
+        assert_eq!(perform_contract_call(name, body, Some(None), false, false, None, None), 0);
     }
 
     #[test]    
@@ -239,7 +239,7 @@ mod tests {
         };
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
-        assert_eq!(perform_contract_call(name, body, Some(None), false, false, None), 0);
+        assert_eq!(perform_contract_call(name, body, Some(None), false, false, None, None), 0);
     }
 
     #[test]
@@ -259,7 +259,7 @@ mod tests {
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
         
-        assert_eq!(perform_contract_call(name, body, Some(Some("key1")), true, false, None), 0);
+        assert_eq!(perform_contract_call(name, body, Some(Some("key1")), true, false, None, None), 0);
     }
 
     #[test]
@@ -267,5 +267,18 @@ mod tests {
         let addr = hex::decode("fcb91a3a3816d0f7b8c2c76108b8a9bc5a6b7a55bd79f8ab101c52db29232260").unwrap();
         let addr = calc_userfriendly_address(-1, &addr, true, true);
         assert_eq!(addr, "kf/8uRo6OBbQ97jCx2EIuKm8Wmt6Vb15+KsQHFLbKSMiYIny");
+    }
+
+    #[test]
+    fn test_ticktock() {
+        let mut parser = ParseEngine::new();
+        let source = File::open("./tests/ticktock.code").unwrap();
+        let lib = File::open("./stdlib_sol.tvm").unwrap();
+        assert_eq!(parser.parse(source, vec![lib], None), ok!());
+        let prog = Program::new(parser);
+        let contract_file = prog.compile_to_file(-1).unwrap();
+        let name = contract_file.split('.').next().unwrap();
+        
+        assert_eq!(perform_contract_call(name, None, None, false, false, None, Some("-1")), 0);
     }
 }

@@ -4,6 +4,7 @@ use program::{load_from_file, save_to_file};
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use sha2::Sha512;
 use std::fmt;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tvm::executor::Engine;
@@ -63,9 +64,9 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) {
     *body = signed_body.into();
 }
 
-fn initialize_registers(data: SliceData) -> SaveList {
+fn initialize_registers(data: SliceData, myself: MsgAddressInt) -> SaveList {
     let mut ctrls = SaveList::new();
-    let mut info = SmartContractInfo::with_myself(MsgAddressInt::with_standart(None, 0, AccountId::from([0u8; 32])).unwrap());
+    let mut info = SmartContractInfo::with_myself(myself);
     *info.balance_remaining_mut() = CurrencyCollection::with_grams(100_000_000_000u64);
     *info.unix_time_mut() = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32;
     ctrls.put(4, &mut StackItem::Cell(data.into_cell())).unwrap();
@@ -89,47 +90,47 @@ pub fn perform_contract_call(
     debug: bool, 
     decode_actions: bool,
     msg_value: Option<&str>,
+    ticktock: Option<&str>,
 ) -> i32 {
+    let addr = AccountId::from_str(contract_file).unwrap();
     let mut state_init = load_from_file(&format!("{}.tvc", contract_file));
-    let contract_addr = [0x11u8; 32].into();
     
     let mut stack = Stack::new();
-    let is_internal;
-    let value = if msg_value.is_some() {
-        is_internal = true;
+    let func_selector = if msg_value.is_some() {
+        0 
+    } else {
+        if ticktock.is_some() {
+            -2
+        } else {
+            -1
+        }
+    };
+        
+    let value = if func_selector == 0 { 
         u64::from_str_radix(msg_value.unwrap(), 10).unwrap()
     } else {
-        is_internal = false;
         0
     };
+
     let msg = 
-        if is_internal {
-            create_internal_msg(
+        if func_selector == 0 {
+            Some(create_internal_msg(
                 [0u8; 32].into(),
-                contract_addr, 
+                addr.clone(), 
                 value,
                 1,
                 SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32,
                 body.clone()
-            )
-        } else {
-            create_external_inbound_msg(
-                &contract_addr, 
+            ))
+        } else if func_selector == -1 {
+            Some(create_external_inbound_msg(
+                &addr, 
                 body.clone(),
-            )
+            ))
+        } else {
+            None
         };
     
-    let msg_cell = StackItem::Cell(msg.write_to_new_cell().unwrap().into());
-
-    let mut body: SliceData = match body {
-        Some(b) => b.into(),
-        None => BuilderData::new().into(),
-    };
-    
-    if !is_internal {
-        key_file.map(|key| sign_body(&mut body, key));
-    }
-
     if !log_enabled!(Error) {
         init_logger(debug);
     }
@@ -143,14 +144,37 @@ pub fn perform_contract_call(
             .unwrap_or(BuilderData::new().into())
             .into();
 
-    let registers = initialize_registers(data);
-    let func_selector = if is_internal { 0 } else { -1 };
-    stack
-        .push(int!(100_000_000_000u64)) //contract balance: 100 grams
-        .push(int!(value))           //msg balance
-        .push(msg_cell)
-        .push(StackItem::Slice(body)) 
-        .push(int!(func_selector));
+    let workchain_id = if func_selector > -2 { 0 } else { -1 };
+    let registers = initialize_registers(
+        data,
+        MsgAddressInt::with_standart(None, workchain_id, addr.clone()).unwrap()
+    );
+    
+    if func_selector > -2 {
+        let msg_cell = StackItem::Cell(msg.unwrap().write_to_new_cell().unwrap().into());
+
+        let mut body: SliceData = match body {
+            Some(b) => b.into(),
+            None => BuilderData::new().into(),
+        };
+        
+        if func_selector == -1 {
+            key_file.map(|key| sign_body(&mut body, key));
+        }
+
+        stack
+            .push(int!(100_000_000_000u64)) //contract balance: 100 grams
+            .push(int!(value))              //msg balance
+            .push(msg_cell)                 //msg
+            .push(StackItem::Slice(body))   //msg.body
+            .push(int!(func_selector));     //selector
+    } else {
+        stack
+            .push(int!(100_000_000_000u64)) //contract balance: 100 grams
+            .push(StackItem::Integer(Arc::new(IntegerData::from_str_radix(contract_file, 16).unwrap()))) //contract address
+            .push(int!(i8::from_str_radix(ticktock.unwrap(), 10).unwrap())) //tick or tock
+            .push(int!(func_selector));
+    }
 
     let mut engine = Engine::new().setup(code, Some(registers), Some(stack), Some(Gas::test()));
     if debug { 
