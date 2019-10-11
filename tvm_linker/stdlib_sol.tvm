@@ -1,39 +1,22 @@
-	.internal-alias :main_internal,      0
 	.internal-alias :general_purpose,    1
 
-
 	.selector
-	; s0 - func_id
-	; s1.. - other data
-	PRINTSTR selector
+	;s0 - selector
+	;s1 - ...
 	SETCP0
-	PUSHREFSLICE        ; dictionary of methods in first reference
-	PLDDICT
-	OVER
-	NEQINT 1
-	PUSHCONT {          ; if func_id negative or zero - direct call to method
-		PUSHINT 32
-		PRINTSTR selector_jmp_0
-		DICTIGETJMP     ; execute method and return
+	DUP
+    EQINT 1
+	DICTPUSHCONST 32
+    ROT
+	PUSHCONT {
+        DICTIGETJMP
 	}
-	PUSHCONT {          ; get dictionary with methods
-		PUSHINT 32
-		DICTIGETREF
-		THROWIFNOT 52   ; no dictionary of methods
-		PUSHINT 32
-		PRINTSTR selector_jmp
-		DICTUGETJMP     ; execute method and return
-		THROW 51
-	}
-	IFELSE
-
-	.internal   :main_internal
-	PUSHINT $main_internal_body$
-	CALL 1
-	IFRET
-	CALL 1 ;public method call
-	RET
-
+	IFNOTJMP
+    PUSHREFCONT
+	POPCTR c3
+	ROT 
+    DROP
+	DICTIGETJMP
 
 				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 				;;; THE CODE BELOW IS GENERATED. DO NOT CHANGE IT!
@@ -660,12 +643,12 @@ PUSHCONT { ; store_either_inline
 		PUSH s2
 		STU 1
 		POP s2
-		;; slice
-		;; stack=2
-		DUP
 		;; builder
+		;; stack=2
+		PUSH s1
+		;; slice
 		;; stack=3
-		PUSH s2
+		PUSH s1
 		STSLICER
 		POP s2
 	}
@@ -731,12 +714,12 @@ PUSHCONT { ; store_either_inline
 		PUSH s2
 		STU 1
 		POP s2
-		;; slice
-		;; stack=2
-		DUP
 		;; builder
+		;; stack=2
+		PUSH s1
+		;; slice
 		;; stack=3
-		PUSH s2
+		PUSH s1
 		STSLICER
 		POP s2
 	}
@@ -871,13 +854,13 @@ PUSHCONT {
 	LDREF
 	POP s4
 	;; decl: code
-	;; code
-	;; stack=6
-	DUP
-	CTOS
 	;; builder
+	;; stack=6
+	PUSH s2
+	;; code
 	;; stack=7
-	PUSH s3
+	PUSH s1
+	CTOS
 	STSLICER
 	POP s3
 	;; drop locals
@@ -984,13 +967,13 @@ PUSHCONT {
 	LDREF
 	POP s8
 	;; decl: lib
-	;; lib
-	;; stack=10
-	DUP
-	CTOS
 	;; builder
+	;; stack=10
+	PUSH s6
+	;; lib
 	;; stack=11
-	PUSH s7
+	PUSH s1
+	CTOS
 	STSLICER
 	POP s7
 	;; drop locals
@@ -1125,12 +1108,12 @@ PUSHCONT { ; store_either_inline
 		PUSH s2
 		STU 1
 		POP s2
-		;; slice
-		;; stack=2
-		DUP
 		;; builder
+		;; stack=2
+		PUSH s1
+		;; slice
 		;; stack=3
-		PUSH s2
+		PUSH s1
 		STSLICER
 		POP s2
 	}
@@ -1252,12 +1235,12 @@ PUSHCONT {
 	PUSH s2
 	STU 1
 	POP s2
-	;; slice
-	;; stack=2
-	DUP
 	;; builder
+	;; stack=2
+	PUSH s1
+	;; slice
 	;; stack=3
-	PUSH s2
+	PUSH s1
 	STSLICER
 	POP s2
 }
@@ -1631,7 +1614,7 @@ PUSH s1
 ;; dst_addr
 ;; stack=4
 PUSH s3
-PUSHINT 10_000_000
+PUSHINT 10000000
 PUSHINT $send_int_msg$
 CALL 1
 BLKDROP 2
@@ -1672,53 +1655,9 @@ BLKDROP 4
 PRINTSTR get_self_addr
 MYADDR
 PUSHINT 11
-PUSHCONT { ; get_address_from_slice_inline
-	;; param: slice
-	;; param: offset
-	;; slice
-	;; stack=2
-	PUSH s1
-	;; offset
-	;; stack=3
-	PUSH s1
-	SDSKIPFIRST
-	POP s2
-	;; slice
-	;; stack=2
-	PUSH s1
-	LDU 256
-	POP s3
-	;; return
-	NIP
-	NIP
-	RET
-}
-CALLX
-;; return
-RET
-
-.globl	get_address_from_slice_inline
-.type	get_address_from_slice_inline, @function
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: get_address_from_slice_inline
-;; param: slice
-;; param: offset
-;; slice
-;; stack=2
-PUSH s1
-;; offset
-;; stack=3
-PUSH s1
 SDSKIPFIRST
-POP s2
-;; slice
-;; stack=2
-PUSH s1
-LDU 256
-POP s3
+PLDU 256
 ;; return
-NIP
-NIP
 RET
 
 .globl	get_rand_seed
@@ -1761,6 +1700,7 @@ PUSHINT 0
 ;; !=
 NEQ
 PUSHCONT {
+	PRINTSTR get_src_addr0
 	PUSHINT 0
 	PUSHINT 0
 	;; return
@@ -1785,30 +1725,10 @@ POP s2
 ;; stack=3
 PUSH s1
 PUSHINT 11
-PUSHCONT { ; get_address_from_slice_inline
-	;; param: slice
-	;; param: offset
-	;; slice
-	;; stack=2
-	PUSH s1
-	;; offset
-	;; stack=3
-	PUSH s1
-	SDSKIPFIRST
-	POP s2
-	;; slice
-	;; stack=2
-	PUSH s1
-	LDU 256
-	POP s3
-	;; return
-	NIP
-	NIP
-	RET
-}
-CALLX
+SDSKIPFIRST
+PLDU 256
 ;; decl: addr
-PRINTSTR get_src_addr_en
+PRINTSTR get_src_addr1
 ;; bounced
 ;; stack=4
 PUSH s1
@@ -1826,114 +1746,67 @@ RET
 ;; Function: get_msg_pubkey_inline
 ;; param: msg_slice
 PRINTSTR get_msg_pubkey
-PUSHINT 0
-;; decl: pubKey
 ;; if
 ;; msg_slice
-;; stack=2
-PUSH s1
+;; stack=1
+DUP
 SREMPTY
 PUSHCONT {
-	;; m_addReturnFlag = 1
-	PRINTSTR get_msg_pubkey3
+	PRINTSTR get_msg_pubkey1
+	PUSHINT 0
+	;; return
+	NIP
+	RET
+}
+IFJMP
+LDREFRTOS
+;; decl: slice
+;; if
+;; slice
+;; stack=2
+DUP
+SDEMPTY
+PUSHCONT {
+	PRINTSTR get_msg_pubkey2
 	PUSHINT 0
 	;; return
 	NIP
 	NIP
-	PUSHINT 1 ; return
 	RET
 }
-PUSHCONT {
-	;; m_addReturnFlag = 1
-	;; msg_slice
-	;; stack=2
-	PUSH s1
-	LDREFRTOS
-	;; decl: rest_msg_slice
-	;; decl: slice
-	;; if
-	;; slice
-	;; stack=4
-	DUP
-	SDEMPTY
-	PUSHCONT {
-		;; m_addReturnFlag = 1
-		PRINTSTR get_msg_pubkey3
-		PUSHINT 0
-		;; return
-		XCHG s4
-		BLKDROP 4
-		PUSHINT 1 ; return
-		RET
-	}
-	IFJMP
-	;; slice
-	;; stack=4
-	DUP
-	PUSHINT 512
-	PUSHCONT { ; get_address_from_slice_inline
-		;; param: slice
-		;; param: offset
-		;; slice
-		;; stack=2
-		PUSH s1
-		;; offset
-		;; stack=3
-		PUSH s1
-		SDSKIPFIRST
-		POP s2
-		;; slice
-		;; stack=2
-		PUSH s1
-		LDU 256
-		POP s3
-		;; return
-		NIP
-		NIP
-		RET
-	}
-	CALLX
-	;; assign pubKey
-	POP s3
-	;; rest_msg_slice
-	;; stack=4
-	PUSH s1
-	HASHSU
-	;; decl: hash
-	;; hash
-	;; stack=5
-	DUP
-	;; slice
-	;; stack=6
-	PUSH s2
-	;; pubKey
-	;; stack=7
-	PUSH s5
-	CHKSIGNU
-	;; decl: checkSig
-	;; checkSig
-	;; stack=6
-	DUP
-	THROWIFNOT 40
-	;; drop locals
-	BLKDROP 4
-	FALSE
-}
-IFELSE
-IFRET
-PRINTSTR get_msg_pubkey2
-;; pubKey
+IFJMP
+;; slice
 ;; stack=2
 DUP
+PUSHINT 512
+SDSKIPFIRST
+PLDU 256
+;; decl: pubKey
+;; msg_slice
+;; stack=3
+PUSH s2
+HASHSU
+;; slice
+;; stack=4
+PUSH s2
+;; pubKey
+;; stack=5
+PUSH s2
+CHKSIGNU
+THROWIFNOT 40
+PRINTSTR get_msg_pubkey3
+;; pubKey
+;; stack=3
+DUP
 ;; return
-NIP
-NIP
+XCHG s3
+BLKDROP 3
 RET
 
-.globl	main_internal_body
-.type	main_internal_body, @function
+.internal-alias :main_internal,        0
+.internal	:main_internal
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: main_internal_body
+;; Function: main_internal
 ;; param: 
 ;; param: msg_balance
 ;; param: msg_cell
@@ -1961,6 +1834,7 @@ PUSHCONT { ; get_src_addr_and_bounce__inline
 	;; !=
 	NEQ
 	PUSHCONT {
+		PRINTSTR get_src_addr0
 		PUSHINT 0
 		PUSHINT 0
 		;; return
@@ -1985,30 +1859,10 @@ PUSHCONT { ; get_src_addr_and_bounce__inline
 	;; stack=3
 	PUSH s1
 	PUSHINT 11
-	PUSHCONT { ; get_address_from_slice_inline
-		;; param: slice
-		;; param: offset
-		;; slice
-		;; stack=2
-		PUSH s1
-		;; offset
-		;; stack=3
-		PUSH s1
-		SDSKIPFIRST
-		POP s2
-		;; slice
-		;; stack=2
-		PUSH s1
-		LDU 256
-		POP s3
-		;; return
-		NIP
-		NIP
-		RET
-	}
-	CALLX
+	SDSKIPFIRST
+	PLDU 256
 	;; decl: addr
-	PRINTSTR get_src_addr_en
+	PRINTSTR get_src_addr1
 	;; bounced
 	;; stack=4
 	PUSH s1
@@ -2077,24 +1931,19 @@ PUSHCONT {
 	;; ==
 	EQUAL
 	PUSHCONT {
+		;; msg_body_slice
+		;; stack=6
+		PUSH s2
 		PUSHINT $fallback$
-		;; decl: id_fun
-		PUSHINT 0
-		;; id_fun
-		;; stack=8
-		PUSH s1
-		PUSHINT 0
+		BLKSWAP 6, 2
+		BLKDROP 6
+		JMP 1
 		;; return
-		BLKSWAP 7, 3
-		BLKDROP 7
+		BLKDROP 6
 		RET
 	}
 	IFJMP
-	PUSHINT 0
-	PUSHINT 0
-	PUSHINT 1
 	;; return
-	BLKSWAP 6, 3
 	BLKDROP 6
 	RET
 }
@@ -2113,18 +1962,15 @@ PUSHINT 1
 ;; ==
 EQUAL
 PUSHCONT {
-	PUSHINT $onBounce$
-	;; decl: on_bounce_id
 	;; func_id
-	;; stack=8
-	PUSH s1
-	;; on_bounce_id
-	;; stack=9
-	PUSH s1
-	PUSHINT 0
+	;; stack=7
+	DUP
+	PUSHINT $onBounce$
+	BLKSWAP 7, 2
+	BLKDROP 7
+	JMP 1
 	;; return
-	BLKSWAP 8, 3
-	BLKDROP 8
+	BLKDROP 7
 	RET
 }
 IFJMP
@@ -2134,16 +1980,15 @@ PUSH s3
 ;; func_id
 ;; stack=8
 PUSH s1
-PUSHINT 0
-;; return
-BLKSWAP 7, 3
+BLKSWAP 7, 2
 BLKDROP 7
-RET
+JMP 1
+BLKDROP 7
 
 .internal-alias :main_external,        -1
 .internal	:main_external
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: main_external_body
+;; Function: main_external
 ;; param: 
 ;; param: msg_balance
 ;; param: msg_cell
@@ -2170,6 +2015,7 @@ PUSHCONT { ; get_src_addr_and_bounce__inline
 	;; !=
 	NEQ
 	PUSHCONT {
+		PRINTSTR get_src_addr0
 		PUSHINT 0
 		PUSHINT 0
 		;; return
@@ -2194,30 +2040,10 @@ PUSHCONT { ; get_src_addr_and_bounce__inline
 	;; stack=3
 	PUSH s1
 	PUSHINT 11
-	PUSHCONT { ; get_address_from_slice_inline
-		;; param: slice
-		;; param: offset
-		;; slice
-		;; stack=2
-		PUSH s1
-		;; offset
-		;; stack=3
-		PUSH s1
-		SDSKIPFIRST
-		POP s2
-		;; slice
-		;; stack=2
-		PUSH s1
-		LDU 256
-		POP s3
-		;; return
-		NIP
-		NIP
-		RET
-	}
-	CALLX
+	SDSKIPFIRST
+	PLDU 256
 	;; decl: addr
-	PRINTSTR get_src_addr_en
+	PRINTSTR get_src_addr1
 	;; bounced
 	;; stack=4
 	PUSH s1
@@ -2238,108 +2064,61 @@ PUSH s1
 PUSHCONT { ; get_msg_pubkey_inline
 	;; param: msg_slice
 	PRINTSTR get_msg_pubkey
-	PUSHINT 0
-	;; decl: pubKey
 	;; if
 	;; msg_slice
-	;; stack=2
-	PUSH s1
+	;; stack=1
+	DUP
 	SREMPTY
 	PUSHCONT {
-		;; m_addReturnFlag = 1
-		PRINTSTR get_msg_pubkey3
+		PRINTSTR get_msg_pubkey1
+		PUSHINT 0
+		;; return
+		NIP
+		RET
+	}
+	IFJMP
+	LDREFRTOS
+	;; decl: slice
+	;; if
+	;; slice
+	;; stack=2
+	DUP
+	SDEMPTY
+	PUSHCONT {
+		PRINTSTR get_msg_pubkey2
 		PUSHINT 0
 		;; return
 		NIP
 		NIP
-		PUSHINT 1 ; return
 		RET
 	}
-	PUSHCONT {
-		;; m_addReturnFlag = 1
-		;; msg_slice
-		;; stack=2
-		PUSH s1
-		LDREFRTOS
-		;; decl: rest_msg_slice
-		;; decl: slice
-		;; if
-		;; slice
-		;; stack=4
-		DUP
-		SDEMPTY
-		PUSHCONT {
-			;; m_addReturnFlag = 1
-			PRINTSTR get_msg_pubkey3
-			PUSHINT 0
-			;; return
-			XCHG s4
-			BLKDROP 4
-			PUSHINT 1 ; return
-			RET
-		}
-		IFJMP
-		;; slice
-		;; stack=4
-		DUP
-		PUSHINT 512
-		PUSHCONT { ; get_address_from_slice_inline
-			;; param: slice
-			;; param: offset
-			;; slice
-			;; stack=2
-			PUSH s1
-			;; offset
-			;; stack=3
-			PUSH s1
-			SDSKIPFIRST
-			POP s2
-			;; slice
-			;; stack=2
-			PUSH s1
-			LDU 256
-			POP s3
-			;; return
-			NIP
-			NIP
-			RET
-		}
-		CALLX
-		;; assign pubKey
-		POP s3
-		;; rest_msg_slice
-		;; stack=4
-		PUSH s1
-		HASHSU
-		;; decl: hash
-		;; hash
-		;; stack=5
-		DUP
-		;; slice
-		;; stack=6
-		PUSH s2
-		;; pubKey
-		;; stack=7
-		PUSH s5
-		CHKSIGNU
-		;; decl: checkSig
-		;; checkSig
-		;; stack=6
-		DUP
-		THROWIFNOT 40
-		;; drop locals
-		BLKDROP 4
-		FALSE
-	}
-	IFELSE
-	IFRET
-	PRINTSTR get_msg_pubkey2
-	;; pubKey
+	IFJMP
+	;; slice
 	;; stack=2
 	DUP
+	PUSHINT 512
+	SDSKIPFIRST
+	PLDU 256
+	;; decl: pubKey
+	;; msg_slice
+	;; stack=3
+	PUSH s2
+	HASHSU
+	;; slice
+	;; stack=4
+	PUSH s2
+	;; pubKey
+	;; stack=5
+	PUSH s2
+	CHKSIGNU
+	THROWIFNOT 40
+	PRINTSTR get_msg_pubkey3
+	;; pubKey
+	;; stack=3
+	DUP
 	;; return
-	NIP
-	NIP
+	XCHG s3
+	BLKDROP 3
 	RET
 }
 CALLX
@@ -2427,98 +2206,217 @@ PUSH s3
 LDU 64
 POP s5
 ;; decl: msg_timestamp
-PUSHCONT { ; previous_message_info_inline
-	;; ret param: timestamp
+;; if
+;; msg_timestamp
+;; stack=8
+DUP
+PUSHCONT { ; replay_prot_inline
+	;; param: msg_timestamp
+	PRINTSTR replay_prot
 	PUSHINT 0
-	;; ret param: interval
+	;; decl: dict
 	PUSHINT 0
-	PRINTSTR prev_time
+	;; decl: previous_message_timestamp
+	PUSHINT 0
+	;; decl: interval
 	PUSHROOT
 	CTOS
 	;; decl: c4
 	;; c4
-	;; stack=3
+	;; stack=5
 	DUP
 	LDDICT
 	POP s2
-	;; decl: dict
+	;; assign dict
+	POP s4
+	;; if
+	;; c4
+	;; stack=5
+	DUP
 	PUSHINT 128
-	PUSHINT 2
-	;; dict
-	;; stack=6
-	PUSH s2
-	PUSHINT 64
-	DICTUGET
-	PUSHCONT { 
-		NIP
+	SCHKBITSQ
+	PUSHCONT {
+		PRINTSTR replay_have
+		;; c4
+		;; stack=5
+		DUP
+		LDU 64
+		POP s2
+		;; assign previous_message_timestamp
+		POP s3
+		;; c4
+		;; stack=5
+		DUP
+		LDU 64
+		POP s2
+		;; assign interval
+		POP s2
 	}
 	PUSHCONT {
-		NEWC      ; valueBits builder
-		PUSHINT 0 ; valueBits builder 0
-		XCHG S2   ; 0 builder valueBits
-		STUX      ; builder
-		ENDC      ; cell
-		CTOS      ; default_value
+		PUSHINT 60000
+		;; assign interval
+		POP s2
+		PRINTSTR replay_have_no
 	}
 	IFELSE
-	;; decl: slice
-	;; slice
+	PRINTSTR replay_prot2
+	;; if
+	;; previous_message_timestamp
+	;; stack=5
+	PUSH s2
+	;; msg_timestamp
+	;; stack=6
+	PUSH s5
+	;; <
+	LESS
+	;; msg_timestamp
+	;; stack=6
+	PUSH s5
+	NOW
+	PUSHINT 1000
+	;; *
+	MUL
+	;; interval
+	;; stack=8
+	PUSH s4
+	;; +
+	ADD
+	;; <
+	LESS
+	;; &&
+	AND
+	PUSHCONT {
+		NEWC
+		;; decl: c4_builder
+		;; dict
+		;; stack=6
+		PUSH s4
+		SWAP
+		STDICT
+		PRINTSTR replay_prot3
+		;; msg_timestamp
+		;; stack=6
+		PUSH s5
+		STUR 64
+		;; interval
+		;; stack=6
+		PUSH s2
+		STUR 64
+		;; c4
+		;; stack=6
+		PUSH s1
+		STSLICER
+		;; c4_builder
+		;; stack=6
+		DUP
+		ENDC
+		POPROOT
+		TRUE
+		;; return
+		XCHG s6
+		BLKDROP 6
+		RET
+	}
+	IFJMP
+	FALSE
+	;; return
+	XCHG s5
+	BLKDROP 5
+	RET
+}
+CALLX
+PUSHCONT {
+	ACCEPT
+	PRINTSTR main_external2
+	;; msg_body_slice
+	;; stack=8
+	PUSH s4
+	;; func_id
+	;; stack=9
+	PUSH s2
+	BLKSWAP 8, 2
+	BLKDROP 8
+	JMP 1
+	;; return
+	BLKDROP 8
+	RET
+}
+IFJMP
+PUSHINT 124
+THROWANY
+BLKDROP 8
+
+.globl	replay_prot_inline
+.type	replay_prot_inline, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: replay_prot_inline
+;; param: msg_timestamp
+PRINTSTR replay_prot
+PUSHINT 0
+;; decl: dict
+PUSHINT 0
+;; decl: previous_message_timestamp
+PUSHINT 0
+;; decl: interval
+PUSHROOT
+CTOS
+;; decl: c4
+;; c4
+;; stack=5
+DUP
+LDDICT
+POP s2
+;; assign dict
+POP s4
+;; if
+;; c4
+;; stack=5
+DUP
+PUSHINT 128
+SCHKBITSQ
+PUSHCONT {
+	PRINTSTR replay_have
+	;; c4
 	;; stack=5
 	DUP
 	LDU 64
 	POP s2
-	;; assign timestamp
-	POP s5
-	;; slice
+	;; assign previous_message_timestamp
+	POP s3
+	;; c4
 	;; stack=5
 	DUP
 	LDU 64
 	POP s2
 	;; assign interval
-	POP s4
-	;; if
-	;; timestamp
-	;; stack=5
-	PUSH s4
-	PUSHINT 0
-	;; ==
-	EQUAL
-	PUSHCONT {
-		PUSHINT 60000
-		;; assign interval
-		POP s4
-	}
-	IF
-	PRINTSTR prev_time_end
-	;; returning named params
-	BLKDROP 3
+	POP s2
 }
-CALLX
-;; decl: previous_message_timestamp
-;; decl: interval
-NOW
-;; decl: mynow
-PRINTSTR replay_prot
+PUSHCONT {
+	PUSHINT 60000
+	;; assign interval
+	POP s2
+	PRINTSTR replay_have_no
+}
+IFELSE
+PRINTSTR replay_prot2
 ;; if
 ;; previous_message_timestamp
-;; stack=11
+;; stack=5
 PUSH s2
 ;; msg_timestamp
-;; stack=12
-PUSH s4
+;; stack=6
+PUSH s5
 ;; <
 LESS
 ;; msg_timestamp
-;; stack=12
-PUSH s4
-;; mynow
-;; stack=13
-PUSH s2
+;; stack=6
+PUSH s5
+NOW
 PUSHINT 1000
 ;; *
 MUL
 ;; interval
-;; stack=14
+;; stack=8
 PUSH s4
 ;; +
 ADD
@@ -2527,204 +2425,43 @@ LESS
 ;; &&
 AND
 PUSHCONT {
-	ACCEPT
+	NEWC
+	;; decl: c4_builder
+	;; dict
+	;; stack=6
+	PUSH s4
+	SWAP
+	STDICT
+	PRINTSTR replay_prot3
 	;; msg_timestamp
-	;; stack=11
-	PUSH s3
-	;; interval
-	;; stack=12
-	PUSH s2
-	PUSHCONT { ; set_previous_message_info_inline
-		;; param: timestamp
-		;; param: interval
-		PUSHROOT
-		CTOS
-		;; decl: c4
-		;; c4
-		;; stack=3
-		DUP
-		LDDICT
-		POP s2
-		;; decl: dict
-		NEWC
-		;; decl: builder
-		;; timestamp
-		;; stack=5
-		PUSH s4
-		STUR 64
-		;; interval
-		;; stack=5
-		PUSH s3
-		STUR 64
-		;; builder
-		;; stack=5
-		DUP
-		ENDC
-		CTOS
-		PUSHINT 2
-		;; dict
-		;; stack=7
-		PUSH s3
-		PUSHINT 64
-		DICTUSET
-		POP s2
-		NEWC
-		;; decl: c4_builder
-		;; dict
-		;; stack=6
-		PUSH s2
-		;; c4_builder
-		;; stack=7
-		PUSH s1
-		STDICT
-		NIP
-		;; c4_builder
-		;; stack=6
-		DUP
-		ENDC
-		POPROOT
-		BLKDROP 6
-	}
-	CALLX
-	;; msg_body_slice
-	;; stack=11
-	PUSH s7
-	;; func_id
-	;; stack=12
+	;; stack=6
 	PUSH s5
-	BLKSWAP 11, 2
-	BLKDROP 11
-	JMP 1
+	STUR 64
+	;; interval
+	;; stack=6
+	PUSH s2
+	STUR 64
+	;; c4
+	;; stack=6
+	PUSH s1
+	STSLICER
+	;; c4_builder
+	;; stack=6
+	DUP
+	ENDC
+	POPROOT
+	TRUE
 	;; return
-	BLKDROP 11
+	XCHG s6
+	BLKDROP 6
 	RET
 }
 IFJMP
-THROW 124
-BLKDROP 11
-
-.globl	set_previous_message_info_inline
-.type	set_previous_message_info_inline, @function
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: set_previous_message_info_inline
-;; param: timestamp
-;; param: interval
-PUSHROOT
-CTOS
-;; decl: c4
-;; c4
-;; stack=3
-DUP
-LDDICT
-POP s2
-;; decl: dict
-NEWC
-;; decl: builder
-;; timestamp
-;; stack=5
-PUSH s4
-STUR 64
-;; interval
-;; stack=5
-PUSH s3
-STUR 64
-;; builder
-;; stack=5
-DUP
-ENDC
-CTOS
-PUSHINT 2
-;; dict
-;; stack=7
-PUSH s3
-PUSHINT 64
-DICTUSET
-POP s2
-NEWC
-;; decl: c4_builder
-;; dict
-;; stack=6
-PUSH s2
-;; c4_builder
-;; stack=7
-PUSH s1
-STDICT
-NIP
-;; c4_builder
-;; stack=6
-DUP
-ENDC
-POPROOT
-BLKDROP 6
-
-.globl	previous_message_info_inline
-.type	previous_message_info_inline, @function
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: previous_message_info_inline
-;; ret param: timestamp
-PUSHINT 0
-;; ret param: interval
-PUSHINT 0
-PRINTSTR prev_time
-PUSHROOT
-CTOS
-;; decl: c4
-;; c4
-;; stack=3
-DUP
-LDDICT
-POP s2
-;; decl: dict
-PUSHINT 128
-PUSHINT 2
-;; dict
-;; stack=6
-PUSH s2
-PUSHINT 64
-DICTUGET
-PUSHCONT { 
-	NIP
-}
-PUSHCONT {
-	NEWC      ; valueBits builder
-	PUSHINT 0 ; valueBits builder 0
-	XCHG S2   ; 0 builder valueBits
-	STUX      ; builder
-	ENDC      ; cell
-	CTOS      ; default_value
-}
-IFELSE
-;; decl: slice
-;; slice
-;; stack=5
-DUP
-LDU 64
-POP s2
-;; assign timestamp
-POP s5
-;; slice
-;; stack=5
-DUP
-LDU 64
-POP s2
-;; assign interval
-POP s4
-;; if
-;; timestamp
-;; stack=5
-PUSH s4
-PUSHINT 0
-;; ==
-EQUAL
-PUSHCONT {
-	PUSHINT 60000
-	;; assign interval
-	POP s4
-}
-IF
-PRINTSTR prev_time_end
-;; returning named params
-BLKDROP 3
+FALSE
+;; return
+XCHG s5
+BLKDROP 5
+RET
 
 .globl	my_pubkey
 .type	my_pubkey, @function
@@ -2768,4 +2505,64 @@ DUP
 XCHG s4
 BLKDROP 4
 RET
+
+.globl	generateConstructorProtection
+.type	generateConstructorProtection, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: generateConstructorProtection
+PUSHINT 0
+;; decl: dict
+PUSHINT 0
+;; decl: previous_message_timestamp_and_interval
+PUSHROOT
+CTOS
+;; decl: c4
+;; c4
+;; stack=3
+DUP
+LDDICT
+POP s2
+;; assign dict
+POP s3
+;; c4
+;; stack=3
+DUP
+LDI 128
+POP s2
+;; assign previous_message_timestamp_and_interval
+POP s2
+;; if
+;; c4
+;; stack=3
+DUP
+PUSHINT 1
+SCHKBITSQ
+PUSHCONT {
+	PUSHINT 123
+	THROWANY
+}
+IF
+NEWC
+;; decl: c4_builder
+;; dict
+;; stack=4
+PUSH s3
+SWAP
+STDICT
+;; previous_message_timestamp_and_interval
+;; stack=4
+PUSH s2
+STUR 128
+PUSHINT 1
+STONES
+;; c4
+;; stack=4
+PUSH s1
+STSLICER
+;; c4_builder
+;; stack=4
+DUP
+ENDC
+POPROOT
+BLKDROP 4
 

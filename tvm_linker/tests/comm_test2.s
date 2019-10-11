@@ -1,6 +1,7 @@
 	.text
 	.file	"test_matrix1.c"
 	.globl	main                    ; -- Begin function main
+	.public main
 	.p2align	1
 	.type	main,@function
 main:

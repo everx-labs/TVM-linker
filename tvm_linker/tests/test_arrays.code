@@ -3,32 +3,15 @@
 RET
 
 .globl	constructor
+.public	constructor
 .type	constructor, @function
-; protect constructor from twice call
-PUSHINT 1
-PUSHROOT CTOS PLDDICTQ
-PUSHCONT {
-	NEWDICT
-}
-IFNOT
-PUSHINT 64
-DICTUGET
-THROWIF 123
-PUSHINT 1 NEWC STU 1
-PUSHINT 1
-PUSHROOT CTOS PLDDICTQ
-PUSHCONT {
-	NEWDICT
-}
-IFNOT
-PUSHINT 64
-DICTUSETB
-NEWC STDICT ENDC
-POPROOT
+PUSHINT $generateConstructorProtection$
+CALL 1
 ; Decode input parameters
 DROP
 
 .globl	at32
+.public	at32
 .type	at32, @function
 ; Decode input parameters
 PUSHINT 8
@@ -78,6 +61,7 @@ NIP
 RET
 
 .globl	pair64
+.public	pair64
 .type	pair64, @function
 ; Decode input parameters
 PUSHINT $decode_array$
@@ -138,6 +122,7 @@ UFITS 64
 RET
 
 .globl	pair8
+.public	pair8
 .type	pair8, @function
 ; Decode input parameters
 PUSHINT $decode_array$
@@ -198,6 +183,7 @@ UFITS 8
 RET
 
 .globl	at256
+.public	at256
 .type	at256, @function
 ; Decode input parameters
 PUSHINT 8
@@ -247,6 +233,7 @@ NIP
 RET
 
 .globl	atAt32
+.public	atAt32
 .type	atAt32, @function
 ; Decode input parameters
 PUSHINT 32
@@ -305,6 +292,7 @@ BLKDROP 3
 RET
 
 .globl	atAt256
+.public	atAt256
 .type	atAt256, @function
 ; Decode input parameters
 PUSHINT 32

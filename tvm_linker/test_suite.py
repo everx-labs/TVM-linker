@@ -86,7 +86,7 @@ def compile2(source_name, directory = "tests_sol", lib_file = STDLIB_SOL):
 	source_file = "./" + directory + "/{}.code".format(source_name)
 	abi_file = "./" + directory + "/{}.abi.json".format(source_name)
 	
-	cmd = "{} compile {} --abi-json {} --lib {} --debug > compile_log.tmp"
+	cmd = "{} compile {} --abi-json {} --lib {} --setkey key1 --debug > compile_log.tmp"
 	cmd = cmd.format(TVM_PATH, source_file, abi_file, lib_file)
 	# print cmd
 	ec = os.system(cmd)
@@ -346,12 +346,20 @@ def testEvents():
 	expect_output(r"data: 45b72e0e")
 	expect_output(r"data: 45b72e0e")
 
+def testWallet():
+	linker_options = "--sign key1 --decode-c6"
+	compile2('Wallet', 'tests')
+	expect_success2("Wallet", "constructor", '{}', None, linker_options)
+	expect_success2("Wallet", "sendTransaction", '{"dest":"0x11","value":"1000000000","bounce":"true"}', None, linker_options)
+
 #testOld()
 testArrays()
 testCall()
 testEvents()
+testWallet()
 #testLlvmPiggyBank()
 
+'''
 SIGN = 'key1'
 compile1('hello.code', 'stdlib_c.tvm')
 expect_output(r"Hello")
@@ -359,4 +367,5 @@ SIGN = None
 
 compile1('hello.code', 'stdlib_c.tvm')
 expect_output(r"Hello")
+'''
 cleanup()

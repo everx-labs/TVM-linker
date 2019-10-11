@@ -1,6 +1,7 @@
     globl	main                    ; -- Begin function main
 	.p2align	1
 	.type	main,@function
+    .public main
 main:                                   ; @main
     PUSHINT $str$
     PUSHINT $persistent-base$           ; { str | persistent-base | - }

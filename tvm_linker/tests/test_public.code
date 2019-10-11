@@ -1,0 +1,19 @@
+    .globl sum
+    .type sum, @function
+    .public sum
+sum:
+    PUSHINT 1
+    PUSHINT $sum_p$
+    CALL 1
+
+    .globl sum_p
+    .type sum_p, @function
+sum_p:
+    PUSHINT 2
+    ADD
+
+    .globl sum2
+    .type sum2, @function
+sum2:
+    PUSHINT 2
+    PUSHINT $sum_p$

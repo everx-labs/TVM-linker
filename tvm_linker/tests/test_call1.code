@@ -1,26 +1,8 @@
 .globl	constructor
+.public	constructor
 .type	constructor, @function
-; protect constructor from twice call
-PUSHINT 1
-PUSHROOT CTOS PLDDICTQ
-PUSHCONT {
-	NEWDICT
-}
-IFNOT
-PUSHINT 64
-DICTUGET
-THROWIF 123
-PUSHINT 1 NEWC STU 1
-PUSHINT 1
-PUSHROOT CTOS PLDDICTQ
-PUSHCONT {
-	NEWDICT
-}
-IFNOT
-PUSHINT 64
-DICTUSETB
-NEWC STDICT ENDC
-POPROOT
+PUSHINT $generateConstructorProtection$
+CALL 1
 ; Decode input parameters
 DROP
 PUSHINT $constructor_TestBody$
@@ -33,6 +15,7 @@ RET
 ;; Function: constructor_TestBody
 
 .globl	send
+.public	send
 .type	send, @function
 ; Decode input parameters
 PUSHINT 256

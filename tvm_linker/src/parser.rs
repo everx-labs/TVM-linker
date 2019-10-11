@@ -82,6 +82,7 @@ struct Object {
     pub name: String,
     pub size: usize,
     pub index: usize,
+    pub public: bool,
     pub dtype: ObjectType,
 }
 
@@ -91,6 +92,7 @@ impl Object {
             name,
             size: 0,
             index: 0,
+            public: false,
             dtype: ObjectType::from(stype),
         }
     }
@@ -103,16 +105,26 @@ impl Default for Object {
 }
 
 pub struct ParseEngine {
-    xrefs: HashMap<String, u32>,
+    /// .internal function references (name -> id)
     intrefs: HashMap<String, i32>,
-    aliases: HashMap<String, i32>,
-    globals: HashMap<String, Object>,
+    /// .internal functions bodies (id -> body)
     internals: HashMap<i32, String>,
+    //// map of aliases for function names
+    aliases: HashMap<String, i32>,
+    /// .globl functions references (name -> id)
+    xrefs: HashMap<String, u32>,
+    /// map of .global objects: functions (private and public)
+    /// or variables (name -> object)
+    globals: HashMap<String, Object>,
+    /// selector code
     entry_point: String,
+    /// starting key for objects in global memory dictionary
     globl_base: Ptr,
+    /// key for next object in global memory dictionary
     globl_ptr: Ptr,
     pub persistent_base: Ptr,
     persistent_ptr: Ptr,
+    ///Contract ABI info, used for correct function id calculation
     abi: Option<Contract>,
 }
 
@@ -124,9 +136,9 @@ const PATTERN_ALIAS:    &'static str = r"^[\t\s]*\.internal-alias (:[a-zA-Z0-9_]
 const PATTERN_GLBLBASE: &'static str = r"^[\t\s]*\.global-base[\t\s]+([0-9]+)";
 const PATTERN_PERSBASE: &'static str = r"^[\t\s]*\.persistent-base[\t\s]+([0-9]+)";
 const PATTERN_LABEL:    &'static str = r"^[\.a-zA-Z0-9_]+:";
-//const PATTERN_GLOBLSTART: &'static str = r"^([a-zA-Z0-9_]+):";
 const PATTERN_PARAM:    &'static str = r#"^[\t\s]+\.([a-zA-Z0-9_]+),?[\t\s]*([a-zA-Z0-9-_\s"]+)"#;
 const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*@([a-zA-Z]+)";
+const PATTERN_PUBLIC:   &'static str = r"^[\t\s]*\.public[\t\s]+([a-zA-Z0-9_\.]+)";
 const PATTERN_SIZE:     &'static str = r"^[\t\s]*\.size[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([\.a-zA-Z0-9_]+)";
 const PATTERN_COMM:     &'static str = r"^[\t\s]*\.comm[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([0-9]+),[\t\s]*([0-9]+)";
 const PATTERN_ASCIZ:    &'static str = r#"^[\t\s]*\.asciz[\t\s]+"(.+)""#;
@@ -136,7 +148,6 @@ const GLOBL:    &'static str = ".globl";
 const INTERNAL: &'static str = ".internal";
 const SELECTOR: &'static str = ".selector";
 
-//const FUNCTION_TYPENAME:&'static str = "function";
 const DATA_TYPENAME:    &'static str = "object";
 
 const PERSISTENT_DATA_SUFFIX: &'static str = "_persistent";
@@ -201,17 +212,32 @@ impl ParseEngine {
         self.intrefs.iter().find(|i| *i.1 == id).map(|i| i.0.clone())
     }
 
+    #[allow(dead_code)]
     pub fn internal_by_name(&self, name: &str) -> Option<(i32, String)> {
         let id = self.intrefs.get(name)?;
         let body = self.internals.get(id).map(|v| v.to_owned())?;
         Some((*id, body))
     }
 
-    pub fn globals(&self) -> HashMap<u32, String> {
+    pub fn publics(&self) -> HashMap<u32, String> {
+        self.globals(true)
+    }
+
+    pub fn privates(&self) -> HashMap<u32, String> {
+        self.globals(false)
+    }
+
+    fn globals(&self, public: bool) -> HashMap<u32, String> {
         let mut funcs = HashMap::new();
         let iter = self.globals.iter().filter_map(|item| {
             match &item.1.dtype {
-                ObjectType::Function(ref func) => Some(func),
+                ObjectType::Function(ref func) => {
+                    if public == item.1.public {
+                        Some(func)
+                    } else {
+                        None
+                    }
+                },
                 _ => None,
             }
         });
@@ -292,6 +318,7 @@ impl ParseEngine {
         let base_glbl_regex = Regex::new(PATTERN_GLBLBASE).unwrap();
         let base_pers_regex = Regex::new(PATTERN_PERSBASE).unwrap();
         let ignored_regex = Regex::new(PATTERN_IGNORED).unwrap();
+        let public_regex = Regex::new(PATTERN_PUBLIC).unwrap();
 
         let mut section_name: String = String::new();
         let mut obj_body: String = "".to_owned();
@@ -307,7 +334,7 @@ impl ParseEngine {
             lnum += 1;
             if ignored_regex.is_match(&l) {
                 //ignore unused parameters
-                debug!("ignored: {}", l);
+                debug!("ignored: {}", l);            
             } else if base_glbl_regex.is_match(&l) {
                 // .global-base
                 let cap = base_glbl_regex.captures(&l).unwrap();
@@ -345,6 +372,11 @@ impl ParseEngine {
                 let size_str = cap.get(2).ok_or(format!("line {}: .size option is invalid", lnum))?.as_str();
                 let item_ref = self.globals.entry(name.clone()).or_insert(Object::new(name, ""));
                 item_ref.size = usize::from_str_radix(size_str, 10).unwrap_or(0);
+            } else if public_regex.is_match(&l) {
+                // .public x
+                let cap = public_regex.captures(&l).unwrap();
+                let name = cap.get(1).unwrap().as_str();
+                self.globals.get_mut(name).and_then(|obj| {obj.public = true; Some(obj)});
             } else if globl_regex.is_match(&l) { 
                 // .globl x
                 let cap = globl_regex.captures(&l).unwrap();
@@ -412,8 +444,16 @@ impl ParseEngine {
                 }
             },
             GLOBL => {
-               let abi = self.abi.clone();
-               let item = self.globals.get_mut(func).unwrap();
+                let abi = self.abi.clone();
+                let item = self.globals.get_mut(func).unwrap();
+                let is_public = abi.as_ref()
+                    .map(|abi| abi.functions().get(func).is_some())
+                    .unwrap_or(false);
+                //we do not reset publicity if symbol isn't included in ABI,
+                //because it can be marked as public in assembly.
+                if is_public {
+                    item.public = true;
+                }
                 match &mut item.dtype {
                     ObjectType::Function(fparams) => {
                         let func_id = gen_abi_id(abi, func);
@@ -597,7 +637,7 @@ impl ParseEngine {
         for (k, v) in &self.xrefs {
             println! ("Function {:30}: id={:08X}", k, v);
         }
-        for (k, v) in self.globals() {
+        for (k, v) in self.publics() {
             println! ("Function {:08X}\n{}\n{}\n{}", k, line, v, line);
         }        
         println!("{}\nInternal functions:\n{}", line, line);
@@ -751,7 +791,7 @@ mod tests {
         assert_eq!(parser.parse(source, vec![lib1, lib2], None), ok!());
     }
 
-        #[test]
+    #[test]
     fn test_external_linking() {
         let mut parser = ParseEngine::new();
         let lib1 = File::open("./tests/test_extlink_lib.tvm").unwrap();

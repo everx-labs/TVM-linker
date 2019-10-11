@@ -1,0 +1,241 @@
+.globl	constructor
+.public	constructor
+.type	constructor, @function
+PUSHINT $generateConstructorProtection$
+CALL 1
+; Decode input parameters
+DROP
+PUSHINT $constructor_Wallet$
+CALL 1
+RET
+
+.globl	constructor_Wallet
+.type	constructor_Wallet, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: constructor_Wallet
+PUSHCTR c7
+SECOND
+FIRST
+;; assign owner
+NEWC STU 256 ENDC CTOS
+PUSHINT 100
+PUSHROOT CTOS PLDDICT
+PUSHINT 64
+DICTUSET
+NEWC
+STDICT
+PUSHROOT CTOS SKIPDICT
+STSLICER
+ENDC
+POPROOT
+
+.globl	sendTransaction
+.public	sendTransaction
+.type	sendTransaction, @function
+; Decode input parameters
+PUSHINT 256
+PUSHINT $smart_ldu$
+CALL 1
+PUSHINT 128
+PUSHINT $smart_ldu$
+CALL 1
+PUSHINT 1
+PUSHINT $smart_ldi$
+CALL 1
+DROP
+PUSHINT $sendTransaction_internal$
+CALL 1
+RET
+
+.globl	sendTransaction_internal
+.type	sendTransaction_internal, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: sendTransaction_internal
+;; param: dest
+;; param: value
+;; param: bounce
+PUSHCTR c7
+SECOND
+FIRST
+;; owner
+;; stack=4
+PUSHINT 100
+PUSHROOT CTOS PLDDICT
+PUSHINT 64
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; ==
+EQUAL
+;; subscription
+;; stack=4
+PUSHINT 101
+PUSHROOT CTOS PLDDICT
+PUSHINT 64
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+PUSHINT 0
+;; address
+UFITS 256
+;; !=
+NEQ
+;; get member sender
+PUSHCTR c7
+SECOND
+SECOND
+;; subscription
+;; stack=6
+PUSHINT 101
+PUSHROOT CTOS PLDDICT
+PUSHINT 64
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; ==
+EQUAL
+;; &&
+AND
+;; ||
+OR
+THROWIFNOT 100
+;; value
+;; stack=3
+PUSH s1
+PUSHINT 0
+;; >
+GREATER
+;; value
+;; stack=4
+PUSH s2
+;; get member balance
+PUSHINT $get_contract_balance$
+CALL 1
+;; <
+LESS
+;; &&
+AND
+THROWIFNOT 102
+;; dest
+;; stack=3
+PUSH s2
+PUSHINT 0
+;; address
+UFITS 256
+;; !=
+NEQ
+THROWIFNOT 103
+;; dest
+;; stack=3
+PUSH s2
+;; value
+;; stack=4
+PUSH s2
+;; bounce
+;; stack=5
+PUSH s2
+PUSHINT 0
+PUSHINT $accurate_transfer$
+CALL 1
+BLKDROP 3
+
+.globl	setSubscriptionAccount
+.public	setSubscriptionAccount
+.type	setSubscriptionAccount, @function
+; Decode input parameters
+PUSHINT 256
+PUSHINT $smart_ldu$
+CALL 1
+DROP
+PUSHINT $setSubscriptionAccount_internal$
+CALL 1
+RET
+
+.globl	setSubscriptionAccount_internal
+.type	setSubscriptionAccount_internal, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: setSubscriptionAccount_internal
+;; param: addr
+PUSHCTR c7
+SECOND
+FIRST
+;; owner
+;; stack=2
+PUSHINT 100
+PUSHROOT CTOS PLDDICT
+PUSHINT 64
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; ==
+EQUAL
+THROWIFNOT 100
+;; addr
+;; stack=1
+DUP
+;; assign subscription
+NEWC STU 256 ENDC CTOS
+PUSHINT 101
+PUSHROOT CTOS PLDDICT
+PUSHINT 64
+DICTUSET
+NEWC
+STDICT
+PUSHROOT CTOS SKIPDICT
+STSLICER
+ENDC
+POPROOT
+DROP
+
+.globl	getSubscriptionAccount
+.public	getSubscriptionAccount
+.type	getSubscriptionAccount, @function
+; Decode input parameters
+DROP
+PUSHINT $getSubscriptionAccount_internal$
+CALL 1
+;; emitting 1 value(s)
+NEWC
+PUSHINT $getSubscriptionAccount$
+PUSHINT 2147483648
+OR
+STUR 32
+NEWC
+PUSH s2
+STUR 256
+STBREFR
+ENDC CTOS
+PUSHINT $send_ext_msg$
+CALL 1
+RET
+
+.globl	getSubscriptionAccount_internal
+.type	getSubscriptionAccount_internal, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: getSubscriptionAccount_internal
+;; subscription
+;; stack=0
+PUSHINT 101
+PUSHROOT CTOS PLDDICT
+PUSHINT 64
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; return
+RET
+
+.globl	fallback
+.type	fallback, @function
+DROP
+RET
+
+.globl	onBounce
+.type	onBounce, @function
+DROP
+RET
+
