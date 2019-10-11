@@ -4,17 +4,36 @@ RET
 
 .globl	constructor
 .type	constructor, @function
-DROP
-NEWDICT
+; protect constructor from twice call
+PUSHINT 1
+PUSHROOT CTOS PLDDICTQ
+PUSHCONT {
+	NEWDICT
+}
+IFNOT
+PUSHINT 64
+DICTUGET
+THROWIF 123
+PUSHINT 1 NEWC STU 1
+PUSHINT 1
+PUSHROOT CTOS PLDDICTQ
+PUSHCONT {
+	NEWDICT
+}
+IFNOT
+PUSHINT 64
+DICTUSETB
 NEWC STDICT ENDC
 POPROOT
+; Decode input parameters
+DROP
 
 .globl	at32
 .type	at32, @function
+; Decode input parameters
 PUSHINT 8
 PUSHINT $smart_ldu$
 CALL 1
-PUSHINT 32
 PUSHINT $decode_array$
 CALL 1
 DROP
@@ -22,9 +41,9 @@ PUSHINT $at32_internal$
 CALL 1
 ;; emitting 1 value(s)
 NEWC
-PUSHINT 0
-STUR 8
 PUSHINT $at32$
+PUSHINT 2147483648
+OR
 STUR 32
 NEWC
 PUSH s2
@@ -54,16 +73,15 @@ PUSHCONT { LDU 32 ENDS }
 PUSHCONT { PUSHINT 0 }
 IFELSE
 ;; return
-POP s1
-POP s1
+NIP
+NIP
 RET
 
 .globl	pair64
 .type	pair64, @function
-PUSHINT 64
+; Decode input parameters
 PUSHINT $decode_array$
 CALL 1
-PUSHINT 64
 PUSHINT $decode_array$
 CALL 1
 DROP
@@ -71,9 +89,9 @@ PUSHINT $pair64_internal$
 CALL 1
 ;; emitting 1 value(s)
 NEWC
-PUSHINT 0
-STUR 8
 PUSHINT $pair64$
+PUSHINT 2147483648
+OR
 STUR 32
 NEWC
 PUSH s2
@@ -113,18 +131,17 @@ IFELSE
 ;; +
 ADD
 ;; return
-POP s1
-POP s1
+NIP
+NIP
 ;; uint64
 UFITS 64
 RET
 
 .globl	pair8
 .type	pair8, @function
-PUSHINT 8
+; Decode input parameters
 PUSHINT $decode_array$
 CALL 1
-PUSHINT 8
 PUSHINT $decode_array$
 CALL 1
 DROP
@@ -132,9 +149,9 @@ PUSHINT $pair8_internal$
 CALL 1
 ;; emitting 1 value(s)
 NEWC
-PUSHINT 0
-STUR 8
 PUSHINT $pair8$
+PUSHINT 2147483648
+OR
 STUR 32
 NEWC
 PUSH s2
@@ -174,18 +191,18 @@ IFELSE
 ;; +
 ADD
 ;; return
-POP s1
-POP s1
+NIP
+NIP
 ;; uint8
 UFITS 8
 RET
 
 .globl	at256
 .type	at256, @function
+; Decode input parameters
 PUSHINT 8
 PUSHINT $smart_ldu$
 CALL 1
-PUSHINT 256
 PUSHINT $decode_array$
 CALL 1
 DROP
@@ -193,9 +210,9 @@ PUSHINT $at256_internal$
 CALL 1
 ;; emitting 1 value(s)
 NEWC
-PUSHINT 0
-STUR 8
 PUSHINT $at256$
+PUSHINT 2147483648
+OR
 STUR 32
 NEWC
 PUSH s2
@@ -225,16 +242,16 @@ PUSHCONT { LDU 256 ENDS }
 PUSHCONT { PUSHINT 0 }
 IFELSE
 ;; return
-POP s1
-POP s1
+NIP
+NIP
 RET
 
 .globl	atAt32
 .type	atAt32, @function
+; Decode input parameters
 PUSHINT 32
 PUSHINT $smart_ldu$
 CALL 1
-PUSHINT 32
 PUSHINT $decode_array$
 CALL 1
 PUSHINT 32
@@ -245,9 +262,9 @@ PUSHINT $atAt32_internal$
 CALL 1
 ;; emitting 1 value(s)
 NEWC
-PUSHINT 0
-STUR 8
 PUSHINT $atAt32$
+PUSHINT 2147483648
+OR
 STUR 32
 NEWC
 PUSH s2
@@ -289,10 +306,10 @@ RET
 
 .globl	atAt256
 .type	atAt256, @function
+; Decode input parameters
 PUSHINT 32
 PUSHINT $smart_ldu$
 CALL 1
-PUSHINT 256
 PUSHINT $decode_array$
 CALL 1
 PUSHINT 32
@@ -303,9 +320,9 @@ PUSHINT $atAt256_internal$
 CALL 1
 ;; emitting 1 value(s)
 NEWC
-PUSHINT 0
-STUR 8
 PUSHINT $atAt256$
+PUSHINT 2147483648
+OR
 STUR 32
 NEWC
 PUSH s2
@@ -347,6 +364,11 @@ RET
 
 .globl	fallback
 .type	fallback, @function
+DROP
+RET
+
+.globl	onBounce
+.type	onBounce, @function
 DROP
 RET
 

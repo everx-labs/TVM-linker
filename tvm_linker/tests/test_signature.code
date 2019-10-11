@@ -1,21 +1,39 @@
-
-.globl	constructor_external
-.type	constructor_external, @function
-DROP
-PUSHINT $constructor$
-CALL 1
-
 .globl	constructor
 .type	constructor, @function
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: constructor
-NEWDICT
+; protect constructor from twice call
+PUSHINT 1
+PUSHROOT CTOS PLDDICTQ
+PUSHCONT {
+	NEWDICT
+}
+IFNOT
+PUSHINT 64
+DICTUGET
+THROWIF 123
+PUSHINT 1 NEWC STU 1
+PUSHINT 1
+PUSHROOT CTOS PLDDICTQ
+PUSHCONT {
+	NEWDICT
+}
+IFNOT
+PUSHINT 64
+DICTUSETB
 NEWC STDICT ENDC
 POPROOT
-;; tvm_sender_pubkey
-;; stack=0
-PUSHINT $get_pubkey$
+; Decode input parameters
+DROP
+PUSHINT $constructor_TestSignature$
 CALL 1
+RET
+
+.globl	constructor_TestSignature
+.type	constructor_TestSignature, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: constructor_TestSignature
+PUSHCTR c7
+SECOND
+FIRST
 ;; decl: pubkey
 ;; pubkey
 ;; stack=1
@@ -23,13 +41,11 @@ DUP
 PUSHINT 0
 ;; !=
 NEQ
-;; require
-;; stack=2
 THROWIFNOT 100
 ;; fetch m_roles
-PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
-PUSHINT 256
+PUSHINT 100
+PUSHROOT CTOS PLDDICT
+PUSHINT 64
 DICTUGETOPTREF
 ;; pubkey
 ;; stack=2
@@ -41,32 +57,35 @@ ROTREV
 PUSHINT 256
 DICTUSET
 ;; assign m_roles
-PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
-PUSHINT 256
-DICTUSETREF
+PUSHINT 100
+PUSHROOT CTOS PLDDICT
+PUSHINT 64
+DICTUSETGETOPTREF DROP
 NEWC STDICT ENDC
 POPROOT
 ;; return
 DROP
 RET
 
-.globl	set_role_external
-.type	set_role_external, @function
-LDU 8
-DROP
-PUSHINT $set_role$
-CALL 1
-
 .globl	set_role
 .type	set_role, @function
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: set_role
-;; param: role
-;; tvm_sender_pubkey
-;; stack=1
-PUSHINT $get_pubkey$
+; Decode input parameters
+PUSHINT 8
+PUSHINT $smart_ldu$
 CALL 1
+DROP
+PUSHINT $set_role_internal$
+CALL 1
+RET
+
+.globl	set_role_internal
+.type	set_role_internal, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: set_role_internal
+;; param: role
+PUSHCTR c7
+SECOND
+FIRST
 ;; decl: pubkey
 ;; pubkey
 ;; stack=2
@@ -74,13 +93,11 @@ DUP
 PUSHINT 0
 ;; !=
 NEQ
-;; require
-;; stack=3
 THROWIFNOT 100
 ;; fetch m_roles
-PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
-PUSHINT 256
+PUSHINT 100
+PUSHROOT CTOS PLDDICT
+PUSHINT 64
 DICTUGETOPTREF
 ;; pubkey
 ;; stack=3
@@ -94,30 +111,31 @@ ROTREV
 PUSHINT 256
 DICTUSET
 ;; assign m_roles
-PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
-PUSHINT 256
-DICTUSETREF
+PUSHINT 100
+PUSHROOT CTOS PLDDICT
+PUSHINT 64
+DICTUSETGETOPTREF DROP
 NEWC STDICT ENDC
 POPROOT
 ;; return
 BLKDROP 2
 RET
 
-.globl	get_role_external
-.type	get_role_external, @function
-DROP
-PUSHINT $get_role$
-CALL 1
-
 .globl	get_role
 .type	get_role, @function
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: get_role
-;; tvm_sender_pubkey
-;; stack=0
-PUSHINT $get_pubkey$
+; Decode input parameters
+DROP
+PUSHINT $get_role_internal$
 CALL 1
+RET
+
+.globl	get_role_internal
+.type	get_role_internal, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: get_role_internal
+PUSHCTR c7
+SECOND
+FIRST
 ;; decl: pubkey
 ;; pubkey
 ;; stack=1
@@ -125,30 +143,60 @@ DUP
 PUSHINT 0
 ;; !=
 NEQ
-;; require
-;; stack=2
 THROWIFNOT 100
-;; m_roles
-;; stack=1
-PUSHINT 0
-PUSHROOT CTOS PLDDICTQ NULLSWAPIFNOT DROP
-PUSHINT 256
-DICTUGETOPTREF
 ;; pubkey
+;; stack=1
+DUP
+;; m_roles
 ;; stack=2
-PUSH s1
+PUSHINT 100
+PUSHROOT CTOS PLDDICT
+PUSHINT 64
+DICTUGETOPTREF
 ;; index
-SWAP
 PUSHINT 256
 DICTUGET
 PUSHCONT { LDU 256 ENDS }
 PUSHCONT { PUSHINT 0 }
 IFELSE
 ;; return
-POP s1
+NIP
 RET
+
+.globl	test_gas
+.type	test_gas, @function
+; Decode input parameters
+DROP
+PUSHINT $test_gas_internal$
+CALL 1
+RET
+
+.globl	test_gas_internal
+.type	test_gas_internal, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: test_gas_internal
+PRINTSTR test_gas1
+PUSHCTR c7
+SECOND
+FIRST
+;; decl: pubkey
+;; pubkey
+;; stack=1
+DUP
+PUSHINT 0
+;; !=
+NEQ
+THROWIFNOT 100
+PRINTSTR test_gas2
+DROP
 
 .globl	fallback
 .type	fallback, @function
 DROP
 RET
+
+.globl	onBounce
+.type	onBounce, @function
+DROP
+RET
+

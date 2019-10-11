@@ -4,21 +4,41 @@ RET
 
 .globl	constructor
 .type	constructor, @function
-DROP
-NEWDICT
+; protect constructor from twice call
+PUSHINT 1
+PUSHROOT CTOS PLDDICTQ
+PUSHCONT {
+	NEWDICT
+}
+IFNOT
+PUSHINT 64
+DICTUGET
+THROWIF 123
+PUSHINT 1 NEWC STU 1
+PUSHINT 1
+PUSHROOT CTOS PLDDICTQ
+PUSHCONT {
+	NEWDICT
+}
+IFNOT
+PUSHINT 64
+DICTUSETB
 NEWC STDICT ENDC
 POPROOT
+; Decode input parameters
+DROP
 
 .globl	main
 .type	main, @function
+; Decode input parameters
 DROP
 PUSHINT $main_internal$
 CALL 1
 ;; emitting 1 value(s)
 NEWC
-PUSHINT 0
-STUR 8
 PUSHINT $main$
+PUSHINT 2147483648
+OR
 STUR 32
 NEWC
 PUSH s2
@@ -34,13 +54,19 @@ RET
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: main_internal
 ;; get member value
-PUSHINT $get_msg_balance$
-CALL 1
+PUSHCTR c7
+SECOND
+THIRD
 ;; return
 RET
 
 .globl	fallback
 .type	fallback, @function
+DROP
+RET
+
+.globl	onBounce
+.type	onBounce, @function
 DROP
 RET
 

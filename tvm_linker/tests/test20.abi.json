@@ -1,27 +1,34 @@
 {
-	"ABI version": 0,
-	"functions": [{
-		"name": "test19",
-		"inputs": [
-			{"name":"a","type":"uint32"},
-			{"name":"b","type":"uint32"}
-		],
-		"outputs": [
-		]
-	}, {
-		"name": "constructor",
-		"inputs": [
-		],
-		"outputs": [
-		]
-	}],
-	"events": [{
-		"name": "TestEvent",
-		"inputs": [
-			{"name":"aaa","type":"uint32"},
-			{"name":"bbb","type":"uint32"}
-		],
-		"outputs": [
-		]
-	}]
+	"ABI version": 1,
+	"functions": [
+		{
+			"name": "test19",
+			"inputs": [
+				{"name":"a","type":"uint32"},
+				{"name":"b","type":"uint32"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "constructor",
+			"inputs": [
+			],
+			"outputs": [
+			]
+		}
+	],
+	"events": [
+		{
+			"name": "TestEvent",
+			"inputs": [
+				{"name":"aaa","type":"uint32"},
+				{"name":"bbb","type":"uint32"}
+			],
+			"outputs": [
+			]
+		}
+	],
+	"data": [
+	]
 }

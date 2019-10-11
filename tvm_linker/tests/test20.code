@@ -4,13 +4,33 @@ RET
 
 .globl	constructor
 .type	constructor, @function
-DROP
-NEWDICT
+; protect constructor from twice call
+PUSHINT 1
+PUSHROOT CTOS PLDDICTQ
+PUSHCONT {
+	NEWDICT
+}
+IFNOT
+PUSHINT 64
+DICTUGET
+THROWIF 123
+PUSHINT 1 NEWC STU 1
+PUSHINT 1
+PUSHROOT CTOS PLDDICTQ
+PUSHCONT {
+	NEWDICT
+}
+IFNOT
+PUSHINT 64
+DICTUSETB
 NEWC STDICT ENDC
 POPROOT
+; Decode input parameters
+DROP
 
 .globl	test19
 .type	test19, @function
+; Decode input parameters
 PUSHINT 32
 PUSHINT $smart_ldu$
 CALL 1
@@ -30,9 +50,9 @@ RET
 ;; param: b
 ;; emit TestEvent
 NEWC
-PUSHINT 0
-STUR 8
 PUSHINT $TestEvent$
+PUSHINT 2147483647
+AND
 STUR 32
 NEWC
 ;; aaa
@@ -57,6 +77,11 @@ RET
 
 .globl	fallback
 .type	fallback, @function
+DROP
+RET
+
+.globl	onBounce
+.type	onBounce, @function
 DROP
 RET
 

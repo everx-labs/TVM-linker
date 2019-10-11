@@ -1,24 +1,32 @@
 {
-	"ABI version": 0,
-	"functions": [{
-		"name": "on_get_allowance",
-		"inputs": [
-			{"name":"amount","type":"uint64"}
-		],
-		"outputs": [
-		]
-	}, {
-		"name": "get_allowance",
-		"inputs": [
-			{"name":"requester","type":"uint256"}
-		],
-		"outputs": [
-		]
-	}, {
-		"name": "constructor",
-		"inputs": [
-		],
-		"outputs": [
-		]
-	}]
+	"ABI version": 1,
+	"functions": [
+		{
+			"name": "on_get_allowance",
+			"inputs": [
+				{"name":"amount","type":"uint64"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "get_allowance",
+			"inputs": [
+				{"name":"requester","type":"uint256"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "constructor",
+			"inputs": [
+			],
+			"outputs": [
+			]
+		}
+	],
+	"events": [
+	],
+	"data": [
+	]
 }

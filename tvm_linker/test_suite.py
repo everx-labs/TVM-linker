@@ -325,7 +325,7 @@ def testCall():
 	addr = '1'*64
 	expect_success2('test_call1', 'send', '{"a": "0x' + addr + '"}', '', linker_options)
 	expect_output(r"destination : 0:1111111111111111111111111111111111111111111111111111111111111111")
-	expect_output(r"body_hex: 00bcee5314")
+	expect_output(r"body_hex: 459dde93")
 
 def testLlvmPiggyBank():
 	#it maybe '--sign key1' or '--internal 0' - test will work correctly
@@ -341,16 +341,16 @@ def testEvents():
 	compile2('event', 'tests')
 	expect_success2("event", "constructor", '{}', None, linker_options)
 	expect_success2("event", "emitValue", '{"id":"0x1234"}', None, linker_options)
-	expect_output(r"data: 006886dac2")
+	expect_output(r"data: 45b72e0e")
 	expect_success2("event", "returnValue", '{"id":"0x1234"}', None, linker_options)
-	expect_output(r"data: 006886dac2")
-	expect_output(r"data: 00e92ce792")
+	expect_output(r"data: 45b72e0e")
+	expect_output(r"data: 45b72e0e")
 
-testOld()
+#testOld()
 testArrays()
 testCall()
 testEvents()
-testLlvmPiggyBank()
+#testLlvmPiggyBank()
 
 SIGN = 'key1'
 compile1('hello.code', 'stdlib_c.tvm')
