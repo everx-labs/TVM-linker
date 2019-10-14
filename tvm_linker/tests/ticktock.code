@@ -1,5 +1,10 @@
     .internal-alias :main_ticktock,   -2
 
+    .globl constructor
+    .type constructor, @function
+constructor:
+
+
     .internal :main_ticktock
     PUSHCONT {
         PUSHINT 10
@@ -14,3 +19,7 @@
     .globl fallback
     .type fallback,@function
 fallback:
+
+    .globl onBounce
+    .type onBounce,@function
+onBounce:

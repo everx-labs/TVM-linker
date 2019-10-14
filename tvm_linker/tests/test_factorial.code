@@ -1,30 +1,52 @@
-.globl constructor_external
-.type constructor_external, @function
-DROP
-PUSHINT $constructor$
-CALL 1
-.globl constructor
-.type constructor, @function
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: constructor
-NEWDICT
+.globl	constructor
+.type	constructor, @function
+; protect constructor from twice call
+PUSHINT 1
+PUSHROOT CTOS PLDDICTQ
+PUSHCONT {
+	NEWDICT
+}
+IFNOT
+PUSHINT 64
+DICTUGET
+THROWIF 123
+PUSHINT 1 NEWC STU 1
+PUSHINT 1
+PUSHROOT CTOS PLDDICTQ
+PUSHCONT {
+	NEWDICT
+}
+IFNOT
+PUSHINT 64
+DICTUSETB
 NEWC STDICT ENDC
 POPROOT
+; Decode input parameters
+DROP
+PUSHINT $constructor_TestFuncs$
+CALL 1
+RET
+
+.globl	constructor_TestFuncs
+.type	constructor_TestFuncs, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: constructor_TestFuncs
 PUSHINT 0
 ;; assign m_accumulator
 NEWC STU 256 ENDC CTOS
-PUSHINT 0
+PUSHINT 100
 PUSHROOT CTOS PLDDICT
-PUSHINT 256
+PUSHINT 64
 DICTUSET
 NEWC STDICT ENDC
 POPROOT
 ;; return
 RET
-.globl fact
-.type fact, @function
+
+.globl	fact_internal
+.type	fact_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: fact
+;; Function: fact_internal
 ;; param: n
 ;; if
 ;; n
@@ -36,7 +58,7 @@ EQUAL
 PUSHCONT {
 	PUSHINT 1
 	;; return
-	POP s1
+	NIP
 	RET
 }
 IFJMP
@@ -49,29 +71,48 @@ PUSH s1
 PUSHINT 1
 ;; -
 SUB
-PUSHINT $fact$
+PUSHINT $fact_internal$
 CALL 1
 ;; *
 MUL
 ;; return
-POP s1
+NIP
 RET
-.globl main_external
-.type main_external, @function
-LDU 16
-DROP
-PUSHINT $main$
+
+.globl	main
+.type	main, @function
+; Decode input parameters
+PUSHINT 16
+PUSHINT $smart_ldu$
 CALL 1
-.globl main
-.type main, @function
+DROP
+PUSHINT $main_internal$
+CALL 1
+;; emitting 1 value(s)
+NEWC
+PUSHINT $main$
+PUSHINT 2147483648
+OR
+STUR 32
+NEWC
+PUSH s2
+STUR 256
+STBREFR
+ENDC CTOS
+PUSHINT $send_ext_msg$
+CALL 1
+RET
+
+.globl	main_internal
+.type	main_internal, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: main
+;; Function: main_internal
 ;; param: n
 ;; m_accumulator
 ;; stack=1
-PUSHINT 0
+PUSHINT 100
 PUSHROOT CTOS PLDDICT
-PUSHINT 256
+PUSHINT 64
 DICTUGET
 PUSHCONT { LDU 256 ENDS }
 PUSHCONT { PUSHINT 0 }
@@ -79,32 +120,38 @@ IFELSE
 ;; n
 ;; stack=2
 PUSH s1
-PUSHINT $fact$
+PUSHINT $fact_internal$
 CALL 1
 ;; +
 ADD
 ;; assign m_accumulator
 NEWC STU 256 ENDC CTOS
-PUSHINT 0
+PUSHINT 100
 PUSHROOT CTOS PLDDICT
-PUSHINT 256
+PUSHINT 64
 DICTUSET
 NEWC STDICT ENDC
 POPROOT
 ;; m_accumulator
 ;; stack=1
-PUSHINT 0
+PUSHINT 100
 PUSHROOT CTOS PLDDICT
-PUSHINT 256
+PUSHINT 64
 DICTUGET
 PUSHCONT { LDU 256 ENDS }
 PUSHCONT { PUSHINT 0 }
 IFELSE
 ;; return
-POP s1
+NIP
 RET
 
 .globl	fallback
 .type	fallback, @function
 DROP
 RET
+
+.globl	onBounce
+.type	onBounce, @function
+DROP
+RET
+

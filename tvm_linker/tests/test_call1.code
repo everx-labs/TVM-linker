@@ -1,5 +1,27 @@
 .globl	constructor
 .type	constructor, @function
+; protect constructor from twice call
+PUSHINT 1
+PUSHROOT CTOS PLDDICTQ
+PUSHCONT {
+	NEWDICT
+}
+IFNOT
+PUSHINT 64
+DICTUGET
+THROWIF 123
+PUSHINT 1 NEWC STU 1
+PUSHINT 1
+PUSHROOT CTOS PLDDICTQ
+PUSHCONT {
+	NEWDICT
+}
+IFNOT
+PUSHINT 64
+DICTUSETB
+NEWC STDICT ENDC
+POPROOT
+; Decode input parameters
 DROP
 PUSHINT $constructor_TestBody$
 CALL 1
@@ -9,12 +31,10 @@ RET
 .type	constructor_TestBody, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: constructor_TestBody
-NEWDICT
-NEWC STDICT ENDC
-POPROOT
 
 .globl	send
 .type	send, @function
+; Decode input parameters
 PUSHINT 256
 PUSHINT $smart_ldu$
 CALL 1
@@ -33,8 +53,6 @@ RET
 ;; stack=1
 DUP
 NEWC
-PUSHINT 0
-STUR 8
 PUSHINT $request$
 STUR 32
 NEWC
@@ -59,6 +77,11 @@ DROP
 
 .globl	fallback
 .type	fallback, @function
+DROP
+RET
+
+.globl	onBounce
+.type	onBounce, @function
 DROP
 RET
 
