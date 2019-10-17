@@ -37,7 +37,7 @@ use std::io::{BufReader, Read};
 use testcall::perform_contract_call;
 use tvm::stack::{BuilderData, SliceData};
 
-fn main() {
+fn main() -> Result<(), i32> {
     println!(
         "TVM linker {}\nCOMMIT_ID: {}\nBUILD_DATE: {}\nCOMMIT_DATE: {}\nGIT_BRANCH: {}",
         env!("CARGO_PKG_VERSION"),
@@ -46,9 +46,10 @@ fn main() {
         env!("BUILD_GIT_DATE"),
         env!("BUILD_GIT_BRANCH")
     );
-    if let Err(err_str) = linker_main() {
-        println!("error: {}", err_str);
-    }
+    linker_main().map_err(|err_str| {
+        println!("Error: {}", err_str);
+        1
+    })
 }
 
 fn linker_main() -> Result<(), String> {
