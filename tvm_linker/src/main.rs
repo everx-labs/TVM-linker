@@ -64,7 +64,8 @@ fn linker_main() -> Result<(), String> {
             (about: "Decode real TON message")
             (version: "0.1")
             (author: "tonlabs")
-            (@arg INPUT: +required +takes_value "TON message file")
+            (@arg INPUT: +required +takes_value "BOC file")
+            (@arg TVC: --tvc "BOC file is tvc file")
         )
         (@subcommand compile => 
             (about: "compile contract")
@@ -199,7 +200,10 @@ fn linker_main() -> Result<(), String> {
 
     //SUBCOMMAND DECODE
     if let Some(decode_matches) = matches.subcommand_matches("decode") {
-        decode_boc(decode_matches.value_of("INPUT").unwrap());
+        decode_boc(
+            decode_matches.value_of("INPUT").unwrap(),
+            decode_matches.is_present("TVC"),
+        );
         return ok!();
     }
 
