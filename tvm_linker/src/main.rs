@@ -37,7 +37,7 @@ use std::io::{BufReader, Read};
 use testcall::perform_contract_call;
 use tvm::stack::{BuilderData, SliceData};
 
-fn main() {
+fn main() -> Result<(), i32> {
     println!(
         "TVM linker {}\nCOMMIT_ID: {}\nBUILD_DATE: {}\nCOMMIT_DATE: {}\nGIT_BRANCH: {}",
         env!("CARGO_PKG_VERSION"),
@@ -46,9 +46,10 @@ fn main() {
         env!("BUILD_GIT_DATE"),
         env!("BUILD_GIT_BRANCH")
     );
-    if let Err(err_str) = linker_main() {
-        println!("error: {}", err_str);
-    }
+    linker_main().map_err(|err_str| {
+        println!("Error: {}", err_str);
+        1
+    })
 }
 
 fn linker_main() -> Result<(), String> {
@@ -64,7 +65,8 @@ fn linker_main() -> Result<(), String> {
             (about: "Decode real TON message")
             (version: "0.1")
             (author: "tonlabs")
-            (@arg INPUT: +required +takes_value "TON message file")
+            (@arg INPUT: +required +takes_value "BOC file")
+            (@arg TVC: --tvc "BOC file is tvc file")
         )
         (@subcommand compile => 
             (about: "compile contract")
@@ -199,7 +201,10 @@ fn linker_main() -> Result<(), String> {
 
     //SUBCOMMAND DECODE
     if let Some(decode_matches) = matches.subcommand_matches("decode") {
-        decode_boc(decode_matches.value_of("INPUT").unwrap());
+        decode_boc(
+            decode_matches.value_of("INPUT").unwrap(),
+            decode_matches.is_present("TVC"),
+        );
         return ok!();
     }
 
