@@ -18,7 +18,6 @@ pub struct Program {
 }
 
 const SELECTOR_INTERNAL: &str = "
-    DROP
     DICTPUSHCONST 32
 	DICTUGETJMP
 ";
@@ -199,7 +198,7 @@ mod tests {
         };
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
-        assert_eq!(perform_contract_call(name, body, Some(None), false, false, None, None), 0);
+        assert_eq!(perform_contract_call(name, body, Some(None), true, false, None, None), 0);
     }
 
     #[test]

@@ -17,17 +17,67 @@ pub fn ptr_to_builder(n: Ptr) -> Result<BuilderData, String> {
     Ok(b)
 }
 
+#[derive(Clone)]
+struct Func {
+    pub id: u32,
+    pub body: String,
+}
+
+struct Data {
+    pub addr: Ptr,
+    pub values: Vec<DataValue>,
+    pub persistent: bool,
+}
+
 enum ObjectType {
     None,
-    Function((u32, String)),
-    Data { addr: Ptr, values: Vec<DataValue>, persistent: bool },
+    Function(Func),
+    Data(Data),
 }
+
 impl From<&str> for ObjectType {
     fn from(stype: &str) -> ObjectType {
         match stype {
-            "function" => ObjectType::Function((0, String::new())),
-            "object" => ObjectType::Data{ addr: 0, values: vec![], persistent: false },
+            "function" => ObjectType::Function(Func { id: 0, body: String::new() }),
+            "object" => ObjectType::Data(Data { addr: 0, values: vec![], persistent: false }),
             _ => ObjectType::None,
+        }
+    }
+}
+
+impl ObjectType {
+    pub fn is_func(&self) -> bool {
+        match self {
+            ObjectType::Function(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn func_mut(&mut self) -> Option<&mut Func> {
+        match self {
+            ObjectType::Function(params) => Some(params),
+            _ => None,
+        }
+    }
+
+    pub fn func(&self) -> Option<&Func> {
+        match self {
+            ObjectType::Function(params) => Some(params),
+            _ => None,
+        }
+    }
+
+    pub fn data_mut(&mut self) -> Option<&mut Data> {
+        match self {
+            ObjectType::Data(params) => Some(params),
+            _ => None,
+        }
+    }
+
+    pub fn data(&self) -> Option<&Data> {
+        match self {
+            ObjectType::Data(params) => Some(params),
+            _ => None,
         }
     }
 }
@@ -116,6 +166,8 @@ pub struct ParseEngine {
     /// map of .global objects: functions (private and public)
     /// or variables (name -> object)
     globals: HashMap<String, Object>,
+    /// ID for next private global function
+    next_private_globl_funcid: u32,
     /// selector code
     entry_point: String,
     /// starting key for objects in global memory dictionary
@@ -163,6 +215,7 @@ impl ParseEngine {
             intrefs:    HashMap::new(), 
             aliases:    HashMap::new(),
             globals:    HashMap::new(), 
+            next_private_globl_funcid: 0,
             internals:  HashMap::new(),
             entry_point: String::new(),
             globl_base: 0,
@@ -186,6 +239,8 @@ impl ParseEngine {
             lib.seek(SeekFrom::Start(0))
                 .map_err(|e| format!("error while seeking source file: {}", e))?;            
         }
+
+        self.next_private_globl_funcid = 0;
         for lib in &mut sources {
             self.parse_code(lib, false)?;
         }
@@ -230,28 +285,26 @@ impl ParseEngine {
     fn globals(&self, public: bool) -> HashMap<u32, String> {
         let mut funcs = HashMap::new();
         let iter = self.globals.iter().filter_map(|item| {
-            match &item.1.dtype {
-                ObjectType::Function(ref func) => {
-                    if public == item.1.public {
-                        Some(func)
-                    } else {
-                        None
-                    }
-                },
-                _ => None,
-            }
+            item.1.dtype.func().and_then(|i| {
+                if public == item.1.public {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
         });
         for i in iter {
-            funcs.insert(i.0, i.1.clone());
+            funcs.insert(i.id, i.body.clone());
         }
         funcs
     }
 
     pub fn global_name(&self, id: u32) -> Option<String> {
         self.globals.iter().find(|item| {
-            match item.1.dtype {
-                ObjectType::Function(ref func) => func.0 == id,
-                _ => false,
+            if let Some(func) = item.1.dtype.func() {
+                func.id == id
+            } else { 
+                false
             }
         })
         .map(|i| i.0.clone())
@@ -259,10 +312,7 @@ impl ParseEngine {
 
     pub fn global_by_name(&self, name: &str) -> Option<(u32, String)> {
         self.globals.get(name).and_then(|v| {
-            match v.dtype {
-                ObjectType::Function(ref func) => Some(func.clone()),
-                _ => None,
-            }
+            v.dtype.func().and_then(|func| Some((func.id.clone(), func.body.clone()) ))
         })
     }
    
@@ -271,38 +321,46 @@ impl ParseEngine {
             PUBKEY_NAME.to_string(), 
             Object::new(PUBKEY_NAME.to_string(), DATA_TYPENAME)
         );
-        match self.globals.get_mut(PUBKEY_NAME).unwrap().dtype {
-            ObjectType::Data {addr: _, ref mut values, ref mut persistent} => {
-                *persistent = true;
-                values.push(DataValue::Empty);
-            },
-            _ => ()
-        };
+        self.globals.get_mut(PUBKEY_NAME)
+            .unwrap()
+            .dtype
+            .data_mut()
+            .and_then(|data| {
+                data.persistent = true;
+                data.values.push(DataValue::Empty);
+                Some(data)
+            });
 
         self.globals.insert(
             SCI_NAME.to_string(), 
             Object::new(SCI_NAME.to_string(), DATA_TYPENAME)
         );
-        match self.globals.get_mut(SCI_NAME).unwrap().dtype {
-            ObjectType::Data {addr: _, ref mut values, ref mut persistent} => {
-                *persistent = false;
-                values.push(DataValue::Empty);
-            },
-            _ => ()
-        };
+        self.globals.get_mut(SCI_NAME)
+            .unwrap()
+            .dtype
+            .data_mut()
+            .and_then(|data| {
+                data.persistent = false;
+                data.values.push(DataValue::Empty);
+                Some(data)
+            });
         ok!()
     }
 
     fn update_predefined(&mut self) {
-        if let ObjectType::Data { ref mut addr, values: _, persistent: _ } 
-            = self.globals.get_mut(SCI_NAME).unwrap().dtype {
-            *addr = self.globl_base;
-        }
+        let data = self.globals.get_mut(SCI_NAME)
+            .unwrap()
+            .dtype
+            .data_mut()
+            .unwrap();
+        data.addr = self.globl_base; 
 
-        if let ObjectType::Data { ref mut addr, values: _, persistent: _ } 
-            = self.globals.get_mut(PUBKEY_NAME).unwrap().dtype {
-            *addr = self.persistent_base;
-        }
+        let data = self.globals.get_mut(PUBKEY_NAME)
+            .unwrap()
+            .dtype
+            .data_mut()
+            .unwrap();
+        data.addr = self.persistent_base; 
     }
 
     pub fn parse_code<R: BufRead>(&mut self, reader: &mut R, first_pass: bool) -> Result<(), String> {
@@ -434,6 +492,16 @@ impl ParseEngine {
         ok!()
     }
 
+    fn create_function_id(&mut self, func: &str) -> u32 {
+        let is_public = self.globals.get(func).unwrap().public;
+        if is_public {
+            gen_abi_id(self.abi.clone(), func)
+        } else {
+            self.next_private_globl_funcid += 1;
+            self.next_private_globl_funcid
+        }
+    }
+
     fn update(&mut self, section: &str, func: &str, body: &str, first_pass: bool) -> Result<(), String> {
         match section {
             SELECTOR => {
@@ -444,45 +512,49 @@ impl ParseEngine {
                 }
             },
             GLOBL => {
-                let abi = self.abi.clone();
-                let item = self.globals.get_mut(func).unwrap();
-                let is_public = abi.as_ref()
-                    .map(|abi| abi.functions().get(func).is_some())
+                let is_public = self.abi.as_ref()
+                    .map(|abi| {
+                        abi.functions().get(func).is_some() 
+                        || abi.events().get(func).is_some() 
+                    })
                     .unwrap_or(false);
                 //we do not reset publicity if symbol isn't included in ABI,
                 //because it can be marked as public in assembly.
                 if is_public {
-                    item.public = true;
+                    self.globals.get_mut(func)
+                        .unwrap()
+                        .public = true;
                 }
-                match &mut item.dtype {
-                    ObjectType::Function(fparams) => {
-                        let func_id = gen_abi_id(abi, func);
-                        *fparams = (func_id, body.trim_end().to_string());
-                        let prev = self.xrefs.insert(func.to_string(), func_id);
-                        if first_pass && prev.is_some() {
-                            Err(format!(
-                                "global function with id = {:x} and name \"{}\" already exist", 
-                                func_id,
-                                func
-                            ))?;
-                        }
-                    },
-                    ObjectType::Data { addr, ref mut values, persistent } => {
-                        if func.ends_with(PERSISTENT_DATA_SUFFIX) {
-                            *persistent = true;
-                        }
-                        Self::update_data(body, func, &mut item.size, values)?;
-                        let offset = (values.len() as Ptr) * WORD_SIZE;
-                        if *persistent { 
-                            *addr = self.persistent_ptr;
-                            self.persistent_ptr += offset;
-                        } else { 
-                            *addr = self.globl_ptr;
-                            self.globl_ptr += offset;
-                        }
-                    },
-                    ObjectType::None => Err(format!("The type of global object {} is unknown. Use .type {}, xxx", func, func))?,
-                };
+                if self.globals.get(func)
+                    .unwrap()
+                    .dtype.is_func() {
+                    let func_id = self.create_function_id(func);
+                    let item = self.globals.get_mut(func).unwrap();
+                    let params = item.dtype.func_mut().unwrap();
+                    params.id = func_id;
+                    params.body = body.trim_end().to_string();
+                    let prev = self.xrefs.insert(func.to_string(), func_id);
+                    if first_pass && prev.is_some() {
+                        Err(format!(
+                            "global function with id = {:x} and name \"{}\" already exist", 
+                            func_id,
+                            func,
+                        ))?;
+                    }
+                } else {
+                    let item = self.globals.get_mut(func).unwrap();
+                    let data = item.dtype.data_mut().unwrap();
+                    Self::update_data(body, func, &mut item.size, &mut data.values)?;
+                    let offset = (data.values.len() as Ptr) * WORD_SIZE;
+                    if func.ends_with(PERSISTENT_DATA_SUFFIX) {
+                        data.persistent = true;
+                        data.addr = self.persistent_ptr;
+                        self.persistent_ptr += offset;
+                    } else { 
+                        data.addr = self.globl_ptr;
+                        self.globl_ptr += offset;
+                    }
+                }
             },
             INTERNAL => {
                 let f_id = self.aliases.get(func).ok_or(format!("id for '{}' not found", func))?;
@@ -571,13 +643,17 @@ impl ParseEngine {
     }
 
     fn build_data(&self) -> Option<Arc<CellData>> {
-        let filter = |is_persistent: bool| self.globals.iter().filter_map(move |item| {
-            match &item.1.dtype {
-                ObjectType::Data { addr, values, persistent } => 
-                    if *persistent == is_persistent { Some((addr, values)) } else { None },
-                _ => None,
-            }
-        });
+        let filter = |persistent: bool| {
+            self.globals.iter().filter_map(move |item| {
+                item.1.dtype.data().and_then(|data| {
+                    if data.persistent == persistent { 
+                        Some((&data.addr, &data.values)) 
+                    } else {
+                        None
+                    }
+                })
+            })
+        };
         let globl_data_vec: Vec<(&Ptr, &Vec<DataValue>)> = filter(false).collect();
         let pers_data_vec: Vec<(&Ptr, &Vec<DataValue>)> = filter(true).collect();
 
@@ -614,12 +690,13 @@ impl ParseEngine {
 
     fn replace_labels(&mut self, line: &str) -> Result<String, String> {
         resolve_name(line, |name| self.xrefs.get(name).map(|id| id.clone()))
-            .or_else(|_| resolve_name(line, |name| self.intrefs.get(name).map(|id| id.clone())))
+            .or_else(|_| resolve_name(line, |name| self.intrefs.get(name).and_then(|id| {
+                Some(id.clone())
+            })))
             .or_else(|_| resolve_name(line, |name| self.globals.get(name).and_then(|obj| {
-                match &obj.dtype {
-                    ObjectType::Data { addr, values: _, persistent: _ } => Some(addr.clone()),
-                    _ => None,
-                }           
+                obj.dtype.data().and_then(|data| {
+                    Some(data.addr.clone())
+                })
             })))
             .or_else(|_| resolve_name(line, |name| {
                 match name {
