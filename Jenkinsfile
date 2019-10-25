@@ -21,6 +21,12 @@ pipeline {
         disableConcurrentBuilds()
         parallelsAlwaysFailFast()
     }
+    triggers {
+        upstream(
+            upstreamProjects: 'TON-SDK/master, walletapi/sdk-emulator/master',
+            threshold: hudson.model.Result.SUCCESS
+        )
+    }
     stages {
         stage ('Build') {
             steps {
