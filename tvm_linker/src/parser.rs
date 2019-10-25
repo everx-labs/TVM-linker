@@ -180,16 +180,16 @@ pub struct ParseEngine {
     abi: Option<Contract>,
 }
 
-const PATTERN_GLOBL:    &'static str = r"^[\t\s]*\.globl[\t\s]+([a-zA-Z0-9_\.]+)";
+const PATTERN_GLOBL:    &'static str = r"^[\t\s]*\.globl[\t\s]+(:?[a-zA-Z0-9_\.]+)";
 const PATTERN_DATA:     &'static str = r"^[\t\s]*\.data";
 const PATTERN_INTERNAL: &'static str = r"^[\t\s]*\.internal[\t\s]+(:[a-zA-Z0-9_]+)";
 const PATTERN_SELECTOR: &'static str = r"^[\t\s]*\.selector";
 const PATTERN_ALIAS:    &'static str = r"^[\t\s]*\.internal-alias (:[a-zA-Z0-9_]+),[\t\s]+(-?\d+)";
 const PATTERN_GLBLBASE: &'static str = r"^[\t\s]*\.global-base[\t\s]+([0-9]+)";
 const PATTERN_PERSBASE: &'static str = r"^[\t\s]*\.persistent-base[\t\s]+([0-9]+)";
-const PATTERN_LABEL:    &'static str = r"^[\.a-zA-Z0-9_]+:";
+const PATTERN_LABEL:    &'static str = r"^:?[\.a-zA-Z0-9_]+:";
 const PATTERN_PARAM:    &'static str = r#"^[\t\s]+\.([a-zA-Z0-9_]+),?[\t\s]*([a-zA-Z0-9-_\s"]+)"#;
-const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*@([a-zA-Z]+)";
+const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+(:?[a-zA-Z0-9_\.]+),[\t\s]*@([a-zA-Z]+)";
 const PATTERN_PUBLIC:   &'static str = r"^[\t\s]*\.public[\t\s]+([a-zA-Z0-9_\.]+)";
 const PATTERN_SIZE:     &'static str = r"^[\t\s]*\.size[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([\.a-zA-Z0-9_]+)";
 const PATTERN_COMM:     &'static str = r"^[\t\s]*\.comm[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([0-9]+),[\t\s]*([0-9]+)";
