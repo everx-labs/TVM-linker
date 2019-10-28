@@ -17,17 +17,67 @@ pub fn ptr_to_builder(n: Ptr) -> Result<BuilderData, String> {
     Ok(b)
 }
 
+#[derive(Clone)]
+struct Func {
+    pub id: u32,
+    pub body: String,
+}
+
+struct Data {
+    pub addr: Ptr,
+    pub values: Vec<DataValue>,
+    pub persistent: bool,
+}
+
 enum ObjectType {
     None,
-    Function((u32, String)),
-    Data { addr: Ptr, values: Vec<DataValue>, persistent: bool },
+    Function(Func),
+    Data(Data),
 }
+
 impl From<&str> for ObjectType {
     fn from(stype: &str) -> ObjectType {
         match stype {
-            "function" => ObjectType::Function((0, String::new())),
-            "object" => ObjectType::Data{ addr: 0, values: vec![], persistent: false },
+            "function" => ObjectType::Function(Func { id: 0, body: String::new() }),
+            "object" => ObjectType::Data(Data { addr: 0, values: vec![], persistent: false }),
             _ => ObjectType::None,
+        }
+    }
+}
+
+impl ObjectType {
+    pub fn is_func(&self) -> bool {
+        match self {
+            ObjectType::Function(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn func_mut(&mut self) -> Option<&mut Func> {
+        match self {
+            ObjectType::Function(params) => Some(params),
+            _ => None,
+        }
+    }
+
+    pub fn func(&self) -> Option<&Func> {
+        match self {
+            ObjectType::Function(params) => Some(params),
+            _ => None,
+        }
+    }
+
+    pub fn data_mut(&mut self) -> Option<&mut Data> {
+        match self {
+            ObjectType::Data(params) => Some(params),
+            _ => None,
+        }
+    }
+
+    pub fn data(&self) -> Option<&Data> {
+        match self {
+            ObjectType::Data(params) => Some(params),
+            _ => None,
         }
     }
 }
@@ -82,6 +132,7 @@ struct Object {
     pub name: String,
     pub size: usize,
     pub index: usize,
+    pub public: bool,
     pub dtype: ObjectType,
 }
 
@@ -91,6 +142,7 @@ impl Object {
             name,
             size: 0,
             index: 0,
+            public: false,
             dtype: ObjectType::from(stype),
         }
     }
@@ -103,30 +155,42 @@ impl Default for Object {
 }
 
 pub struct ParseEngine {
-    xrefs: HashMap<String, u32>,
+    /// .internal function references (name -> id)
     intrefs: HashMap<String, i32>,
-    aliases: HashMap<String, i32>,
-    globals: HashMap<String, Object>,
+    /// .internal functions bodies (id -> body)
     internals: HashMap<i32, String>,
+    //// map of aliases for function names
+    aliases: HashMap<String, i32>,
+    /// .globl functions references (name -> id)
+    xrefs: HashMap<String, u32>,
+    /// map of .global objects: functions (private and public)
+    /// or variables (name -> object)
+    globals: HashMap<String, Object>,
+    /// ID for next private global function
+    next_private_globl_funcid: u32,
+    /// selector code
     entry_point: String,
+    /// starting key for objects in global memory dictionary
     globl_base: Ptr,
+    /// key for next object in global memory dictionary
     globl_ptr: Ptr,
     pub persistent_base: Ptr,
     persistent_ptr: Ptr,
+    ///Contract ABI info, used for correct function id calculation
     abi: Option<Contract>,
 }
 
-const PATTERN_GLOBL:    &'static str = r"^[\t\s]*\.globl[\t\s]+([a-zA-Z0-9_\.]+)";
+const PATTERN_GLOBL:    &'static str = r"^[\t\s]*\.globl[\t\s]+(:?[a-zA-Z0-9_\.]+)";
 const PATTERN_DATA:     &'static str = r"^[\t\s]*\.data";
 const PATTERN_INTERNAL: &'static str = r"^[\t\s]*\.internal[\t\s]+(:[a-zA-Z0-9_]+)";
 const PATTERN_SELECTOR: &'static str = r"^[\t\s]*\.selector";
 const PATTERN_ALIAS:    &'static str = r"^[\t\s]*\.internal-alias (:[a-zA-Z0-9_]+),[\t\s]+(-?\d+)";
 const PATTERN_GLBLBASE: &'static str = r"^[\t\s]*\.global-base[\t\s]+([0-9]+)";
 const PATTERN_PERSBASE: &'static str = r"^[\t\s]*\.persistent-base[\t\s]+([0-9]+)";
-const PATTERN_LABEL:    &'static str = r"^[\.a-zA-Z0-9_]+:";
-//const PATTERN_GLOBLSTART: &'static str = r"^([a-zA-Z0-9_]+):";
+const PATTERN_LABEL:    &'static str = r"^:?[\.a-zA-Z0-9_]+:";
 const PATTERN_PARAM:    &'static str = r#"^[\t\s]+\.([a-zA-Z0-9_]+),?[\t\s]*([a-zA-Z0-9-_\s"]+)"#;
-const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*@([a-zA-Z]+)";
+const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+(:?[a-zA-Z0-9_\.]+),[\t\s]*@([a-zA-Z]+)";
+const PATTERN_PUBLIC:   &'static str = r"^[\t\s]*\.public[\t\s]+([a-zA-Z0-9_\.]+)";
 const PATTERN_SIZE:     &'static str = r"^[\t\s]*\.size[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([\.a-zA-Z0-9_]+)";
 const PATTERN_COMM:     &'static str = r"^[\t\s]*\.comm[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([0-9]+),[\t\s]*([0-9]+)";
 const PATTERN_ASCIZ:    &'static str = r#"^[\t\s]*\.asciz[\t\s]+"(.+)""#;
@@ -136,7 +200,6 @@ const GLOBL:    &'static str = ".globl";
 const INTERNAL: &'static str = ".internal";
 const SELECTOR: &'static str = ".selector";
 
-//const FUNCTION_TYPENAME:&'static str = "function";
 const DATA_TYPENAME:    &'static str = "object";
 
 const PERSISTENT_DATA_SUFFIX: &'static str = "_persistent";
@@ -152,6 +215,7 @@ impl ParseEngine {
             intrefs:    HashMap::new(), 
             aliases:    HashMap::new(),
             globals:    HashMap::new(), 
+            next_private_globl_funcid: 0,
             internals:  HashMap::new(),
             entry_point: String::new(),
             globl_base: 0,
@@ -175,6 +239,8 @@ impl ParseEngine {
             lib.seek(SeekFrom::Start(0))
                 .map_err(|e| format!("error while seeking source file: {}", e))?;            
         }
+
+        self.next_private_globl_funcid = 0;
         for lib in &mut sources {
             self.parse_code(lib, false)?;
         }
@@ -201,31 +267,44 @@ impl ParseEngine {
         self.intrefs.iter().find(|i| *i.1 == id).map(|i| i.0.clone())
     }
 
+    #[allow(dead_code)]
     pub fn internal_by_name(&self, name: &str) -> Option<(i32, String)> {
         let id = self.intrefs.get(name)?;
         let body = self.internals.get(id).map(|v| v.to_owned())?;
         Some((*id, body))
     }
 
-    pub fn globals(&self) -> HashMap<u32, String> {
+    pub fn publics(&self) -> HashMap<u32, String> {
+        self.globals(true)
+    }
+
+    pub fn privates(&self) -> HashMap<u32, String> {
+        self.globals(false)
+    }
+
+    fn globals(&self, public: bool) -> HashMap<u32, String> {
         let mut funcs = HashMap::new();
         let iter = self.globals.iter().filter_map(|item| {
-            match &item.1.dtype {
-                ObjectType::Function(ref func) => Some(func),
-                _ => None,
-            }
+            item.1.dtype.func().and_then(|i| {
+                if public == item.1.public {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
         });
         for i in iter {
-            funcs.insert(i.0, i.1.clone());
+            funcs.insert(i.id, i.body.clone());
         }
         funcs
     }
 
     pub fn global_name(&self, id: u32) -> Option<String> {
         self.globals.iter().find(|item| {
-            match item.1.dtype {
-                ObjectType::Function(ref func) => func.0 == id,
-                _ => false,
+            if let Some(func) = item.1.dtype.func() {
+                func.id == id
+            } else { 
+                false
             }
         })
         .map(|i| i.0.clone())
@@ -233,10 +312,7 @@ impl ParseEngine {
 
     pub fn global_by_name(&self, name: &str) -> Option<(u32, String)> {
         self.globals.get(name).and_then(|v| {
-            match v.dtype {
-                ObjectType::Function(ref func) => Some(func.clone()),
-                _ => None,
-            }
+            v.dtype.func().and_then(|func| Some((func.id.clone(), func.body.clone()) ))
         })
     }
    
@@ -245,38 +321,46 @@ impl ParseEngine {
             PUBKEY_NAME.to_string(), 
             Object::new(PUBKEY_NAME.to_string(), DATA_TYPENAME)
         );
-        match self.globals.get_mut(PUBKEY_NAME).unwrap().dtype {
-            ObjectType::Data {addr: _, ref mut values, ref mut persistent} => {
-                *persistent = true;
-                values.push(DataValue::Empty);
-            },
-            _ => ()
-        };
+        self.globals.get_mut(PUBKEY_NAME)
+            .unwrap()
+            .dtype
+            .data_mut()
+            .and_then(|data| {
+                data.persistent = true;
+                data.values.push(DataValue::Empty);
+                Some(data)
+            });
 
         self.globals.insert(
             SCI_NAME.to_string(), 
             Object::new(SCI_NAME.to_string(), DATA_TYPENAME)
         );
-        match self.globals.get_mut(SCI_NAME).unwrap().dtype {
-            ObjectType::Data {addr: _, ref mut values, ref mut persistent} => {
-                *persistent = false;
-                values.push(DataValue::Empty);
-            },
-            _ => ()
-        };
+        self.globals.get_mut(SCI_NAME)
+            .unwrap()
+            .dtype
+            .data_mut()
+            .and_then(|data| {
+                data.persistent = false;
+                data.values.push(DataValue::Empty);
+                Some(data)
+            });
         ok!()
     }
 
     fn update_predefined(&mut self) {
-        if let ObjectType::Data { ref mut addr, values: _, persistent: _ } 
-            = self.globals.get_mut(SCI_NAME).unwrap().dtype {
-            *addr = self.globl_base;
-        }
+        let data = self.globals.get_mut(SCI_NAME)
+            .unwrap()
+            .dtype
+            .data_mut()
+            .unwrap();
+        data.addr = self.globl_base; 
 
-        if let ObjectType::Data { ref mut addr, values: _, persistent: _ } 
-            = self.globals.get_mut(PUBKEY_NAME).unwrap().dtype {
-            *addr = self.persistent_base;
-        }
+        let data = self.globals.get_mut(PUBKEY_NAME)
+            .unwrap()
+            .dtype
+            .data_mut()
+            .unwrap();
+        data.addr = self.persistent_base; 
     }
 
     pub fn parse_code<R: BufRead>(&mut self, reader: &mut R, first_pass: bool) -> Result<(), String> {
@@ -292,6 +376,7 @@ impl ParseEngine {
         let base_glbl_regex = Regex::new(PATTERN_GLBLBASE).unwrap();
         let base_pers_regex = Regex::new(PATTERN_PERSBASE).unwrap();
         let ignored_regex = Regex::new(PATTERN_IGNORED).unwrap();
+        let public_regex = Regex::new(PATTERN_PUBLIC).unwrap();
 
         let mut section_name: String = String::new();
         let mut obj_body: String = "".to_owned();
@@ -307,7 +392,7 @@ impl ParseEngine {
             lnum += 1;
             if ignored_regex.is_match(&l) {
                 //ignore unused parameters
-                debug!("ignored: {}", l);
+                debug!("ignored: {}", l);            
             } else if base_glbl_regex.is_match(&l) {
                 // .global-base
                 let cap = base_glbl_regex.captures(&l).unwrap();
@@ -345,6 +430,11 @@ impl ParseEngine {
                 let size_str = cap.get(2).ok_or(format!("line {}: .size option is invalid", lnum))?.as_str();
                 let item_ref = self.globals.entry(name.clone()).or_insert(Object::new(name, ""));
                 item_ref.size = usize::from_str_radix(size_str, 10).unwrap_or(0);
+            } else if public_regex.is_match(&l) {
+                // .public x
+                let cap = public_regex.captures(&l).unwrap();
+                let name = cap.get(1).unwrap().as_str();
+                self.globals.get_mut(name).and_then(|obj| {obj.public = true; Some(obj)});
             } else if globl_regex.is_match(&l) { 
                 // .globl x
                 let cap = globl_regex.captures(&l).unwrap();
@@ -402,6 +492,16 @@ impl ParseEngine {
         ok!()
     }
 
+    fn create_function_id(&mut self, func: &str) -> u32 {
+        let is_public = self.globals.get(func).unwrap().public;
+        if is_public {
+            gen_abi_id(self.abi.clone(), func)
+        } else {
+            self.next_private_globl_funcid += 1;
+            self.next_private_globl_funcid
+        }
+    }
+
     fn update(&mut self, section: &str, func: &str, body: &str, first_pass: bool) -> Result<(), String> {
         match section {
             SELECTOR => {
@@ -412,37 +512,49 @@ impl ParseEngine {
                 }
             },
             GLOBL => {
-               let abi = self.abi.clone();
-               let item = self.globals.get_mut(func).unwrap();
-                match &mut item.dtype {
-                    ObjectType::Function(fparams) => {
-                        let func_id = gen_abi_id(abi, func);
-                        *fparams = (func_id, body.trim_end().to_string());
-                        let prev = self.xrefs.insert(func.to_string(), func_id);
-                        if first_pass && prev.is_some() {
-                            Err(format!(
-                                "global function with id = {:x} and name \"{}\" already exist", 
-                                func_id,
-                                func
-                            ))?;
-                        }
-                    },
-                    ObjectType::Data { addr, ref mut values, persistent } => {
-                        if func.ends_with(PERSISTENT_DATA_SUFFIX) {
-                            *persistent = true;
-                        }
-                        Self::update_data(body, func, &mut item.size, values)?;
-                        let offset = (values.len() as Ptr) * WORD_SIZE;
-                        if *persistent { 
-                            *addr = self.persistent_ptr;
-                            self.persistent_ptr += offset;
-                        } else { 
-                            *addr = self.globl_ptr;
-                            self.globl_ptr += offset;
-                        }
-                    },
-                    ObjectType::None => Err(format!("The type of global object {} is unknown. Use .type {}, xxx", func, func))?,
-                };
+                let is_public = self.abi.as_ref()
+                    .map(|abi| {
+                        abi.functions().get(func).is_some() 
+                        || abi.events().get(func).is_some() 
+                    })
+                    .unwrap_or(false);
+                //we do not reset publicity if symbol isn't included in ABI,
+                //because it can be marked as public in assembly.
+                if is_public {
+                    self.globals.get_mut(func)
+                        .unwrap()
+                        .public = true;
+                }
+                if self.globals.get(func)
+                    .unwrap()
+                    .dtype.is_func() {
+                    let func_id = self.create_function_id(func);
+                    let item = self.globals.get_mut(func).unwrap();
+                    let params = item.dtype.func_mut().unwrap();
+                    params.id = func_id;
+                    params.body = body.trim_end().to_string();
+                    let prev = self.xrefs.insert(func.to_string(), func_id);
+                    if first_pass && prev.is_some() {
+                        Err(format!(
+                            "global function with id = {:x} and name \"{}\" already exist", 
+                            func_id,
+                            func,
+                        ))?;
+                    }
+                } else {
+                    let item = self.globals.get_mut(func).unwrap();
+                    let data = item.dtype.data_mut().unwrap();
+                    Self::update_data(body, func, &mut item.size, &mut data.values)?;
+                    let offset = (data.values.len() as Ptr) * WORD_SIZE;
+                    if func.ends_with(PERSISTENT_DATA_SUFFIX) {
+                        data.persistent = true;
+                        data.addr = self.persistent_ptr;
+                        self.persistent_ptr += offset;
+                    } else { 
+                        data.addr = self.globl_ptr;
+                        self.globl_ptr += offset;
+                    }
+                }
             },
             INTERNAL => {
                 let f_id = self.aliases.get(func).ok_or(format!("id for '{}' not found", func))?;
@@ -531,13 +643,17 @@ impl ParseEngine {
     }
 
     fn build_data(&self) -> Option<Arc<CellData>> {
-        let filter = |is_persistent: bool| self.globals.iter().filter_map(move |item| {
-            match &item.1.dtype {
-                ObjectType::Data { addr, values, persistent } => 
-                    if *persistent == is_persistent { Some((addr, values)) } else { None },
-                _ => None,
-            }
-        });
+        let filter = |persistent: bool| {
+            self.globals.iter().filter_map(move |item| {
+                item.1.dtype.data().and_then(|data| {
+                    if data.persistent == persistent { 
+                        Some((&data.addr, &data.values)) 
+                    } else {
+                        None
+                    }
+                })
+            })
+        };
         let globl_data_vec: Vec<(&Ptr, &Vec<DataValue>)> = filter(false).collect();
         let pers_data_vec: Vec<(&Ptr, &Vec<DataValue>)> = filter(true).collect();
 
@@ -574,12 +690,13 @@ impl ParseEngine {
 
     fn replace_labels(&mut self, line: &str) -> Result<String, String> {
         resolve_name(line, |name| self.xrefs.get(name).map(|id| id.clone()))
-            .or_else(|_| resolve_name(line, |name| self.intrefs.get(name).map(|id| id.clone())))
+            .or_else(|_| resolve_name(line, |name| self.intrefs.get(name).and_then(|id| {
+                Some(id.clone())
+            })))
             .or_else(|_| resolve_name(line, |name| self.globals.get(name).and_then(|obj| {
-                match &obj.dtype {
-                    ObjectType::Data { addr, values: _, persistent: _ } => Some(addr.clone()),
-                    _ => None,
-                }           
+                obj.dtype.data().and_then(|data| {
+                    Some(data.addr.clone())
+                })
             })))
             .or_else(|_| resolve_name(line, |name| {
                 match name {
@@ -597,7 +714,7 @@ impl ParseEngine {
         for (k, v) in &self.xrefs {
             println! ("Function {:30}: id={:08X}", k, v);
         }
-        for (k, v) in self.globals() {
+        for (k, v) in self.publics() {
             println! ("Function {:08X}\n{}\n{}\n{}", k, line, v, line);
         }        
         println!("{}\nInternal functions:\n{}", line, line);
@@ -751,7 +868,7 @@ mod tests {
         assert_eq!(parser.parse(source, vec![lib1, lib2], None), ok!());
     }
 
-        #[test]
+    #[test]
     fn test_external_linking() {
         let mut parser = ParseEngine::new();
         let lib1 = File::open("./tests/test_extlink_lib.tvm").unwrap();

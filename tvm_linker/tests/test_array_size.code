@@ -3,43 +3,123 @@
 RET
 
 .globl	constructor
+.public	constructor
 .type	constructor, @function
-; protect constructor from twice call
-PUSHINT 1
-PUSHROOT CTOS PLDDICTQ
+PRINTSTR constr_prot_0
+PUSHINT 0
+;; decl: dict
+PUSHINT 0
+;; decl: previous_message_timestamp
+PUSHINT 1800000
+;; decl: interval
+PUSHROOT
+CTOS
+;; decl: c4
+;; c4
+;; stack=4
+DUP
+LDDICT
+POP s2
+;; assign dict
+POP s4
+;; if
+;; c4
+;; stack=4
+DUP
+PUSHINT 128
+SCHKBITSQ
 PUSHCONT {
-	NEWDICT
+	;; c4
+	;; stack=4
+	DUP
+	LDI 64
+	POP s2
+	;; assign previous_message_timestamp
+	POP s3
+	;; c4
+	;; stack=4
+	DUP
+	LDI 64
+	POP s2
+	;; assign interval
+	POP s2
+	;; if
+	;; c4
+	;; stack=4
+	DUP
+	PUSHINT 1
+	SCHKBITSQ
+	PUSHCONT {
+		PUSHINT 123
+		THROWANY
+	}
+	IF
 }
-IFNOT
-PUSHINT 64
-DICTUGET
-THROWIF 123
-PUSHINT 1 NEWC STU 1
+IF
+NEWC
+;; decl: c4_builder
+;; dict
+;; stack=5
+PUSH s4
+SWAP
+STDICT
+;; previous_message_timestamp
+;; stack=5
+PUSH s3
+STUR 64
+;; interval
+;; stack=5
+PUSH s2
+STUR 64
 PUSHINT 1
-PUSHROOT CTOS PLDDICTQ
-PUSHCONT {
-	NEWDICT
-}
-IFNOT
-PUSHINT 64
-DICTUSETB
-NEWC STDICT ENDC
+STONES
+;; c4
+;; stack=5
+PUSH s1
+STSLICER
+;; c4_builder
+;; stack=5
+DUP
+ENDC
 POPROOT
+PRINTSTR constr_prot_1
+BLKDROP 5
+ACCEPT
 ; Decode input parameters
 DROP
+PRINTSTR pushpdc7toc4
+PUSHROOT
+CTOS
+;; decl: c4
+SKIPDICT
+NEWC
+;; decl: c4_builder
+PUSHCTR c7
+THIRD
+SWAP
+STDICT
+;; c4
+;; stack=2
+PUSH s1
+STSLICER
+;; c4_builder
+;; stack=2
+DUP
+ENDC
+POPROOT
+PRINTSTR pushpdc7toc40
+BLKDROP 2
 
 .globl	main
+.public	main
 .type	main, @function
 ; Decode input parameters
 PUSHINT 16
-PUSHINT $smart_ldu$
-CALL 1
+CALL $smart_ldu$
 PUSHINT 16
-PUSHINT $smart_ldu$
-CALL 1
+CALL $smart_ldu$
 DROP
-PUSHINT $main_internal$
-CALL 1
+CALL $main_internal$
 ;; emitting 1 value(s)
 NEWC
 PUSHINT $main$
@@ -50,9 +130,29 @@ NEWC
 PUSH s2
 STUR 256
 STBREFR
-ENDC CTOS
-PUSHINT $send_ext_msg$
-CALL 1
+CALL $send_ext_msg$
+PRINTSTR pushpdc7toc4
+PUSHROOT
+CTOS
+;; decl: c4
+SKIPDICT
+NEWC
+;; decl: c4_builder
+PUSHCTR c7
+THIRD
+SWAP
+STDICT
+;; c4
+;; stack=2
+PUSH s1
+STSLICER
+;; c4_builder
+;; stack=2
+DUP
+ENDC
+POPROOT
+PRINTSTR pushpdc7toc40
+BLKDROP 2
 RET
 
 .globl	main_internal
@@ -80,7 +180,7 @@ PUSHCONT {
 	;; m_isUntil = 1
 	;; fetch arr
 	PUSHINT 100
-	PUSHROOT CTOS PLDDICT
+	PUSH c7 THIRD
 	PUSHINT 64
 	DICTUGETOPTREF
 	;; i
@@ -93,17 +193,19 @@ PUSHCONT {
 	PUSHINT 1
 	;; +
 	ADD
-	NEWC STU 256 ENDC CTOS
+	NEWC STU 256
 	ROTREV
 	PUSHINT 32
-	DICTUSET
+	DICTUSETB
 	;; assign arr
 	PUSHINT 100
-	PUSHROOT CTOS PLDDICT
+	PUSH c7 THIRD
 	PUSHINT 64
 	DICTUSETGETOPTREF DROP
-	NEWC STDICT ENDC
-	POPROOT
+	PUSH c7
+	SWAP
+	SETTHIRD
+	POP c7
 	;; ++
 	INC
 	FALSE
@@ -116,7 +218,7 @@ DROP
 ;; arr
 ;; stack=2
 PUSHINT 100
-PUSHROOT CTOS PLDDICT
+PUSH c7 THIRD
 PUSHINT 64
 DICTUGETOPTREF
 PUSHINT 32
@@ -132,29 +234,30 @@ EQUAL
 THROWIFNOT 100
 ;; fetch arr
 PUSHINT 100
-PUSHROOT CTOS PLDDICT
+PUSH c7 THIRD
 PUSHINT 64
 DICTUGETOPTREF
 PUSHINT 0
-NEWC STU 256 ENDC CTOS
+NEWC STU 256
 SWAP
 ;; new_len
 ;; stack=4
 PUSH s2
-PUSHINT $change_array_length$
-CALL 1
+CALL $change_array_length$
 ;; assign arr
 PUSHINT 100
-PUSHROOT CTOS PLDDICT
+PUSH c7 THIRD
 PUSHINT 64
 DICTUSETGETOPTREF DROP
-NEWC STDICT ENDC
-POPROOT
+PUSH c7
+SWAP
+SETTHIRD
+POP c7
 ;; get member length
 ;; arr
 ;; stack=2
 PUSHINT 100
-PUSHROOT CTOS PLDDICT
+PUSH c7 THIRD
 PUSHINT 64
 DICTUGETOPTREF
 PUSHINT 32
@@ -200,7 +303,7 @@ PUSHCONT {
 		;; arr
 		;; stack=4
 		PUSHINT 100
-		PUSHROOT CTOS PLDDICT
+		PUSH c7 THIRD
 		PUSHINT 64
 		DICTUGETOPTREF
 		;; index
@@ -227,7 +330,7 @@ IF
 ;; arr
 ;; stack=2
 PUSHINT 100
-PUSHROOT CTOS PLDDICT
+PUSH c7 THIRD
 PUSHINT 64
 DICTUGETOPTREF
 PUSHINT 32

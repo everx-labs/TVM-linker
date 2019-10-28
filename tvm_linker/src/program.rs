@@ -10,13 +10,17 @@ use tvm::assembler::compile_code;
 use tvm::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use tvm::stack::*;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
-use tvm::assembler::CompileError;
 use parser::{ptr_to_builder, ParseEngine};
 
 pub struct Program {
     engine: ParseEngine,
     keypair: Option<Keypair>,
 }
+
+const SELECTOR_INTERNAL: &str = "
+    DICTPUSHCONST 32
+	DICTUGETJMP
+";
 
 impl Program {
     pub fn new(parser: ParseEngine) -> Self {
@@ -57,33 +61,20 @@ impl Program {
         self.engine.entry()
     }
 
-    pub fn method_dict(&self) -> Result<SliceData, String> {
-        let mut method_dict = HashmapE::with_hashmap(32, self.build_toplevel_dict()?.as_ref());
-        let methods = prepare_methods(&self.engine.globals())
-            .map_err(|e| {
-                let name = self.engine.global_name(e.0).unwrap();
-                let code = self.engine.global_by_name(&name).unwrap().1;
-                format_compilation_error_string(e.1, &name, &code)
-            })?;
+    pub fn internal_method_dict(&self) -> Result<Option<Arc<CellData>>, String> {
+        let dict = prepare_methods(&self.engine.privates())
+            .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()) )?;
+        Ok(dict.data().map(|cell| cell.clone()))
+    }
 
-        if methods.is_some() {
-            method_dict.setref(
-                1i32.write_to_new_cell().unwrap().into(), 
-                &methods.unwrap()
-            )
-            .map_err(|e| format!("cannot setref to top level dictionary: {}", e))?;
-        }
-        
-        //convert Hashmap to HashmapE
-        let mut dict_cell = BuilderData::new();
-        match method_dict.data() {
-            Some(cell) => {
-                dict_cell.append_bit_one().unwrap();
-                dict_cell.checked_append_reference(cell).unwrap()
-            },
-            None => dict_cell.append_bit_zero().unwrap(),
-        };
-        Ok(dict_cell.into())
+    pub fn public_method_dict(&self) -> Result<Option<Arc<CellData>>, String> {
+        let mut dict = prepare_methods(self.engine.internals())
+            .map_err(|e| e.1.replace("_name_", &self.engine.internal_name(e.0).unwrap()) )?;
+
+        insert_methods(&mut dict, &self.engine.publics())
+            .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()) )?;
+
+        Ok(dict.data().map(|cell| cell.clone()))
     }
    
     pub fn compile_to_file(&self, wc: i8) -> Result<String, String> {
@@ -98,28 +89,23 @@ impl Program {
     }
 
     pub fn compile_asm(&self) -> Result<SliceData, String> {
-        let mut bytecode = compile_code(self.engine.entry())
-            .map_err(|e| format_compilation_error_string(e, "selector", self.engine.entry()) )?;
-        bytecode.append_reference(self.method_dict()?);
-        Ok(bytecode)
-    }
-
-    fn build_toplevel_dict(&self) -> Result<Option<Arc<CellData>>, String> {
-        let dict = prepare_methods(self.engine.internals())
-            .map_err(|e| {
-                let name = self.engine.internal_name(e.0).unwrap();
-                let code = self.engine.internal_by_name(&name).unwrap().1;
-                format_compilation_error_string(e.1, &name, &code)
-            })?;
+        let mut internal_selector = compile_code(SELECTOR_INTERNAL)
+            .map_err(|_| "unexpected TVM error while compiling internal selector".to_string())?;
+        internal_selector.append_reference(self.internal_method_dict()?.unwrap_or_default().into());
         
-        Ok(dict)
-    }
+        let mut main_selector = compile_code(self.engine.entry())
+            .map_err(|e| format_compilation_error_string(e, self.engine.entry()).replace("_name_", "selector"))?;
+        main_selector.append_reference(self.public_method_dict()?.unwrap_or_default().into());
+        main_selector.append_reference(internal_selector);
+
+        Ok(main_selector)
+    }   
 
     pub fn debug_print(&self) {
         self.engine.debug_print();
         let line = "--------------------------";
-        if let Ok(slice) = self.method_dict() {
-            println! ("Dictionary of methods:\n{}\n{}", line, slice);
+        if let Ok(cell) = self.public_method_dict() {
+            println! ("Dictionary of methods:\n{}\n{}", line, cell.unwrap_or_default());
         }
     }
 }
@@ -171,54 +157,27 @@ pub fn load_from_file(contract_file: &str) -> StateInit {
     StateInit::construct_from(&mut cell.into()).unwrap()
 }
 
-fn format_compilation_error_string(err: CompileError, func_name: &str, func_code: &str) -> String {
-    let line_num = match err {
-        CompileError::Syntax(position @ _, _) => position.line,
-        CompileError::UnknownOperation(position @ _, _) => position.line,
-        CompileError::Operation(position @ _, _, _) => position.line,
-    };
-    format!("compilation failed: \"{}\":{}:\"{}\"", 
-        func_name,
-        err,
-        func_code.lines().nth(line_num - 1).unwrap(),
-    )
-}
+
 
 #[cfg(test)]
 mod tests {
+    use abi;
     use super::*;
     use std::fs::File;
     use testcall::perform_contract_call;
 
     #[test]
-    fn test_sum_global_array() {
-        let mut parser = ParseEngine::new();
-        let pbank_file = File::open("./tests/sum-global-array.s").unwrap();
-        let test_file = File::open("./stdlib_c.tvm").unwrap();
-        assert_eq!(parser.parse(pbank_file, vec![test_file], None), ok!());
-        let prog = Program::new(parser);
-        let body = {
-            let buf = hex::decode("000D6E4079").unwrap();
-            let buf_bits = buf.len() * 8;
-            Some(BuilderData::with_raw(buf, buf_bits).unwrap().into())
-        };
-        let contract_file = prog.compile_to_file(0).unwrap();
-        let name = contract_file.split('.').next().unwrap();
-
-        assert_eq!(perform_contract_call(name, body, Some(None), false, false, None, None), 0);
-    }
-
-    #[test]
     fn test_comm_var_addresses() {
         let mut parser = ParseEngine::new();
         let source = File::open("./tests/comm_test2.s").unwrap();
-        let lib = File::open("./stdlib_c.tvm").unwrap();
+        let lib = File::open("./stdlib.tvm").unwrap();
         assert_eq!(parser.parse(source, vec![lib], None), ok!());
         let prog = Program::new(parser);
         let body = {
-            let buf = hex::decode("000D6E4079").unwrap();
-            let buf_bits = buf.len() * 8;
-            Some(BuilderData::with_raw(buf, buf_bits).unwrap().into())
+            let mut b = BuilderData::new();
+            b.append_u32(abi::gen_abi_id(None, "main")).unwrap();
+            b.append_reference(BuilderData::new());
+            Some(b.into())
         };
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
@@ -233,13 +192,13 @@ mod tests {
         assert_eq!(parser.parse(source, vec![lib], None), ok!());
         let prog = Program::new(parser);
         let body = {
-            let buf = hex::decode("000D6E4079").unwrap();
-            let buf_bits = buf.len() * 8;
-            Some(BuilderData::with_raw(buf, buf_bits).unwrap().into())
+            let mut b = BuilderData::new();
+            b.append_u32(abi::gen_abi_id(None, "main")).unwrap();
+            Some(b.into())
         };
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
-        assert_eq!(perform_contract_call(name, body, Some(None), false, false, None, None), 0);
+        assert_eq!(perform_contract_call(name, body, Some(None), true, false, None, None), 0);
     }
 
     #[test]
@@ -259,7 +218,7 @@ mod tests {
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
         
-        assert_eq!(perform_contract_call(name, body, Some(Some("key1")), true, false, None, None), 0);
+        assert_eq!(perform_contract_call(name, body, Some(Some("key1")), false, false, None, None), 0);
     }
 
     #[test]
@@ -280,5 +239,60 @@ mod tests {
         let name = contract_file.split('.').next().unwrap();
         
         assert_eq!(perform_contract_call(name, None, None, false, false, None, Some("-1")), 0);
+    }
+
+
+    #[test]
+    fn test_public_and_private() {
+        use abi_json::Contract;
+        use std::io::Read;
+
+        let mut parser = ParseEngine::new();
+        let source = File::open("./tests/test_public.code").unwrap();
+        let lib = File::open("./stdlib.tvm").unwrap();
+        let abi = Contract::load(
+            std::fs::read("./tests/test_public.abi.json")
+                .unwrap()
+                .as_slice()
+        ).unwrap();
+
+        let mut abi_str = String::new();
+        File::open("./tests/test_public.abi.json")
+            .unwrap()
+            .read_to_string(&mut abi_str)
+            .unwrap();
+
+        assert_eq!(
+            parser.parse(source, vec![lib], Some(abi_str)), 
+            ok!()
+        );
+
+        let prog = Program::new(parser);
+        let contract_file = prog.compile_to_file(0).unwrap();
+        let name = contract_file.split('.').next().unwrap();
+        let body1 = {
+            let mut b = BuilderData::new();
+            b.append_u32(abi::gen_abi_id(None, "sum")).unwrap();
+            b.append_reference(BuilderData::new());
+            Some(b.into())
+        };
+        
+        assert_eq!(perform_contract_call(name, body1, None, false, false, None, None), 0);
+
+        let body2 = {
+            let mut b = BuilderData::new();
+            b.append_u32(abi::gen_abi_id(None, "sum_p")).unwrap();
+            b.append_reference(BuilderData::new());
+            Some(b.into())
+        };
+        assert!(perform_contract_call(name, body2, None, false, false, None, None) != 0);
+
+        let body3 = {
+            let mut b = BuilderData::new();
+            b.append_u32(abi::gen_abi_id(Some(abi), "sum2")).unwrap();
+            b.append_reference(BuilderData::new());
+            Some(b.into())
+        };
+        assert_eq!(perform_contract_call(name, body3, None, false, false, None, None), 0);
     }
 }
