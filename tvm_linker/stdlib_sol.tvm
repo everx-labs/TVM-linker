@@ -2,7 +2,7 @@
 
 	.selector
 	;s0 - selector
-	;s1 - ...
+	; s1.. - other data
 	SETCP0
 	DUP
     EQINT 1
@@ -129,72 +129,6 @@ PUSH s4
 ;; return
 BLKSWAP 4, 2
 BLKDROP 4
-RET
-
-.globl	load_slice_from_two_cell
-.type	load_slice_from_two_cell, @function
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: load_slice_from_two_cell
-;; param: slice
-;; param: bitQty0
-;; param: bitQty1
-;; slice
-;; stack=3
-PUSH s2
-;; bitQty0
-;; stack=4
-PUSH s2
-LDSLICEX
-POP s4
-;; decl: sliceValue0
-;; slice
-;; stack=4
-PUSH s3
-LDREF
-POP s5
-;; decl: nextCell
-;; slice
-;; stack=5
-PUSH s4
-ENDS
-NULL
-POP s5
-;; nextCell
-;; stack=5
-DUP
-CTOS
-;; assign slice
-POP s5
-;; slice
-;; stack=5
-PUSH s4
-;; bitQty1
-;; stack=6
-PUSH s3
-LDSLICEX
-POP s6
-;; decl: sliceValue1
-NEWC
-;; decl: numberBuilder
-;; sliceValue0
-;; stack=7
-PUSH s3
-STSLICER
-;; sliceValue1
-;; stack=7
-PUSH s1
-STSLICER
-;; numberBuilder
-;; stack=7
-DUP
-ENDC
-CTOS
-;; slice
-;; stack=8
-PUSH s7
-;; return
-BLKSWAP 7, 2
-BLKDROP 7
 RET
 
 .globl	abi_encode_packed
@@ -515,22 +449,24 @@ BLKSWAP 9, 2
 BLKDROP 9
 RET
 
-.globl	deploy_contract_without_constructor_params
-.type	deploy_contract_without_constructor_params, @function
+.globl	deploy_contract
+.type	deploy_contract, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: deploy_contract_without_constructor_params
+;; Function: deploy_contract
 ;; param: my_contract
 ;; param: remote_addr
 ;; param: grams_value
+;; param: constuctor_id
+;; param: encodedParams
 PRINTSTR deploy_contract
 NEWC
 ;; decl: msg_builder
 ;; grams_value
-;; stack=4
-PUSH s1
-;; remote_addr
-;; stack=5
+;; stack=6
 PUSH s3
+;; remote_addr
+;; stack=7
+PUSH s5
 PUSHINT 0
 PUSHCONT { ; make__CommonMsgInfoRelaxed__int_msg_info_0__inline
 	;; param: value
@@ -573,46 +509,37 @@ PUSHCONT { ; make__CommonMsgInfoRelaxed__int_msg_info_0__inline
 	;; builder
 	;; stack=4
 	DUP
-	ENDC
 	;; return
 	XCHG s4
 	BLKDROP 4
 	RET
 }
 CALLX
-;; decl: info
-;; info
-;; stack=5
-DUP
-CTOS
-;; msg_builder
-;; stack=6
-PUSH s2
-STSLICE
-POP s2
-;; msg_builder
-;; stack=5
-PUSH s1
+STBR
 PUSHINT 1
 STONES
-POP s2
-;; msg_builder
-;; stack=5
-PUSH s1
 ;; my_contract
 ;; stack=6
 PUSH s5
-PUSHCONT { ; store_either_inline
+;; msg_builder
+;; stack=7
+PUSH s1
+PUSHCONT { ; store_either_for_cell_inline
+	;; param: x
 	;; param: builder
-	;; param: slice
-	PRINTSTR store_either
-	;; if
-	;; builder
+	PRINTSTR st_either_cell
+	;; x
 	;; stack=2
 	PUSH s1
-	BREMBITS ; tvm_brembits
-	;; slice
+	CTOS
+	;; decl: slice_x
+	;; if
+	;; builder
 	;; stack=3
+	PUSH s1
+	BREMBITS ; tvm_brembits
+	;; slice_x
+	;; stack=4
 	PUSH s1
 	SBITS ; tvm_sbits
 	PUSHINT 1
@@ -621,41 +548,105 @@ PUSHCONT { ; store_either_inline
 	;; >
 	GREATER
 	PUSHCONT {
-		PUSHINT 0
 		;; builder
 		;; stack=3
-		PUSH s2
-		STU 1
+		PUSH s1
+		PUSHINT 1
+		STZEROES
 		POP s2
-		;; slice
-		;; stack=2
+		;; slice_x
+		;; stack=3
 		DUP
 		;; builder
-		;; stack=3
+		;; stack=4
 		PUSH s2
 		STSLICE
 		POP s2
 	}
 	PUSHCONT {
-		PUSHINT 1
 		;; builder
+		;; stack=3
+		PUSH s1
+		PUSHINT 1
+		STONES
+		POP s2
+		;; x
 		;; stack=3
 		PUSH s2
-		STU 1
-		POP s2
 		;; builder
-		;; stack=2
-		PUSH s1
-		;; slice
-		;; stack=3
-		PUSH s1
-		STSLICER
+		;; stack=4
+		PUSH s2
+		STREF
 		POP s2
 	}
 	IFELSE
+	PRINTSTR st_either_cell0
+	;; builder
+	;; stack=3
+	PUSH s1
+	;; return
+	XCHG s3
+	BLKDROP 3
+	RET
+}
+CALLX
+;; assign msg_builder
+NIP
+NEWC
+;; decl: body_builder
+;; constuctor_id
+;; stack=7
+PUSH s3
+STUR 32
+;; encodedParams
+;; stack=7
+PUSH s2
+STBR
+;; body_builder
+;; stack=7
+DUP
+;; msg_builder
+;; stack=8
+PUSH s2
+PUSHCONT { ; store_either_inline
+	;; param: x
+	;; param: builder
+	PRINTSTR store_either
+	;; if
 	;; builder
 	;; stack=2
-	PUSH s1
+	DUP
+	BREMBITS ; tvm_brembits
+	;; x
+	;; stack=3
+	PUSH s2
+	BBITS
+	PUSHINT 1
+	;; +
+	ADD
+	;; >
+	GREATER
+	PUSHCONT {
+		PUSHINT 1
+		STZEROES
+		;; x
+		;; stack=2
+		PUSH s1
+		STBR
+	}
+	PUSHCONT {
+		PUSHINT 1
+		STONES
+		;; x
+		;; stack=2
+		PUSH s1
+		STBREFR
+	}
+	IFELSE
+	PRINTSTR store_either_0
+	;; builder
+	;; stack=2
+	DUP
 	;; return
 	NIP
 	NIP
@@ -664,106 +655,239 @@ PUSHCONT { ; store_either_inline
 CALLX
 ;; assign msg_builder
 POP s2
-PUSHINT $make_abi_and_constructorId$
-CALL 1
-;; decl: body
+PRINTSTR deploy_contrac0
 ;; msg_builder
-;; stack=6
-PUSH s2
-;; body
 ;; stack=7
 PUSH s1
-PUSHCONT { ; store_either_inline
-	;; param: builder
-	;; param: slice
-	PRINTSTR store_either
-	;; if
-	;; builder
-	;; stack=2
-	PUSH s1
-	BREMBITS ; tvm_brembits
-	;; slice
-	;; stack=3
-	PUSH s1
-	SBITS ; tvm_sbits
-	PUSHINT 1
-	;; +
-	ADD
-	;; >
-	GREATER
-	PUSHCONT {
-		PUSHINT 0
-		;; builder
-		;; stack=3
-		PUSH s2
-		STU 1
-		POP s2
-		;; slice
-		;; stack=2
-		DUP
-		;; builder
-		;; stack=3
-		PUSH s2
-		STSLICE
-		POP s2
-	}
-	PUSHCONT {
-		PUSHINT 1
-		;; builder
-		;; stack=3
-		PUSH s2
-		STU 1
-		POP s2
-		;; builder
-		;; stack=2
-		PUSH s1
-		;; slice
-		;; stack=3
-		PUSH s1
-		STSLICER
-		POP s2
-	}
-	IFELSE
-	;; builder
-	;; stack=2
-	PUSH s1
-	;; return
-	NIP
-	NIP
-	RET
-}
-CALLX
-;; assign msg_builder
-POP s3
-;; msg_builder
-;; stack=6
-PUSH s2
 ENDC
-;; decl: message
-;; message
-;; stack=7
-DUP
 PUSHINT 0
 SENDRAWMSG
 BLKDROP 7
 
-.globl	make_abi_and_constructorId
-.type	make_abi_and_constructorId, @function
+.globl	deploy_contract2
+.type	deploy_contract2, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: make_abi_and_constructorId
-PRINTSTR st_abi_n_constr
+;; Function: deploy_contract2
+;; param: my_contract
+;; param: remote_addr
+;; param: grams
+;; param: payload
+PRINTSTR deploy_contr2_0
 NEWC
-;; decl: builder
-PUSHINT $constructor$
-STUR 32
-;; builder
-;; stack=1
+;; decl: msg_builder
+;; grams
+;; stack=5
+PUSH s2
+;; remote_addr
+;; stack=6
+PUSH s4
+PUSHINT 0
+PUSHCONT { ; make__CommonMsgInfoRelaxed__int_msg_info_0__inline
+	;; param: value
+	;; param: remote_addr
+	;; param: bounce
+	PRINTSTR buildmsg
+	NEWC
+	;; decl: builder
+	PUSHINT 2
+	STZEROES
+	;; bounce
+	;; stack=4
+	PUSH s1
+	STIR 1
+	PUSHINT 1
+	STZEROES
+	MYADDR
+	STSLICER
+	PUSHINT 1024
+	STUR 11
+	;; remote_addr
+	;; stack=4
+	PUSH s2
+	STUR 256
+	;; value
+	;; stack=4
+	PUSH s3
+	STGRAMS
+	PUSHINT 1
+	STZEROES
+	PUSHINT 0
+	STGRAMS
+	PUSHINT 0
+	STGRAMS
+	PUSHINT 64
+	STZEROES
+	NOW
+	STUR 32
+	PRINTSTR buildmsg_end
+	;; builder
+	;; stack=4
+	DUP
+	;; return
+	XCHG s4
+	BLKDROP 4
+	RET
+}
+CALLX
+STBR
+PUSHINT 1
+STONES
+;; my_contract
+;; stack=5
+PUSH s4
+;; msg_builder
+;; stack=6
+PUSH s1
+PUSHCONT { ; store_either_for_cell_inline
+	;; param: x
+	;; param: builder
+	PRINTSTR st_either_cell
+	;; x
+	;; stack=2
+	PUSH s1
+	CTOS
+	;; decl: slice_x
+	;; if
+	;; builder
+	;; stack=3
+	PUSH s1
+	BREMBITS ; tvm_brembits
+	;; slice_x
+	;; stack=4
+	PUSH s1
+	SBITS ; tvm_sbits
+	PUSHINT 1
+	;; +
+	ADD
+	;; >
+	GREATER
+	PUSHCONT {
+		;; builder
+		;; stack=3
+		PUSH s1
+		PUSHINT 1
+		STZEROES
+		POP s2
+		;; slice_x
+		;; stack=3
+		DUP
+		;; builder
+		;; stack=4
+		PUSH s2
+		STSLICE
+		POP s2
+	}
+	PUSHCONT {
+		;; builder
+		;; stack=3
+		PUSH s1
+		PUSHINT 1
+		STONES
+		POP s2
+		;; x
+		;; stack=3
+		PUSH s2
+		;; builder
+		;; stack=4
+		PUSH s2
+		STREF
+		POP s2
+	}
+	IFELSE
+	PRINTSTR st_either_cell0
+	;; builder
+	;; stack=3
+	PUSH s1
+	;; return
+	XCHG s3
+	BLKDROP 3
+	RET
+}
+CALLX
+;; assign msg_builder
+NIP
+;; payload
+;; stack=5
+PUSH s1
+;; msg_builder
+;; stack=6
+PUSH s1
+PUSHCONT { ; store_either_for_cell_inline
+	;; param: x
+	;; param: builder
+	PRINTSTR st_either_cell
+	;; x
+	;; stack=2
+	PUSH s1
+	CTOS
+	;; decl: slice_x
+	;; if
+	;; builder
+	;; stack=3
+	PUSH s1
+	BREMBITS ; tvm_brembits
+	;; slice_x
+	;; stack=4
+	PUSH s1
+	SBITS ; tvm_sbits
+	PUSHINT 1
+	;; +
+	ADD
+	;; >
+	GREATER
+	PUSHCONT {
+		;; builder
+		;; stack=3
+		PUSH s1
+		PUSHINT 1
+		STZEROES
+		POP s2
+		;; slice_x
+		;; stack=3
+		DUP
+		;; builder
+		;; stack=4
+		PUSH s2
+		STSLICE
+		POP s2
+	}
+	PUSHCONT {
+		;; builder
+		;; stack=3
+		PUSH s1
+		PUSHINT 1
+		STONES
+		POP s2
+		;; x
+		;; stack=3
+		PUSH s2
+		;; builder
+		;; stack=4
+		PUSH s2
+		STREF
+		POP s2
+	}
+	IFELSE
+	PRINTSTR st_either_cell0
+	;; builder
+	;; stack=3
+	PUSH s1
+	;; return
+	XCHG s3
+	BLKDROP 3
+	RET
+}
+CALLX
+;; assign msg_builder
+NIP
+PRINTSTR deploy_contr2_1
+;; msg_builder
+;; stack=5
 DUP
 ENDC
-CTOS
-;; return
-NIP
-RET
+PUSHINT 0
+SENDRAWMSG
+BLKDROP 5
 
 .globl	insert_pubkey
 .type	insert_pubkey, @function
@@ -771,6 +895,7 @@ RET
 ;; Function: insert_pubkey
 ;; param: my_contract
 ;; param: pubkey
+PRINTSTR insert_pubkey_0
 ;; my_contract
 ;; stack=2
 PUSH s1
@@ -778,233 +903,222 @@ CTOS
 ;; decl: slice
 NEWC
 ;; decl: builder
-PUSHINT 0
-;; decl: maybe
-;; slice
-;; stack=5
-PUSH s2
-LDU 32
-POP s4
-;; builder
-;; stack=6
-PUSH s2
-STU 32
-POP s2
-;; slice
-;; stack=5
-PUSH s2
-LDU 1
-POP s4
-;; assign maybe
-NIP
-;; maybe
-;; stack=5
-DUP
-;; builder
-;; stack=6
-PUSH s2
-STU 1
-POP s2
 ;; if
-;; maybe
-;; stack=5
-DUP
-PUSHINT 1
-;; ==
-EQUAL
+;; slice
+;; stack=4
+PUSH s1
+LDU 1
+POP s3
+ISZERO
 PUSHCONT {
-	;; slice
-	;; stack=5
-	PUSH s2
-	LDU 2
-	POP s4
-	;; builder
-	;; stack=6
-	PUSH s2
-	STU 2
-	POP s2
+	PUSHINT 1
+	STZEROES
 }
-IF
-;; slice
-;; stack=5
-PUSH s2
-LDU 1
-POP s4
-;; assign maybe
-NIP
-;; maybe
-;; stack=5
-DUP
-;; builder
-;; stack=6
-PUSH s2
-STU 1
-POP s2
-;; if
-;; maybe
-;; stack=5
-DUP
-PUSHINT 1
-;; ==
-EQUAL
 PUSHCONT {
+	PUSHINT 1
+	STONES
 	;; slice
-	;; stack=5
-	PUSH s2
-	LDREF
-	POP s4
-	;; decl: code
-	;; builder
-	;; stack=6
-	PUSH s2
-	;; code
-	;; stack=7
+	;; stack=4
 	PUSH s1
-	CTOS
-	STSLICER
+	LDU 32
 	POP s3
-	;; drop locals
-	DROP
+	STUR 32
 }
-IF
+IFELSE
+;; if
 ;; slice
-;; stack=5
-PUSH s2
+;; stack=4
+PUSH s1
 LDU 1
-POP s4
-;; assign maybe
-NIP
-;; maybe
-;; stack=5
-DUP
-;; builder
-;; stack=6
-PUSH s2
-STU 1
-POP s2
-;; maybe
-;; stack=5
-DUP
+POP s3
+ISZERO
+PUSHCONT {
+	PUSHINT 1
+	STZEROES
+}
+PUSHCONT {
+	PUSHINT 1
+	STONES
+	;; slice
+	;; stack=4
+	PUSH s1
+	LDU 2
+	POP s3
+	STUR 2
+}
+IFELSE
+;; if
+;; slice
+;; stack=4
+PUSH s1
+LDU 1
+POP s3
+ISZERO
+PUSHCONT {
+	PUSHINT 1
+	STZEROES
+}
+PUSHCONT {
+	PUSHINT 1
+	STONES
+	;; slice
+	;; stack=4
+	PUSH s1
+	LDREF
+	POP s3
+	STREFR
+}
+IFELSE
+;; slice
+;; stack=4
+PUSH s1
+LDU 1
+POP s3
 PUSHINT 1
 ;; ==
 EQUAL
 THROWIFNOT 100
-PUSHINT 0
-;; decl: tmp_builder
+PUSHINT 1
+STONES
 NEWC
-;; assign tmp_builder
-NIP
+;; decl: key_builder
 ;; pubkey
-;; stack=6
-PUSH s4
+;; stack=5
+PUSH s3
 STUR 256
-;; tmp_builder
-;; stack=6
-DUP
-ENDC
-CTOS
-;; decl: slice_pubkey
 ;; slice
-;; stack=7
-PUSH s4
+;; stack=5
+PUSH s2
 LDREF
-POP s6
+POP s4
 CTOS
-;; decl: slice_data
-;; slice_data
-;; stack=8
+;; decl: data
+;; data
+;; stack=6
 DUP
 LDDICT
 POP s2
 ;; decl: dict
-;; slice_pubkey
-;; stack=9
+;; key_builder
+;; stack=7
 PUSH s2
 PUSHINT 0
 ;; dict
-;; stack=11
+;; stack=9
 PUSH s2
 PUSHINT 64
-DICTUSET
+DICTUSETB
 NIP
 NEWC
-;; assign tmp_builder
-POP s4
+;; decl: dict_builder
 ;; dict
-;; stack=9
-DUP
-;; tmp_builder
-;; stack=10
-PUSH s4
+;; stack=8
+PUSH s1
+SWAP
 STDICT
-POP s4
-;; slice
-;; stack=9
-PUSH s6
-LDU 1
-POP s8
-;; assign maybe
-POP s5
-;; maybe
-;; stack=9
-PUSH s4
-;; builder
-;; stack=10
-PUSH s6
-STU 1
-POP s6
-;; if
-;; maybe
-;; stack=9
-PUSH s4
-PUSHINT 1
-;; ==
-EQUAL
-PUSHCONT {
-	;; slice
-	;; stack=9
-	PUSH s6
-	LDREF
-	POP s8
-	;; decl: lib
-	;; builder
-	;; stack=10
-	PUSH s6
-	;; lib
-	;; stack=11
-	PUSH s1
-	CTOS
-	STSLICER
-	POP s7
-	;; drop locals
-	DROP
-}
-IF
+;; dict_builder
+;; stack=8
+DUP
+ENDC
 ;; builder
 ;; stack=9
 PUSH s5
+STREF
+POP s5
+;; if
+;; slice
+;; stack=8
+PUSH s5
+LDU 1
+POP s7
+ISZERO
+PUSHCONT {
+	;; builder
+	;; stack=8
+	PUSH s4
+	PUSHINT 1
+	STZEROES
+	POP s5
+}
+PUSHCONT {
+	;; builder
+	;; stack=8
+	PUSH s4
+	PUSHINT 1
+	STONES
+	POP s5
+	;; slice
+	;; stack=8
+	PUSH s5
+	LDREF
+	POP s7
+	;; builder
+	;; stack=9
+	PUSH s5
+	STREF
+	POP s5
+}
+IFELSE
+PRINTSTR insert_pubkey_9
+;; builder
+;; stack=8
+PUSH s4
 ENDC
 ;; return
-XCHG s9
-BLKDROP 9
+XCHG s8
+BLKDROP 8
+RET
+
+.globl	build_state_init
+.type	build_state_init, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: build_state_init
+;; param: code
+;; param: data
+PRINTSTR bld_stt_nt_0
+NEWC
+;; decl: builder
+PUSHINT 2
+STZEROES
+PUSHINT 1
+STONES
+;; code
+;; stack=3
+PUSH s2
+STREFR
+PUSHINT 1
+STONES
+;; data
+;; stack=3
+PUSH s1
+STREFR
+PUSHINT 1
+STZEROES
+PRINTSTR bld_stt_nt_1
+;; builder
+;; stack=3
+DUP
+ENDC
+;; return
+XCHG s3
+BLKDROP 3
 RET
 
 .globl	send_int_msg
 .type	send_int_msg, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: send_int_msg
-;; param: 
-;; param: body_slice
+;; param: body
 ;; param: remote_addr
 ;; param: grams_value
 PRINTSTR send_int_msg
 NEWC
 ;; decl: msg_builder
 ;; grams_value
-;; stack=5
+;; stack=4
 PUSH s1
 ;; remote_addr
-;; stack=6
+;; stack=5
 PUSH s3
 ;; -
 PUSHINT 1
@@ -1050,77 +1164,60 @@ PUSHCONT { ; make__CommonMsgInfoRelaxed__int_msg_info_0__inline
 	;; builder
 	;; stack=4
 	DUP
-	ENDC
 	;; return
 	XCHG s4
 	BLKDROP 4
 	RET
 }
 CALLX
-CTOS
-STSLICER
+STBR
 PUSHINT 0
 STUR 1
+;; body
+;; stack=4
+PUSH s3
 ;; msg_builder
 ;; stack=5
-DUP
-;; body_slice
-;; stack=6
-PUSH s4
+PUSH s1
 PUSHCONT { ; store_either_inline
+	;; param: x
 	;; param: builder
-	;; param: slice
 	PRINTSTR store_either
 	;; if
 	;; builder
 	;; stack=2
-	PUSH s1
+	DUP
 	BREMBITS ; tvm_brembits
-	;; slice
+	;; x
 	;; stack=3
-	PUSH s1
-	SBITS ; tvm_sbits
+	PUSH s2
+	BBITS
 	PUSHINT 1
 	;; +
 	ADD
 	;; >
 	GREATER
 	PUSHCONT {
-		PUSHINT 0
-		;; builder
-		;; stack=3
-		PUSH s2
-		STU 1
-		POP s2
-		;; slice
+		PUSHINT 1
+		STZEROES
+		;; x
 		;; stack=2
-		DUP
-		;; builder
-		;; stack=3
-		PUSH s2
-		STSLICE
-		POP s2
+		PUSH s1
+		STBR
 	}
 	PUSHCONT {
 		PUSHINT 1
-		;; builder
-		;; stack=3
-		PUSH s2
-		STU 1
-		POP s2
-		;; builder
+		STONES
+		;; x
 		;; stack=2
 		PUSH s1
-		;; slice
-		;; stack=3
-		PUSH s1
-		STSLICER
-		POP s2
+		STBREFR
 	}
 	IFELSE
+	PRINTSTR store_either_0
 	;; builder
 	;; stack=2
-	PUSH s1
+	DUP
 	;; return
 	NIP
 	NIP
@@ -1130,12 +1227,12 @@ CALLX
 ;; assign msg_builder
 NIP
 ;; msg_builder
-;; stack=5
+;; stack=4
 DUP
 ENDC
 PUSHINT 0
 SENDRAWMSG
-BLKDROP 5
+BLKDROP 4
 
 .globl	accurate_transfer
 .type	accurate_transfer, @function
@@ -1195,16 +1292,68 @@ BLKDROP 5
 .type	store_either_inline, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: store_either_inline
+;; param: x
 ;; param: builder
-;; param: slice
 PRINTSTR store_either
 ;; if
 ;; builder
 ;; stack=2
+DUP
+BREMBITS ; tvm_brembits
+;; x
+;; stack=3
+PUSH s2
+BBITS
+PUSHINT 1
+;; +
+ADD
+;; >
+GREATER
+PUSHCONT {
+	PUSHINT 1
+	STZEROES
+	;; x
+	;; stack=2
+	PUSH s1
+	STBR
+}
+PUSHCONT {
+	PUSHINT 1
+	STONES
+	;; x
+	;; stack=2
+	PUSH s1
+	STBREFR
+}
+IFELSE
+PRINTSTR store_either_0
+;; builder
+;; stack=2
+DUP
+;; return
+NIP
+NIP
+RET
+
+.globl	store_either_for_cell_inline
+.type	store_either_for_cell_inline, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: store_either_for_cell_inline
+;; param: x
+;; param: builder
+PRINTSTR st_either_cell
+;; x
+;; stack=2
+PUSH s1
+CTOS
+;; decl: slice_x
+;; if
+;; builder
+;; stack=3
 PUSH s1
 BREMBITS ; tvm_brembits
-;; slice
-;; stack=3
+;; slice_x
+;; stack=4
 PUSH s1
 SBITS ; tvm_sbits
 PUSHINT 1
@@ -1213,44 +1362,45 @@ ADD
 ;; >
 GREATER
 PUSHCONT {
-	PUSHINT 0
 	;; builder
 	;; stack=3
-	PUSH s2
-	STU 1
+	PUSH s1
+	PUSHINT 1
+	STZEROES
 	POP s2
-	;; slice
-	;; stack=2
+	;; slice_x
+	;; stack=3
 	DUP
 	;; builder
-	;; stack=3
+	;; stack=4
 	PUSH s2
 	STSLICE
 	POP s2
 }
 PUSHCONT {
-	PUSHINT 1
 	;; builder
+	;; stack=3
+	PUSH s1
+	PUSHINT 1
+	STONES
+	POP s2
+	;; x
 	;; stack=3
 	PUSH s2
-	STU 1
-	POP s2
 	;; builder
-	;; stack=2
-	PUSH s1
-	;; slice
-	;; stack=3
-	PUSH s1
-	STSLICER
+	;; stack=4
+	PUSH s2
+	STREF
 	POP s2
 }
 IFELSE
+PRINTSTR st_either_cell0
 ;; builder
-;; stack=2
+;; stack=3
 PUSH s1
 ;; return
-NIP
-NIP
+XCHG s3
+BLKDROP 3
 RET
 
 .globl	make__CommonMsgInfoRelaxed__int_msg_info_0__inline
@@ -1297,7 +1447,6 @@ PRINTSTR buildmsg_end
 ;; builder
 ;; stack=4
 DUP
-ENDC
 ;; return
 XCHG s4
 BLKDROP 4
@@ -1324,13 +1473,6 @@ STUXR
 ;; builder
 ;; stack=6
 DUP
-ENDC
-CTOS
-;; assign builder
-NIP
-;; builder
-;; stack=6
-DUP
 ;; key
 ;; stack=7
 PUSH s5
@@ -1340,7 +1482,7 @@ PUSH s5
 ;; bits
 ;; stack=9
 PUSH s5
-DICTUSET
+DICTUSETB
 POP s4
 ;; dictionary
 ;; stack=6
@@ -1350,10 +1492,10 @@ XCHG s6
 BLKDROP 6
 RET
 
-.globl	store_signature_inline
-.type	store_signature_inline, @function
+.globl	store_inbound_stack_and_c4_to_c7_inline
+.type	store_inbound_stack_and_c4_to_c7_inline, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: store_signature_inline
+;; Function: store_inbound_stack_and_c4_to_c7_inline
 ;; param: msg_balance
 ;; param: src_addr
 ;; param: sign
@@ -1377,6 +1519,10 @@ PUSHCTR c7
 ;; tuple
 ;; stack=5
 PUSH s1
+TPUSH
+PUSHROOT
+CTOS
+PLDDICT
 TPUSH
 ;; c7
 ;; stack=5
@@ -1411,84 +1557,51 @@ PUSHINT 0
 STUR 32
 PUSHINT 0
 STUR 1
+;; if
 ;; builder
 ;; stack=4
 DUP
 BREMBITS ; tvm_brembits
-;; decl: bits
 ;; body
 ;; stack=5
 PUSH s4
-SBITS ; tvm_sbits
+BBITS
 PUSHINT 1
 ;; +
 ADD
-;; decl: body_bits
-;; if
-;; bits
-;; stack=6
-PUSH s1
-;; body_bits
-;; stack=7
-PUSH s1
 ;; >
 GREATER
 PUSHCONT {
-	PUSHINT 0
-	;; builder
-	;; stack=7
-	PUSH s3
-	STU 1
-	POP s3
+	PUSHINT 1
+	STZEROES
 	;; body
-	;; stack=6
-	PUSH s5
-	;; builder
-	;; stack=7
+	;; stack=4
 	PUSH s3
-	STSLICE
-	POP s3
+	STBR
 }
 PUSHCONT {
 	PUSHINT 1
-	;; builder
-	;; stack=7
-	PUSH s3
-	STU 1
-	POP s3
-	NEWC
-	;; decl: builder2
+	STONES
 	;; body
-	;; stack=7
-	PUSH s6
-	STSLICER
-	;; builder2
-	;; stack=7
-	DUP
-	ENDC
-	;; builder
-	;; stack=8
-	PUSH s4
-	STREF
-	POP s4
-	;; drop locals
-	DROP
+	;; stack=4
+	PUSH s3
+	STBREFR
 }
 IFELSE
 ;; builder
-;; stack=6
-PUSH s2
+;; stack=4
+DUP
 ENDC
 ;; return
-XCHG s6
-BLKDROP 6
+XCHG s4
+BLKDROP 4
 RET
 
 .globl	change_array_length
 .type	change_array_length, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: change_array_length
-;; param: slice
+;; param: defaultValue
 ;; param: array
 ;; param: new_len
 PRINTSTR change_arr_len
@@ -1544,13 +1657,13 @@ PUSHCONT {
 PUSHCONT {
 	;; if
 	;; !
-	;; slice
+	;; defaultValue
 	;; stack=4
 	PUSH s3
 	ISNULL
 	NOT
 	PUSHCONT {
-		;; slice
+		;; defaultValue
 		;; stack=4
 		PUSH s3
 		;; new_len
@@ -1563,7 +1676,7 @@ PUSHCONT {
 		;; stack=6
 		PUSH s4
 		PUSHINT 32
-		DICTUSET
+		DICTUSETB
 		POP s3
 	}
 	IF
@@ -1584,20 +1697,18 @@ RET
 ;; Function: send_grams
 ;; param: grams_value
 ;; param: dst_addr
-;; param: body_slice
+;; param: body
 PRINTSTR send_grams
-PUSHINT 0
-;; body_slice
-;; stack=4
-PUSH s1
+;; body
+;; stack=3
+DUP
 ;; dst_addr
-;; stack=5
-PUSH s3
+;; stack=4
+PUSH s2
 ;; grams_value
-;; stack=6
-PUSH s5
-PUSHINT $send_int_msg$
-CALL 1
+;; stack=5
+PUSH s4
+CALL $send_int_msg$
 BLKDROP 3
 
 .globl	send_int_msg_2
@@ -1605,48 +1716,33 @@ BLKDROP 3
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: send_int_msg_2
 ;; param: dst_addr
-;; param: body_slice
+;; param: body
 PRINTSTR send_int_msg_2
-PUSHINT 0
-;; body_slice
-;; stack=3
-PUSH s1
+;; body
+;; stack=2
+DUP
 ;; dst_addr
-;; stack=4
-PUSH s3
+;; stack=3
+PUSH s2
 PUSHINT 10000000
-PUSHINT $send_int_msg$
-CALL 1
+CALL $send_int_msg$
 BLKDROP 2
 
 .globl	send_ext_msg
 .type	send_ext_msg, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: send_ext_msg
-;; param: body_slice
+;; param: body
 PRINTSTR send_ext_msg
-LTIME
-;; decl: ltime
-MYADDR
-;; decl: snd_addr
-;; body_slice
-;; stack=3
-PUSH s2
-;; ltime
-;; stack=4
-PUSH s2
-;; snd_addr
-;; stack=5
-PUSH s2
-PUSHINT $build_external_outbound_message$
-CALL 1
-;; decl: cell
-;; cell
-;; stack=4
+;; body
+;; stack=1
 DUP
+LTIME
+MYADDR
+CALL $build_external_outbound_message$
 PUSHINT 0
 SENDRAWMSG
-BLKDROP 4
+DROP
 
 .globl	get_self_address
 .type	get_self_address, @function
@@ -1811,7 +1907,6 @@ RET
 ;; param: msg_balance
 ;; param: msg_cell
 ;; param: msg_body_slice
-ACCEPT
 PRINTSTR main_internal
 ;; msg_cell
 ;; stack=4
@@ -1884,7 +1979,7 @@ PUSH s4
 ;; stack=7
 PUSH s1
 PUSHINT 0
-PUSHCONT { ; store_signature_inline
+PUSHCONT { ; store_inbound_stack_and_c4_to_c7_inline
 	;; param: msg_balance
 	;; param: src_addr
 	;; param: sign
@@ -1908,6 +2003,10 @@ PUSHCONT { ; store_signature_inline
 	;; tuple
 	;; stack=5
 	PUSH s1
+	TPUSH
+	PUSHROOT
+	CTOS
+	PLDDICT
 	TPUSH
 	;; c7
 	;; stack=5
@@ -1948,6 +2047,7 @@ PUSHCONT {
 	RET
 }
 IFJMP
+PRINTSTR main_internal1
 ;; msg_body_slice
 ;; stack=6
 PUSH s2
@@ -2149,7 +2249,7 @@ PUSH s2
 ;; pubKey
 ;; stack=8
 PUSH s2
-PUSHCONT { ; store_signature_inline
+PUSHCONT { ; store_inbound_stack_and_c4_to_c7_inline
 	;; param: msg_balance
 	;; param: src_addr
 	;; param: sign
@@ -2173,6 +2273,10 @@ PUSHCONT { ; store_signature_inline
 	;; tuple
 	;; stack=5
 	PUSH s1
+	TPUSH
+	PUSHROOT
+	CTOS
+	PLDDICT
 	TPUSH
 	;; c7
 	;; stack=5
@@ -2236,7 +2340,6 @@ PUSHCONT { ; replay_prot_inline
 	PUSHINT 128
 	SCHKBITSQ
 	PUSHCONT {
-		PRINTSTR replay_have
 		;; c4
 		;; stack=5
 		DUP
@@ -2253,13 +2356,11 @@ PUSHCONT { ; replay_prot_inline
 		POP s2
 	}
 	PUSHCONT {
-		PUSHINT 60000
+		PUSHINT 1800000
 		;; assign interval
 		POP s2
-		PRINTSTR replay_have_no
 	}
 	IFELSE
-	PRINTSTR replay_prot2
 	;; if
 	;; previous_message_timestamp
 	;; stack=5
@@ -2293,7 +2394,6 @@ PUSHCONT { ; replay_prot_inline
 		PUSH s4
 		SWAP
 		STDICT
-		PRINTSTR replay_prot3
 		;; msg_timestamp
 		;; stack=6
 		PUSH s5
@@ -2311,6 +2411,7 @@ PUSHCONT { ; replay_prot_inline
 		DUP
 		ENDC
 		POPROOT
+		PRINTSTR replay_prot2
 		TRUE
 		;; return
 		XCHG s6
@@ -2318,6 +2419,7 @@ PUSHCONT { ; replay_prot_inline
 		RET
 	}
 	IFJMP
+	PRINTSTR replay_prot3
 	FALSE
 	;; return
 	XCHG s5
@@ -2326,7 +2428,6 @@ PUSHCONT { ; replay_prot_inline
 }
 CALLX
 PUSHCONT {
-	ACCEPT
 	PRINTSTR main_external2
 	;; msg_body_slice
 	;; stack=8
@@ -2337,6 +2438,7 @@ PUSHCONT {
 	BLKSWAP 8, 2
 	BLKDROP 8
 	JMP 1
+	PRINTSTR main_external3
 	;; return
 	BLKDROP 8
 	RET
@@ -2345,6 +2447,33 @@ IFJMP
 PUSHINT 124
 THROWANY
 BLKDROP 8
+
+.globl	push_persistent_data_from_c7_to_c4
+.type	push_persistent_data_from_c7_to_c4, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: push_persistent_data_from_c7_to_c4
+PRINTSTR pushpdc7toc4
+PUSHROOT
+CTOS
+;; decl: c4
+SKIPDICT
+NEWC
+;; decl: c4_builder
+PUSHCTR c7
+THIRD
+SWAP
+STDICT
+;; c4
+;; stack=2
+PUSH s1
+STSLICER
+;; c4_builder
+;; stack=2
+DUP
+ENDC
+POPROOT
+PRINTSTR pushpdc7toc40
+BLKDROP 2
 
 .globl	replay_prot_inline
 .type	replay_prot_inline, @function
@@ -2375,7 +2504,6 @@ DUP
 PUSHINT 128
 SCHKBITSQ
 PUSHCONT {
-	PRINTSTR replay_have
 	;; c4
 	;; stack=5
 	DUP
@@ -2392,13 +2520,11 @@ PUSHCONT {
 	POP s2
 }
 PUSHCONT {
-	PUSHINT 60000
+	PUSHINT 1800000
 	;; assign interval
 	POP s2
-	PRINTSTR replay_have_no
 }
 IFELSE
-PRINTSTR replay_prot2
 ;; if
 ;; previous_message_timestamp
 ;; stack=5
@@ -2432,7 +2558,6 @@ PUSHCONT {
 	PUSH s4
 	SWAP
 	STDICT
-	PRINTSTR replay_prot3
 	;; msg_timestamp
 	;; stack=6
 	PUSH s5
@@ -2450,6 +2575,7 @@ PUSHCONT {
 	DUP
 	ENDC
 	POPROOT
+	PRINTSTR replay_prot2
 	TRUE
 	;; return
 	XCHG s6
@@ -2457,6 +2583,7 @@ PUSHCONT {
 	RET
 }
 IFJMP
+PRINTSTR replay_prot3
 FALSE
 ;; return
 XCHG s5
@@ -2510,59 +2637,83 @@ RET
 .type	generateConstructorProtection, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function: generateConstructorProtection
+PRINTSTR constr_prot_0
 PUSHINT 0
 ;; decl: dict
 PUSHINT 0
-;; decl: previous_message_timestamp_and_interval
+;; decl: previous_message_timestamp
+PUSHINT 1800000
+;; decl: interval
 PUSHROOT
 CTOS
 ;; decl: c4
 ;; c4
-;; stack=3
+;; stack=4
 DUP
 LDDICT
 POP s2
 ;; assign dict
-POP s3
-;; c4
-;; stack=3
-DUP
-LDI 128
-POP s2
-;; assign previous_message_timestamp_and_interval
-POP s2
+POP s4
 ;; if
 ;; c4
-;; stack=3
+;; stack=4
 DUP
-PUSHINT 1
+PUSHINT 128
 SCHKBITSQ
 PUSHCONT {
-	PUSHINT 123
-	THROWANY
+	;; c4
+	;; stack=4
+	DUP
+	LDI 64
+	POP s2
+	;; assign previous_message_timestamp
+	POP s3
+	;; c4
+	;; stack=4
+	DUP
+	LDI 64
+	POP s2
+	;; assign interval
+	POP s2
+	;; if
+	;; c4
+	;; stack=4
+	DUP
+	PUSHINT 1
+	SCHKBITSQ
+	PUSHCONT {
+		PUSHINT 123
+		THROWANY
+	}
+	IF
 }
 IF
 NEWC
 ;; decl: c4_builder
 ;; dict
-;; stack=4
-PUSH s3
+;; stack=5
+PUSH s4
 SWAP
 STDICT
-;; previous_message_timestamp_and_interval
-;; stack=4
+;; previous_message_timestamp
+;; stack=5
+PUSH s3
+STUR 64
+;; interval
+;; stack=5
 PUSH s2
-STUR 128
+STUR 64
 PUSHINT 1
 STONES
 ;; c4
-;; stack=4
+;; stack=5
 PUSH s1
 STSLICER
 ;; c4_builder
-;; stack=4
+;; stack=5
 DUP
 ENDC
 POPROOT
-BLKDROP 4
+PRINTSTR constr_prot_1
+BLKDROP 5
 

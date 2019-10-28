@@ -1,12 +1,111 @@
 .globl	constructor
 .public	constructor
 .type	constructor, @function
-PUSHINT $generateConstructorProtection$
-CALL 1
+PRINTSTR constr_prot_0
+PUSHINT 0
+;; decl: dict
+PUSHINT 0
+;; decl: previous_message_timestamp
+PUSHINT 1800000
+;; decl: interval
+PUSHROOT
+CTOS
+;; decl: c4
+;; c4
+;; stack=4
+DUP
+LDDICT
+POP s2
+;; assign dict
+POP s4
+;; if
+;; c4
+;; stack=4
+DUP
+PUSHINT 128
+SCHKBITSQ
+PUSHCONT {
+	;; c4
+	;; stack=4
+	DUP
+	LDI 64
+	POP s2
+	;; assign previous_message_timestamp
+	POP s3
+	;; c4
+	;; stack=4
+	DUP
+	LDI 64
+	POP s2
+	;; assign interval
+	POP s2
+	;; if
+	;; c4
+	;; stack=4
+	DUP
+	PUSHINT 1
+	SCHKBITSQ
+	PUSHCONT {
+		PUSHINT 123
+		THROWANY
+	}
+	IF
+}
+IF
+NEWC
+;; decl: c4_builder
+;; dict
+;; stack=5
+PUSH s4
+SWAP
+STDICT
+;; previous_message_timestamp
+;; stack=5
+PUSH s3
+STUR 64
+;; interval
+;; stack=5
+PUSH s2
+STUR 64
+PUSHINT 1
+STONES
+;; c4
+;; stack=5
+PUSH s1
+STSLICER
+;; c4_builder
+;; stack=5
+DUP
+ENDC
+POPROOT
+PRINTSTR constr_prot_1
+BLKDROP 5
+ACCEPT
 ; Decode input parameters
 DROP
-PUSHINT $constructor_TestBody$
-CALL 1
+CALL $constructor_TestBody$
+PRINTSTR pushpdc7toc4
+PUSHROOT
+CTOS
+;; decl: c4
+SKIPDICT
+NEWC
+;; decl: c4_builder
+PUSHCTR c7
+THIRD
+SWAP
+STDICT
+;; c4
+;; stack=2
+PUSH s1
+STSLICER
+;; c4_builder
+;; stack=2
+DUP
+ENDC
+POPROOT
+PRINTSTR pushpdc7toc40
+BLKDROP 2
 RET
 
 .globl	constructor_TestBody
@@ -19,11 +118,31 @@ RET
 .type	send, @function
 ; Decode input parameters
 PUSHINT 256
-PUSHINT $smart_ldu$
-CALL 1
+CALL $smart_ldu$
 DROP
-PUSHINT $send_internal$
-CALL 1
+CALL $send_internal$
+PRINTSTR pushpdc7toc4
+PUSHROOT
+CTOS
+;; decl: c4
+SKIPDICT
+NEWC
+;; decl: c4_builder
+PUSHCTR c7
+THIRD
+SWAP
+STDICT
+;; c4
+;; stack=2
+PUSH s1
+STSLICER
+;; c4_builder
+;; stack=2
+DUP
+ENDC
+POPROOT
+PRINTSTR pushpdc7toc40
+BLKDROP 2
 RET
 
 .globl	send_internal
@@ -53,9 +172,7 @@ STUR 256
 STBREFR
 STBREFR
 STBREFR
-ENDC CTOS
-PUSHINT $send_int_msg_2$
-CALL 1
+CALL $send_int_msg_2$
 DROP
 
 .globl	fallback
