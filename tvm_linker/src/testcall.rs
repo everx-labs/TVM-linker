@@ -12,6 +12,7 @@ use tvm::executor::gas::gas_state::Gas;
 use tvm::stack::*;
 use tvm::types::AccountId;
 use tvm::block::*;
+use tvm::SmartContractInfo;
 
 #[allow(dead_code)]
 fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Arc<CellData> {

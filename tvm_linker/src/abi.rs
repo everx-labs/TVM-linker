@@ -12,9 +12,10 @@ pub fn build_abi_body(abi_file: &str, method: &str, params: &str, keypair: Optio
     file.read_to_string(&mut abi_json).map_err(|e| format!("failed to read abi file: {}", e))?;
     
     encode_function_call(
-        abi_json, 
-        method.to_owned(), 
+        abi_json,
+        method.to_owned(),
         params.to_owned(),
+        false,
         keypair.as_ref(),
     ).map_err(|e| format!("cannot encode abi body: {:?}", e))
 }
