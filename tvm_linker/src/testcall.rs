@@ -12,6 +12,7 @@ use tvm::executor::gas::gas_state::Gas;
 use tvm::stack::*;
 use tvm::types::AccountId;
 use tvm::block::*;
+use tvm::SmartContractInfo;
 
 #[allow(dead_code)]
 fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Arc<CellData> {
@@ -66,11 +67,11 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) {
 
 fn initialize_registers(data: SliceData, myself: MsgAddressInt) -> SaveList {
     let mut ctrls = SaveList::new();
-    let mut info = SmartContractInfo::with_myself(myself);
-    *info.balance_remaining_mut() = CurrencyCollection::with_grams(100_000_000_000u64);
+    let mut info = SmartContractInfo::with_myself(myself.write_to_new_cell().unwrap().into());
+    *info.balance_remaining_grams_mut() = 100_000_000_000;
     *info.unix_time_mut() = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32;
     ctrls.put(4, &mut StackItem::Cell(data.into_cell())).unwrap();
-    ctrls.put(7, &mut info.into_temp_data().unwrap()).unwrap();
+    ctrls.put(7, &mut info.into_temp_data()).unwrap();
     ctrls
 }
 
