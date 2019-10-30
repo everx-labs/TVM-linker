@@ -123,20 +123,14 @@ fn linker_main() -> Result<(), String> {
                 let pair = KeypairManager::from_secret_file(path);
                 pair.drain()
             });
-            println!("key_file.is_none = {}", key_file.is_none());
-            let mut body: SliceData = build_abi_body(
+            let is_internal = matches.is_present("INTERNAL");            
+            let body: SliceData = build_abi_body(
                 abi_file.unwrap(), 
                 method_name.unwrap(), 
                 params.unwrap(), 
-                key_file
-            )?.into();
-            if matches.is_present("INTERNAL") {
-                //internal messages are unsigned: drop signature cell
-                body.checked_drain_reference().unwrap();
-                let mut tempbody = BuilderData::new();
-                tempbody.checked_append_references_and_data(&body).unwrap();
-                body = tempbody.into();
-            }
+                key_file,
+                is_internal
+            )?.into();            
             Ok(Some(body))
         } else if mask == 0 {
             Ok(None)

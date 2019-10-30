@@ -6,7 +6,13 @@ use std::fs::File;
 use std::io::Read;
 use tvm::stack::BuilderData;
 
-pub fn build_abi_body(abi_file: &str, method: &str, params: &str, keypair: Option<Keypair>) -> Result<BuilderData, String> {
+pub fn build_abi_body(
+    abi_file: &str,
+    method: &str,
+    params: &str,
+    keypair: Option<Keypair>,
+    internal: bool,
+) -> Result<BuilderData, String> {
     let mut abi_json = String::new();
     let mut file = File::open(abi_file).map_err(|e| format!("cannot open abi file: {}", e))?;
     file.read_to_string(&mut abi_json).map_err(|e| format!("failed to read abi file: {}", e))?;
@@ -15,7 +21,7 @@ pub fn build_abi_body(abi_file: &str, method: &str, params: &str, keypair: Optio
         abi_json,
         method.to_owned(),
         params.to_owned(),
-        false,
+        internal,
         keypair.as_ref(),
     ).map_err(|e| format!("cannot encode abi body: {:?}", e))
 }
