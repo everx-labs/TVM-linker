@@ -1,0 +1,13 @@
+    .globl  main
+    .public main
+    .type main, @function
+main:
+PUSHINT 10
+DROP
+CALL $sum$
+PUSHINT 3
+
+    .macros sum
+PUSHINT 1
+PUSHINT 2
+ADD
