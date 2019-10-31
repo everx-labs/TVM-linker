@@ -197,12 +197,12 @@ const PATTERN_PUBLIC:   &'static str = r"^[\t\s]*\.public[\t\s]+([a-zA-Z0-9_\.]+
 const PATTERN_SIZE:     &'static str = r"^[\t\s]*\.size[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([\.a-zA-Z0-9_]+)";
 const PATTERN_COMM:     &'static str = r"^[\t\s]*\.comm[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([0-9]+),[\t\s]*([0-9]+)";
 const PATTERN_ASCIZ:    &'static str = r#"^[\t\s]*\.asciz[\t\s]+"(.+)""#;
-const PATTERN_MACRO:    &'static str = r"^[\t\s]*\.macros[\t\s]+([a-zA-Z0-9_\.]+)";
+const PATTERN_MACRO:    &'static str = r"^[\t\s]*\.macro[\t\s]+([a-zA-Z0-9_\.]+)";
 const PATTERN_IGNORED:  &'static str = r"^[\t\s]+\.(p2align|align|text|file|ident|section)";
 
 const GLOBL:    &'static str = ".globl";
 const INTERNAL: &'static str = ".internal";
-const MACROS:    &'static str = ".macros";
+const MACROS:    &'static str = ".macro";
 const SELECTOR: &'static str = ".selector";
 
 const DATA_TYPENAME:    &'static str = "object";
@@ -448,6 +448,7 @@ impl ParseEngine {
                 let name = cap.get(1).unwrap().as_str().to_owned();
                 self.globals.entry(name.clone()).or_insert(Object::new(name.clone(), ""));
             } else if macro_regex.is_match(&l) {
+                // .macro x
                 self.update(&section_name, &obj_name, &obj_body, first_pass)
                     .map_err(|e| format!("line {}: {}", lnum, e))?;
                 section_name = MACROS.to_owned();

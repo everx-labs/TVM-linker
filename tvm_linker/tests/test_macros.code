@@ -7,7 +7,7 @@ DROP
 CALL $sum$
 PUSHINT 3
 
-    .macros sum
+    .macro sum
 PUSHINT 1
 PUSHINT 2
 ADD
