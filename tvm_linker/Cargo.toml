@@ -1,8 +1,15 @@
 [package]
 build = "build/build.rs"
 name = "tvm_linker"
+description = "TVM linker"
 version = "0.1.0"
-authors = ["tonlabs"]
+authors = ["TON DEV SOLUTIONS LTD <support@tonlabs.io>"]
+readme = "README.md"
+license-file = "LICENSE.md"
+homepage = "https://ton.dev"
+repository = "https://github.com/tonlabs/TVM-linker"
+documentation = "https://docs.ton.dev"
+keywords = ["TON", "linker", "TVM", "tonlabs"]
 
 [dependencies]
 base64 = "0.10.1"
