@@ -501,7 +501,8 @@ impl ParseEngine {
             l.clear();
         }
 
-        self.update(&section_name, &obj_name, &obj_body, first_pass)?;
+        self.update(&section_name, &obj_name, &obj_body, first_pass)
+            .map_err(|e| format!("line {}: {}", lnum, e))?;
         ok!()
     }
 
