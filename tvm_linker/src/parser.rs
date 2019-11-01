@@ -714,13 +714,11 @@ impl ParseEngine {
             self.intrefs.get(name).and_then(|id| Some(id.clone()))
         })
         .or_else(|_| resolve_name(line, |name| {
-            self.globals.get(name).and_then(|obj| {
-                obj.dtype.data().and_then(|data| Some(data.addr.clone()))
-            })
+            self.xrefs.get(name).map(|id| id.clone())
         }))
         .or_else(|_| resolve_name(line, |name| {
             self.globals.get(name).and_then(|obj| {
-                obj.dtype.func().and_then(|func| Some(func.id))
+                obj.dtype.data().and_then(|data| Some(data.addr.clone()))
             })
         }))
         .or_else(|_| resolve_name(line, |name| {
@@ -921,5 +919,5 @@ mod tests {
             body,
             "PUSHINT 10\nDROP\nPUSHINT 1\nPUSHINT 2\nADD\nPUSHINT 3"
         );
-    }  
+    }
 }
