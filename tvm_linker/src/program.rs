@@ -241,6 +241,23 @@ mod tests {
         assert_eq!(perform_contract_call(name, None, None, false, false, None, Some("-1")), 0);
     }
 
+    #[test]
+    fn test_recursive_call() {
+        let mut parser = ParseEngine::new();
+        let lib1 = File::open("./stdlib.tvm").unwrap();
+        let source = File::open("./tests/test_recursive.code").unwrap();
+        assert_eq!(parser.parse(source, vec![lib1], None), ok!());
+        let prog = Program::new(parser);
+        let contract_file = prog.compile_to_file(-1).unwrap();
+        let name = contract_file.split('.').next().unwrap();
+        let body = {
+            let mut b = BuilderData::new();
+            b.append_u32(abi::gen_abi_id(None, "main")).unwrap();
+            Some(b.into())
+        };
+        
+        assert_eq!(perform_contract_call(name, body, Some(Some("key1")), false, false, None, None), 0);
+    }
 
     #[test]
     fn test_public_and_private() {

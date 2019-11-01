@@ -9,6 +9,7 @@ use tvm::stack::integer::serialization::{Encoding, SignedIntegerBigEndianEncodin
 use tvm::stack::serialization::Serializer;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
 use std::sync::Arc;
+
 pub type Ptr = i64;
 
 pub fn ptr_to_builder(n: Ptr) -> Result<BuilderData, String> {
@@ -168,6 +169,8 @@ pub struct ParseEngine {
     globals: HashMap<String, Object>,
     /// ID for next private global function
     next_private_globl_funcid: u32,
+    /// map of macros
+    macros: HashMap<String, String>,
     /// selector code
     entry_point: String,
     /// starting key for objects in global memory dictionary
@@ -194,10 +197,12 @@ const PATTERN_PUBLIC:   &'static str = r"^[\t\s]*\.public[\t\s]+([a-zA-Z0-9_\.]+
 const PATTERN_SIZE:     &'static str = r"^[\t\s]*\.size[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([\.a-zA-Z0-9_]+)";
 const PATTERN_COMM:     &'static str = r"^[\t\s]*\.comm[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([0-9]+),[\t\s]*([0-9]+)";
 const PATTERN_ASCIZ:    &'static str = r#"^[\t\s]*\.asciz[\t\s]+"(.+)""#;
+const PATTERN_MACRO:    &'static str = r"^[\t\s]*\.macro[\t\s]+([a-zA-Z0-9_\.]+)";
 const PATTERN_IGNORED:  &'static str = r"^[\t\s]+\.(p2align|align|text|file|ident|section)";
 
 const GLOBL:    &'static str = ".globl";
 const INTERNAL: &'static str = ".internal";
+const MACROS:    &'static str = ".macro";
 const SELECTOR: &'static str = ".selector";
 
 const DATA_TYPENAME:    &'static str = "object";
@@ -217,6 +222,7 @@ impl ParseEngine {
             globals:    HashMap::new(), 
             next_private_globl_funcid: 0,
             internals:  HashMap::new(),
+            macros:     HashMap::new(),
             entry_point: String::new(),
             globl_base: 0,
             globl_ptr: 0,
@@ -377,6 +383,7 @@ impl ParseEngine {
         let base_pers_regex = Regex::new(PATTERN_PERSBASE).unwrap();
         let ignored_regex = Regex::new(PATTERN_IGNORED).unwrap();
         let public_regex = Regex::new(PATTERN_PUBLIC).unwrap();
+        let macro_regex = Regex::new(PATTERN_MACRO).unwrap();
 
         let mut section_name: String = String::new();
         let mut obj_body: String = "".to_owned();
@@ -440,6 +447,13 @@ impl ParseEngine {
                 let cap = globl_regex.captures(&l).unwrap();
                 let name = cap.get(1).unwrap().as_str().to_owned();
                 self.globals.entry(name.clone()).or_insert(Object::new(name.clone(), ""));
+            } else if macro_regex.is_match(&l) {
+                // .macro x
+                self.update(&section_name, &obj_name, &obj_body, first_pass)
+                    .map_err(|e| format!("line {}: {}", lnum, e))?;
+                section_name = MACROS.to_owned();
+                obj_body = "".to_owned();
+                obj_name = macro_regex.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
             } else if data_regex.is_match(&l) {
                 // .data
                 //ignore, not used
@@ -488,7 +502,8 @@ impl ParseEngine {
             l.clear();
         }
 
-        self.update(&section_name, &obj_name, &obj_body, first_pass)?;
+        self.update(&section_name, &obj_name, &obj_body, first_pass)
+            .map_err(|e| format!("line {}: {}", lnum, e))?;
         ok!()
     }
 
@@ -502,7 +517,7 @@ impl ParseEngine {
         }
     }
 
-    fn update(&mut self, section: &str, func: &str, body: &str, first_pass: bool) -> Result<(), String> {
+    fn update(&mut self, section: &str, name: &str, body: &str, first_pass: bool) -> Result<(), String> {
         match section {
             SELECTOR => {
                 if self.entry_point.is_empty() {
@@ -514,39 +529,39 @@ impl ParseEngine {
             GLOBL => {
                 let is_public = self.abi.as_ref()
                     .map(|abi| {
-                        abi.functions().get(func).is_some() 
-                        || abi.events().get(func).is_some() 
+                        abi.functions().get(name).is_some() 
+                        || abi.events().get(name).is_some() 
                     })
                     .unwrap_or(false);
                 //we do not reset publicity if symbol isn't included in ABI,
                 //because it can be marked as public in assembly.
                 if is_public {
-                    self.globals.get_mut(func)
+                    self.globals.get_mut(name)
                         .unwrap()
                         .public = true;
                 }
-                if self.globals.get(func)
+                if self.globals.get(name)
                     .unwrap()
                     .dtype.is_func() {
-                    let func_id = self.create_function_id(func);
-                    let item = self.globals.get_mut(func).unwrap();
+                    let func_id = self.create_function_id(name);
+                    let item = self.globals.get_mut(name).unwrap();
                     let params = item.dtype.func_mut().unwrap();
                     params.id = func_id;
                     params.body = body.trim_end().to_string();
-                    let prev = self.xrefs.insert(func.to_string(), func_id);
+                    let prev = self.xrefs.insert(name.to_string(), func_id);
                     if first_pass && prev.is_some() {
                         Err(format!(
                             "global function with id = {:x} and name \"{}\" already exist", 
                             func_id,
-                            func,
+                            name,
                         ))?;
                     }
                 } else {
-                    let item = self.globals.get_mut(func).unwrap();
+                    let item = self.globals.get_mut(name).unwrap();
                     let data = item.dtype.data_mut().unwrap();
-                    Self::update_data(body, func, &mut item.size, &mut data.values)?;
+                    Self::update_data(body, name, &mut item.size, &mut data.values)?;
                     let offset = (data.values.len() as Ptr) * WORD_SIZE;
-                    if func.ends_with(PERSISTENT_DATA_SUFFIX) {
+                    if name.ends_with(PERSISTENT_DATA_SUFFIX) {
                         data.persistent = true;
                         data.addr = self.persistent_ptr;
                         self.persistent_ptr += offset;
@@ -557,12 +572,18 @@ impl ParseEngine {
                 }
             },
             INTERNAL => {
-                let f_id = self.aliases.get(func).ok_or(format!("id for '{}' not found", func))?;
+                let f_id = self.aliases.get(name).ok_or(format!("id for '{}' not found", name))?;
                 let prev = self.internals.insert(*f_id, body.trim_end().to_string());
                 if first_pass && prev.is_some() {
                     Err(format!("internal function with id = {} already exist", *f_id))?;
                 }
-                self.intrefs.insert(func.to_string(), *f_id);
+                self.intrefs.insert(name.to_string(), *f_id);
+            },
+            MACROS => {
+                let prev = self.macros.insert(name.to_string(), body.trim_end().to_string());
+                if first_pass && prev.is_some() {
+                    Err(format!("macros with name \"{}\" already exist", name))?;
+                }
             },
             _ => (),
         }
@@ -689,22 +710,31 @@ impl ParseEngine {
     }
 
     fn replace_labels(&mut self, line: &str) -> Result<String, String> {
-        resolve_name(line, |name| self.xrefs.get(name).map(|id| id.clone()))
-            .or_else(|_| resolve_name(line, |name| self.intrefs.get(name).and_then(|id| {
-                Some(id.clone())
-            })))
-            .or_else(|_| resolve_name(line, |name| self.globals.get(name).and_then(|obj| {
-                obj.dtype.data().and_then(|data| {
-                    Some(data.addr.clone())
-                })
-            })))
-            .or_else(|_| resolve_name(line, |name| {
-                match name {
-                    "global-base" => Some(self.globl_base.clone()),
-                    "persistent-base" => Some(self.persistent_base.clone()),
-                    _ => None,
-                }
-            }))        
+        resolve_name(line, |name| {
+            self.intrefs.get(name).and_then(|id| Some(id.clone()))
+        })
+        .or_else(|_| resolve_name(line, |name| {
+            self.xrefs.get(name).map(|id| id.clone())
+        }))
+        .or_else(|_| resolve_name(line, |name| {
+            self.globals.get(name).and_then(|obj| {
+                obj.dtype.data().and_then(|data| Some(data.addr.clone()))
+            })
+        }))
+        .or_else(|_| resolve_name(line, |name| {
+            match name {
+                "global-base" => Some(self.globl_base.clone()),
+                "persistent-base" => Some(self.persistent_base.clone()),
+                _ => None,
+            }
+        }))
+        .or_else(|e| {
+            let mut name = String::new();
+            resolve_name(line, |n| { name = n.to_string(); Some(0)}).unwrap();
+            self.macros.get(&name)
+                .ok_or(e)
+                .map(|body| body.clone() + "\n")
+        })
     }
 
     pub fn debug_print(&self) {
@@ -874,5 +904,20 @@ mod tests {
         let lib1 = File::open("./tests/test_extlink_lib.tvm").unwrap();
         let source = File::open("./tests/test_extlink_source.s").unwrap();
         assert_eq!(parser.parse(source, vec![lib1], None), ok!());
-    }   
+    }
+
+    #[test]
+    fn test_macros() {
+        let mut parser = ParseEngine::new();
+        let lib1 = File::open("./stdlib.tvm").unwrap();
+        let source = File::open("./tests/test_macros.code").unwrap();
+        assert_eq!(parser.parse(source, vec![lib1], None), ok!());
+        let publics = parser.publics();
+        let body = publics.get(&0x0D6E4079).unwrap();
+
+        assert_eq!(
+            body,
+            "PUSHINT 10\nDROP\nPUSHINT 1\nPUSHINT 2\nADD\nPUSHINT 3"
+        );
+    }
 }

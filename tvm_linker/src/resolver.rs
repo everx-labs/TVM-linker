@@ -6,9 +6,9 @@ lazy_static! {
     pub static ref NAMES: Regex = Regex::new(r"\$(?P<id>:?[-_0-9a-zA-Z\.]+)(?P<offset>\+\d+)?(:(?P<len>\d*)?(?P<fmt>[xX])?)?\$").unwrap();
 }
 
-pub fn resolve_name<F, T>(text: &str, get: F) -> Result<String, String> 
+pub fn resolve_name<F, T>(text: &str, mut get: F) -> Result<String, String> 
     where 
-        F: Fn(&str) -> Option<T>,
+        F: FnMut(&str) -> Option<T>,
         T: LowerHex + UpperHex + Display + TryFrom<isize> + std::ops::AddAssign {
     let mut res_str = String::new();
     let mut end = 0;
