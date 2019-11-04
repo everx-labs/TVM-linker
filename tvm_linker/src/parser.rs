@@ -21,6 +21,7 @@ use tvm::stack::{BuilderData, IBitstring, IntegerData, SliceData, CellData};
 use tvm::stack::integer::serialization::{Encoding, SignedIntegerBigEndianEncoding};
 use tvm::stack::serialization::Serializer;
 use tvm::stack::dictionary::{HashmapE, HashmapType};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 pub type Ptr = i64;
@@ -35,6 +36,7 @@ pub fn ptr_to_builder(n: Ptr) -> Result<BuilderData, String> {
 struct Func {
     pub id: u32,
     pub body: String,
+    pub calls: Vec<u32>,
 }
 
 struct Data {
@@ -52,7 +54,7 @@ enum ObjectType {
 impl From<&str> for ObjectType {
     fn from(stype: &str) -> ObjectType {
         match stype {
-            "function" => ObjectType::Function(Func { id: 0, body: String::new() }),
+            "function" => ObjectType::Function(Func { id: 0, body: String::new(), calls: vec![] }),
             "object" => ObjectType::Data(Data { addr: 0, values: vec![], persistent: false }),
             _ => ObjectType::None,
         }
@@ -146,7 +148,7 @@ struct Object {
     pub name: String,
     pub size: usize,
     pub index: usize,
-    pub public: bool,
+    pub public: bool,    
     pub dtype: ObjectType,
 }
 
@@ -172,7 +174,7 @@ pub struct ParseEngine {
     /// .internal function references (name -> id)
     intrefs: HashMap<String, i32>,
     /// .internal functions bodies (id -> body)
-    internals: HashMap<i32, String>,
+    internals: HashMap<i32, Func>,
     //// map of aliases for function names
     aliases: HashMap<String, i32>,
     /// .globl functions references (name -> id)
@@ -267,8 +269,11 @@ impl ParseEngine {
         if self.entry_point.is_empty() {
             return Err("Selector not found".to_string());
         }
+
+        self.drop_unused_objects();
+        //self.debug_print();
         ok!()
-    }
+    }    
 
     pub fn data(&self) -> Option<Arc<CellData>> {
         self.build_data()
@@ -278,8 +283,12 @@ impl ParseEngine {
         &self.entry_point
     }
 
-    pub fn internals(&self) -> &HashMap<i32, String> {
-        &self.internals
+    pub fn internals(&self) -> HashMap<i32, String> {
+        let mut funcs = HashMap::new();
+        self.internals.iter().for_each(|x| {
+            funcs.insert(x.0.clone(), x.1.body.clone());
+        });
+        funcs
     }
 
     pub fn internal_name(&self, id: i32) -> Option<String> {
@@ -289,7 +298,7 @@ impl ParseEngine {
     #[allow(dead_code)]
     pub fn internal_by_name(&self, name: &str) -> Option<(i32, String)> {
         let id = self.intrefs.get(name)?;
-        let body = self.internals.get(id).map(|v| v.to_owned())?;
+        let body = self.internals.get(id).map(|f| f.body.to_owned())?;
         Some((*id, body))
     }
 
@@ -508,7 +517,8 @@ impl ParseEngine {
             } else {
                 let resolved_line = match first_pass { 
                     true  => l.to_owned(),
-                    false => self.replace_labels(&l).map_err(|e| format!("line {}: cannot resolve label: {}", lnum, e))?, 
+                    false => self.replace_labels(&l, &obj_name)
+                        .map_err(|e| format!("line {}: cannot resolve label: {}", lnum, e))?, 
                 };
                 obj_body.push_str(&resolved_line);
             }
@@ -586,7 +596,10 @@ impl ParseEngine {
             },
             INTERNAL => {
                 let f_id = self.aliases.get(name).ok_or(format!("id for '{}' not found", name))?;
-                let prev = self.internals.insert(*f_id, body.trim_end().to_string());
+                let prev = self.internals.insert(
+                    *f_id,
+                    Func{ id: *f_id as u32, body: body.trim_end().to_string(), calls: vec![] },
+                );
                 if first_pass && prev.is_some() {
                     Err(format!("internal function with id = {} already exist", *f_id))?;
                 }
@@ -722,12 +735,27 @@ impl ParseEngine {
         pers_dict.data().map(|cell| cell.clone())
     }
 
-    fn replace_labels(&mut self, line: &str) -> Result<String, String> {
+    fn replace_labels(&mut self, line: &str, cur_obj_name: &str) -> Result<String, String> {
+        let is_call = Regex::new(r"^[\t\s]*CALL").unwrap().is_match(&line);        
         resolve_name(line, |name| {
-            self.intrefs.get(name).and_then(|id| Some(id.clone()))
+            let mut res = self.intrefs.get(name).and_then(|id| Some(id.clone()));
+            if res.is_some() && is_call {
+                let id = res.unwrap();
+                self.insert_called_func(cur_obj_name, id as u32);
+                println!("internal: line = {}, is_call = {}, push = {}, cur_name = {}", line, is_call, id, cur_obj_name);
+                res = Some(id);
+            }
+            res
         })
         .or_else(|_| resolve_name(line, |name| {
-            self.xrefs.get(name).map(|id| id.clone())
+            let mut res = self.xrefs.get(name).map(|id| id.clone());
+            if res.is_some() && is_call {
+                let id = res.unwrap();
+                self.insert_called_func(cur_obj_name, id);
+                println!("globl: line = {}, is_call = {}, push = {}, cur_name = {}", line, is_call, id, cur_obj_name);
+                res = Some(id);
+            }
+            res
         }))
         .or_else(|_| resolve_name(line, |name| {
             self.globals.get(name).and_then(|obj| {
@@ -750,13 +778,77 @@ impl ParseEngine {
         })
     }
 
+    fn insert_called_func(&mut self, obj_name: &str, func_id: u32) {
+         self.globals.get_mut(obj_name)
+            .and_then(|obj| {
+                obj.dtype.func_mut().and_then(|f| {
+                    f.calls.push(func_id);
+                    Some(f)
+                })
+            });
+        if let Some(cur_id) = self.intrefs.get(obj_name) {
+            self.internals.get_mut(cur_id).and_then(|f| {
+                println!("!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                f.calls.push(func_id);
+                Some(f)
+            });
+        }
+    }
+
+    fn drop_unused_objects(&mut self) {
+        let mut ids = HashSet::new();
+        let publics_iter = self.globals.iter().filter_map(|obj| {
+            obj.1.dtype.func()
+                .and_then(|i| if obj.1.public { Some(i) } else { None })
+        });
+       
+        for func in publics_iter {
+            self.enum_calling_funcs(&func, &mut ids);
+        }
+        for func in self.internals.iter() {
+            self.enum_calling_funcs(&func.1, &mut ids);
+        }
+
+        self.globals.retain(|_k, v| {
+            v.dtype.func()
+                .map(|f| ids.contains(&f.id))
+                .unwrap_or(true)            
+        });
+        self.xrefs.retain(|_k, v| {
+            ids.contains(&v)
+        });
+    }
+
+    fn enum_calling_funcs(&self, func: &Func, ids: &mut HashSet<u32>) {
+        println!("id = {:08X}", func.id);
+        ids.insert(func.id);
+        for id in &func.calls {
+            println!("   id = {:08X}", id);
+            if ids.insert(id.clone()) {
+                let subfunc = self.globals.iter().find(|obj| {
+                    obj.1.dtype.func().map(|f| f.id == *id).unwrap_or(false)
+                })
+                .map(|x| x.1.dtype.func().unwrap());
+                if subfunc.is_some() {
+                    self.enum_calling_funcs(&subfunc.unwrap(), ids);
+                }
+            }
+        }
+    }
+
     pub fn debug_print(&self) {
         let line = "--------------------------";
         println!("Entry point:\n{}\n{}\n{}", line, self.entry(), line);
         println!("General-purpose functions:\n{}", line);
+        
         for (k, v) in &self.xrefs {
             println! ("Function {:30}: id={:08X}", k, v);
         }
+        println!("private:");
+        for (k, v) in &self.privates() {
+            println! ("Function {:08X}\n{}\n{}\n{}", k, line, v, line);
+        }
+        println!("public:");
         for (k, v) in self.publics() {
             println! ("Function {:08X}\n{}\n{}\n{}", k, line, v, line);
         }        
@@ -765,7 +857,7 @@ impl ParseEngine {
             println! ("Function {:30}: id={:08X}", k, v);
         }
         for (k, v) in &self.internals {
-            println! ("Function {:08X}\n{}\n{}\n{}", k, line, v, line);
+            println! ("Function {:08X}\n{}\n{}\n{}", k, line, v.body, line);
         }
     }
 }

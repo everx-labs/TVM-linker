@@ -81,7 +81,7 @@ impl Program {
     }
 
     pub fn public_method_dict(&self) -> Result<Option<Arc<CellData>>, String> {
-        let mut dict = prepare_methods(self.engine.internals())
+        let mut dict = prepare_methods(&self.engine.internals())
             .map_err(|e| e.1.replace("_name_", &self.engine.internal_name(e.0).unwrap()) )?;
 
         insert_methods(&mut dict, &self.engine.publics())
@@ -309,7 +309,7 @@ mod tests {
         
         assert_eq!(perform_contract_call(name, body1, None, false, false, None, None), 0);
 
-        let body2 = {
+        /*let body2 = {
             let mut b = BuilderData::new();
             b.append_u32(abi::gen_abi_id(None, "sum_p")).unwrap();
             b.append_reference(BuilderData::new());
@@ -323,6 +323,6 @@ mod tests {
             b.append_reference(BuilderData::new());
             Some(b.into())
         };
-        assert_eq!(perform_contract_call(name, body3, None, false, false, None, None), 0);
+        assert_eq!(perform_contract_call(name, body3, None, false, false, None, None), 0);*/
     }
 }

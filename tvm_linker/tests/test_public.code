@@ -3,8 +3,7 @@
     .public sum
 sum:
     PUSHINT 1
-    PUSHINT $sum_p$
-    CALL 1
+    CALL $sum_p$
 
     .globl sum_p
     .type sum_p, @function
@@ -16,4 +15,5 @@ sum_p:
     .type sum2, @function
 sum2:
     PUSHINT 2
-    PUSHINT $sum_p$
+    CALL $sum_p$
+    
