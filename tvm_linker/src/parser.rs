@@ -39,6 +39,12 @@ struct Func {
     pub calls: Vec<u32>,
 }
 
+impl Func {
+    pub fn new() -> Self {
+        Func { id: 0, body: String::new(), calls: vec![] }
+    }
+}
+
 struct Data {
     pub addr: Ptr,
     pub values: Vec<DataValue>,
@@ -271,7 +277,6 @@ impl ParseEngine {
         }
 
         self.drop_unused_objects();
-        //self.debug_print();
         ok!()
     }    
 
@@ -540,6 +545,15 @@ impl ParseEngine {
         }
     }
 
+    fn is_public(&self, globl_name: &str) -> bool {
+        self.abi.as_ref()
+            .map(|abi| {
+                abi.functions().get(globl_name).is_some() 
+                || abi.events().get(globl_name).is_some() 
+            })
+            .unwrap_or(false)
+    }
+
     fn update(&mut self, section: &str, name: &str, body: &str, first_pass: bool) -> Result<(), String> {
         match section {
             SELECTOR => {
@@ -550,22 +564,14 @@ impl ParseEngine {
                 }
             },
             GLOBL => {
-                let is_public = self.abi.as_ref()
-                    .map(|abi| {
-                        abi.functions().get(name).is_some() 
-                        || abi.events().get(name).is_some() 
-                    })
-                    .unwrap_or(false);
-                //we do not reset publicity if symbol isn't included in ABI,
+                //do not reset public flag if symbol isn't included in ABI,
                 //because it can be marked as public in assembly.
-                if is_public {
-                    self.globals.get_mut(name)
-                        .unwrap()
-                        .public = true;
+                if self.is_public(name) {
+                    self.globals.get_mut(name).unwrap().public = true;
                 }
-                if self.globals.get(name)
-                    .unwrap()
-                    .dtype.is_func() {
+
+                if self.globals.get(name).unwrap().dtype.is_func() {
+                    // globl object is function
                     let func_id = self.create_function_id(name);
                     let item = self.globals.get_mut(name).unwrap();
                     let params = item.dtype.func_mut().unwrap();
@@ -580,6 +586,7 @@ impl ParseEngine {
                         ))?;
                     }
                 } else {
+                    // globl object is data
                     let item = self.globals.get_mut(name).unwrap();
                     let data = item.dtype.data_mut().unwrap();
                     Self::update_data(body, name, &mut item.size, &mut data.values)?;
@@ -595,15 +602,16 @@ impl ParseEngine {
                 }
             },
             INTERNAL => {
-                let f_id = self.aliases.get(name).ok_or(format!("id for '{}' not found", name))?;
-                let prev = self.internals.insert(
-                    *f_id,
-                    Func{ id: *f_id as u32, body: body.trim_end().to_string(), calls: vec![] },
-                );
-                if first_pass && prev.is_some() {
-                    Err(format!("internal function with id = {} already exist", *f_id))?;
+                let func_id = self.aliases.get(name).ok_or(format!("id for '{}' not found", name))?;
+                if first_pass {
+                    self.intrefs.insert(name.to_string(), *func_id);
+                    let prev = self.internals.insert(*func_id,Func::new());
+                    if prev.is_some() {
+                        Err(format!("internal function with id = {} already exist", *func_id))?;
+                    }
+                } else {
+                    self.internals.get_mut(func_id).unwrap().body = body.trim_end().to_string();
                 }
-                self.intrefs.insert(name.to_string(), *f_id);
             },
             MACROS => {
                 let prev = self.macros.insert(name.to_string(), body.trim_end().to_string());
@@ -738,21 +746,13 @@ impl ParseEngine {
     fn replace_labels(&mut self, line: &str, cur_obj_name: &str) -> Result<String, String> {
         let is_call = Regex::new(r"^[\t\s]*CALL").unwrap().is_match(&line);        
         resolve_name(line, |name| {
-            let mut res = self.intrefs.get(name).and_then(|id| Some(id.clone()));
-            if res.is_some() && is_call {
-                let id = res.unwrap();
-                self.insert_called_func(cur_obj_name, id as u32);
-                println!("internal: line = {}, is_call = {}, push = {}, cur_name = {}", line, is_call, id, cur_obj_name);
-                res = Some(id);
-            }
-            res
+            self.intrefs.get(name).and_then(|id| Some(id.clone()))
         })
         .or_else(|_| resolve_name(line, |name| {
             let mut res = self.xrefs.get(name).map(|id| id.clone());
             if res.is_some() && is_call {
                 let id = res.unwrap();
                 self.insert_called_func(cur_obj_name, id);
-                println!("globl: line = {}, is_call = {}, push = {}, cur_name = {}", line, is_call, id, cur_obj_name);
                 res = Some(id);
             }
             res
@@ -788,7 +788,6 @@ impl ParseEngine {
             });
         if let Some(cur_id) = self.intrefs.get(obj_name) {
             self.internals.get_mut(cur_id).and_then(|f| {
-                println!("!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 f.calls.push(func_id);
                 Some(f)
             });
@@ -820,10 +819,8 @@ impl ParseEngine {
     }
 
     fn enum_calling_funcs(&self, func: &Func, ids: &mut HashSet<u32>) {
-        println!("id = {:08X}", func.id);
         ids.insert(func.id);
         for id in &func.calls {
-            println!("   id = {:08X}", id);
             if ids.insert(id.clone()) {
                 let subfunc = self.globals.iter().find(|obj| {
                     obj.1.dtype.func().map(|f| f.id == *id).unwrap_or(false)
@@ -842,7 +839,7 @@ impl ParseEngine {
         println!("General-purpose functions:\n{}", line);
         
         for (k, v) in &self.xrefs {
-            println! ("Function {:30}: id={:08X}", k, v);
+            println! ("Function {:30}: id={:08X} public={}", k, v, self.globals.get(k).unwrap().public);
         }
         println!("private:");
         for (k, v) in &self.privates() {
