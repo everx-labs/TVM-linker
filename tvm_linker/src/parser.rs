@@ -744,13 +744,12 @@ impl ParseEngine {
     }
 
     fn replace_labels(&mut self, line: &str, cur_obj_name: &str) -> Result<String, String> {
-        let is_call = Regex::new(r"^[\t\s]*CALL").unwrap().is_match(&line);        
         resolve_name(line, |name| {
             self.intrefs.get(name).and_then(|id| Some(id.clone()))
         })
         .or_else(|_| resolve_name(line, |name| {
             let mut res = self.xrefs.get(name).map(|id| id.clone());
-            if res.is_some() && is_call {
+            if res.is_some(){
                 let id = res.unwrap();
                 self.insert_called_func(cur_obj_name, id);
                 res = Some(id);
