@@ -129,9 +129,26 @@ POP c7
 .globl	sendTransaction
 .public	sendTransaction
 .type	sendTransaction, @function
+; Modifier checkOwnerAndAccept
+PUSHCTR c7
+SECOND
+FIRST
+;; owner
+;; stack=1
+PUSHINT 100
+PUSH c7 THIRD
+PUSHINT 64
+DICTUGET
+PUSHCONT { LDU 256 ENDS }
+PUSHCONT { PUSHINT 0 }
+IFELSE
+;; ==
+EQUAL
+THROWIFNOT 100
+PRINTSTR mod_accept
+ACCEPT
 ; Decode input parameters
-PUSHINT 256
-CALL $smart_ldu$
+CALL $decode_addr$
 PUSHINT 128
 CALL $smart_ldu$
 PUSHINT 1
@@ -169,54 +186,7 @@ RET
 ;; param: dest
 ;; param: value
 ;; param: bounce
-PUSHCTR c7
-SECOND
-FIRST
-;; owner
-;; stack=4
-PUSHINT 100
-PUSH c7 THIRD
-PUSHINT 64
-DICTUGET
-PUSHCONT { LDU 256 ENDS }
-PUSHCONT { PUSHINT 0 }
-IFELSE
-;; ==
-EQUAL
-;; subscription
-;; stack=4
-PUSHINT 101
-PUSH c7 THIRD
-PUSHINT 64
-DICTUGET
-PUSHCONT { LDU 256 ENDS }
-PUSHCONT { PUSHINT 0 }
-IFELSE
-PUSHINT 0
-;; address
-UFITS 256
-;; !=
-NEQ
-;; get member sender
-PUSHCTR c7
-SECOND
-SECOND
-;; subscription
-;; stack=6
-PUSHINT 101
-PUSH c7 THIRD
-PUSHINT 64
-DICTUGET
-PUSHCONT { LDU 256 ENDS }
-PUSHCONT { PUSHINT 0 }
-IFELSE
-;; ==
-EQUAL
-;; &&
-AND
-;; ||
-OR
-THROWIFNOT 100
+PRINTSTR sendTrans
 ;; value
 ;; stack=3
 PUSH s1
@@ -233,15 +203,8 @@ LESS
 ;; &&
 AND
 THROWIFNOT 102
-;; dest
-;; stack=3
-PUSH s2
-PUSHINT 0
-;; address
-UFITS 256
-;; !=
-NEQ
-THROWIFNOT 103
+PRINTSTR func_accept
+ACCEPT
 ;; dest
 ;; stack=3
 PUSH s2
@@ -255,109 +218,8 @@ PUSHINT 0
 CALL $accurate_transfer$
 BLKDROP 3
 
-.globl	setSubscriptionAccount
-.public	setSubscriptionAccount
-.type	setSubscriptionAccount, @function
-; Decode input parameters
-PUSHINT 256
-CALL $smart_ldu$
-DROP
-CALL $setSubscriptionAccount_internal$
-PRINTSTR pushpdc7toc4
-PUSHROOT
-CTOS
-;; decl: c4
-SKIPDICT
-NEWC
-;; decl: c4_builder
-PUSHCTR c7
-THIRD
-SWAP
-STDICT
-;; c4
-;; stack=2
-PUSH s1
-STSLICER
-;; c4_builder
-;; stack=2
-DUP
-ENDC
-POPROOT
-PRINTSTR pushpdc7toc40
-BLKDROP 2
-RET
-
-.globl	setSubscriptionAccount_internal
-.type	setSubscriptionAccount_internal, @function
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: setSubscriptionAccount_internal
-;; param: addr
-PUSHCTR c7
-SECOND
-FIRST
-;; owner
-;; stack=2
-PUSHINT 100
-PUSH c7 THIRD
-PUSHINT 64
-DICTUGET
-PUSHCONT { LDU 256 ENDS }
-PUSHCONT { PUSHINT 0 }
-IFELSE
-;; ==
-EQUAL
-THROWIFNOT 100
-;; addr
-;; stack=1
-DUP
-;; assign subscription
-NEWC STU 256
-PUSHINT 101
-PUSH c7 THIRD
-PUSHINT 64
-DICTUSETB
-PUSH c7
-SWAP
-SETTHIRD
-POP c7
-DROP
-
-.globl	getSubscriptionAccount
-.public	getSubscriptionAccount
-.type	getSubscriptionAccount, @function
-; Decode input parameters
-DROP
-CALL $getSubscriptionAccount_internal$
-;; emitting 1 value(s)
-NEWC
-PUSHINT $getSubscriptionAccount$
-PUSHINT 2147483648
-OR
-STUR 32
-NEWC
-PUSH s2
-STUR 256
-STBREFR
-CALL $send_ext_msg$
-RET
-
-.globl	getSubscriptionAccount_internal
-.type	getSubscriptionAccount_internal, @function
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: getSubscriptionAccount_internal
-;; subscription
-;; stack=0
-PUSHINT 101
-PUSH c7 THIRD
-PUSHINT 64
-DICTUGET
-PUSHCONT { LDU 256 ENDS }
-PUSHCONT { PUSHINT 0 }
-IFELSE
-;; return
-RET
-
 .globl	fallback
+.public fallback
 .type	fallback, @function
 DROP
 RET
