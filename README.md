@@ -22,56 +22,58 @@ Rust 1.38 or higher, cargo tool
 
 The linker has several modes of work:
 
-### 1) Generating ready-to-deploy contract
-    tvm_linker compile <source> [--lib library [...]] [--abi-json <abi_file>] [--genkey | --setkey <keyfile>]
+### 1) Generating ready-to-deploy contract.
+    tvm_linker compile [--lib <lib_file>] [--abi-json <abi_file>] [--genkey | --setkey <keyfile>] [-w <workchain_id>] [--debug] <source>
 
-Here `source` - a name of tvm asm source file, `library` - a list of runtime library filenames.
+Here `source` is a name of tvm assembly source file, `library` is a runtime library file (can be more than one: `--lib` 
+should be supplied for every file).
+
+If contract ABI file presents it is better to use `--abi-json` option to supply contract ABI file. Function ids will be generated according to function signatures in ABI.
+
 Linker generates `address.tvc` file, where `address` is a hash from initial data and code of the contract.
 
-If contract ABI file presents it is better to use `--abi-json` option to supply contract ABI file. Function ids will be generated according to function signatues in ABI.
+Linker prints contract address in different formats: raw and user-friendly (testnet and mainnet). Define workchain id option `-w` 
+to generate proper user-friendly address. -1 is used by default.
 
-To generate a new keypair and put the public key to the contract, call:
+To generate a new keypair and put the public key to the contract:
 
 	tvm_linker compile <source> --genkey <key_file>
 
-where `key_file` - a name of the file to store public and private keys. The linker will generate 2 files: `key_file.pub` for public key and `key_file` for private key.
+where `key_file` is a name of the file to store public and private keys. The linker will generate 2 files: `key_file.pub` for public key and `key_file` for private key.
 
-To load existing keypair, call:
+To load existing keypair use:
 
 	tvm_linker compile <source> --setkey <key_file>
 
 ### 2) Decoding of boc messages, prepared somewhere else.
 To use this method, call
 
-	tvm_linker decode boc-file-with-msg
+	tvm_linker decode [--tvc] boc-file
 
-### 3) Preparing message in boc format.
+If `--tvc` is omitted, `boc-file` is a file with serialized message, otherwise it is a contract `tvc` file.
+
+### 3) Preparing external inbound messages in boc format.
 
 First, generate contract as described in 1). Then use `message` subcommand to create external inbound message in boc format:
 
 	tvm_linker message <contract-address> [--init] [--data] [-w]
 
-`contract-address` - the name of the compiled contract file without extension.
+	tvm_linker message <contract-address> [--init] --abi-json <abi_file> --abi-method <method_name> --abi-params {json_with_params} [-w]
 
-If you want to deploy your contract, use --init option:
+`contract-address` - the name of the compiled contract file without extension. Contract tvc file should be placed in current directory.
 
-	tvm_linker message <contract-address> --init
+To create `constructor message` with contract's code and data, use `--init` option.
 
-Constructor message will be created with code and data loaded from file `address.tvc`. 
-
-Aditional, you can add body to the message with option `--data':
+Aditionally, you can add raw body to the message with option `--data':
 
 	tvm_linker message <contract-address> --data XXXX...
 
 Instead of `XXXX...`, specify the necessary message body in hex format. 
 
-Linker can create ABI encoded messages:
-
-	tvm_linker message <contract-address> [--init] [-w] --abi-json <json-file-with-abi> --abi-method <method-name> --abi-params <json-string-with-params> 
-
-`<json-file-with-abi>` - path to json file with contract interface described according to ABI specification,
-`<method-name>` - name of the contract method to call,
-`<json-string-with-params>` - arguments of the method, declared in json like this: `{"arg_a": "0x1234", "arg_b": "x12345678"}`
+Or make a message with ABI call using combination of options:
+- `--abi-json <abi_file>` - path to json with contract interface described according to ABI specification,
+- `--abi-method <method-name>` - name of the contract method to call,
+- `--abi-params {<json-string-with-params>}` - arguments of the method declared in json like this: `{"arg_a": "0x1234", "arg_b": "x12345678"}`.
 
 By default, -1 is used as a workchain id in contract address. To use another one, use `-w` option:
 
@@ -79,14 +81,25 @@ By default, -1 is used as a workchain id in contract address. To use another one
 
 ### 4) Emulating execution of the contract:
 
+Linker can emulate compute phase of blockchain transaction. This is useful for contract debugging.
+
 	tvm_linker test <contract-address> --body XXXX... [--sign key-file] [--trace] [--decode-c6] [--internal value] [-s source-file]
 
-Loads contract from file by contract address `address` and emulates contract call sending external inbound message (by default) with body defined after `--body` parameter to the contract. 
+Loads contract from file by contract address `address` and emulates contract call sending external inbound message (by default) with body defined after `--body` parameter to the contract. `XXXX...` is a hex string. 
 
-`XXXX...` is a hex string. You can insert global ids by their names using `$...$` syntax:
-`$name:[0len][type]$`, where `name` is a name of global object, `len` - length in chars of the label (if `len` is bigger than `name`'s length in chars than zeros will be added at the left side to fit required length), `type` can be `x` or `X` - hexademical integer  in lowercase or uppercase. 
+If `--sign` specified, the body will be signed with the private key from `key-file` file.
 
-You have to set `-s source` option when you use $...$ syntax.
+Use `--trace` flag to trace VM execution: stack, registers and gas will be printed after each executed VM command.
+
+Use `--decode-c6` to see output actions in user friendly format.
+
+Use `--internal` to send internal message to the contract with defined nanograms in `value`.
+
+ABI body can be generated if `abi-params`, `abi-json` and `abi-method` will be used instead of `--body XXXX...`.
+
+If `--body` is used, contract's public function ids can be encoded by their names using `$...$` syntax:`$name:[0len][type]$`, 
+where `name` is a name of public function, `len` - length in chars of the id (if `len` is bigger than `name`'s length in chars than 
+zeros will be added at the left side to fit required length), `type` can be `x` or `X` - hexademical integer  in lowercase or uppercase. You have to set `-s source` option when you use $...$ syntax.
 
 Example:
 
@@ -95,36 +108,35 @@ Example:
 	tvm_linker address test --body 00$main:X$ -s source
 	tvm_linker address test --body 00$main:x$ -s source
 
-If `--sign` specified, the body will be signed with the private key from `key-file` file.
-
-Use `--trace` flag to trace VM execution, stack and registers will be printed after each executed VM command.
-
-Use `--decode-c6` to see output actions in user friendly format.
-
-Use `--internal` to send internal message to the contract with defined nanograms in `value`.
-
-ABI body can be generated if `abi-params`, `abi-json` and `abi-method` will be used instead of `--body XXXX...`.
-
 ### More Help
 Use `tvm_linker --help` for detailed description about all options, flags and subcommands.
 
 ## Input format
 
 As a temporary measure, some LLVM-assembler like input is used.
-The source code should consist of functions, started by .globl keyword:
+The source code should consist of functions of different types:
+
+- .selector - contract's entry point. This function should be short.
 
 ```
-	.globl	x
+	.selector
 	<code here>
 ```
 
-At the end of the file a .data section may be specified.
-The data from this .data section are bundled together with the code
-into the init message.
+- .globl - general purpose functions, can be public or private.
 
 ```
 	.globl	x
+	[.public x]
+	.type x, @function
+	x:
 	<code here>
-	.data
-	00000001
 ```
+
+- .internal - special functions, which are used only by contract's runtime. There are some wellknown internal functions:
+
+	main_external, main_internal, main_ticktock, main_split, main_merge
+
+## Support
+
+Videos and samples illustrating how to use the tvm_linker will soon appear at https://ton.dev/ and https://www.youtube.com/channel/UC9kJ6DKaxSxk6T3lEGdq-Gg. Stay tuned.
