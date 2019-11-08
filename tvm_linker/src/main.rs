@@ -70,33 +70,34 @@ fn linker_main() -> Result<(), String> {
         Some(s) => s,
         None => "",
     };
-    let matches = clap_app! (tvm_loader =>
+    let matches = clap_app! (tvm_linker =>        
         (version: &*format!("0.1 ({})", build_info))
-        (author: "tonlabs")
-        (about: "Links TVM assembler file, loads and executes it in testing environment")
+        (author: "TONLabs")
+        (about: "Linker for TVM assembly")
         (@subcommand decode => 
             (about: "Decode real TON message")
             (version: "0.1")
-            (author: "tonlabs")
+            (author: "TONLabs")
             (@arg INPUT: +required +takes_value "BOC file")
             (@arg TVC: --tvc "BOC file is tvc file")
         )
-        (@subcommand compile => 
+        (@subcommand compile =>
+            (@setting AllowNegativeNumbers)
             (about: "compile contract")
             (version: "0.1")
-            (author: "tonlabs")
+            (author: "TONLabs")
             (@arg INPUT: +required +takes_value "TVM assembler source file")
-            (@arg LIB: --lib +takes_value ... "Standard library source file")
             (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids")
             (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file")
             (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
+            (@arg WC: -w +takes_value "Workchain id used to print contract address, -1 by default.")            
             (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
-            (@arg WC: -w +takes_value "Workchain id used to print contract address, -1 by default.")
+            (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file")
         )
         (@subcommand test =>
             (about: "execute contract in test environment")
             (version: "0.1")
-            (author: "tonlabs")
+            (author: "TONLabs")
             (@arg SOURCE: -s --source +takes_value "contract source file")
             (@arg BODY: --body +takes_value "Body for external inbound message (hex string)")
             (@arg SIGN: --sign +takes_value "Signs body with private key from defined file")
@@ -110,9 +111,10 @@ fn linker_main() -> Result<(), String> {
             (@arg ABI_PARAMS: -p --("abi-params") +takes_value conflicts_with[BODY] "Supplies ABI arguments for the contract method")
         )
         (@subcommand message =>
+            (@setting AllowNegativeNumbers)
             (about: "generate external inbound message for the blockchain")
             (version: "0.1")
-            (author: "tonlabs")
+            (author: "TONLabs")
             (@arg INIT: -i --init "Generates constructor message with code and data of the contract")
             (@arg DATA: -d --data +takes_value "Supplies body for the message in hex format (empty data by default)")
             (@arg WORKCHAIN: -w --workchain +takes_value "Supplies workchain id for the contract address")
