@@ -25,6 +25,7 @@ pub fn resolve_name<F, T>(text: &str, mut get: F) -> Result<String, String>
         T: LowerHex + UpperHex + Display + TryFrom<isize> + std::ops::AddAssign {
     let mut res_str = String::new();
     let mut end = 0;
+    let text = text.find(';').and_then(|idx| text.get(..idx)).unwrap_or(text);
     for cap in NAMES.captures_iter(text) {
         if cap.name("id").is_none() {
             return Err("invalid syntax: object name not found".to_string());
@@ -134,5 +135,10 @@ mod tests {
         assert_eq!(resolve_name("$get+256:08x$", id_by_name), Ok("000001ff".to_string()));
         assert_eq!(resolve_name("$ctor+$", id_by_name), Ok("$ctor+$".to_string()));
         assert_eq!(resolve_name("$x.y+1$", id_by_name),      Ok("12".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_with_comments() {
+        assert_eq!(resolve_name("text; ignore this $ctor$", id_by_name), Ok("text".to_string()));
     }
 }
