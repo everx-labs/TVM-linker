@@ -2,6 +2,13 @@
 	"ABI version": 1,
 	"functions": [
 		{
+			"name": "constructor",
+			"inputs": [
+			],
+			"outputs": [
+			]
+		},
+		{
 			"name": "request",
 			"inputs": [
 				{"name":"a","type":"uint256"},
@@ -12,16 +19,9 @@
 			]
 		},
 		{
-			"name": "constructor",
-			"inputs": [
-			],
-			"outputs": [
-			]
-		},
-		{
 			"name": "send",
 			"inputs": [
-				{"name":"a","type":"uint256"}
+				{"name":"a","type":"address"}
 			],
 			"outputs": [
 			]

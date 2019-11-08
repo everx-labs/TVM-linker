@@ -117,8 +117,7 @@ RET
 .public	send
 .type	send, @function
 ; Decode input parameters
-PUSHINT 256
-CALL $smart_ldu$
+CALL $decode_addr$
 DROP
 CALL $send_internal$
 PRINTSTR pushpdc7toc4

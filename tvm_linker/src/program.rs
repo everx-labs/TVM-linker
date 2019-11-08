@@ -81,7 +81,7 @@ impl Program {
     }
 
     pub fn public_method_dict(&self) -> Result<Option<Arc<CellData>>, String> {
-        let mut dict = prepare_methods(self.engine.internals())
+        let mut dict = prepare_methods(&self.engine.internals())
             .map_err(|e| e.1.replace("_name_", &self.engine.internal_name(e.0).unwrap()) )?;
 
         insert_methods(&mut dict, &self.engine.publics())

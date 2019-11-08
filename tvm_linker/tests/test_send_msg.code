@@ -114,8 +114,7 @@ BLKDROP 2
 .public	get_allowance
 .type	get_allowance, @function
 ; Decode input parameters
-PUSHINT 256
-CALL $smart_ldu$
+CALL $decode_addr$
 DROP
 CALL $get_allowance_internal$
 PRINTSTR pushpdc7toc4

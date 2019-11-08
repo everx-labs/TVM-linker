@@ -12,7 +12,7 @@
 		{
 			"name": "get_allowance",
 			"inputs": [
-				{"name":"requester","type":"uint256"}
+				{"name":"requester","type":"address"}
 			],
 			"outputs": [
 			]

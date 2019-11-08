@@ -323,7 +323,7 @@ def testCall():
 
 	expect_success2('test_call1', 'constructor', '{}', '', linker_options)
 	addr = '1'*64
-	expect_success2('test_call1', 'send', '{"a": "0x' + addr + '"}', '', linker_options)
+	expect_success2('test_call1', 'send', '{"a": "0:' + addr + '"}', '', linker_options)
 	expect_output(r"destination : 0:1111111111111111111111111111111111111111111111111111111111111111")
 	expect_output(r"body_hex: 459dde93")
 
@@ -350,7 +350,7 @@ def testWallet():
 	linker_options = "--sign key1 --decode-c6"
 	compile2('Wallet', 'tests')
 	expect_success2("Wallet", "constructor", '{}', None, linker_options)
-	expect_success2("Wallet", "sendTransaction", '{"dest":"0x11","value":"1000000000","bounce":"true"}', None, linker_options)
+	expect_success2("Wallet", "sendTransaction", '{"dest":"0:11","value":"1000000000","bounce":"true"}', None, linker_options)
 
 #testOld()
 testArrays()

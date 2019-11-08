@@ -111,9 +111,7 @@ cleanup_stack:
     SWAP
     CALL 1      ;public method call
 
-    PUSHINT $cleanup_stack$
-    CALL 1
-
+    CALL $cleanup_stack$
 
     .internal   :main_internal
     ; s0 - msg body: slice
@@ -137,8 +135,7 @@ cleanup_stack:
     SWAP
     CALL 1      ;public method call 
 
-    PUSHINT $cleanup_stack$
-    CALL 1
+    CALL $cleanup_stack$
 
     .internal   :parse_msg
     CTOS        ;TODO: use parser from contract_api library

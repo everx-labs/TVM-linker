@@ -23,7 +23,14 @@ contract Wallet {
     function tvm_sender_pubkey() private view returns (uint256) {}
     function tvm_logstr(bytes32 logstr) private view {}
     function tvm_transfer(address payable addr, uint128 value, bool bounce, uint16 flags) private {}
+    function tvm_accept() private {}
 
+    modifier checkOwnerAndAccept {
+		require(tvm_sender_pubkey() == owner, 100);
+        tvm_logstr("mod_accept");
+        tvm_accept();
+        _;
+	}
     /*
      * Public functions
      */
@@ -37,30 +44,12 @@ contract Wallet {
     /// @dev Allows to transfer grams to destination account.
     /// @param dest Transfer target address.
     /// @param value Nanograms value to transfer.
-    function sendTransaction(address payable dest, uint128 value, bool bounce) public {
-        require(tvm_sender_pubkey() == owner ||
-            (subscription != address(0) && msg.sender == subscription), 100);
+    function sendTransaction(address payable dest, uint128 value, bool bounce) public checkOwnerAndAccept {
+        tvm_logstr("sendTrans");
         require(value > 0 && value < address(this).balance, 102);
-        require(dest != address(0), 103);
-        //TODO: tvm_accept();
+        tvm_logstr("func_accept");
+        tvm_accept();
         tvm_transfer(dest, value, bounce, 0);
     }
-
-    /*
-       For subscription contract
-     */
-    function setSubscriptionAccount(address addr) public {
-        require(tvm_sender_pubkey() == owner, 100);
-        //TODO: tvm_accept();
-        subscription = addr;
-    }
-
-    /*
-     * Get methods
-     */
-
-
-    function getSubscriptionAccount() public view returns (address) {
-        return subscription;
-    }
+    
 }

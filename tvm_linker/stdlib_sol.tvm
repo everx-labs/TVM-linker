@@ -485,12 +485,10 @@ PUSHCONT { ; make__CommonMsgInfoRelaxed__int_msg_info_0__inline
 	STZEROES
 	MYADDR
 	STSLICER
-	PUSHINT 1024
-	STUR 11
 	;; remote_addr
 	;; stack=4
 	PUSH s2
-	STUR 256
+	STSLICER
 	;; value
 	;; stack=4
 	PUSH s3
@@ -608,7 +606,7 @@ DUP
 ;; msg_builder
 ;; stack=8
 PUSH s2
-PUSHCONT { ; store_either_inline
+PUSHCONT { ; store_either_for_builder_inline
 	;; param: x
 	;; param: builder
 	PRINTSTR store_either
@@ -699,12 +697,10 @@ PUSHCONT { ; make__CommonMsgInfoRelaxed__int_msg_info_0__inline
 	STZEROES
 	MYADDR
 	STSLICER
-	PUSHINT 1024
-	STUR 11
 	;; remote_addr
 	;; stack=4
 	PUSH s2
-	STUR 256
+	STSLICER
 	;; value
 	;; stack=4
 	PUSH s3
@@ -1120,9 +1116,7 @@ PUSH s1
 ;; remote_addr
 ;; stack=5
 PUSH s3
-;; -
-PUSHINT 1
-NEGATE
+PUSHINT -1
 PUSHCONT { ; make__CommonMsgInfoRelaxed__int_msg_info_0__inline
 	;; param: value
 	;; param: remote_addr
@@ -1140,12 +1134,10 @@ PUSHCONT { ; make__CommonMsgInfoRelaxed__int_msg_info_0__inline
 	STZEROES
 	MYADDR
 	STSLICER
-	PUSHINT 1024
-	STUR 11
 	;; remote_addr
 	;; stack=4
 	PUSH s2
-	STUR 256
+	STSLICER
 	;; value
 	;; stack=4
 	PUSH s3
@@ -1179,7 +1171,7 @@ PUSH s3
 ;; msg_builder
 ;; stack=5
 PUSH s1
-PUSHCONT { ; store_either_inline
+PUSHCONT { ; store_either_for_builder_inline
 	;; param: x
 	;; param: builder
 	PRINTSTR store_either
@@ -1234,6 +1226,29 @@ PUSHINT 0
 SENDRAWMSG
 BLKDROP 4
 
+.globl	make__MsgAddressInt__addr_std_10
+.type	make__MsgAddressInt__addr_std_10, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: make__MsgAddressInt__addr_std_10
+;; param: dst_account
+PRINTSTR make_addr_std
+NEWC
+;; decl: builder
+PUSHINT 1024
+STUR 11
+;; dst_account
+;; stack=2
+PUSH s1
+STUR 256
+PRINTSTR make_addr_std0
+;; builder
+;; stack=2
+DUP
+;; return
+NIP
+NIP
+RET
+
 .globl	accurate_transfer
 .type	accurate_transfer, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1255,12 +1270,10 @@ PUSHINT 1
 STZEROES
 MYADDR
 STSLICER
-PUSHINT 1024
-STUR 11
 ;; remote_addr
 ;; stack=5
 PUSH s4
-STUR 256
+STSLICER
 ;; grams_value
 ;; stack=5
 PUSH s3
@@ -1288,10 +1301,10 @@ SENDRAWMSG
 PRINTSTR ac_transfer_end
 BLKDROP 5
 
-.globl	store_either_inline
-.type	store_either_inline, @function
+.globl	store_either_for_builder_inline
+.type	store_either_for_builder_inline, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: store_either_inline
+;; Function: store_either_for_builder_inline
 ;; param: x
 ;; param: builder
 PRINTSTR store_either
@@ -1423,12 +1436,10 @@ PUSHINT 1
 STZEROES
 MYADDR
 STSLICER
-PUSHINT 1024
-STUR 11
 ;; remote_addr
 ;; stack=4
 PUSH s2
-STUR 256
+STSLICER
 ;; value
 ;; stack=4
 PUSH s3
@@ -1744,16 +1755,92 @@ PUSHINT 0
 SENDRAWMSG
 DROP
 
-.globl	get_self_address
-.type	get_self_address, @function
+.globl	make_address
+.type	make_address, @function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function: get_self_address
-PRINTSTR get_self_addr
-MYADDR
-PUSHINT 11
-SDSKIPFIRST
+;; Function: make_address
+;; param: wid
+;; param: addr
+PRINTSTR make_address
+NEWC
+;; decl: builder
+PUSHINT 4
+STUR 3
+;; wid
+;; stack=3
+PUSH s2
+STIR 8
+;; addr
+;; stack=3
+PUSH s1
+STUR 256
+PRINTSTR make_address0
+;; builder
+;; stack=3
+DUP
+ENDC
+CTOS
+;; return
+XCHG s3
+BLKDROP 3
+RET
+
+.globl	unpack_address
+.type	unpack_address, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: unpack_address
+;; param: slice
+PRINTSTR unpack_address
+;; slice
+;; stack=1
+DUP
+PARSEMSGADDR
+;; decl: tuple
+;; tuple
+;; stack=2
+DUP
+FIRST
+PUSHINT 2
+;; ==
+EQUAL
+THROWIFNOT 84
+PRINTSTR unpack_address0
+;; tuple
+;; stack=2
+DUP
+THIRD
+;; tuple
+;; stack=3
+PUSH s1
+INDEX 3
 PLDU 256
 ;; return
+BLKSWAP 2, 2
+BLKDROP 2
+RET
+
+.globl	get_address_from_slice
+.type	get_address_from_slice, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: get_address_from_slice
+;; param: slice
+;; param: offset
+;; slice
+;; stack=2
+PUSH s1
+;; offset
+;; stack=3
+PUSH s1
+SDSKIPFIRST
+POP s2
+;; slice
+;; stack=2
+PUSH s1
+LDU 256
+POP s3
+;; return
+NIP
+NIP
 RET
 
 .globl	get_rand_seed
@@ -1798,7 +1885,9 @@ NEQ
 PUSHCONT {
 	PRINTSTR get_src_addr0
 	PUSHINT 0
-	PUSHINT 0
+	NEWC
+	ENDC
+	CTOS
 	;; return
 	BLKSWAP 2, 2
 	BLKDROP 2
@@ -1820,9 +1909,8 @@ POP s2
 ;; msg_slice
 ;; stack=3
 PUSH s1
-PUSHINT 11
-SDSKIPFIRST
-PLDU 256
+LDMSGADDR
+POP s3
 ;; decl: addr
 PRINTSTR get_src_addr1
 ;; bounced
@@ -1931,7 +2019,9 @@ PUSHCONT { ; get_src_addr_and_bounce__inline
 	PUSHCONT {
 		PRINTSTR get_src_addr0
 		PUSHINT 0
-		PUSHINT 0
+		NEWC
+		ENDC
+		CTOS
 		;; return
 		BLKSWAP 2, 2
 		BLKDROP 2
@@ -1953,9 +2043,8 @@ PUSHCONT { ; get_src_addr_and_bounce__inline
 	;; msg_slice
 	;; stack=3
 	PUSH s1
-	PUSHINT 11
-	SDSKIPFIRST
-	PLDU 256
+	LDMSGADDR
+	POP s3
 	;; decl: addr
 	PRINTSTR get_src_addr1
 	;; bounced
@@ -2117,7 +2206,9 @@ PUSHCONT { ; get_src_addr_and_bounce__inline
 	PUSHCONT {
 		PRINTSTR get_src_addr0
 		PUSHINT 0
-		PUSHINT 0
+		NEWC
+		ENDC
+		CTOS
 		;; return
 		BLKSWAP 2, 2
 		BLKDROP 2
@@ -2139,9 +2230,8 @@ PUSHCONT { ; get_src_addr_and_bounce__inline
 	;; msg_slice
 	;; stack=3
 	PUSH s1
-	PUSHINT 11
-	SDSKIPFIRST
-	PLDU 256
+	LDMSGADDR
+	POP s3
 	;; decl: addr
 	PRINTSTR get_src_addr1
 	;; bounced
@@ -2664,14 +2754,14 @@ PUSHCONT {
 	;; c4
 	;; stack=4
 	DUP
-	LDI 64
+	LDU 64
 	POP s2
 	;; assign previous_message_timestamp
 	POP s3
 	;; c4
 	;; stack=4
 	DUP
-	LDI 64
+	LDU 64
 	POP s2
 	;; assign interval
 	POP s2
@@ -2716,4 +2806,114 @@ ENDC
 POPROOT
 PRINTSTR constr_prot_1
 BLKDROP 5
+
+.globl	decode_addr
+.type	decode_addr, @function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function: decode_addr
+;; param: slice
+PRINTSTR decode_addr
+;; slice
+;; stack=1
+DUP
+LDMSGADDR
+POP s2
+PARSEMSGADDR
+;; decl: tuple
+;; tuple
+;; stack=2
+DUP
+FIRST
+;; decl: constructor_id
+;; constructor_id
+;; stack=3
+DUP
+PUSHINT 2
+;; ==
+EQUAL
+;; constructor_id
+;; stack=4
+PUSH s1
+PUSHINT 3
+;; ==
+EQUAL
+;; ||
+OR
+THROWIFNOT 125
+;; tuple
+;; stack=3
+PUSH s1
+SECOND
+ISNULL
+THROWIFNOT 125
+NEWC
+;; decl: builder
+PUSHINT 4
+STUR 3
+;; tuple
+;; stack=4
+PUSH s2
+THIRD
+STIR 8
+;; tuple
+;; stack=4
+PUSH s2
+INDEX 3
+;; decl: addr
+;; if
+;; constructor_id
+;; stack=5
+PUSH s2
+PUSHINT 2
+;; ==
+EQUAL
+PUSHCONT {
+	PRINTSTR decode_addr1
+	;; tuple
+	;; stack=5
+	PUSH s3
+	INDEX 3
+	;; builder
+	;; stack=6
+	PUSH s2
+	STSLICE
+	POP s2
+}
+PUSHCONT {
+	PRINTSTR decode_addr2
+	;; builder
+	;; stack=5
+	PUSH s1
+	PUSHINT 256
+	;; addr
+	;; stack=7
+	PUSH s2
+	SBITS ; tvm_sbits
+	;; -
+	SUB
+	STZEROES
+	POP s2
+	;; addr
+	;; stack=5
+	DUP
+	;; builder
+	;; stack=6
+	PUSH s2
+	STSLICE
+	POP s2
+}
+IFELSE
+PRINTSTR decode_addr3
+;; builder
+;; stack=5
+PUSH s1
+ENDC
+CTOS
+;; slice
+;; stack=6
+PUSH s5
+;; return
+BLKSWAP 5, 2
+BLKDROP 5
+RET
 
