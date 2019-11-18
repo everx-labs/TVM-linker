@@ -32,6 +32,7 @@ extern crate log;
 mod abi;
 mod keyman;
 mod parser;
+mod printer;
 mod program;
 mod real_ton;
 mod resolver;

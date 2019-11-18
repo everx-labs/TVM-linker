@@ -13,10 +13,10 @@
  */
 use keyman::KeypairManager;
 use log::Level::Error;
+use printer::MsgPrinter;
 use program::{load_from_file, save_to_file};
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use sha2::Sha512;
-use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -234,70 +234,6 @@ pub fn perform_contract_call(
         }
     }
     exit_code
-}
-
-struct MsgPrinter {
-    pub msg: Arc<Message>,
-}
-
-impl fmt::Display for MsgPrinter {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "message header\n{}init  : {:?}\nbody  : {}\nbody_hex: {}\n",
-            print_msg_header(&self.msg.header()),
-            self.msg.state_init(),
-            match self.msg.body() {
-                Some(b) => format!("{:.2}", Arc::<CellData>::from(BuilderData::from_slice(&b))),
-                None => "None".to_string(),
-            },
-            if self.msg.body().is_some() { hex::encode(self.msg.body().unwrap().get_bytestring(0)) } else { "None".to_string() },
-        )
-    }    
-}
-
-fn print_msg_header(header: &CommonMsgInfo) -> String {
-    match header {
-        CommonMsgInfo::IntMsgInfo(header) => {
-            format!("   ihr_disabled: {}\n", header.ihr_disabled) +
-            &format!("   bounce      : {}\n", header.bounce) +
-            &format!("   bounced     : {}\n", header.bounced) +
-            &format!("   source      : {}\n", print_int_address(&header.src)) +
-            &format!("   destination : {}\n", print_int_address(&header.dst)) +
-            &format!("   value       : {}\n", header.value) +
-            &format!("   ihr_fee     : {}\n", header.ihr_fee) +
-            &format!("   fwd_fee     : {}\n", header.fwd_fee) +
-            &format!("   created_lt  : {}\n", header.created_lt) +
-            &format!("   created_at  : {}\n", header.created_at)
-        },
-        CommonMsgInfo::ExtInMsgInfo(header) => {
-            format!("   source      : {}\n", print_ext_address(&header.src)) +
-            &format!("   destination : {}\n", print_int_address(&header.dst)) +
-            &format!("   import_fee  : {}\n", header.import_fee)
-        },
-        CommonMsgInfo::ExtOutMsgInfo(header) => {
-            format!("   source      : {}\n", print_int_address(&header.src)) +
-            &format!("   destination : {}\n", print_ext_address(&header.dst)) +
-            &format!("   created_lt  : {}\n", header.created_lt) +
-            &format!("   created_at  : {}\n", header.created_at)
-        }
-    }
-}
-
-fn print_int_address(addr: &MsgAddressInt) -> String {
-    //TODO: use display method of SliceData (std.address) when it will be implemented
-    match addr {
-        MsgAddressInt::AddrStd(ref std) => format!("{}:{}", std.workchain_id, hex::encode(std.address.get_bytestring(0))),
-        MsgAddressInt::AddrVar(ref var) => format!("{}:{}", var.workchain_id, hex::encode(var.address.get_bytestring(0))),
-        MsgAddressInt::AddrNone => format!("None"),
-    }
-}
-
-fn print_ext_address(addr: &MsgAddressExt) -> String {
-    match addr {
-        MsgAddressExt::AddrNone => "AddrNone".to_string(),
-        MsgAddressExt::AddrExtern(x) => format!("{}", x)
-    }
 }
 
 #[cfg(test)]
