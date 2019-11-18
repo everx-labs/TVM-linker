@@ -38,10 +38,10 @@ pub fn decode_boc(file_name: &str, is_tvc: bool) {
     println!("Encoded: {}\n", hex::encode(orig_bytes));
     if is_tvc {
         let state: StateInit = StateInit::construct_from(&mut root_slice).expect("cannot read state_init from slice");
-        println!("Decoded: {}", &serde_json::to_string_pretty(&state).expect("cannot serialize state_init to json"));
+        // println!("Decoded: {}", &serde_json::to_string_pretty(&state).expect("cannot serialize state_init to json"));
     } else {
         let msg: Message = Message::construct_from(&mut root_slice).expect("cannot read message from slice");
-        println!("Decoded: {}", &serde_json::to_string_pretty(&msg).expect("cannot serialize message to json"));
+        // println!("Decoded: {}", &serde_json::to_string_pretty(&msg).expect("cannot serialize message to json"));
     }
 
 }

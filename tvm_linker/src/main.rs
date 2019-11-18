@@ -11,7 +11,7 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
-extern crate abi_json;
+extern crate ton_abi as abi_json;
 extern crate base64;
 #[macro_use]
 extern crate clap;
