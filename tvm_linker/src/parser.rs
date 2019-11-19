@@ -1018,8 +1018,9 @@ mod tests {
         let body = publics.get(&0x0D6E4079).unwrap();
 
         assert_eq!(
-            body,
-            "PUSHINT 10\nDROP\nPUSHINT 1\nPUSHINT 2\nADD\nPUSHINT 3"
+            body.split(|c| c == '\n' || c == '\r').collect::<Vec<&str>>(),
+            "PUSHINT 10|DROP|PUSHINT 1|PUSHINT 2|ADD|PUSHINT 3"
+                .split('|').collect::<Vec<&str>>()
         );
     }
 }
