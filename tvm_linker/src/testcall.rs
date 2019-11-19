@@ -191,9 +191,7 @@ pub fn perform_contract_call(
     }
 
     let mut engine = Engine::new().setup(code, Some(registers), Some(stack), Some(Gas::test()));
-    if debug { 
-        engine.set_trace(Engine::TRACE_ALL);
-    }
+    engine.set_trace(if debug {Engine::TRACE_ALL} else {0});
     let exit_code: i32 = match engine.execute() {
         Ok(code) => {
             code as i32
