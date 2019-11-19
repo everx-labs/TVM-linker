@@ -1,7 +1,0 @@
-	.selector
-	NEWC
-	STI 16
-	STSLICE
-	ENDC
-	POPROOT
-	RET

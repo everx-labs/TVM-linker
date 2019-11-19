@@ -13,7 +13,6 @@ keywords = ["TON", "linker", "TVM", "tonlabs"]
 
 [dependencies]
 base64 = "0.10.1"
-byteorder = "1.2.7"
 regex = "1"
 clap = "2.32"
 ed25519-dalek = "0.9.1"
