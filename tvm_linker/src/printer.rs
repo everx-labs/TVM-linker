@@ -74,8 +74,8 @@ fn print_msg_header(header: &CommonMsgInfo) -> String {
             format!("   ihr_disabled: {}\n", header.ihr_disabled) +
             &format!("   bounce      : {}\n", header.bounce) +
             &format!("   bounced     : {}\n", header.bounced) +
-            &format!("   source      : {}\n", print_int_address(&header.src)) +
-            &format!("   destination : {}\n", print_int_address(&header.dst)) +
+            &format!("   source      : {}\n", &header.src) +
+            &format!("   destination : {}\n", &header.dst) +
             &format!("   value       : {}\n", header.value) +
             &format!("   ihr_fee     : {}\n", header.ihr_fee) +
             &format!("   fwd_fee     : {}\n", header.fwd_fee) +
@@ -83,31 +83,15 @@ fn print_msg_header(header: &CommonMsgInfo) -> String {
             &format!("   created_at  : {}\n", header.created_at)
         },
         CommonMsgInfo::ExtInMsgInfo(header) => {
-            format!("   source      : {}\n", print_ext_address(&header.src)) +
-            &format!("   destination : {}\n", print_int_address(&header.dst)) +
+            format!( "   source      : {}\n", &header.src) +
+            &format!("   destination : {}\n", &header.dst) +
             &format!("   import_fee  : {}\n", header.import_fee)
         },
         CommonMsgInfo::ExtOutMsgInfo(header) => {
-            format!("   source      : {}\n", print_int_address(&header.src)) +
-            &format!("   destination : {}\n", print_ext_address(&header.dst)) +
+            format!( "   source      : {}\n", &header.src) +
+            &format!("   destination : {}\n", &header.dst) +
             &format!("   created_lt  : {}\n", header.created_lt) +
             &format!("   created_at  : {}\n", header.created_at)
         }
-    }
-}
-
-fn print_int_address(addr: &MsgAddressInt) -> String {
-    //TODO: use display method of SliceData (std.address) when it will be implemented
-    match addr {
-        MsgAddressInt::AddrStd(ref std) => format!("{}:{}", std.workchain_id, hex::encode(std.address.get_bytestring(0))),
-        MsgAddressInt::AddrVar(ref var) => format!("{}:{}", var.workchain_id, hex::encode(var.address.get_bytestring(0))),
-        MsgAddressInt::AddrNone => format!("None"),
-    }
-}
-
-fn print_ext_address(addr: &MsgAddressExt) -> String {
-    match addr {
-        MsgAddressExt::AddrNone => "AddrNone".to_string(),
-        MsgAddressExt::AddrExtern(x) => format!("{}", x)
     }
 }
