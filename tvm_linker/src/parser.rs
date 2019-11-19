@@ -862,9 +862,9 @@ impl ParseEngine {
 mod tests {
     use super::*;
     use std::fs::File;
-    use std::sync::Arc;
-    use tvm::test_framework::*;
     use tvm::stack::*;
+    use tvm::executor::Engine;
+    use tvm::assembler::compile_code;
 
     #[test]
     fn test_parser_testlib() {
@@ -873,8 +873,8 @@ mod tests {
         assert_eq!(parser.parse(source, vec![], None), ok!());  
         let mut data_dict = BuilderData::new();
         data_dict.append_bit_one().unwrap().checked_append_reference(&parser.data().unwrap()).unwrap();
-        tvm::logger::init();
-        test_case(&format!("
+
+        let code = compile_code(&format!("
         ;s0 - persistent data dictionary
             PLDDICT
         ;read public key from persistent_base index,
@@ -950,20 +950,21 @@ mod tests {
         ", 
         base = 1000000,
         offset = OFFSET_GLOBL_DATA,
-        ))
-        .with_stack(
-            Stack::new()
-                .push(StackItem::Slice(data_dict.into()))
-                .clone()
-        )
-        .expect_stack(
-            Stack::new()
-                .push(int!(1))
-                .push(int!(2))
-                .push(int!(3))
-                .push(int!(4))
-                .push(int!(127))
-        );
+        )).expect("Couldn't compile code");
+
+        let mut stack = Stack::new();
+        stack.push(StackItem::Slice(data_dict.into()));
+
+        let mut engine = Engine::new().setup(code, None, Some(stack), None);
+        engine.set_trace(Engine::TRACE_ALL);
+        engine.execute().unwrap();
+
+        engine.assert_stack(Stack::new()
+            .push(int!(1))
+            .push(int!(2))
+            .push(int!(3))
+            .push(int!(4))
+            .push(int!(127)));
     }
 
     #[test]
@@ -1017,8 +1018,8 @@ mod tests {
         let body = publics.get(&0x0D6E4079).unwrap();
 
         assert_eq!(
-            body,
-            "PUSHINT 10\nDROP\nPUSHINT 1\nPUSHINT 2\nADD\nPUSHINT 3"
+            body.lines().collect::<Vec<&str>>(),
+            vec!["PUSHINT 10", "DROP", "PUSHINT 1", "PUSHINT 2", "ADD", "PUSHINT 3"],
         );
     }
 }

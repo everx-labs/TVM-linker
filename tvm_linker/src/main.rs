@@ -11,7 +11,7 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
-extern crate abi_json;
+extern crate ton_abi as abi_json;
 extern crate base64;
 #[macro_use]
 extern crate clap;
@@ -32,6 +32,7 @@ extern crate log;
 mod abi;
 mod keyman;
 mod parser;
+mod printer;
 mod program;
 mod real_ton;
 mod resolver;
