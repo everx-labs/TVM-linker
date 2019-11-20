@@ -63,7 +63,9 @@ impl fmt::Display for MsgPrinter {
                 Some(b) => format!("{:.2}", Arc::<CellData>::from(BuilderData::from_slice(&b))),
                 None => "None".to_string(),
             },
-            if self.msg.body().is_some() { hex::encode(self.msg.body().unwrap().get_bytestring(0)) } else { "None".to_string() },
+            tree_of_cells_into_base64(
+                self.msg.body().map(|slice| slice.into_cell()).as_ref(),
+            ),
         )
     }    
 }
