@@ -325,7 +325,7 @@ def testCall():
 	addr = '1'*64
 	expect_success2('test_call1', 'send', '{"a": "0:' + addr + '"}', '', linker_options)
 	expect_output(r"destination : 0:1111111111111111111111111111111111111111111111111111111111111111")
-	expect_output(r"body_hex: 459dde93")
+	expect_output(r"data: 459dde93")
 
 def testLlvmPiggyBank():
 	#it maybe '--sign key1' or '--internal 0' - test will work correctly

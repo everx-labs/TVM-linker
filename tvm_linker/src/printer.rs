@@ -54,7 +54,7 @@ impl fmt::Display for MsgPrinter {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "message header\n{}init  : {}\nbody  : {}\nbody_hex: {}\n",
+            "message header\n{}init  : {}\nbody  : {}\nbody_hex: {}\nbody_base64: {}\n",
             print_msg_header(&self.msg.header()),
             self.msg.state_init().as_ref().map(|x| {
                 format!("{}", StateInitPrinter{ state: x })
@@ -63,7 +63,14 @@ impl fmt::Display for MsgPrinter {
                 Some(b) => format!("{:.2}", Arc::<CellData>::from(BuilderData::from_slice(&b))),
                 None => "None".to_string(),
             },
-            if self.msg.body().is_some() { hex::encode(self.msg.body().unwrap().get_bytestring(0)) } else { "None".to_string() },
+            self.msg.body()
+                .map(|b| hex::encode(b.get_bytestring(0)))
+                .unwrap_or("None".to_string()),
+            tree_of_cells_into_base64(
+                self.msg.body()
+                    .map(|slice| slice.into_cell())
+                    .as_ref(),
+            ),
         )
     }    
 }
