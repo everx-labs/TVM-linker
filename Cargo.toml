@@ -1,0 +1,11 @@
+[workspace]
+members = [
+    "tvm_linker",
+    "ton-labs-tools",
+]
+
+[patch."https://github.com/tonlabs/ton-labs-types.git"]
+ton_types = { git = "ssh://git@github.com/tonlabs/ton-types.git" }
+
+[patch."https://github.com/tonlabs/ton-labs-vm.git"]
+ton_vm = { git = "ssh://git@github.com/tonlabs/ton-vm.git" }
