@@ -25,7 +25,7 @@ extern crate serde_json;
 extern crate sha2;
 extern crate simplelog;
 #[macro_use]
-extern crate tvm;
+extern crate ton_vm as tvm;
 #[macro_use]
 extern crate log;
 
