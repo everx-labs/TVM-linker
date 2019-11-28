@@ -1,6 +1,6 @@
 [package]
 build = "../build.rs"
-name = "ton_labs_tools"
+name = "tvm_tools"
 version = "0.1.0"
 
 [dependencies]

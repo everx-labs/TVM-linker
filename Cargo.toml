@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "tvm_linker",
-    "ton-labs-tools",
+    "tvm-tools",
 ]
 
 [patch."https://github.com/tonlabs/ton-labs-types.git"]
