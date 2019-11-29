@@ -13,9 +13,9 @@
  */
 use std::fmt;
 use std::sync::Arc;
-use tvm::block::*;
-use tvm::cells_serialization::serialize_tree_of_cells;
-use tvm::stack::*;
+use ton_block::*;
+use ton_types::cells_serialization::serialize_tree_of_cells;
+use ton_types::{BuilderData, CellData};
 
 pub struct StateInitPrinter<'a> {
     pub state: &'a StateInit,

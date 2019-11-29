@@ -15,7 +15,7 @@
 #![cfg_attr(feature = "ci_run", deny(warnings))]
 
 extern crate ton_vm as tvm;
-extern crate ton_labs_tools;
+extern crate tvm_tools;
 extern crate clap;
 #[allow(unused_imports)]
 #[macro_use]
@@ -30,7 +30,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 use tvm::executor::Engine;
-use ton_labs_tools::{
+use tvm_tools::{
     Contract,
     ContractsRepository,
     FileBasedContractsRepository

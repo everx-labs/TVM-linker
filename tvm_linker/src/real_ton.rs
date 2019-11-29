@@ -20,11 +20,10 @@ use std::sync::Arc;
 use std::io::prelude::*;
 use std::fs::File;
 extern crate hex;
-use tvm::block::*;
-use tvm::types::{AccountAddress, AccountId};
-use tvm::cells_serialization::{BocSerialiseMode, BagOfCells, deserialize_cells_tree_ex };
-use tvm::stack::BuilderData;
-use tvm::stack::SliceData;
+use ton_block::*;
+use ton_types::types::{AccountId};
+use ton_types::cells_serialization::{BocSerialiseMode, BagOfCells, deserialize_cells_tree_ex };
+use ton_types::{BuilderData, SliceData};
 
 pub fn decode_boc(file_name: &str, is_tvc: bool) {
     let mut orig_bytes = Vec::new();
@@ -51,9 +50,9 @@ pub fn decode_boc(file_name: &str, is_tvc: bool) {
 #[allow(dead_code)]
 pub fn make_boc() {
     println! ("Making real TON");
-    let address : AccountAddress = AccountAddress::from_str ("4e5756321b532011c422382c5478569d21bd15ef33d5ede4e7fc250408a926d2").unwrap();
+    let address = AccountId::from_str("4e5756321b532011c422382c5478569d21bd15ef33d5ede4e7fc250408a926d2").unwrap();
     let mut msg_hdr = ExternalInboundMessageHeader::default();
-    msg_hdr.dst = MsgAddressInt::AddrStd (MsgAddrStd::with_address(None, -1, address.account_id));
+    msg_hdr.dst = MsgAddressInt::AddrStd (MsgAddrStd::with_address(None, -1, address));
     let mut msg = Message::with_ext_in_header (msg_hdr);
 
     let left = BuilderData::new();
@@ -117,5 +116,5 @@ pub fn compile_message(
     f.write_all(&bytes).map_err(|_| "Unable to write_data to msg file".to_string())?;
 
     println!("boc file created: {}", output_file_name);
-    ok!()
+    Ok(())
 }

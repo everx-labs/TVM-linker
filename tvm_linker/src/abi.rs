@@ -17,7 +17,7 @@ use ed25519_dalek::Keypair;
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io::Read;
-use tvm::stack::BuilderData;
+use ton_types::BuilderData;
 
 pub fn build_abi_body(
     abi_file: &str,

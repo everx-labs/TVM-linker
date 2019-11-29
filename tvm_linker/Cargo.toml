@@ -26,4 +26,6 @@ serde_json = "1.0.40"
 crc16 = "*"
 
 ton_abi = { git = "https://github.com/tonlabs/TON-SDK.git" }
+ton_block = { git = "https://github.com/tonlabs/ton-labs-block.git" }
+ton_types = { git = "https://github.com/tonlabs/ton-labs-types.git" }
 ton_vm = { git = "https://github.com/tonlabs/ton-labs-vm.git", default-features = false }

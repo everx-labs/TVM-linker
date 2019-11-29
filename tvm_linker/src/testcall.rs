@@ -20,12 +20,12 @@ use sha2::Sha512;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tvm::executor::Engine;
-use tvm::executor::gas::gas_state::Gas;
-use tvm::stack::*;
-use tvm::types::AccountId;
-use tvm::block::*;
-use tvm::SmartContractInfo;
+use ton_vm::executor::{Engine, gas::gas_state::Gas};
+use ton_vm::stack::integer::{IntegerData};
+use ton_vm::stack::{StackItem, Stack, SaveList};
+use ton_vm::SmartContractInfo;
+use ton_types::{BuilderData, CellData, SliceData};
+use ton_block::*;//AccountId
 
 #[allow(dead_code)]
 fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Arc<CellData> {

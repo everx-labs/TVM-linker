@@ -16,7 +16,7 @@
 
 extern crate ton_types;
 extern crate ton_vm as tvm;
-extern crate ton_labs_tools;
+extern crate tvm_tools;
 extern crate clap;
 
 use std::ffi::OsStr;
@@ -31,7 +31,7 @@ use tvm::stack::SliceData;
 
 use ton_types::cells_serialization::deserialize_tree_of_cells;
 use tvm::types::AccountId;
-use ton_labs_tools::{
+use tvm_tools::{
     Contract,
     ContractsRepository,
     FileBasedContractsRepository
