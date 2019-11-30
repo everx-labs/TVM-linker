@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.0.0-experimental
 
-FROM rust:1.39-alpine as build-ton-compiler
+FROM rust:1.39 as build-ton-compiler
 ARG TARGET="x86_64-unknown-linux-musl"
 USER root
 RUN apt-get -y update
