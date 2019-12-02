@@ -15,14 +15,14 @@ use abi::gen_abi_id;
 use abi_json::Contract;
 use regex::Regex;
 use resolver::resolve_name;
-use std::collections::HashMap;
+use std::collections::{HashSet, HashMap};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
-use tvm::stack::{BuilderData, IBitstring, IntegerData, SliceData, CellData};
-use tvm::stack::integer::serialization::{Encoding, SignedIntegerBigEndianEncoding};
-use tvm::stack::serialization::Serializer;
-use tvm::stack::dictionary::{HashmapE, HashmapType};
-use std::collections::HashSet;
 use std::sync::Arc;
+use ton_types::{BuilderData, IBitstring, SliceData, CellData};
+use ton_types::dictionary::{HashmapE, HashmapType};
+use ton_vm::stack::integer::{IntegerData, serialization::{Encoding, SignedIntegerBigEndianEncoding}};
+use ton_vm::stack::serialization::Serializer;
+
 
 pub type Ptr = i64;
 
@@ -277,7 +277,7 @@ impl ParseEngine {
         }
 
         self.drop_unused_objects();
-        ok!()
+        Ok(())
     }    
 
     pub fn data(&self) -> Option<Arc<CellData>> {
@@ -377,7 +377,7 @@ impl ParseEngine {
                 data.values.push(DataValue::Empty);
                 Some(data)
             });
-        ok!()
+        Ok(())
     }
 
     fn update_predefined(&mut self) {
@@ -532,7 +532,7 @@ impl ParseEngine {
 
         self.update(&section_name, &obj_name, &obj_body, first_pass)
             .map_err(|e| format!("line {}: {}", lnum, e))?;
-        ok!()
+        Ok(())
     }
 
     fn create_function_id(&mut self, func: &str) -> u32 {
@@ -621,7 +621,7 @@ impl ParseEngine {
             },
             _ => (),
         }
-        ok!()
+        Ok(())
     }
 
     fn update_data(
@@ -694,7 +694,7 @@ impl ParseEngine {
         if *item_size > 0 {
             Err(format!("global object {} has invalid \".size\" value: real size = {}", name, *item_size))?;
         }
-        ok!()
+        Ok(())
     }
 
     fn build_data(&self) -> Option<Arc<CellData>> {
@@ -862,15 +862,15 @@ impl ParseEngine {
 mod tests {
     use super::*;
     use std::fs::File;
-    use tvm::stack::*;
-    use tvm::executor::Engine;
-    use tvm::assembler::compile_code;
+    use ton_vm::executor::Engine;
+    use ton_vm::assembler::compile_code;
+    use ton_vm::stack::{Stack, StackItem};
 
     #[test]
     fn test_parser_testlib() {
         let mut parser = ParseEngine::new();
         let source = File::open("./tests/test.tvm").unwrap();
-        assert_eq!(parser.parse(source, vec![], None), ok!());  
+        assert_eq!(parser.parse(source, vec![], None), Ok(()));  
         let mut data_dict = BuilderData::new();
         data_dict.append_bit_one().unwrap().checked_append_reference(&parser.data().unwrap()).unwrap();
 
@@ -972,7 +972,7 @@ mod tests {
         let mut parser = ParseEngine::new();
         let source_file = File::open("./tests/local_global_var.code").unwrap();
         let lib_file = File::open("./stdlib.tvm").unwrap();
-        assert_eq!(parser.parse(source_file, vec![lib_file], None), ok!());
+        assert_eq!(parser.parse(source_file, vec![lib_file], None), Ok(()));
     }   
 
     #[test]
@@ -980,7 +980,7 @@ mod tests {
         let mut parser = ParseEngine::new();
         let source_file = File::open("./tests/comm_test1.s").unwrap();
         let lib_file = File::open("./stdlib.tvm").unwrap();
-        assert_eq!(parser.parse(source_file, vec![lib_file], None), ok!());
+        assert_eq!(parser.parse(source_file, vec![lib_file], None), Ok(()));
     }
 
     #[test]
@@ -988,7 +988,7 @@ mod tests {
         let mut parser = ParseEngine::new();
         let source = File::open("./tests/bss_test1.s").unwrap();
         let lib = File::open("./stdlib.tvm").unwrap();
-        assert_eq!(parser.parse(source, vec![lib], None), ok!());
+        assert_eq!(parser.parse(source, vec![lib], None), Ok(()));
     }
 
     #[test]
@@ -997,7 +997,7 @@ mod tests {
         let lib1 = File::open("./tests/testlib1.tvm").unwrap();
         let lib2 = File::open("./tests/testlib2.tvm").unwrap();
         let source = File::open("./tests/hello.code").unwrap();
-        assert_eq!(parser.parse(source, vec![lib1, lib2], None), ok!());
+        assert_eq!(parser.parse(source, vec![lib1, lib2], None), Ok(()));
     }
 
     #[test]
@@ -1005,7 +1005,7 @@ mod tests {
         let mut parser = ParseEngine::new();
         let lib1 = File::open("./tests/test_extlink_lib.tvm").unwrap();
         let source = File::open("./tests/test_extlink_source.s").unwrap();
-        assert_eq!(parser.parse(source, vec![lib1], None), ok!());
+        assert_eq!(parser.parse(source, vec![lib1], None), Ok(()));
     }
 
     #[test]
@@ -1013,7 +1013,7 @@ mod tests {
         let mut parser = ParseEngine::new();
         let lib1 = File::open("./stdlib.tvm").unwrap();
         let source = File::open("./tests/test_macros.code").unwrap();
-        assert_eq!(parser.parse(source, vec![lib1], None), ok!());
+        assert_eq!(parser.parse(source, vec![lib1], None), Ok(()));
         let publics = parser.publics();
         let body = publics.get(&0x0D6E4079).unwrap();
 

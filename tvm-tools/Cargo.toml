@@ -1,0 +1,13 @@
+[package]
+build = "../build.rs"
+name = "tvm_tools"
+version = "0.1.0"
+
+[dependencies]
+ton_types = { git = "https://github.com/tonlabs/ton-labs-types.git" }
+ton_vm = { git = "https://github.com/tonlabs/ton-labs-vm.git" }
+
+clap = "2.32"
+hex = "0.3.2"
+log = "0.4.6"
+zip = "0.5.3"

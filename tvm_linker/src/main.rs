@@ -24,8 +24,10 @@ extern crate regex;
 extern crate serde_json;
 extern crate sha2;
 extern crate simplelog;
+extern crate ton_block;
+extern crate ton_types;
 #[macro_use]
-extern crate tvm;
+extern crate ton_vm;
 #[macro_use]
 extern crate log;
 
@@ -49,7 +51,7 @@ use resolver::resolve_name;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use testcall::perform_contract_call;
-use tvm::stack::{BuilderData, SliceData};
+use ton_types::{BuilderData, SliceData};
 
 fn main() -> Result<(), i32> {
     println!(
@@ -206,7 +208,7 @@ fn linker_main() -> Result<(), String> {
             test_matches.value_of("TICKTOCK"),
         );
         println!("TEST COMPLETED");
-        return ok!();
+        return Ok(());
     }
 
     //SUBCOMMAND DECODE
@@ -215,7 +217,7 @@ fn linker_main() -> Result<(), String> {
             decode_matches.value_of("INPUT").unwrap(),
             decode_matches.is_present("TVC"),
         );
-        return ok!();
+        return Ok(());
     }
 
     //SUBCOMMAND MESSAGE
@@ -304,7 +306,7 @@ fn linker_main() -> Result<(), String> {
             .unwrap_or(-1);
          
         prog.compile_to_file(wc)?;
-        return ok!();
+        return Ok(());
     }
 
     unreachable!()

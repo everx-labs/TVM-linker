@@ -12,11 +12,9 @@
  * limitations under the License.
  */
 use std::collections::HashMap;
-use tvm::assembler::compile_code;
-use tvm::assembler::CompileError;
-use tvm::block::Serializable;
-use tvm::stack::dictionary::HashmapE;
-use tvm::stack::SliceData;
+use ton_block::Serializable;
+use ton_vm::assembler::{compile_code, CompileError};
+use ton_types::{SliceData, dictionary::HashmapE};
 
 pub fn prepare_methods<T>(
     methods: &HashMap<T, String>,
@@ -46,7 +44,7 @@ where
             (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
         })?;
     }
-    ok!()
+    Ok(())
 }
 
 pub fn format_compilation_error_string(err: CompileError, func_code: &str) -> String {

@@ -18,11 +18,11 @@ use std::io::Cursor;
 use std::io::Write;
 use std::sync::Arc;
 use methdict::*;
-use tvm::block::*;
-use tvm::assembler::compile_code;
-use tvm::cells_serialization::{BagOfCells, deserialize_cells_tree};
-use tvm::stack::*;
-use tvm::stack::dictionary::{HashmapE, HashmapType};
+use ton_block::*;
+use ton_vm::assembler::compile_code;
+use ton_types::cells_serialization::{BagOfCells, deserialize_cells_tree};
+use ton_types::{CellData, SliceData, BuilderData, IBitstring};
+use ton_types::dictionary::{HashmapE, HashmapType};
 use parser::{ptr_to_builder, ParseEngine};
 
 pub struct Program {
@@ -184,7 +184,7 @@ mod tests {
         let mut parser = ParseEngine::new();
         let source = File::open("./tests/comm_test2.s").unwrap();
         let lib = File::open("./stdlib.tvm").unwrap();
-        assert_eq!(parser.parse(source, vec![lib], None), ok!());
+        assert_eq!(parser.parse(source, vec![lib], None), Ok(()));
         let prog = Program::new(parser);
         let body = {
             let mut b = BuilderData::new();
@@ -202,7 +202,7 @@ mod tests {
         let mut parser = ParseEngine::new();
         let source = File::open("./tests/asci_test1.s").unwrap();
         let lib = File::open("./stdlib.tvm").unwrap();
-        assert_eq!(parser.parse(source, vec![lib], None), ok!());
+        assert_eq!(parser.parse(source, vec![lib], None), Ok(()));
         let prog = Program::new(parser);
         let body = {
             let mut b = BuilderData::new();
@@ -221,7 +221,7 @@ mod tests {
         let mut parser = ParseEngine::new();
         let source = File::open("./tests/sign-test.s").unwrap();
         let lib = File::open("./stdlib_c.tvm").unwrap();
-        assert_eq!(parser.parse(source, vec![lib], None), ok!());
+        assert_eq!(parser.parse(source, vec![lib], None), Ok(()));
         let prog = Program::new(parser);
         let body = {
             let buf = hex::decode("000D6E4079").unwrap();
@@ -246,7 +246,7 @@ mod tests {
         let mut parser = ParseEngine::new();
         let source = File::open("./tests/ticktock.code").unwrap();
         let lib = File::open("./stdlib_sol.tvm").unwrap();
-        assert_eq!(parser.parse(source, vec![lib], None), ok!());
+        assert_eq!(parser.parse(source, vec![lib], None), Ok(()));
         let prog = Program::new(parser);
         let contract_file = prog.compile_to_file(-1).unwrap();
         let name = contract_file.split('.').next().unwrap();
@@ -259,7 +259,7 @@ mod tests {
         let mut parser = ParseEngine::new();
         let lib1 = File::open("./stdlib.tvm").unwrap();
         let source = File::open("./tests/test_recursive.code").unwrap();
-        assert_eq!(parser.parse(source, vec![lib1], None), ok!());
+        assert_eq!(parser.parse(source, vec![lib1], None), Ok(()));
         let prog = Program::new(parser);
         let contract_file = prog.compile_to_file(-1).unwrap();
         let name = contract_file.split('.').next().unwrap();
@@ -294,7 +294,7 @@ mod tests {
 
         assert_eq!(
             parser.parse(source, vec![lib], Some(abi_str)), 
-            ok!()
+            Ok(())
         );
 
         let prog = Program::new(parser);
