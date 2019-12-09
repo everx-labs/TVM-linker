@@ -23,7 +23,7 @@ pipeline {
     }
     triggers {
         upstream(
-            upstreamProjects: 'Node/ton-labs-abi/master,walletapi/sdk-emulator/feature-address-serialize,Node/ton-labs-vm/master,Node/ton-labs-block/master',
+            upstreamProjects: 'Node/ton-labs-abi/master,walletapi/sdk-emulator/feature-address-serialize',
             threshold: hudson.model.Result.SUCCESS
         )
     }
