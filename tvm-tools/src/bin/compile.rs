@@ -91,7 +91,7 @@ fn compile_contract(
         final_bytecode + &bytecode + "};"
     };
 
-    println!("C/C++ bytecode {} ", bytecode_formatter(&mut code.storage().clone()));
+    println!("C/C++ bytecode {} ", bytecode_formatter(&mut code.storage().to_vec()));
 
     let mut bag_of_cells = vec![];
     serialize_tree_of_cells(&code.into_cell(), &mut bag_of_cells)
