@@ -10,27 +10,28 @@ process.on('uncaughtException', (err) => {
 const runPath = process.cwd();
 
 if(process.argv.length < 3) {
-    console.log(`Usage: node ${path.relative(runPath, __filename)} <solc file path>`);
+    console.log(`Usage: node ${path.relative(runPath, __filename)} <prog file path>`);
     process.exit(1);
 }
-const solc = path.join(runPath, process.argv[2])
+const prog = path.join(runPath, process.argv[2]);
+const prog_name = path.parse(prog).name;
 
-if(!fs.existsSync(solc)) {
-    console.log(`File ${solc} is not exist`);
+if(!fs.existsSync(prog)) {
+    console.log(`File ${prog} is not exist`);
     process.exit(2);
 }
 
 (async () => {
-    const proc = await exec(`${solc} --version`);
+    const proc = await exec(`${prog} --version`);
     const ver = proc.stdout.toString().match(/[\d]{1,}\.[\d]{1,}\.[\d]{1,}/g)[0].trim();
     console.log(`Version: ${ver}`);
     
-    const dst = path.join(runPath, `${path.parse(solc).name}_${ver.toString().replace(/\./gi, '_')}_${require('os').platform()}.gz`);
+    const dst = path.join(runPath, `${prog_name}_${ver.toString().replace(/\./gi, '_')}_${require('os').platform()}.gz`);
     if(fs.existsSync(dst)) {
         fs.unlinkSync(dst);
     }
     
-    fs.createReadStream(solc).pipe(zlib.createGzip({level: 9})).pipe(fs.createWriteStream(dst)).on('close', () => {
+    fs.createReadStream(prog).pipe(zlib.createGzip({level: 9})).pipe(fs.createWriteStream(dst)).on('close', () => {
         console.log(`File ${dst} was been successfully produced`);
     });
 
@@ -39,10 +40,11 @@ if(!fs.existsSync(solc)) {
     if(fs.existsSync(baseFile)) {
         base = JSON.parse(fs.readFileSync(baseFile));
     } else {
-        base = {solc: []};
+        base = {};
+        base[`${prog_name}`] = [];
     }
-    if(!base.solc.includes(ver)) {
-        base.solc.push(ver);
+    if(!base[`${prog_name}`].includes(ver)) {
+        base[`${prog_name}`].push(ver);
         fs.writeFileSync(baseFile,JSON.stringify(base));
         console.log(`${baseFile} was been updated`);
     }
