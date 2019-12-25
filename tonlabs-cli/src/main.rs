@@ -11,22 +11,10 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
-//extern crate ton_abi;
-//extern crate base64;
 #[macro_use]
 extern crate clap;
 extern crate crc16;
-//extern crate ed25519_dalek;
-//#[macro_use]
-//extern crate lazy_static;
-//extern crate rand;
-//extern crate regex;
-//extern crate serde_json;
-//extern crate sha2;
-//extern crate ton_block;
-//extern crate ton_types;
-//#[macro_use]
-//extern crate ton_vm;
+extern crate serde_json;
 extern crate ton_client_rs;
 
 mod config;
@@ -37,7 +25,7 @@ mod call;
 
 use call::call_contract;
 use clap::ArgMatches;
-use config::Config;
+use config::{Config, set_config};
 use deploy::deploy_contract;
 use genaddr::generate_address;
 
@@ -92,8 +80,6 @@ fn main_internal() -> Result <(), String> {
             (version: "0.1")
             (author: "TONLabs")
             (@arg ADDRESS: +required +takes_value "Contract address.")
-            (@arg BODY: --body +takes_value "Raw body as hex string.")
-            (@arg MSG: --message +takes_value "File with message boc.")
             (@arg ABI_JSON: --abi +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: --method +takes_value conflicts_with[BODY] "Supplies the name of the calling contract method")
             (@arg ABI_PARAMS: --params +takes_value conflicts_with[BODY] "Supplies ABI arguments for the contract method")
@@ -114,15 +100,13 @@ fn main_internal() -> Result <(), String> {
             (author: "TONLabs")
             (@arg URL: --url +takes_value "Supplies url to connect.")
             (@arg ABI: --abi +takes_value conflicts_with[DATA] "File with contract ABI.")
-            (@arg METHOD: --method +takes_value "The name of the calling contract method.")
-            (@arg PARAMS: --params +takes_value "Arguments for the contract method.")
             (@arg KEYS: --keys +takes_value "File with keypair.")
             (@arg ADDR: --addr +takes_value "Contract address.")
         )
         (@setting SubcommandRequired)
     ).get_matches();
 
-    let conf = Config::new();
+    let conf = Config::from_file("tonlabs-cli.conf.json").unwrap_or(Config::new());
 
     if let Some(send_matches) = matches.subcommand_matches("send") {
         return send_command(send_matches, conf);
@@ -168,7 +152,11 @@ fn deploy_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
 }
 
 fn config_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
-    Ok(())
+    let url = matches.value_of("URL");
+    let addr = matches.value_of("ADDR");
+    let keys = matches.value_of("KEYS");
+    let abi = matches.value_of("ABI");
+    set_config(config, "tonlabs-cli.conf.json", url, addr, keys, abi)
 }
 
 fn genaddr_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
