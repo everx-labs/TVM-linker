@@ -15,7 +15,7 @@ use std::fmt;
 use std::sync::Arc;
 use ton_block::*;
 use ton_types::cells_serialization::serialize_tree_of_cells;
-use ton_types::{BuilderData, CellData};
+use ton_types::Cell;
 
 pub struct StateInitPrinter<'a> {
     pub state: &'a StateInit,
@@ -35,7 +35,7 @@ impl fmt::Display for StateInitPrinter<'_> {
     }    
 }
 
-fn tree_of_cells_into_base64(root_cell: Option<&Arc<CellData>>) -> String {
+fn tree_of_cells_into_base64(root_cell: Option<&Cell>) -> String {
     match root_cell {
         Some(cell) => {
             let mut bytes = Vec::new();
@@ -60,7 +60,7 @@ impl fmt::Display for MsgPrinter {
                 format!("{}", StateInitPrinter{ state: x })
             }).unwrap_or("None".to_string()),
             match self.msg.body() {
-                Some(b) => format!("{:.2}", Arc::<CellData>::from(BuilderData::from_slice(&b))),
+                Some(slice) => format!("{:.2}", slice.into_cell()),
                 None => "None".to_string(),
             },
             self.msg.body()

@@ -24,11 +24,11 @@ use ton_vm::executor::{Engine, gas::gas_state::Gas};
 use ton_vm::stack::integer::{IntegerData};
 use ton_vm::stack::{StackItem, Stack, SaveList};
 use ton_vm::SmartContractInfo;
-use ton_types::{BuilderData, CellData, SliceData};
+use ton_types::{BuilderData, Cell, SliceData};
 use ton_block::*;//AccountId
 
 #[allow(dead_code)]
-fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Arc<CellData> {
+fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Cell {
     let mut builder = BuilderData::new();
     let version: u8 = 0;
     version.write_to(&mut builder).unwrap();

@@ -16,12 +16,11 @@ use crc16::*;
 use ed25519_dalek::{Keypair, PUBLIC_KEY_LENGTH};
 use std::io::Cursor;
 use std::io::Write;
-use std::sync::Arc;
 use methdict::*;
 use ton_block::*;
 use ton_vm::assembler::compile_code;
 use ton_types::cells_serialization::{BagOfCells, deserialize_cells_tree};
-use ton_types::{CellData, SliceData, BuilderData, IBitstring};
+use ton_types::{Cell, SliceData, BuilderData, IBitstring};
 use ton_types::dictionary::{HashmapE, HashmapType};
 use parser::{ptr_to_builder, ParseEngine};
 
@@ -55,7 +54,7 @@ impl Program {
                 [0u8; PUBLIC_KEY_LENGTH]
             };
             
-        let mut data_dict = HashmapE::with_hashmap(64, self.engine.data().as_ref());
+        let mut data_dict = HashmapE::with_hashmap(64, self.engine.data());
         data_dict.set(
             ptr_to_builder(self.engine.persistent_base)?.into(),
             &BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8)
@@ -65,7 +64,7 @@ impl Program {
         let mut data_cell = BuilderData::new();
         data_cell
             .append_bit_one().unwrap()
-            .checked_append_reference(data_dict.data().unwrap()).unwrap();
+            .checked_append_reference(data_dict.data().unwrap().clone()).unwrap();
         Ok(data_cell.into())
     }
 
@@ -74,13 +73,13 @@ impl Program {
         self.engine.entry()
     }
 
-    pub fn internal_method_dict(&self) -> Result<Option<Arc<CellData>>, String> {
+    pub fn internal_method_dict(&self) -> Result<Option<Cell>, String> {
         let dict = prepare_methods(&self.engine.privates())
             .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()) )?;
         Ok(dict.data().map(|cell| cell.clone()))
     }
 
-    pub fn public_method_dict(&self) -> Result<Option<Arc<CellData>>, String> {
+    pub fn public_method_dict(&self) -> Result<Option<Cell>, String> {
         let mut dict = prepare_methods(&self.engine.internals())
             .map_err(|e| e.1.replace("_name_", &self.engine.internal_name(e.0).unwrap()) )?;
 
