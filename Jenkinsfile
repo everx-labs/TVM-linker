@@ -49,7 +49,7 @@ pipeline {
                 }
                 stage('Build linux') {
                     when { 
-                        branch 'build_binaries'
+                        branch 'master'
                     }
                     agent {
                         docker {
@@ -89,7 +89,7 @@ pipeline {
                 }
                 stage('Build darwin') {
                     when { 
-                        branch 'build_binaries'
+                        branch 'master'
                     }
                     agent {
                         label 'ios'
@@ -127,7 +127,7 @@ pipeline {
                 }
                 stage('Build windows') {
                     when { 
-                        branch 'build_binaries'
+                        branch 'master'
                     }
                     agent {
                         label 'Win'
@@ -144,7 +144,9 @@ pipeline {
                                     cargo build --release
                                 """
                             }
-                            sh 'node gzip.js tvm_linker\\target\\release\\tvm_linker.exe'
+                            bat """
+                                node gzip.js tvm_linker\\target\\release\\tvm_linker.exe
+                            """
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
                                 s3Upload \
