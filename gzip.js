@@ -13,7 +13,7 @@ if(process.argv.length < 3) {
     console.log(`Usage: node ${path.relative(runPath, __filename)} <prog file path>`);
     process.exit(1);
 }
-const prog = path.join(runPath, process.argv[2]);
+const prog = path.join(runPath, ...process.argv[2].split(path.sep));
 const prog_name = path.parse(prog).name;
 
 if(!fs.existsSync(prog)) {

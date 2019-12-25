@@ -16,6 +16,7 @@ pipeline {
     agent {
         node {label 'master'}
     }
+    tools {nodejs "Node12.8.0"}
     options {
         buildDiscarder logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '10')
         disableConcurrentBuilds()
@@ -48,7 +49,7 @@ pipeline {
                 }
                 stage('Build linux') {
                     when { 
-                        branch 'master'
+                        branch 'build_binaries'
                     }
                     agent {
                         docker {
@@ -65,10 +66,10 @@ pipeline {
                                 sh """
                                     cargo update
                                     cargo build --release
-                                    chmod a+x tvm_linker/target/release 
+                                    chmod a+x target/release/tvm_linker
                                 """
                             }
-                            sh 'node gzip.js tvm_linker/target/release'
+                            sh 'node gzip.js tvm_linker/target/release/tvm_linker'
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
                                 s3Upload \
@@ -88,7 +89,7 @@ pipeline {
                 }
                 stage('Build darwin') {
                     when { 
-                        branch 'master'
+                        branch 'build_binaries'
                     }
                     agent {
                         label 'ios'
@@ -103,10 +104,10 @@ pipeline {
                                 sh """
                                     cargo update
                                     cargo build --release
-                                    chmod a+x tvm_linker/target/release 
+                                    chmod a+x target/release/tvm_linker
                                 """
                             }
-                            sh 'node gzip.js tvm_linker/target/release'
+                            sh 'node gzip.js tvm_linker/target/release/tvm_linker'
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
                                 s3Upload \
@@ -126,7 +127,7 @@ pipeline {
                 }
                 stage('Build windows') {
                     when { 
-                        branch 'master'
+                        branch 'build_binaries'
                     }
                     agent {
                         label 'Win'
@@ -143,7 +144,7 @@ pipeline {
                                     cargo build --release
                                 """
                             }
-                            sh 'node gzip.js tvm_linker\\target\\release'
+                            sh 'node gzip.js tvm_linker\\target\\release\\tvm_linker.exe'
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
                                 s3Upload \
