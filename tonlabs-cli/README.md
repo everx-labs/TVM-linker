@@ -61,6 +61,8 @@ Example: `tonlabs-cli config --abi wallet.abi.json --keys wallet_keys.json`
 
 After that you can omit `--abi` and `--sign` parameters in `deploy`, `call` and `run` subcommands. 
 
-### 4) Get account info `(not implemented)`
+### 4) Get account info
 
     tonlabs-cli account <address>
+
+Example: `tonlabs-cli account 0:c63a050fe333fac24750e90e4c6056c477a2526f6217b5b519853c30495882c9`

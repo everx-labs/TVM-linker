@@ -13,16 +13,15 @@
  */
 #[macro_use]
 extern crate clap;
-extern crate crc16;
-extern crate serde_json;
-extern crate ton_client_rs;
 
+mod account;
 mod config;
 mod deploy;
 mod genaddr;
 mod helpers;
 mod call;
 
+use account::get_account;
 use call::call_contract;
 use clap::ArgMatches;
 use config::{Config, set_config};
@@ -98,25 +97,34 @@ fn main_internal() -> Result <(), String> {
             (@arg KEYS: --keys +takes_value "File with keypair.")
             (@arg ADDR: --addr +takes_value "Contract address.")
         )
+        (@subcommand account =>
+            (about: "Gets account information.")
+            (version: "0.1")
+            (author: "TONLabs")
+            (@arg ADDRESS: +required +takes_value "Smart contract address.")
+        )
         (@setting SubcommandRequired)
     ).get_matches();
 
     let conf = Config::from_file("tonlabs-cli.conf.json").unwrap_or(Config::new());
 
-    if let Some(send_matches) = matches.subcommand_matches("call") {
-        return send_command(send_matches, conf);
+    if let Some(m) = matches.subcommand_matches("call") {
+        return send_command(m, conf);
     }
-    if let Some(run_matches) = matches.subcommand_matches("run") {
-        return run_command(run_matches, conf);
+    if let Some(m) = matches.subcommand_matches("run") {
+        return run_command(m, conf);
     }
-    if let Some(deploy_matches) = matches.subcommand_matches("deploy") {        
-        return deploy_command(deploy_matches, conf);
+    if let Some(m) = matches.subcommand_matches("deploy") {        
+        return deploy_command(m, conf);
     } 
-    if let Some(config_matches) = matches.subcommand_matches("config") {
-        return config_command(config_matches, conf);
+    if let Some(m) = matches.subcommand_matches("config") {
+        return config_command(m, conf);
     }
-    if let Some(genaddr_matches) = matches.subcommand_matches("genaddr") {
-        return genaddr_command(genaddr_matches, conf);
+    if let Some(m) = matches.subcommand_matches("genaddr") {
+        return genaddr_command(m, conf);
+    }
+    if let Some(m) = matches.subcommand_matches("account") {
+        return account_command(m, conf);
     }
     if let Some(_) = matches.subcommand_matches("version") {
         println!(
@@ -185,4 +193,9 @@ fn genaddr_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
     let keys = matches.value_of("GENKEY").or(matches.value_of("SETKEY"));
     let new_keys = matches.is_present("GENKEY");
     generate_address(config, tvc, wc, keys, new_keys)
+}
+
+fn account_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
+    let addr = matches.value_of("ADDRESS").unwrap();
+    get_account(config, addr)
 }
