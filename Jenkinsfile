@@ -16,6 +16,7 @@ pipeline {
     agent {
         node {label 'master'}
     }
+    tools {nodejs "Node12.8.0"}
     options {
         buildDiscarder logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '10')
         disableConcurrentBuilds()
@@ -28,18 +29,140 @@ pipeline {
         )
     }
     stages {
-        stage ('Build') {
-            steps {
-                script {
-                    G_dockerimage = "tonlabs/tvm_linker:${GIT_COMMIT}"
-                    sshagent (credentials: [G_gitcred]) {
-                        withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=${env.BUILD_TAG}:${GIT_COMMIT}"]) {
-                            app_image = docker.build(
-                                "${G_dockerimage}",
-                                '--label "git-commit=${GIT_COMMIT}" --ssh default .'
-                            )
+        stage('Build') {
+            failFast true
+            parallel {
+                stage ('Build docker image') {
+                    steps {
+                        script {
+                            G_dockerimage = "tonlabs/tvm_linker:${GIT_COMMIT}"
+                            sshagent (credentials: [G_gitcred]) {
+                                withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=${env.BUILD_TAG}:${GIT_COMMIT}"]) {
+                                    app_image = docker.build(
+                                        "${G_dockerimage}",
+                                        '--label "git-commit=${GIT_COMMIT}" --ssh default .'
+                                    )
+                                }
+                            }
                         }
                     }
+                }
+                stage('Build linux') {
+                    when { 
+                        branch 'master'
+                    }
+                    agent {
+                        docker {
+                            image "atomxy/build-rust:20191223"
+                        }
+                    }
+                    steps {
+                        script {
+                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                                identity = awsIdentity()
+                                s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
+                            }
+                            dir('tvm_linker') {
+                                sh """
+                                    cargo update
+                                    cargo build --release
+                                    chmod a+x target/release/tvm_linker
+                                """
+                            }
+                            sh 'node gzip.js tvm_linker/target/release/tvm_linker'
+                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                                identity = awsIdentity()
+                                s3Upload \
+                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    includePathPattern:'*.gz', path: 'tmp_linker', \
+                                    workingDir:'.'
+                                s3Upload \
+                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    includePathPattern:'tvm_linker.json', path: 'tmp_linker', \
+                                    workingDir:'.'
+                            }
+                        }
+                    }
+                    post {
+						cleanup {script{cleanWs notFailBuild: true}}
+					}
+                }
+                stage('Build darwin') {
+                    when { 
+                        branch 'master'
+                    }
+                    agent {
+                        label 'ios'
+                    }
+                    steps {
+                        script {
+                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                                identity = awsIdentity()
+                                s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
+                            }
+                            dir('tvm_linker') {
+                                sh """
+                                    cargo update
+                                    cargo build --release
+                                    chmod a+x target/release/tvm_linker
+                                """
+                            }
+                            sh 'node gzip.js tvm_linker/target/release/tvm_linker'
+                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                                identity = awsIdentity()
+                                s3Upload \
+                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    includePathPattern:'*.gz', path: 'tmp_linker', \
+                                    workingDir:'.'
+                                s3Upload \
+                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    includePathPattern:'tvm_linker.json', path: 'tmp_linker', \
+                                    workingDir:'.'
+                            }
+                        }
+                    }
+                    post {
+						cleanup {script{cleanWs notFailBuild: true}}
+					}
+                }
+                stage('Build windows') {
+                    when { 
+                        branch 'master'
+                    }
+                    agent {
+                        label 'Win'
+                    }
+                    steps {
+                        script {
+                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                                identity = awsIdentity()
+                                s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
+                            }
+                            dir('tvm_linker') {
+                                bat """
+                                    cargo update
+                                    cargo build --release
+                                """
+                            }
+                            bat """
+                                node gzip.js tvm_linker\\target\\release\\tvm_linker.exe
+                            """
+                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                                identity = awsIdentity()
+                                s3Upload \
+                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    includePathPattern:'*.gz', path: 'tmp_linker', \
+                                    workingDir:'.'
+                                s3Upload \
+                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    includePathPattern:'tvm_linker.json', path: 'tmp_linker', \
+                                    workingDir:'.'
+                            }
+                        }
+                    }
+                    post {
+						cleanup {script{cleanWs notFailBuild: true}}
+					}
                 }
             }
         }
@@ -108,6 +231,31 @@ pipeline {
         }
     }
     post {
+        success {
+            node ('master') {
+                script {
+                    withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                        identity = awsIdentity()
+                        list = s3FindFiles(bucket: 'sdkbinaries.tonlabs.io', path: 'tmp_linker/', glob: '*')
+                        for (def file : list) {
+                            s3Copy fromBucket: 'sdkbinaries.tonlabs.io', fromPath: "tmp_linker/${file.path}", toBucket: 'sdkbinaries.tonlabs.io', toPath: "${file.path}"
+                        
+                        }
+                        s3Delete bucket: 'sdkbinaries.tonlabs.io', path: 'tmp_linker/'
+                    }
+                }
+            }
+        }
+        failure {
+            node ('master') {
+                script {
+                    withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                        identity = awsIdentity()
+                        s3Delete bucket: 'sdkbinaries.tonlabs.io', path: 'tmp_linker/'
+                    }
+                }
+            }
+        }
         always {
             notifyTeam(
                 buildstatus: G_buildstatus
