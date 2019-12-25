@@ -17,8 +17,7 @@ use regex::Regex;
 use resolver::resolve_name;
 use std::collections::{HashSet, HashMap};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
-use std::sync::Arc;
-use ton_types::{BuilderData, IBitstring, SliceData, CellData};
+use ton_types::{BuilderData, IBitstring, SliceData, Cell};
 use ton_types::dictionary::{HashmapE, HashmapType};
 use ton_vm::stack::integer::{IntegerData, serialization::{Encoding, SignedIntegerBigEndianEncoding}};
 use ton_vm::stack::serialization::Serializer;
@@ -280,7 +279,7 @@ impl ParseEngine {
         Ok(())
     }    
 
-    pub fn data(&self) -> Option<Arc<CellData>> {
+    pub fn data(&self) -> Option<Cell> {
         self.build_data()
     }
 
@@ -697,7 +696,7 @@ impl ParseEngine {
         Ok(())
     }
 
-    fn build_data(&self) -> Option<Arc<CellData>> {
+    fn build_data(&self) -> Option<Cell> {
         let filter = |persistent: bool| {
             self.globals.iter().filter_map(move |item| {
                 item.1.dtype.data().and_then(|data| {
@@ -730,7 +729,7 @@ impl ParseEngine {
         if let Some(cell) = globl_dict.data() {                
             globl_cell.append_bit_one()
                 .unwrap()
-                .checked_append_reference(cell)
+                .checked_append_reference(cell.clone())
                 .unwrap();
         } else {                                        
             globl_cell.append_bit_zero().unwrap(); 
