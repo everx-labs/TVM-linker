@@ -48,8 +48,13 @@ pub fn get_account(conf: Config, addr: &str) -> Result<(), String> {
         println!("balance:       {}", u64::from_str_radix(balance_str, 16).unwrap());
         println!("last_paid:     {}", acc["last_paid"].as_u64().unwrap());
         println!("last_trans_lt: {}", acc["last_trans_lt"].as_str().unwrap());
-        let data_vec = base64::decode(acc["data"].as_str().unwrap()).unwrap();
-        println!("data(boc): {}", hex::encode(&data_vec));
+        let data_str = acc["data"].as_str();
+        if data_str.is_some() {
+            let data_vec = base64::decode(data_str.unwrap()).unwrap();
+            println!("data(boc): {}", hex::encode(&data_vec));
+        } else {
+            println!("data(boc): null");
+        }
     } else {
         println!("Account not found.");
     }
