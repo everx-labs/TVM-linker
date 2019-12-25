@@ -14,10 +14,9 @@
 use crate::config::Config;
 use crate::helpers::read_keys;
 use crc16::*;
-use hex;
-use std::fs::File;
-use std::io::Write;
+use base64;
 use ton_client_rs::{TonClient, TonAddress};
+
 pub fn generate_address(conf: Config, tvc: &str, _wc_str: Option<&str>, keys_file: Option<&str>, new_keys: bool) -> Result<(), String> {
     let ton = TonClient::new_with_base_url(&conf.url)
         .map_err(|e| format!("failed to create tonclient: {}", e.to_string()))?;
@@ -26,17 +25,19 @@ pub fn generate_address(conf: Config, tvc: &str, _wc_str: Option<&str>, keys_fil
         .map_err(|e| format!("failed to read smart contract file: {}", e.to_string()))?;
 
     let mut new_keys_file = None;
+    let mut print_keys = false;
     let keys = if let Some(filename) = keys_file {
         if new_keys {
             new_keys_file = Some(filename);
             ton.crypto.generate_ed25519_keys()
-            .map_err(|e| format!("keypair generation failed: {}", e.to_string()))?
+                .map_err(|e| format!("keypair generation failed: {}", e.to_string()))?
         } else {
             read_keys(filename)?
         }
     } else {
+        print_keys = true;
         ton.crypto.generate_ed25519_keys()
-        .map_err(|e| format!("failed to generate keypair: {}", e.to_string()))?
+            .map_err(|e| format!("failed to generate keypair: {}", e.to_string()))?
     };
         
     //TODO: use wc_str in address.
@@ -45,9 +46,12 @@ pub fn generate_address(conf: Config, tvc: &str, _wc_str: Option<&str>, keys_fil
 
     println!("Raw address: {}", addr);
 
+    let keys_json = serde_json::to_string_pretty(&keys).unwrap();
     if new_keys_file.is_some() {
-        let mut file = File::create(new_keys_file.unwrap().to_string()).unwrap();
-        file.write_all(&keys.to_bytes()).unwrap();
+        std::fs::write(new_keys_file.unwrap(), &keys_json).unwrap();
+    }
+    if print_keys {
+        println!("Keypair: {}", keys_json);
     }
 
     if let TonAddress::Std(wc, addr256) = addr {
@@ -68,5 +72,5 @@ fn calc_userfriendly_address(wc: i8, addr: &[u8], bounce: bool, testnet: bool) -
     bytes.extend_from_slice(addr);
     let crc = State::<XMODEM>::calculate(&bytes);
     bytes.extend_from_slice(&crc.to_be_bytes());
-    hex::encode(&bytes)
+    base64::encode(&bytes)
 }

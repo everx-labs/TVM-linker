@@ -21,7 +21,7 @@ pub fn call_contract(
     abi: &str,
     method: &str,
     params: &str,
-    keys_file: Option<&str>,
+    keys_file: Option<String>,
     local: bool,
 ) -> Result<(), String> {
     let ton = TonClient::new_with_base_url(&conf.url)
@@ -31,7 +31,7 @@ pub fn call_contract(
         .map_err(|e| format!("failed to read ABI file: {}", e.to_string()))?;
     
     let keys = match keys_file {
-        Some(filename) => Some(read_keys(filename)?),
+        Some(filename) => Some(read_keys(&filename)?),
         None => None,
     };
     
@@ -49,6 +49,8 @@ pub fn call_contract(
     };
 
     println!("Succeded.");
-    println!("result = {}", result);
+    if !result.is_null() {
+        println!("Result = {}", result);
+    }
     Ok(())
 }

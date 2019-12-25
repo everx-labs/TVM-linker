@@ -29,15 +29,7 @@ use config::{Config, set_config};
 use deploy::deploy_contract;
 use genaddr::generate_address;
 
-fn main() -> Result<(), i32> {
-    println!(
-        "tonlabs-cli {}\nCOMMIT_ID: {}\nBUILD_DATE: {}\nCOMMIT_DATE: {}\nGIT_BRANCH: {}",
-        env!("CARGO_PKG_VERSION"),
-        env!("BUILD_GIT_COMMIT"),
-        env!("BUILD_TIME") ,
-        env!("BUILD_GIT_DATE"),
-        env!("BUILD_GIT_BRANCH")
-    );
+fn main() -> Result<(), i32> {    
     main_internal().map_err(|err_str| {
         println!("Error: {}", err_str);
         1
@@ -47,22 +39,25 @@ fn main() -> Result<(), i32> {
 fn main_internal() -> Result <(), String> {
     let build_info = match option_env!("BUILD_INFO") {
         Some(s) => s,
-        None => "",
+        None => "none",
     };
 
     let matches = clap_app! (tonlabs_cli =>        
         (version: &*format!("0.1 ({})", build_info))
         (author: "TONLabs")
         (about: "TONLabs console tool for TON")
+        (@subcommand version =>
+            (about: "Prints build and version info.")
+        )
         (@subcommand genaddr =>
             (@setting AllowNegativeNumbers)
-            (about: "Calculate smart contract address in different formats.")
+            (about: "Calculates smart contract address in different formats.")
             (version: "0.1")
             (author: "TONLabs")
-            (@arg TVC: +required +takes_value "Compiled smart contract (tvc file)")
+            (@arg TVC: +required +takes_value "Compiled smart contract (tvc file).")
             (@arg WC: --wc +takes_value "Workchain id used to generate user-friendly addresses (default -1).")
-            (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file")
-            (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
+            (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file.")
+            (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file.")
         )
         (@subcommand deploy =>
             (@setting AllowNegativeNumbers)
@@ -70,19 +65,19 @@ fn main_internal() -> Result <(), String> {
             (version: "0.1")
             (author: "TONLabs")
             (@arg TVC: +required +takes_value "Compiled smart contract (tvc file)")
-            (@arg ABI: +required +takes_value "Json file with contract ABI.")
             (@arg PARAMS: +required +takes_value "Constructor arguments.")
+            (@arg ABI: --abi +takes_value "Json file with contract ABI.")
             (@arg SIGN: --sign +takes_value "Keypair used to sign 'constructor message'.")
             (@arg WC: --wc +takes_value "Workchain id used to print contract address, -1 by default.")            
         )
-        (@subcommand send =>
+        (@subcommand call =>
             (about: "Sends external message to contract with encoded function call.")
             (version: "0.1")
             (author: "TONLabs")
             (@arg ADDRESS: +required +takes_value "Contract address.")
-            (@arg ABI_JSON: --abi +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
-            (@arg ABI_METHOD: --method +takes_value conflicts_with[BODY] "Supplies the name of the calling contract method")
-            (@arg ABI_PARAMS: --params +takes_value conflicts_with[BODY] "Supplies ABI arguments for the contract method")
+            (@arg METHOD: +required +takes_value "Supplies the name of the calling contract method")
+            (@arg PARAMS: +required +takes_value "Supplies ABI arguments for the contract method")
+            (@arg ABI: --abi +takes_value "Supplies json file with contract ABI")
             (@arg SIGN: --sign +takes_value "Keypair used to sign message.")
         )
         (@subcommand run =>
@@ -90,9 +85,9 @@ fn main_internal() -> Result <(), String> {
             (version: "0.1")
             (author: "TONLabs")
             (@arg ADDRESS: +required +takes_value "Contract address.")
-            (@arg ABI_JSON: --abi +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
-            (@arg ABI_METHOD: --method +takes_value conflicts_with[BODY] "Supplies the name of the calling contract method")
-            (@arg ABI_PARAMS: --params +takes_value conflicts_with[BODY] "Supplies ABI arguments for the contract method")
+            (@arg METHOD: +required +takes_value conflicts_with[BODY] "Supplies the name of the calling contract method")
+            (@arg PARAMS: +required +takes_value conflicts_with[BODY] "Supplies ABI arguments for the contract method")
+            (@arg ABI: --abi +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
         )
         (@subcommand config =>
             (about: "Writes parameters to config file that can be used later in subcommands.")
@@ -108,7 +103,7 @@ fn main_internal() -> Result <(), String> {
 
     let conf = Config::from_file("tonlabs-cli.conf.json").unwrap_or(Config::new());
 
-    if let Some(send_matches) = matches.subcommand_matches("send") {
+    if let Some(send_matches) = matches.subcommand_matches("call") {
         return send_command(send_matches, conf);
     }
     if let Some(run_matches) = matches.subcommand_matches("run") {
@@ -123,32 +118,57 @@ fn main_internal() -> Result <(), String> {
     if let Some(genaddr_matches) = matches.subcommand_matches("genaddr") {
         return genaddr_command(genaddr_matches, conf);
     }
+    if let Some(_) = matches.subcommand_matches("version") {
+        println!(
+            "tonlabs-cli {}\nCOMMIT_ID: {}\nBUILD_DATE: {}\nCOMMIT_DATE: {}\nGIT_BRANCH: {}",
+            env!("CARGO_PKG_VERSION"),
+            env!("BUILD_GIT_COMMIT"),
+            env!("BUILD_TIME") ,
+            env!("BUILD_GIT_DATE"),
+            env!("BUILD_GIT_BRANCH")
+        );
+        return Ok(());
+    }
     Err("invalid arguments".to_string())
 }
 
 fn send_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
     let addr = matches.value_of("ADDRESS").unwrap();
-    let abi = matches.value_of("ABI").unwrap();
     let method = matches.value_of("METHOD").unwrap();
     let params = matches.value_of("PARAMS").unwrap();
-    let keys = matches.value_of("SIGN");
-    call_contract(config, addr, abi, method, params, keys, false)
+    let abi = matches.value_of("ABI")
+        .map(|s| s.to_string())
+        .or(config.abi_path.clone())
+        .ok_or("ABI file not defined. Supply it in config file or command line.".to_string())?;
+    let keys = matches.value_of("SIGN")
+        .map(|s| s.to_string())
+        .or(config.keys_path.clone());
+    call_contract(config, addr, &abi, method, params, keys, false)
 }
 
 fn run_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
     let addr = matches.value_of("ADDRESS").unwrap();
-    let abi = matches.value_of("ABI").unwrap();
     let method = matches.value_of("METHOD").unwrap();
     let params = matches.value_of("PARAMS").unwrap();
-    call_contract(config, addr, abi, method, params, None, false)
+    let abi = matches.value_of("ABI")
+        .map(|s| s.to_string())
+        .or(config.abi_path.clone())
+        .ok_or("ABI file not defined. Supply it in config file or command line.".to_string())?;
+    call_contract(config, addr, &abi, method, params, None, true)
 }
 
 fn deploy_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
     let tvc = matches.value_of("TVC").unwrap();
-    let abi = matches.value_of("ABI").unwrap();
     let params = matches.value_of("PARAMS").unwrap();
-    let keys = matches.value_of("SIGN").ok_or("keypair file is required (--sign option)")?;
-    deploy_contract(config, tvc, abi, params, keys)
+    let abi = matches.value_of("ABI")
+        .map(|s| s.to_string())
+        .or(config.abi_path.clone())
+        .ok_or("ABI file not defined. Supply it in config file or command line.".to_string())?;
+    let keys = matches.value_of("SIGN")
+        .map(|s| s.to_string())
+        .or(config.keys_path.clone())
+        .ok_or("keypair file not defined. Supply it in config file or command line.".to_string())?;
+    deploy_contract(config, tvc, &abi, params, &keys)
 }
 
 fn config_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
@@ -156,7 +176,7 @@ fn config_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
     let addr = matches.value_of("ADDR");
     let keys = matches.value_of("KEYS");
     let abi = matches.value_of("ABI");
-    set_config(config, "tonlabs-cli.conf.json", url, addr, keys, abi)
+    set_config(config, "tonlabs-cli.conf.json", url, addr, abi, keys)
 }
 
 fn genaddr_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
