@@ -1,0 +1,23 @@
+[package]
+name = "tonlabs-cli"
+description = "console utility for TON"
+authors = ["TON DEV SOLUTIONS LTD <support@tonlabs.io>"]
+repository = "https://github.com/tonlabs/TVM-linker"
+homepage = "https://ton.dev"
+documentation = "https://docs.ton.dev"
+build = "../tvm_linker/build/build.rs"
+readme = "README.md"
+license-file = "LICENSE.md"
+keywords = ["TON", "SDK", "smart contract", "tonlabs"]
+edition = "2018"
+version = "0.1.0"
+
+[dependencies]
+base64 = "0.10.1"
+clap = "2.32"
+crc16 = "0.4.0"
+hex = "0.3.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+ton-client-rs = "0.17.0"
