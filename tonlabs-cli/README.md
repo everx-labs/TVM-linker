@@ -19,54 +19,6 @@ cargo run [subcommand args]
 
 `> LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH ./tonlabs-cli [subcommand args]`
 
-## How to use
-
-By default, tonlabs-cli connects to https://net.ton.dev.
-
-tonlabs-cli has several subcommands:
-
-### 1) Generate contract address
-
-    tonlabs-cli genaddr [--genkey|--setkey <keyfile.json>] <tvc>
-
-Example: `tonlabs-cli genaddr --genkey wallet_keys.json wallet.tvc`
-
-`wallet_keys.json` file will be created with new keypair.
-
-### 2) Deploy smart contract
-
-    tonlabs-cli deploy [--sign <keyfile>] [--wc <int8>] [--abi <abifile>] <tvc> <params> 
-
-Example: `tonlabs-cli deploy --abi wallet.abi.json --sign wallet_keys.json wallet.tvc {param1:0}`
-
-If `--abi` or `--sign` option is omitted in parameters it must present in config file. See below.
-
-### 3) Call smart contract method
-
-    tonlabs-cli call [--abi <abi_file>] [--sign <keyfile>] <address> <method> <params>
-
-Run get-method:
-
-    tonlabs-cli run [--abi <abi_file>] <address> <method> <params>
-
-If `--abi` or `--sign` option is omitted in parameters it must present in config file. See below.
-
-### 3) Store parameter values in configuration file
-
-tonlabs-cli can remember some parameter values and use it automatically in `deploy`, `call` and `run` subcommands.
-
-    tonlabs-cli config [--url <url>] [--abi <abifile>] [--keys <keysfile>]
-
-Example: `tonlabs-cli config --abi wallet.abi.json --keys wallet_keys.json`
-
-After that you can omit `--abi` and `--sign` parameters in `deploy`, `call` and `run` subcommands. 
-
-### 4) Get account info
-
-    tonlabs-cli account <address>
-
-Example: `tonlabs-cli account 0:c63a050fe333fac24750e90e4c6056c477a2526f6217b5b519853c30495882c9`
-
 ### Test sequence
 Task: deploy our contract to tonlabs testnet: net.ton.dev.
 
@@ -103,3 +55,55 @@ State should be `Active`.
 #### 7) Use `call` subcommand to execute contract methods in blockchain.
 
     tonlabs-cli call --abi contract.abi.json --sign contract_keys.json <raw_address> methodName {<method_args>}
+
+## List of abailable subcommands
+
+By default, tonlabs-cli connects to https://net.ton.dev.
+
+tonlabs-cli has several subcommands:
+
+### * Generate contract address
+
+    tonlabs-cli genaddr [--genkey|--setkey <keyfile.json>] <tvc>
+
+Example: `tonlabs-cli genaddr --genkey wallet_keys.json wallet.tvc`
+
+`wallet_keys.json` file will be created with new keypair.
+
+### * Deploy smart contract
+
+    tonlabs-cli deploy [--sign <keyfile>] [--wc <int8>] [--abi <abifile>] <tvc> <params> 
+
+Example: `tonlabs-cli deploy --abi wallet.abi.json --sign wallet_keys.json wallet.tvc {param1:0}`
+
+If `--abi` or `--sign` option is omitted in parameters it must present in config file. See below.
+
+### * Call smart contract method
+
+    tonlabs-cli call [--abi <abi_file>] [--sign <keyfile>] <address> <method> <params>
+
+Run get-method:
+
+    tonlabs-cli run [--abi <abi_file>] <address> <method> <params>
+
+If `--abi` or `--sign` option is omitted in parameters it must present in config file. See below.
+
+### * Store parameter values in configuration file
+
+tonlabs-cli can remember some parameter values and use it automatically in `deploy`, `call` and `run` subcommands.
+
+    tonlabs-cli config [--url <url>] [--abi <abifile>] [--keys <keysfile>]
+
+Example: `tonlabs-cli config --abi wallet.abi.json --keys wallet_keys.json`
+
+After that you can omit `--abi` and `--sign` parameters in `deploy`, `call` and `run` subcommands. 
+
+### * Get account info
+
+    tonlabs-cli account <address>
+
+Example: `tonlabs-cli account 0:c63a050fe333fac24750e90e4c6056c477a2526f6217b5b519853c30495882c9`
+
+## Troubleshooting
+
+Possible issues are currently described in a separate document https://www.notion.so/tonlabs/How-to-debug-a-contract-in-test-net-5f5ad45ac26c45099e97351238991d4c
