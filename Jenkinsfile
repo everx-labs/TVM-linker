@@ -81,7 +81,6 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                             "${G_docker_src_image}",
                             "--label \"git-commit=\${GIT_COMMIT}\" -f ./Dockerfile_src ."
                         )
-                        src_image.push()
                     }
                 }
             }
