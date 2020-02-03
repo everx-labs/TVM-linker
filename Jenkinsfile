@@ -33,7 +33,7 @@ pipeline {
         )
         string(
             name:'dockerImage_ton_labs_abi',
-            defaultValue: '',
+            defaultValue: 'tonlabs/ton-labs-abi:latest',
             description: 'Existing ton-labs-abi image name'
         )
         string(
