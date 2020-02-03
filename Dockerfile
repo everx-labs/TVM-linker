@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.0.0-experimental
 
-ARG RUST_IMAGE=rust:1.40
+ARG RUST_IMAGE=rust:1.41
 ARG TON_TYPES_IMAGE=tonlabs/ton-types:latest
 ARG TON_BLOCK_IMAGE=tonlabs/ton-block:latest
 ARG TON_VM_IMAGE=tonlabs/ton-vm:latest
@@ -34,6 +34,7 @@ COPY --from=tvm_linker-src --chown=root:root /tvm_linker ./tvm_linker
 
 WORKDIR /home/user/tvm_linker
 
+RUN more /home/user/tvm_linker/Cargo.toml
 RUN cargo update
 RUN cargo build --release --target $TARGET
 RUN mkdir -p /app

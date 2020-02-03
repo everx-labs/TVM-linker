@@ -2,6 +2,7 @@
 
 G_rust_image = "rust:1.40"
 G_gitcred = "LaninSSHgit"
+G_docker_creds = 'dockerhubLanin'
 G_promoted_branch = 'origin/master'
 G_buildstatus = 'NotSet'
 G_teststatus = 'NotSet'
@@ -76,11 +77,13 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
             steps {
                 script {
                     G_docker_src_image = "tonlabs/tvm_linker:src-${GIT_COMMIT}"
-                    withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=${env.BUILD_TAG}:${GIT_COMMIT}"]) {
-                        src_image = docker.build(
-                            "${G_docker_src_image}",
-                            "--label \"git-commit=\${GIT_COMMIT}\" -f ./Dockerfile_src ."
-                        )
+                    docker.withRegistry('', G_docker_creds) {
+                        withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=${env.BUILD_TAG}:${GIT_COMMIT}"]) {
+                            src_image = docker.build(
+                                "${G_docker_src_image}",
+                                "--label \"git-commit=\${GIT_COMMIT}\" -f ./Dockerfile_src ."
+                            )
+                        }
                     }
                 }
             }
@@ -92,19 +95,21 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                     steps {
                         script {
                             G_docker_pub_image = "tonlabs/tvm_linker:${GIT_COMMIT}"
-                            sshagent (credentials: [G_gitcred]) {
-                                withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=${env.BUILD_TAG}:${GIT_COMMIT}"]) {
-                                    app_image = docker.build(
-                                        "${G_docker_pub_image}",
-                                        "--label \"git-commit=\${GIT_COMMIT}\" --ssh default " + 
-                                        "--build-arg \"RUST_IMAGE=${G_rust_image}\" " + 
-                                        "--build-arg \"TON_TYPES_IMAGE=${params.dockerImage_ton_types}\" " +
-                                        "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_block}\" " + 
-                                        "--build-arg \"TON_VM_IMAGE=${params.dockerImage_ton_vm}\" " + 
-                                        "--build-arg \"TON_LABS_ABI_IMAGE=${params.dockerImage_ton_labs_abi}\" " + 
-                                        "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\" " + 
-                                        "."
-                                    )
+                            docker.withRegistry('', G_docker_creds) {
+                                sshagent (credentials: [G_gitcred]) {
+                                    withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=${env.BUILD_TAG}:${GIT_COMMIT}"]) {
+                                        app_image = docker.build(
+                                            "${G_docker_pub_image}",
+                                            "--label \"git-commit=\${GIT_COMMIT}\" --ssh default " + 
+                                            "--build-arg \"RUST_IMAGE=${G_rust_image}\" " + 
+                                            "--build-arg \"TON_TYPES_IMAGE=${params.dockerImage_ton_types}\" " +
+                                            "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_block}\" " + 
+                                            "--build-arg \"TON_VM_IMAGE=${params.dockerImage_ton_vm}\" " + 
+                                            "--build-arg \"TON_LABS_ABI_IMAGE=${params.dockerImage_ton_labs_abi}\" " + 
+                                            "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\" " + 
+                                            "."
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -248,7 +253,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
 	    stage('Push docker-image') {
             steps {
                 script {
-                    docker.withRegistry('', 'dockerhubLanin') {
+                    docker.withRegistry('', G_docker_creds) {
                         app_image.push()
                     }
                 }
@@ -286,7 +291,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
             }
             steps {
                 script {
-                    docker.withRegistry('', 'dockerhubLanin') {
+                    docker.withRegistry('', G_docker_creds) {
                         docker.image("${G_docker_pub_image}").push('latest')
                     }
                 }
