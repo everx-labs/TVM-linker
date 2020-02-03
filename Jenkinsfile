@@ -61,13 +61,13 @@ pipeline {
             steps {
                 script {
                     sh """
-(cat Cargo.toml | \
+(cat tvm_linker/Cargo.toml | \
 sed 's/ton_types = .*/ton_types = { path = \"\\/ton-types\" }/g' | \
 sed 's/ton_block = .*/ton_block = { path = \"\\/ton-block\" }/g' | \
 sed 's/ton_abi = .*/ton_abi = { path = \"\\/ton-labs-abi\" }/g' | \
-sed 's/ton_vm = .*/ton_vm = { path = \"\\/ton-vm\", default-features = false }/g') > tmp.toml
-rm Cargo.toml
-mv ./tmp.toml ./Cargo.toml
+sed 's/ton_vm = .*/ton_vm = { path = \"\\/ton-vm\", default-features = false }/g') > ./tvm_linker/tmp.toml
+rm ./tvm_linker/Cargo.toml
+mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                     """
                 }
             }
