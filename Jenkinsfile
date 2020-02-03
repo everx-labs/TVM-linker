@@ -1,16 +1,50 @@
 @Library('infrastructure-jenkins-shared-library@master')_
 
+G_rust_image = "rust:1.40"
 G_gitcred = "LaninSSHgit"
 G_promoted_branch = 'origin/master'
 G_buildstatus = 'NotSet'
 G_teststatus = 'NotSet'
+G_docker_src_image = null
+G_docker_pub_image = null
 
 pipeline {
     parameters {
+
         booleanParam (
             defaultValue: false,
             description: 'Promote image built to be used as latest',
             name : 'FORCE_PROMOTE_LATEST'
+        )
+        string(
+            name:'dockerImage_ton_types',
+            defaultValue: 'tonlabs/ton-types:latest',
+            description: 'Existing ton-types image name'
+        )
+        string(
+            name:'dockerImage_ton_block',
+            defaultValue: 'tonlabs/ton-block:latest',
+            description: 'Existing ton-block image name'
+        )
+        string(
+            name:'dockerImage_ton_vm',
+            defaultValue: 'tonlabs/ton-vm:latest',
+            description: 'Existing ton-vm image name'
+        )
+        string(
+            name:'dockerImage_ton_labs_abi',
+            defaultValue: '',
+            description: 'Existing ton-labs-abi image name'
+        )
+        string(
+            name:'dockerImage_tvm_linker',
+            defaultValue: '',
+            description: 'Expected ton-executor image name'
+        )
+        string(
+            name:'ton_sdk_branch',
+            defaultValue: 'master',
+            description: 'ton-sdk branch for upstairs test'
         )
     }
     agent {
@@ -22,25 +56,47 @@ pipeline {
         disableConcurrentBuilds()
         parallelsAlwaysFailFast()
     }
-    triggers {
-        upstream(
-            upstreamProjects: 'Node/ton-labs-abi/master',
-            threshold: hudson.model.Result.SUCCESS
-        )
-    }
     stages {
+        stage('Switch to file source') {
+            steps {
+                script {
+                    sh """
+(cat Cargo.toml | \
+sed 's/ton_types = .*/ton_types = { path = \"\\/ton-types\" }/g' | \
+sed 's/ton_block = .*/ton_block = { path = \"\\/ton-block\" }/g' | \
+sed 's/ton_abi = .*/ton_abi = { path = \"\\/ton-labs-abi\" }/g' | \
+sed 's/ton_vm = .*/ton_vm = { path = \"\\/ton-vm\", default-features = false }/g') > tmp.toml
+rm Cargo.toml
+mv ./tmp.toml ./Cargo.toml
+                    """
+                }
+            }
+        }
+        stage('Prepare sources image') {
+            steps {
+                script {
+                    G_docker_src_image = "tonlabs/tvm_linker:src-${GIT_COMMIT}"
+                    withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=${env.BUILD_TAG}:${GIT_COMMIT}"]) {
+                        app_image = docker.build(
+                            "${G_docker_pub_image}",
+                            "--label \"git-commit=\${GIT_COMMIT}\" -f ./Dockerfile_src ."
+                        )
+                    }
+                }
+            }
+        }
         stage('Build') {
             failFast true
             parallel {
                 stage ('Build docker image') {
                     steps {
                         script {
-                            G_dockerimage = "tonlabs/tvm_linker:${GIT_COMMIT}"
+                            G_docker_pub_image = "tonlabs/tvm_linker:${GIT_COMMIT}"
                             sshagent (credentials: [G_gitcred]) {
                                 withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=${env.BUILD_TAG}:${GIT_COMMIT}"]) {
                                     app_image = docker.build(
-                                        "${G_dockerimage}",
-                                        '--label "git-commit=${GIT_COMMIT}" --ssh default .'
+                                        "${G_docker_pub_image}",
+                                        "--label \"git-commit=\${GIT_COMMIT}\" --ssh default --build-arg \"RUST_IMAGE=${G_rust_image}\" ."
                                     )
                                 }
                             }
@@ -169,7 +225,7 @@ pipeline {
         stage ('Test') {
             agent {
                 docker {
-                    image "${G_dockerimage}"
+                    image "${G_docker_pub_image}"
                     alwaysPull false
                     args '-u root'
                 }
@@ -197,9 +253,9 @@ pipeline {
         stage('Test in compiler-kit') {
             steps {
                 script {
-                    G_dockerimage = "tonlabs/tvm_linker:${GIT_COMMIT}"
+                    G_docker_pub_image = "tonlabs/tvm_linker:${GIT_COMMIT}"
                     def params = [
-                      [$class: 'StringParameterValue', name: 'dockerimage_tvm_linker', value: "${G_dockerimage}"]
+                      [$class: 'StringParameterValue', name: 'dockerimage_tvm_linker', value: "${G_docker_pub_image}"]
                     ]
                     build job : "Infrastructure/compilers/master", parameters : params
                 }
@@ -224,7 +280,7 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('', 'dockerhubLanin') {
-                        docker.image("${G_dockerimage}").push('latest')
+                        docker.image("${G_docker_pub_image}").push('latest')
                     }
                 }
             }
