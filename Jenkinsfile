@@ -77,10 +77,11 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                 script {
                     G_docker_src_image = "tonlabs/tvm_linker:src-${GIT_COMMIT}"
                     withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=${env.BUILD_TAG}:${GIT_COMMIT}"]) {
-                        app_image = docker.build(
-                            "${G_docker_pub_image}",
+                        src_image = docker.build(
+                            "${G_docker_src_image}",
                             "--label \"git-commit=\${GIT_COMMIT}\" -f ./Dockerfile_src ."
                         )
+                        src_image.push()
                     }
                 }
             }
