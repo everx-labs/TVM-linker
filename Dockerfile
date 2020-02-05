@@ -69,7 +69,7 @@ RUN (cat ./tvm_linker/Cargo.toml | \
     sed 's/ton_block = { path = "\/tonlabs.*/ton_block = { path = "\/home\/user\/ton-block" }/g' | \
     sed 's/ton_vm = { path = "\/tonlabs.*/ton_vm = { path = "\/home\/user\/ton-vm\", default-features = false }/g' | \
     sed 's/ton_types = { path = "\/tonlabs.*/ton_types = { path = "\/home\/user\/ton-types" }/g' | \
-    sed 's/ton_abi = { path = "\/tonlabs.*/ton_types = { path = "\/home\/user\/ton-labs-abi" }/g') > tmp.toml && \
+    sed 's/ton_abi = { path = "\/tonlabs.*/ton_abi = { path = "\/home\/user\/ton-labs-abi" }/g') > tmp.toml && \
     rm ./tvm_linker/Cargo.toml && \
     mv ./tmp.toml ./tvm_linker/Cargo.toml
 
