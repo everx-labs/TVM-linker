@@ -82,7 +82,6 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
             steps {
                 script {
                     sh """
-                        apk add zip
                         zip -9 -r linker-src.zip *
                         chown jenkins:jenkins linker-src.zip
                     """
