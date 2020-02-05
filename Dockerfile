@@ -7,11 +7,27 @@ ARG TON_VM_IMAGE=tonlabs/ton-vm:latest
 ARG TON_LABS_ABI_IMAGE=tonlabs/ton-labs-abi:latest
 ARG TVM_LINKER_SRC_IMAGE=tonlabs/tvm_linker:src-latest
 
+FROM alpine as tvm-linker-src
+RUN addgroup --gid 1000 jenkins && \
+    adduser -D -G jenkins jenkins
+COPY --chown=jenkins:jenkins ./tvm_linker /tonlabs/tvm_linker
+VOLUME ["/tonlabs/tvm_linker"]
+
 FROM $TON_TYPES_IMAGE as ton-types-src
 FROM $TON_BLOCK_IMAGE as ton-block-src
 FROM $TON_VM_IMAGE as ton-vm-src
 FROM $TON_LABS_ABI_IMAGE as ton-labs-abi-src
-FROM $TVM_LINKER_SRC_IMAGE as tvm_linker-src
+
+FROM alpine as linker-src
+COPY --from=ton-types-src    --chown=root:root /tonlabs/ton-types    /tonlabs/ton-types
+COPY --from=ton-block-src    --chown=root:root /tonlabs/ton-block    /tonlabs/ton-block
+COPY --from=ton-vm-src       --chown=root:root /tonlabs/ton-vm       /tonlabs/ton-vm
+COPY --from=ton-labs-abi-src --chown=root:root /tonlabs/ton-labs-abi /tonlabs/ton-labs-abi
+COPY --from=tvm-linker-src   --chown=root:root /tonlabs/tvm_linker   /tonlabs/tvm_linker
+VOLUME [ "/tonlabs" ]
+
+
+
 
 FROM $RUST_IMAGE as build-ton-compiler
 ARG TARGET="x86_64-unknown-linux-musl"
@@ -26,15 +42,10 @@ RUN apt-get update; \
     apt-get install -y musl-dev; \
     apt-get install -y musl-tools
 RUN rustup target add $TARGET
-COPY --from=ton-types-src    --chown=root:root /ton-types    /ton-types
-COPY --from=ton-block-src    --chown=root:root /ton-block    /ton-block
-COPY --from=ton-vm-src       --chown=root:root /ton-vm       /ton-vm
-COPY --from=ton-labs-abi-src --chown=root:root /ton-labs-abi /ton-labs-abi
-COPY --from=tvm_linker-src --chown=root:root /tvm_linker ./tvm_linker
+COPY --from=linker-src --chown=root:root /tonlabs /home/user
 
 WORKDIR /home/user/tvm_linker
 
-RUN more /home/user/tvm_linker/Cargo.toml
 RUN cargo update
 RUN cargo build --release --target $TARGET
 RUN mkdir -p /app
