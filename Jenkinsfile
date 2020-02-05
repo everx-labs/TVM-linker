@@ -73,18 +73,19 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                 }
             }
         }
-        stage('Prepare sources image') {
+        stage('Prepare sources for agents') {
+            agent {
+                dockerfile {
+                    args "--target linker-src"
+                }
+            }
             steps {
                 script {
-                    G_docker_src_image = "tonlabs/tvm_linker:src-${GIT_COMMIT}"
-                    docker.withRegistry('', G_docker_creds) {
-                        withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=${env.BUILD_TAG}:${GIT_COMMIT}"]) {
-                            src_image = docker.build(
-                                "${G_docker_src_image}",
-                                "--label \"git-commit=\${GIT_COMMIT}\" --target linker-src ."
-                            )
-                        }
-                    }
+                    sh """
+                        apk add zip
+                        zip -9 -r linker-src.zip *
+                    """
+                    stash includes: '**/linker-src.zip', name: 'linker-src'
                 }
             }
         }
