@@ -20,7 +20,8 @@ FROM $TON_LABS_ABI_IMAGE as ton-labs-abi-src
 
 FROM alpine as linker-src
 RUN addgroup --gid 1000 jenkins && \
-    adduser -D -G jenkins jenkins
+    adduser -D -G jenkins jenkins && \
+    apk add zip
 COPY --from=ton-types-src    --chown=jenkins:jenkins /tonlabs/ton-types    /tonlabs/ton-types
 COPY --from=ton-block-src    --chown=jenkins:jenkins /tonlabs/ton-block    /tonlabs/ton-block
 COPY --from=ton-vm-src       --chown=jenkins:jenkins /tonlabs/ton-vm       /tonlabs/ton-vm
