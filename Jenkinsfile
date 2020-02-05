@@ -63,10 +63,10 @@ pipeline {
                 script {
                     sh """
 (cat tvm_linker/Cargo.toml | \
-sed 's/ton_types = .*/ton_types = { path = \"\\/ton-types\" }/g' | \
-sed 's/ton_block = .*/ton_block = { path = \"\\/ton-block\" }/g' | \
-sed 's/ton_abi = .*/ton_abi = { path = \"\\/ton-labs-abi\" }/g' | \
-sed 's/ton_vm = .*/ton_vm = { path = \"\\/ton-vm\", default-features = false }/g') > ./tvm_linker/tmp.toml
+sed 's/ton_types = .*/ton_types = { path = \"\\/tonlabs\\/ton-types\" }/g' | \
+sed 's/ton_block = .*/ton_block = { path = \"\\/tonlabs\\/ton-block\" }/g' | \
+sed 's/ton_abi = .*/ton_abi = { path = \"\\/tonlabs\\/ton-labs-abi\" }/g' | \
+sed 's/ton_vm = .*/ton_vm = { path = \"\\/tonlabs\\/ton-vm\", default-features = false }/g') > ./tvm_linker/tmp.toml
 rm ./tvm_linker/Cargo.toml
 mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                     """
