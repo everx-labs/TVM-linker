@@ -76,7 +76,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
         stage('Prepare sources for agents') {
             agent {
                 dockerfile {
-                    args "--target linker-src"
+                    additionalBuildArgs "--target linker-src"
                 }
             }
             steps {
@@ -84,6 +84,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                     sh """
                         apk add zip
                         zip -9 -r linker-src.zip *
+                        chown jenkins:jenkins linker-src.zip
                     """
                     stash includes: '**/linker-src.zip', name: 'linker-src'
                 }
