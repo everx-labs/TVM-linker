@@ -43,6 +43,35 @@ RUN apt-get update; \
     apt-get install -y musl-tools
 RUN rustup target add $TARGET
 COPY --from=linker-src --chown=root:root /tonlabs /home/user
+# fix file link in dependencies
+# ton-block
+RUN (cat ./ton-block/Cargo.toml | \
+    sed 's/ton_types = { path = "\/tonlabs.*/ton_types = { path = "\/home\/user\/ton-types" }/g') > tmp.toml && \
+    rm ./ton-block/Cargo.toml && \
+    mv ./tmp.toml ./ton-block/Cargo.toml
+
+# ton-vm
+RUN (cat ./ton-vm/Cargo.toml | \
+    sed 's/ton_types = { path = "\/tonlabs.*/ton_types = { path = "\/home\/user\/ton-types" }/g') > tmp.toml && \
+    rm ./ton-vm/Cargo.toml && \
+    mv ./tmp.toml ./ton-vm/Cargo.toml
+
+# ton-labs-abi
+RUN (cat ./ton-labs-abi/Cargo.toml | \
+    sed 's/ton_block = { path = "\/tonlabs.*/ton_block = { path = "\/home\/user\/ton-block" }/g' | \
+    sed 's/ton_vm = { path = "\/tonlabs.*/ton_vm = { path = "\/home\/user\/ton-vm\", default-features = false }/g' | \
+    sed 's/ton_types = { path = "\/tonlabs.*/ton_types = { path = "\/home\/user\/ton-types" }/g') > tmp.toml && \
+    rm ./ton-labs-abi/Cargo.toml && \
+    mv ./tmp.toml ./ton-labs-abi/Cargo.toml
+
+# tvm_linker
+RUN (cat ./tvm_linker/Cargo.toml | \
+    sed 's/ton_block = { path = "\/tonlabs.*/ton_block = { path = "\/home\/user\/ton-block" }/g' | \
+    sed 's/ton_vm = { path = "\/tonlabs.*/ton_vm = { path = "\/home\/user\/ton-vm\", default-features = false }/g' | \
+    sed 's/ton_types = { path = "\/tonlabs.*/ton_types = { path = "\/home\/user\/ton-types" }/g' | \
+    sed 's/ton_abi = { path = "\/tonlabs.*/ton_types = { path = "\/home\/user\/ton-labs-abi" }/g') > tmp.toml && \
+    rm ./tvm_linker/Cargo.toml && \
+    mv ./tmp.toml ./tvm_linker/Cargo.toml
 
 WORKDIR /home/user/tvm_linker
 

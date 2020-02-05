@@ -81,7 +81,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                         withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=${env.BUILD_TAG}:${GIT_COMMIT}"]) {
                             src_image = docker.build(
                                 "${G_docker_src_image}",
-                                "--label \"git-commit=\${GIT_COMMIT}\" -f ./Dockerfile_src ."
+                                "--label \"git-commit=\${GIT_COMMIT}\" --target linker-src ."
                             )
                         }
                     }
@@ -106,7 +106,6 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                                             "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_block}\" " + 
                                             "--build-arg \"TON_VM_IMAGE=${params.dockerImage_ton_vm}\" " + 
                                             "--build-arg \"TON_LABS_ABI_IMAGE=${params.dockerImage_ton_labs_abi}\" " + 
-                                            "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\" " + 
                                             "."
                                         )
                                     }

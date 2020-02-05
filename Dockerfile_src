@@ -1,6 +1,0 @@
-FROM alpine:latest
-RUN addgroup --gid 1000 jenkins && \
-    adduser -D -G jenkins jenkins
-COPY --chown=jenkins:jenkins ./tvm_linker /tvm_linker
-VOLUME ["/tvm_linker"]
-USER jenkins
