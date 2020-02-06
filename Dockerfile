@@ -17,6 +17,7 @@ FROM $TON_TYPES_IMAGE as ton-types-src
 FROM $TON_BLOCK_IMAGE as ton-block-src
 FROM $TON_VM_IMAGE as ton-vm-src
 FROM $TON_LABS_ABI_IMAGE as ton-labs-abi-src
+FROM $TVM_LINKER_SRC_IMAGE as tvm-linker-src2
 
 FROM alpine as linker-src
 RUN addgroup --gid 1000 jenkins && \
@@ -26,7 +27,7 @@ COPY --from=ton-types-src    --chown=jenkins:jenkins /tonlabs/ton-types    /tonl
 COPY --from=ton-block-src    --chown=jenkins:jenkins /tonlabs/ton-block    /tonlabs/ton-block
 COPY --from=ton-vm-src       --chown=jenkins:jenkins /tonlabs/ton-vm       /tonlabs/ton-vm
 COPY --from=ton-labs-abi-src --chown=jenkins:jenkins /tonlabs/ton-labs-abi /tonlabs/ton-labs-abi
-COPY --from=tvm-linker-src   --chown=jenkins:jenkins /tonlabs/tvm_linker   /tonlabs/tvm_linker
+COPY --from=tvm-linker-src2  --chown=jenkins:jenkins /tonlabs/tvm_linker   /tonlabs/tvm_linker
 WORKDIR /tonlabs
 VOLUME [ "/tonlabs" ]
 

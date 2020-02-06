@@ -94,12 +94,18 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
         stage('Prepare sources for agents') {
             agent {
                 dockerfile {
-                    additionalBuildArgs "--target linker-src"
+                    additionalBuildArgs "--target linker-src " + 
+                                        "--build-arg \"TON_TYPES_IMAGE=${params.dockerImage_ton_types}\" " +
+                                        "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_block}\" " + 
+                                        "--build-arg \"TON_VM_IMAGE=${params.dockerImage_ton_vm}\" " + 
+                                        "--build-arg \"TON_LABS_ABI_IMAGE=${params.dockerImage_ton_labs_abi}\" " + 
+                                        "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\""
                 }
             }
             steps {
                 script {
                     sh """
+                        more /tonlabs/tvm_linker/Cargo.toml
                         zip -9 -r linker-src.zip /tonlabs/*
                         chown jenkins:jenkins linker-src.zip
                     """
@@ -234,6 +240,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                             unstash 'linker-src'
                             bat """
                                 unzip linker-src.zip
+                                type tonlabs\\tvm_linker\\Cargo.toml
                                 node pathFix.js tonlabs\\ton-block\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
                                 node pathFix.js tonlabs\\ton-vm\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
                                 node pathFix.js tonlabs\\ton-labs-abi\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
@@ -242,6 +249,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                             dir('tonlabs') {
                                 dir('tvm_linker') {
                                     bat """
+                                        type Cargo.toml
                                         cargo update
                                         cargo build --release
                                         chmod a+x target/release/tvm_linker
