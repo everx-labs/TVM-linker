@@ -41,7 +41,8 @@ WORKDIR /home/user
 RUN apt-get update; \
     apt-get install -y musl; \
     apt-get install -y musl-dev; \
-    apt-get install -y musl-tools
+    apt-get install -y musl-tools; \
+    apt-get install -y nodejs
 RUN rustup target add $TARGET
 COPY --from=linker-src --chown=root:root /tonlabs /tonlabs
 
