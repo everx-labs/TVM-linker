@@ -105,7 +105,6 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
             steps {
                 script {
                     sh """
-                        more /tonlabs/tvm_linker/Cargo.toml
                         zip -9 -r linker-src.zip /tonlabs/*
                         chown jenkins:jenkins linker-src.zip
                     """
@@ -131,6 +130,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                                             "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_block}\" " + 
                                             "--build-arg \"TON_VM_IMAGE=${params.dockerImage_ton_vm}\" " + 
                                             "--build-arg \"TON_LABS_ABI_IMAGE=${params.dockerImage_ton_labs_abi}\" " + 
+                                            "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\" " +
                                             "."
                                         )
                                     }
@@ -145,7 +145,12 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                     }*/
                     agent {
                         dockerfile {
-                            additionalBuildArgs "--target build-ton-compiler"
+                            additionalBuildArgs "--target build-ton-compiler " + 
+                                        "--build-arg \"TON_TYPES_IMAGE=${params.dockerImage_ton_types}\" " +
+                                        "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_block}\" " + 
+                                        "--build-arg \"TON_VM_IMAGE=${params.dockerImage_ton_vm}\" " + 
+                                        "--build-arg \"TON_LABS_ABI_IMAGE=${params.dockerImage_ton_labs_abi}\" " + 
+                                        "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\""
                         }
                     }
                     steps {
