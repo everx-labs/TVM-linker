@@ -73,6 +73,19 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                 }
             }
         }
+        stage('Build sources image') {
+            G_docker_pub_image = "tonlabs/tvm_linker:src-${GIT_COMMIT}"
+            docker.withRegistry('', G_docker_creds) {
+                sshagent (credentials: [G_gitcred]) {
+                    withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=src-${env.BUILD_TAG}:${GIT_COMMIT}"]) {
+                        app_src_image = docker.build(
+                            "${G_docker_src_image}",
+                            "--label \"git-commit=\${GIT_COMMIT}\" --target tvm-linker-src ."
+                        )
+                    }
+                }
+            }
+        }
         stage('Prepare sources for agents') {
             agent {
                 dockerfile {
@@ -82,7 +95,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
             steps {
                 script {
                     sh """
-                        zip -9 -r linker-src.zip *
+                        zip -9 -r linker-src.zip /tonlabs/*
                         chown jenkins:jenkins linker-src.zip
                     """
                     stash includes: '**/linker-src.zip', name: 'linker-src'
@@ -116,12 +129,12 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                     }
                 }
                 stage('Build linux') {
-                    when { 
+                    /*when { 
                         branch 'master'
-                    }
+                    }*/
                     agent {
-                        docker {
-                            image "atomxy/build-rust:20191223"
+                        dockerfile {
+                            additionalBuildArgs "--target build-ton-compiler"
                         }
                     }
                     steps {
@@ -130,14 +143,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                                 identity = awsIdentity()
                                 s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
                             }
-                            dir('tvm_linker') {
-                                sh """
-                                    cargo update
-                                    cargo build --release
-                                    chmod a+x target/release/tvm_linker
-                                """
-                            }
-                            sh 'node gzip.js tvm_linker/target/release/tvm_linker'
+                            sh 'node gzip.js ../../../../app/tvm_linker'
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
                                 s3Upload \
@@ -156,9 +162,9 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
 					}
                 }
                 stage('Build darwin') {
-                    when { 
+                    /*when { 
                         branch 'master'
-                    }
+                    }*/
                     agent {
                         label 'ios'
                     }
@@ -168,14 +174,26 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                                 identity = awsIdentity()
                                 s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
                             }
-                            dir('tvm_linker') {
-                                sh """
-                                    cargo update
-                                    cargo build --release
-                                    chmod a+x target/release/tvm_linker
-                                """
+                            def C_PATH = sh (script: 'pwd', returnStdout: true).trim()
+                            
+                            unstash 'linker-src'
+                            sh """
+                                unzip linker-src.zip
+                                node pathFix.js tonlabs/ton-block/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
+                                node pathFix.js tonlabs/ton-vm/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
+                                node pathFix.js tonlabs/ton-labs-abi/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
+                                node pathFix.js tonlabs/tvm_linker/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
+                            """
+                            dir('tonlabs') {
+                                dir('tvm_linker') {
+                                    sh """
+                                        cargo update
+                                        cargo build --release
+                                        chmod a+x target/release/tvm_linker
+                                    """
+                                }
                             }
-                            sh 'node gzip.js tvm_linker/target/release/tvm_linker'
+                            sh 'node gzip.js tonlabs/tvm_linker/target/release/tvm_linker'
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
                                 s3Upload \
@@ -194,27 +212,39 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
 					}
                 }
                 stage('Build windows') {
-                    when { 
+                    /*when { 
                         branch 'master'
-                    }
+                    }*/
                     agent {
                         label 'Win'
                     }
                     steps {
                         script {
+                            def C_PATH = bat (script: '@echo off && echo %cd%', returnStdout: true).trim()
+                            echo "${C_PATH}"
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
                                 s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
                             }
-                            dir('tvm_linker') {
-                                bat """
-                                    cargo update
-                                    cargo build --release
-                                """
-                            }
+                            unstash 'linker-src'
                             bat """
-                                node gzip.js tvm_linker\\target\\release\\tvm_linker.exe
+                                unzip linker-src.zip
+                                node pathFix.js tonlabs\\ton-block\\Cargo.toml '{ path = \"/tonlabs/' '{ path = \"${C_PATH}\\tonlabs\\'
+                                node pathFix.js tonlabs\\ton-vm\\Cargo.toml '{ path = \"/tonlabs/' '{ path = \"${C_PATH}\\tonlabs\\''
+                                node pathFix.js tonlabs\\ton-labs-abi\\Cargo.toml '{ path = \"/tonlabs/' '{ path = \"${C_PATH}\\tonlabs\\'
+                                node pathFix.js tonlabs\\tvm_linker\\Cargo.toml '{ path = \"/tonlabs/' '{ path = \"${C_PATH}\\tonlabs\\'
                             """
+                            dir('tonlabs') {
+                                dir('tvm_linker') {
+                                    bat """
+                                        cargo update
+                                        cargo build --release
+                                        chmod a+x target/release/tvm_linker
+                                    """
+                                }
+                            }
+
+                            bat "node gzip.js tonlabs\\tvm_linker\\target\\release\\tvm_linker.exe"
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
                                 s3Upload \
@@ -293,6 +323,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                 script {
                     docker.withRegistry('', G_docker_creds) {
                         docker.image("${G_docker_pub_image}").push('latest')
+                        docker.image("${G_docker_src_image}").push('src-latest')
                     }
                 }
             }
