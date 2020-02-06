@@ -9,7 +9,7 @@ if(process.argv.length < 5) {
 
 const file = path.join(process.cwd(), process.argv[2]);
 const fromStr = process.argv[3];
-const toStr = (os.platform() !== 'win32' ? process.argv[4] : process.argv[4].replace(/([A-Za-z]):\\/g, '/$1/')).replace(/\\/g,'/');
+const toStr = (os.platform() !== 'win32' ? process.argv[4] : process.argv[4].replace(/[A-Za-z]:\\/g, '/')).replace(/\\/g,'/');
 
 if(!fs.existsSync(file)) {
     console.log(`File ${file} not found`);
