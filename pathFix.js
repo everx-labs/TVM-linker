@@ -20,7 +20,6 @@ const cont_b = fs.readFileSync(file);
 const re = new RegExp(fromStr,'g');
 const cont_a = cont_b.toString().replace(re,toStr);
 if(cont_b.toString() !== cont_a.toString()) {
-    console.log(cont_b.toString());
     console.log(cont_a.toString());
 }
 fs.writeFileSync(file, cont_a);
