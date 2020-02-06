@@ -86,6 +86,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                                 )
                             }
                         }
+                        docker.image("${G_docker_src_image}").push()
                     }
                 }
             }
