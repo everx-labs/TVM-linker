@@ -30,9 +30,6 @@ COPY --from=tvm-linker-src   --chown=jenkins:jenkins /tonlabs/tvm_linker   /tonl
 WORKDIR /tonlabs
 VOLUME [ "/tonlabs" ]
 
-
-
-
 FROM $RUST_IMAGE as build-ton-compiler
 ARG TARGET="x86_64-unknown-linux-musl"
 USER root
@@ -57,5 +54,5 @@ RUN mv /tonlabs/tvm_linker/target/${TARGET}/release/tvm_linker /app
 RUN chmod a+x /app/tvm_linker
 
 
-FROM alpine
+FROM alpine as final-image
 COPY --from=build-ton-compiler /app/ /usr/bin/
