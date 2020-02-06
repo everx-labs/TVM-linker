@@ -76,7 +76,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
         stage('Build sources image') {
             steps {
                 script {
-                    G_docker_pub_image = "tonlabs/tvm_linker:src-${GIT_COMMIT}"
+                    G_docker_src_image = "tonlabs/tvm_linker:src-${GIT_COMMIT}"
                     docker.withRegistry('', G_docker_creds) {
                         sshagent (credentials: [G_gitcred]) {
                             withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=src-${env.BUILD_TAG}:${GIT_COMMIT}"]) {
