@@ -245,7 +245,6 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                             unstash 'linker-src'
                             bat """
                                 unzip linker-src.zip
-                                type tonlabs\\tvm_linker\\Cargo.toml
                                 node pathFix.js tonlabs\\ton-block\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
                                 node pathFix.js tonlabs\\ton-vm\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
                                 node pathFix.js tonlabs\\ton-labs-abi\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
@@ -254,7 +253,6 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                             dir('tonlabs') {
                                 dir('tvm_linker') {
                                     bat """
-                                        type Cargo.toml
                                         cargo update
                                         cargo build --release
                                         chmod a+x target/release/tvm_linker
