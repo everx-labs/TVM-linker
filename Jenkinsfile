@@ -234,10 +234,10 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                             unstash 'linker-src'
                             bat """
                                 unzip linker-src.zip
-                                node pathFix.js tonlabs\\ton-block\\Cargo.toml '{ path = \"/tonlabs/' '{ path = \"${C_PATH}\\tonlabs\\'
-                                node pathFix.js tonlabs\\ton-vm\\Cargo.toml '{ path = \"/tonlabs/' '{ path = \"${C_PATH}\\tonlabs\\''
-                                node pathFix.js tonlabs\\ton-labs-abi\\Cargo.toml '{ path = \"/tonlabs/' '{ path = \"${C_PATH}\\tonlabs\\'
-                                node pathFix.js tonlabs\\tvm_linker\\Cargo.toml '{ path = \"/tonlabs/' '{ path = \"${C_PATH}\\tonlabs\\'
+                                node pathFix.js tonlabs\\ton-block\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\"
+                                node pathFix.js tonlabs\\ton-vm\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\"
+                                node pathFix.js tonlabs\\ton-labs-abi\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\"
+                                node pathFix.js tonlabs\\tvm_linker\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\"
                             """
                             dir('tonlabs') {
                                 dir('tvm_linker') {
