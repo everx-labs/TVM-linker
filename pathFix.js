@@ -18,9 +18,11 @@ if(!fs.existsSync(file)) {
 
 const cont_b = fs.readFileSync(file);
 const re = new RegExp(fromStr,'g');
-console.log(cont.toString());
 const cont_a = cont_b.toString().replace(re,toStr);
-console.log(cont.toString());
+if(cont_b.toString() !== cont_a.toString()) {
+    console.log(cont_b.toString());
+    console.log(cont_a.toString());
+}
 fs.writeFileSync(file, cont_a);
 
 
