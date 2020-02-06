@@ -16,9 +16,11 @@ if(!fs.existsSync(file)) {
     process.exit(1);
 }
 
-let cont = fs.readFileSync(file);
+const cont_b = fs.readFileSync(file);
 const re = new RegExp(fromStr,'g');
-cont = cont.toString().replace(re,toStr);
-fs.writeFileSync(file, cont);
+console.log(cont.toString());
+const cont_a = cont_b.toString().replace(re,toStr);
+console.log(cont.toString());
+fs.writeFileSync(file, cont_a);
 
 
