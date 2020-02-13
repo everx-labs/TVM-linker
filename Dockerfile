@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1.0.0-experimental
 
-ARG RUST_IMAGE=rust:1.41
-ARG TON_TYPES_IMAGE=tonlabs/ton-types:latest
-ARG TON_BLOCK_IMAGE=tonlabs/ton-block:latest
-ARG TON_VM_IMAGE=tonlabs/ton-vm:latest
+ARG RUST_IMAGE=rust:latest
+ARG TON_TYPES_IMAGE=tonlabs/ton-labs-types:latest
+ARG TON_BLOCK_IMAGE=tonlabs/ton-labs-block:latest
+ARG TON_VM_IMAGE=tonlabs/ton-labs-vm:latest
 ARG TON_LABS_ABI_IMAGE=tonlabs/ton-labs-abi:latest
 ARG TVM_LINKER_SRC_IMAGE=tonlabs/tvm_linker:src-latest
 
@@ -23,11 +23,11 @@ FROM alpine as linker-src
 RUN addgroup --gid 1000 jenkins && \
     adduser -D -G jenkins jenkins && \
     apk add zip
-COPY --from=ton-types-src    --chown=jenkins:jenkins /tonlabs/ton-types    /tonlabs/ton-types
-COPY --from=ton-block-src    --chown=jenkins:jenkins /tonlabs/ton-block    /tonlabs/ton-block
-COPY --from=ton-vm-src       --chown=jenkins:jenkins /tonlabs/ton-vm       /tonlabs/ton-vm
-COPY --from=ton-labs-abi-src --chown=jenkins:jenkins /tonlabs/ton-labs-abi /tonlabs/ton-labs-abi
-COPY --from=tvm-linker-src2  --chown=jenkins:jenkins /tonlabs/tvm_linker   /tonlabs/tvm_linker
+COPY --from=ton-types-src    --chown=jenkins:jenkins /tonlabs/ton-labs-types /tonlabs/ton-labs-types
+COPY --from=ton-block-src    --chown=jenkins:jenkins /tonlabs/ton-labs-block /tonlabs/ton-labs-block
+COPY --from=ton-vm-src       --chown=jenkins:jenkins /tonlabs/ton-labs-vm    /tonlabs/ton-labs-vm
+COPY --from=ton-labs-abi-src --chown=jenkins:jenkins /tonlabs/ton-labs-abi   /tonlabs/ton-labs-abi
+COPY --from=tvm-linker-src2  --chown=jenkins:jenkins /tonlabs/tvm_linker     /tonlabs/tvm_linker
 WORKDIR /tonlabs
 VOLUME [ "/tonlabs" ]
 

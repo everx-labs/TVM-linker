@@ -1,6 +1,5 @@
 @Library('infrastructure-jenkins-shared-library@master')_
 
-G_rust_image = "rust:1.40"
 G_gitcred = "LaninSSHgit"
 G_docker_creds = 'dockerhubLanin'
 G_promoted_branch = 'origin/master'
@@ -18,19 +17,19 @@ pipeline {
             name : 'FORCE_PROMOTE_LATEST'
         )
         string(
-            name:'dockerImage_ton_types',
-            defaultValue: 'tonlabs/ton-types:latest',
-            description: 'Existing ton-types image name'
+            name:'dockerImage_ton_labs_types',
+            defaultValue: 'tonlabs/ton-labs-types:latest',
+            description: 'Existing ton-labs-types image name'
         )
         string(
-            name:'dockerImage_ton_block',
-            defaultValue: 'tonlabs/ton-block:latest',
-            description: 'Existing ton-block image name'
+            name:'dockerImage_ton_labs_block',
+            defaultValue: 'tonlabs/ton-labs-block:latest',
+            description: 'Existing ton-labs-block image name'
         )
         string(
-            name:'dockerImage_ton_vm',
-            defaultValue: 'tonlabs/ton-vm:latest',
-            description: 'Existing ton-vm image name'
+            name:'dockerImage_ton_labs_vm',
+            defaultValue: 'tonlabs/ton-labs-vm:latest',
+            description: 'Existing ton-labs-vm image name'
         )
         string(
             name:'dockerImage_ton_labs_abi',
@@ -40,7 +39,7 @@ pipeline {
         string(
             name:'dockerImage_tvm_linker',
             defaultValue: '',
-            description: 'Expected ton-executor image name'
+            description: 'Expected tvm-linker image name'
         )
         string(
             name:'ton_sdk_branch',
@@ -63,10 +62,10 @@ pipeline {
                 script {
                     sh """
 (cat tvm_linker/Cargo.toml | \
-sed 's/ton_types = .*/ton_types = { path = \"\\/tonlabs\\/ton-types\" }/g' | \
-sed 's/ton_block = .*/ton_block = { path = \"\\/tonlabs\\/ton-block\" }/g' | \
+sed 's/ton_types = .*/ton_types = { path = \"\\/tonlabs\\/ton-labs-types\" }/g' | \
+sed 's/ton_block = .*/ton_block = { path = \"\\/tonlabs\\/ton-labs-block\" }/g' | \
 sed 's/ton_abi = .*/ton_abi = { path = \"\\/tonlabs\\/ton-labs-abi\" }/g' | \
-sed 's/ton_vm = .*/ton_vm = { path = \"\\/tonlabs\\/ton-vm\", default-features = false }/g') > ./tvm_linker/tmp.toml
+sed 's/ton_vm = .*/ton_vm = { path = \"\\/tonlabs\\/ton-labs-vm\", default-features = false }/g') > ./tvm_linker/tmp.toml
 rm ./tvm_linker/Cargo.toml
 mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                     """
@@ -95,9 +94,9 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
             agent {
                 dockerfile {
                     additionalBuildArgs "--target linker-src " + 
-                                        "--build-arg \"TON_TYPES_IMAGE=${params.dockerImage_ton_types}\" " +
-                                        "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_block}\" " + 
-                                        "--build-arg \"TON_VM_IMAGE=${params.dockerImage_ton_vm}\" " + 
+                                        "--build-arg \"TON_TYPES_IMAGE=${params.dockerImage_ton_labs_types}\" " +
+                                        "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_labs_block}\" " + 
+                                        "--build-arg \"TON_VM_IMAGE=${params.dockerImage_ton_labs_vm}\" " + 
                                         "--build-arg \"TON_LABS_ABI_IMAGE=${params.dockerImage_ton_labs_abi}\" " + 
                                         "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\""
                 }
@@ -125,10 +124,10 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                                         app_image = docker.build(
                                             "${G_docker_pub_image}",
                                             "--label \"git-commit=\${GIT_COMMIT}\" --ssh default " + 
-                                            "--build-arg \"RUST_IMAGE=${G_rust_image}\" " + 
-                                            "--build-arg \"TON_TYPES_IMAGE=${params.dockerImage_ton_types}\" " +
-                                            "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_block}\" " + 
-                                            "--build-arg \"TON_VM_IMAGE=${params.dockerImage_ton_vm}\" " + 
+                                            "--build-arg \"RUST_IMAGE=${"rust:latest"}\" " + 
+                                            "--build-arg \"TON_TYPES_IMAGE=${params.dockerImage_ton_labs_types}\" " +
+                                            "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_labs_block}\" " + 
+                                            "--build-arg \"TON_VM_IMAGE=${params.dockerImage_ton_labs_vm}\" " + 
                                             "--build-arg \"TON_LABS_ABI_IMAGE=${params.dockerImage_ton_labs_abi}\" " + 
                                             "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\" " +
                                             "."
@@ -146,9 +145,9 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                     agent {
                         dockerfile {
                             additionalBuildArgs "--target build-ton-compiler " + 
-                                        "--build-arg \"TON_TYPES_IMAGE=${params.dockerImage_ton_types}\" " +
-                                        "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_block}\" " + 
-                                        "--build-arg \"TON_VM_IMAGE=${params.dockerImage_ton_vm}\" " + 
+                                        "--build-arg \"TON_TYPES_IMAGE=${params.dockerImage_ton_labs_types}\" " +
+                                        "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_labs_block}\" " + 
+                                        "--build-arg \"TON_VM_IMAGE=${params.dockerImage_ton_labs_vm}\" " + 
                                         "--build-arg \"TON_LABS_ABI_IMAGE=${params.dockerImage_ton_labs_abi}\" " + 
                                         "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\""
                         }
@@ -195,8 +194,8 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                             unstash 'linker-src'
                             sh """
                                 unzip linker-src.zip
-                                node pathFix.js tonlabs/ton-block/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
-                                node pathFix.js tonlabs/ton-vm/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
+                                node pathFix.js tonlabs/ton-labs-block/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
+                                node pathFix.js tonlabs/ton-labs-vm/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
                                 node pathFix.js tonlabs/ton-labs-abi/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
                                 node pathFix.js tonlabs/tvm_linker/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
                             """
@@ -245,8 +244,8 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                             unstash 'linker-src'
                             bat """
                                 unzip linker-src.zip
-                                node pathFix.js tonlabs\\ton-block\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
-                                node pathFix.js tonlabs\\ton-vm\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
+                                node pathFix.js tonlabs\\ton-labs-block\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
+                                node pathFix.js tonlabs\\ton-labs-vm\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
                                 node pathFix.js tonlabs\\ton-labs-abi\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
                                 node pathFix.js tonlabs\\tvm_linker\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
                             """
