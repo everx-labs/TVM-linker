@@ -254,13 +254,16 @@ mod tests {
     #[test]
     fn test_msg_print() {
         let msg = create_external_inbound_msg(
-            &[0x11; 32].into(), 
+            MsgAddressExt::with_extern(
+                BuilderData::with_raw(vec![0x55; 8], 64).unwrap().into()
+            ).unwrap(),
+            MsgAddressInt::with_standart(None, 0, [0x11; 32].into()).unwrap(),
             Some(create_inbound_body(10, 20, 0x11223344).into()),
         );
 
         let msg2 = create_internal_msg(
-            [0x11; 32].into(),
-            [0x22; 32].into(),
+            MsgAddressInt::with_standart(None, 0, [0x11; 32].into()).unwrap(),
+            MsgAddressInt::with_standart(None, 0, [0x22; 32].into()).unwrap(),
             12345678,
             1,
             2,
