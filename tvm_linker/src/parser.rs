@@ -21,7 +21,7 @@ use ton_types::{BuilderData, IBitstring, SliceData, Cell};
 use ton_types::dictionary::{HashmapE, HashmapType};
 use ton_vm::stack::integer::{IntegerData, serialization::{Encoding, SignedIntegerBigEndianEncoding}};
 use ton_vm::stack::serialization::Serializer;
-
+use std::sync::Arc;
 
 pub type Ptr = i64;
 
@@ -871,7 +871,7 @@ mod tests {
         let source = File::open("./tests/test.tvm").unwrap();
         assert_eq!(parser.parse(source, vec![], None), Ok(()));  
         let mut data_dict = BuilderData::new();
-        data_dict.append_bit_one().unwrap().checked_append_reference(&parser.data().unwrap()).unwrap();
+        data_dict.append_bit_one().unwrap().checked_append_reference(parser.data().unwrap()).unwrap();
 
         let code = compile_code(&format!("
         ;s0 - persistent data dictionary

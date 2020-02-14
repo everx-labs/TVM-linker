@@ -350,7 +350,8 @@ def testWallet():
 	linker_options = "--sign key1 --decode-c6"
 	compile2('Wallet', 'tests')
 	expect_success2("Wallet", "constructor", '{}', None, linker_options)
-	expect_success2("Wallet", "sendTransaction", '{"dest":"0:11","value":"1000000000","bounce":"true"}', None, linker_options)
+	dest = '11' * 32
+	expect_success2("Wallet", "sendTransaction", '{"dest":"0:' + dest + '","value":"1000000000","bounce":"true"}', None, linker_options)
 
 #testOld()
 testArrays()
