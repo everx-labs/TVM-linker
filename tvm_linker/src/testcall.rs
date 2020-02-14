@@ -38,20 +38,20 @@ fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Cell {
     builder.into()
 }
 
-fn create_external_inbound_msg(dst_addr: &AccountId, body: Option<SliceData>) -> Message {
+fn create_external_inbound_msg(src_addr: MsgAddressExt, dst_addr: MsgAddressInt, body: Option<SliceData>) -> Message {
     let mut hdr = ExternalInboundMessageHeader::default();
-    hdr.dst = MsgAddressInt::with_standart(None, -1, dst_addr.clone()).unwrap();
-    hdr.src = MsgAddressExt::with_extern(BuilderData::with_raw(vec![0x55; 8], 64).unwrap().into()).unwrap();
+    hdr.dst = dst_addr;
+    hdr.src = src_addr;
     hdr.import_fee = Grams(0x1234u32.into());
     let mut msg = Message::with_ext_in_header(hdr);
     *msg.body_mut() = body;
     msg
 }
 
-fn create_internal_msg(src_addr: AccountId, dst_addr: AccountId, value: u64, lt: u64, at: u32, body: Option<SliceData>) -> Message {
+fn create_internal_msg(src_addr: MsgAddressInt, dst_addr: MsgAddressInt, value: u64, lt: u64, at: u32, body: Option<SliceData>) -> Message {
     let mut hdr = InternalMessageHeader::with_addresses(
-        MsgAddressInt::with_standart(None, 0, src_addr).unwrap(),
-        MsgAddressInt::with_standart(None, 0, dst_addr).unwrap(),
+        src_addr,
+        dst_addr,
         CurrencyCollection::with_grams(value),
     );
     hdr.bounce = true;
@@ -97,7 +97,7 @@ fn init_logger(debug: bool) {
 
 
 
-pub fn perform_contract_call(
+pub fn perform_contract_call<F>(
     contract_file: &str, 
     body: Option<SliceData>, 
     key_file: Option<Option<&str>>, 
@@ -105,44 +105,57 @@ pub fn perform_contract_call(
     decode_actions: bool,
     msg_value: Option<&str>,
     ticktock: Option<&str>,
-) -> i32 {
+    src_str: Option<&str>,
+    decoder: F,
+) -> i32
+    where F: Fn(SliceData, bool) -> ()
+{
     let addr = AccountId::from_str(contract_file).unwrap();
     let mut state_init = load_from_file(&format!("{}.tvc", contract_file));
     
     let mut stack = Stack::new();
-    let func_selector = if msg_value.is_some() {
-        0 
-    } else {
-        if ticktock.is_some() {
-            -2
-        } else {
-            -1
-        }
+    let func_selector = match msg_value {
+        Some(_) => 0,    
+        None => if ticktock.is_some() { -2 } else { -1 },
     };
         
-    let value = if func_selector == 0 { 
-        u64::from_str_radix(msg_value.unwrap(), 10).unwrap()
-    } else {
-        0
-    };
+    let mut value = 0;
+    if func_selector == 0 { 
+        value = u64::from_str_radix(msg_value.unwrap(), 10).unwrap_or(0);
+    }
 
     let msg = 
-        if func_selector == 0 {
-            Some(create_internal_msg(
-                [0u8; 32].into(),
-                addr.clone(), 
-                value,
-                1,
-                SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32,
-                body.clone()
-            ))
-        } else if func_selector == -1 {
-            Some(create_external_inbound_msg(
-                &addr, 
-                body.clone(),
-            ))
-        } else {
-            None
+        match func_selector {
+            0 => {
+                let src = match src_str {
+                    Some(s) => MsgAddressInt::from_str(s).unwrap(),
+                    None => MsgAddressInt::with_standart(None, 0, [0u8; 32].into()).unwrap(),
+                };
+                Some(create_internal_msg(
+                    src,
+                    MsgAddressInt::with_standart(None, 0, addr.clone()).unwrap(),
+                    value,
+                    1,
+                    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32,
+                    body.clone()
+                ))
+            },
+            -1 => {
+                let src = match src_str {
+                    Some(s) => MsgAddressExt::from_str(s).unwrap(),
+                    None => {
+                        MsgAddressExt::with_extern(
+                            BuilderData::with_raw(vec![0x55; 8], 64).unwrap().into()
+                        ).unwrap()
+                    },
+                };
+                Some(create_external_inbound_msg(
+                    src,
+                    MsgAddressInt::with_standart(None, 0, addr.clone()).unwrap(), 
+                    body.clone(),
+                ))
+            },
+            _ => None,
         };
     
     if !log_enabled!(Error) {
@@ -216,17 +229,17 @@ pub fn perform_contract_call(
         println!("Contract persistent data updated");
     }
     
-    
     if decode_actions {
         if let StackItem::Cell(cell) = engine.get_actions() {
-            let actions: OutActions = OutActions::construct_from(&mut cell.into()).expect("Failed to decode output actions");
+            let actions: OutActions = OutActions::construct_from(&mut cell.into())
+                .expect("Failed to decode output actions");
             println!("Output actions:\n----------------");
             for act in actions {
-                match act {
-                    OutAction::SendMsg{mode: _, out_msg } => {
-                        println!("Action(SendMsg):\n{}", MsgPrinter{ msg: out_msg });
-                    },
-                    _ => (),
+                if let OutAction::SendMsg{mode: _, out_msg } = act {
+                    println!("Action(SendMsg):\n{}", MsgPrinter{ msg: out_msg.clone() });
+                    if let Some(b) = out_msg.body() {
+                        decoder(b, out_msg.is_internal());
+                    }
                 }
             }
         }
