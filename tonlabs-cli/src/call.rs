@@ -11,6 +11,10 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
+use std::thread;
+use std::time::Duration;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use crate::config::Config;
 use crate::helpers::read_keys;
 use ton_client_rs::{TonClient, TonAddress};
@@ -37,20 +41,58 @@ pub fn call_contract(
     
     let ton_addr = TonAddress::from_str(addr)
         .map_err(|e| format!("failed to parse address: {}", e.to_string()))?;
+
+
+    let method_val = method.to_owned();
+    let params_val = params.to_owned();
+
+    let atomic = Arc::new(AtomicBool::new(false));
+    let atomic_clone = atomic.clone();
     
-    let result = if local {
+    let thrd = if local {
         println!("Running get-method...");
-        ton.contracts.run_local(&ton_addr, None, &abi, method, params.into(), None)
-            .map_err(|e| format!("run failed: {}", e.to_string()))?
+        thread::spawn(move || {
+            thread::sleep(Duration::from_secs(500));
+            let result =
+                ton.contracts.run_local(&ton_addr, None, &abi, &method_val, params_val.into(), None)
+                        .map_err(|e| format!("run failed: {}", e.to_string()));
+            atomic_clone.store(true, Ordering::SeqCst);
+            result
+        })
     } else {
         println!("Waiting...");
-        ton.contracts.run(&ton_addr, &abi, method, params.into(), keys.as_ref())
-            .map_err(|e| format!("transaction failed: {}", e.to_string()))?
+        thread::spawn(move || {
+            thread::sleep(Duration::from_secs(500));
+            let result =
+                ton.contracts.run(&ton_addr, &abi, &method_val, params_val.into(), keys.as_ref())
+                    .map_err(|e| format!("transaction failed: {}", e.to_string()));
+            atomic_clone.store(true, Ordering::SeqCst);
+            result
+        })
     };
 
-    println!("Succeded.");
-    if !result.is_null() {
-        println!("Result = {}", result);
+    let mut success = false;
+    for x in 0..60 {
+        thread::sleep(Duration::from_millis(500));
+        if atomic.load(Ordering::SeqCst) {
+            success = true;
+            break;
+        }
+    }
+
+    if success {
+        let result = thrd.join().unwrap();
+        match result {
+            Ok(val) => {
+              println!("Succeded.");
+              if !val.is_null() {
+                   println!("Result = {}", val);
+              }
+            },
+            Err(estr) => { println!("Error: {}", estr); }
+        };
+    } else {
+        println!("Error: run out of time while waiting for a call result");
     }
     Ok(())
 }
