@@ -41,7 +41,7 @@ mod resolver;
 mod methdict;
 mod testcall;
 
-use abi::build_abi_body;
+use abi::{build_abi_body, decode_body};
 use clap::ArgMatches;
 use keyman::KeypairManager;
 use parser::ParseEngine;
@@ -107,6 +107,7 @@ fn linker_main() -> Result<(), String> {
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
             (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
             (@arg INTERNAL: --internal +takes_value "Emulates inbound internal message with value instead of external message")
+            (@arg SRCADDR: --src + takes_value "Supplies message source address")
             (@arg TICKTOCK: --ticktock +takes_value conflicts_with[BODY] "Emulates ticktock transaction in masterchain, 0 for tick and -1 for tock")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
@@ -206,6 +207,16 @@ fn linker_main() -> Result<(), String> {
             test_matches.is_present("DECODEC6"),
             test_matches.value_of("INTERNAL"),
             test_matches.value_of("TICKTOCK"),
+            test_matches.value_of("SRCADDR"),
+            |body, is_int| {
+                let abi_file = test_matches.value_of("ABI_JSON");
+                let method = test_matches.value_of("ABI_METHOD");
+                if abi_file.is_some() && method.is_some() {
+                    let result = decode_body(abi_file.unwrap(), method.unwrap(), body, is_int)
+                        .unwrap_or_default();
+                    println!("{}", result);
+                }
+            }
         );
         println!("TEST COMPLETED");
         return Ok(());
