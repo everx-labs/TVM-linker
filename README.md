@@ -93,7 +93,9 @@ Use `--trace` flag to trace VM execution: stack, registers and gas will be print
 
 Use `--decode-c6` to see output actions in user friendly format.
 
-Use `--internal` to send internal message to the contract with defined nanograms in `value`.
+Use `--internal` to send internal message to the contract with defined nanograms in `value`. By default, source address in internal message in zero address (`0000...0000`), to define another address use option `--src <address>`, where address should be in the format <wc>:<bytes32> (i.e. "0:1122...AABB"). 
+
+Example: `--internal 100000 --src "0:6011b66a47238cf992f1033fe6aff00ce0f850df387ee92468d9c26b5564ba53"`
 
 An ABI body can be generated if `abi-params`, `abi-json` and `abi-method` will be used instead of `--body XXXX...`.
 
