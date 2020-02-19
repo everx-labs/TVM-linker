@@ -23,6 +23,7 @@ pub fn build_abi_body(
     abi_file: &str,
     method: &str,
     params: &str,
+    header: Option<&str>,
     keypair: Option<Keypair>,
     internal: bool,
 ) -> Result<BuilderData, String> {
@@ -33,6 +34,7 @@ pub fn build_abi_body(
     encode_function_call(
         abi_json,
         method.to_owned(),
+        header.map(|v| v.to_owned()),
         params.to_owned(),
         internal,
         keypair.as_ref(),
