@@ -75,7 +75,7 @@ while(args.length > 0) {
             fs.writeFileSync(path.join(cwd, 'version.json'), JSON.stringify(lastVersion));
             process.exit(0);
         } else {
-            throw new Error('Unable to set candidate as release');
+            throw new Error(`Unable to set candidate as release\n${JSON.stringify(lastVersion)}`);
         }
     case '--decline':
             lastVersion.candidate='';

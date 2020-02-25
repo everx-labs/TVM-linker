@@ -433,9 +433,11 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
             notifyTeam(
                 buildstatus: G_buildstatus
             )
+        }
+        cleanup {
             script {
                 cleanWs notFailBuild: true
-            } 
+            }
         }
     }
 }
