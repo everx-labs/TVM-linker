@@ -7,10 +7,15 @@ G_buildstatus = 'NotSet'
 G_teststatus = 'NotSet'
 G_docker_src_image = null
 G_docker_pub_image = null
+G_binversion = "NotSet"
 
 pipeline {
     parameters {
-
+        string(
+            name:'common_version',
+            defaultValue: '',
+            description: 'Common version'
+        )
         booleanParam (
             defaultValue: false,
             description: 'Promote image built to be used as latest',
@@ -357,6 +362,18 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                         }
                         s3Delete bucket: 'sdkbinaries.tonlabs.io', path: 'tmp_linker/'
                     }
+
+                    def cause = "${currentBuild.getBuildCauses()}"
+                    echo "${cause}"
+                    if(!cause.matches('upstream')) {
+                        sh "node tonVersion.js --release"
+                        withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                            identity = awsIdentity()
+                            s3Upload \
+                                bucket: 'sdkbinaries.tonlabs.io', \
+                                includePathPattern:'version.json', workingDir:'.'
+                        }
+                    }
                 }
             }
         }
@@ -367,10 +384,24 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                         identity = awsIdentity()
                         s3Delete bucket: 'sdkbinaries.tonlabs.io', path: 'tmp_linker/'
                     }
+                    def cause = "${currentBuild.getBuildCauses()}"
+                    echo "${cause}"
+                    if(!cause.matches('upstream')) {
+                        sh "node tonVersion.js --decline"
+                        withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                            identity = awsIdentity()
+                            s3Upload \
+                                bucket: 'sdkbinaries.tonlabs.io', \
+                                includePathPattern:'version.json', workingDir:'.'
+                        }
+                    }
                 }
             }
         }
         always {
+            script {
+                cleanWs notFailBuild: true
+            }
             notifyTeam(
                 buildstatus: G_buildstatus
             ) 
