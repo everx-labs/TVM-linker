@@ -430,12 +430,12 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
             }
         }
         always {
-            script {
-                cleanWs notFailBuild: true
-            }
             notifyTeam(
                 buildstatus: G_buildstatus
-            ) 
+            )
+            script {
+                cleanWs notFailBuild: true
+            } 
         }
     }
 }
