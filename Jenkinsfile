@@ -62,6 +62,31 @@ pipeline {
         parallelsAlwaysFailFast()
     }
     stages {
+        stage('Versioning') {
+            steps {
+                script {
+                    withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                        identity = awsIdentity()
+                        s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
+                    }
+                    def folders = "./tvm_linker"
+                    if(params.common_version) {
+                        G_binversion = sh (script: "node tonVersion.js --set ${params.common_version} ${folders}", returnStdout: true).trim()
+                    } else {
+                        G_binversion = sh (script: "node tonVersion.js ${folders}", returnStdout: true).trim()
+                    }
+
+
+                    withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                        identity = awsIdentity()
+                        s3Upload \
+                            bucket: 'sdkbinaries.tonlabs.io', \
+                            includePathPattern:'version.json', path: '', \
+                            workingDir:'.'
+                    }
+                }
+            }
+        }
         stage('Switch to file source') {
             steps {
                 script {
