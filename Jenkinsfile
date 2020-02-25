@@ -390,6 +390,10 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
 
                     def cause = "${currentBuild.getBuildCauses()}"
                     echo "${cause}"
+                    withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                        identity = awsIdentity()
+                        s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
+                    }
                     if(!cause.matches('upstream')) {
                         sh "node tonVersion.js --release"
                         withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
@@ -411,6 +415,10 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                     }
                     def cause = "${currentBuild.getBuildCauses()}"
                     echo "${cause}"
+                    withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                        identity = awsIdentity()
+                        s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
+                    }
                     if(!cause.matches('upstream')) {
                         sh "node tonVersion.js --decline"
                         withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
