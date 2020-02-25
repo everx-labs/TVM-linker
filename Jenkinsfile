@@ -383,18 +383,16 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                         list = s3FindFiles(bucket: 'sdkbinaries.tonlabs.io', path: 'tmp_linker/', glob: '*')
                         for (def file : list) {
                             s3Copy fromBucket: 'sdkbinaries.tonlabs.io', fromPath: "tmp_linker/${file.path}", toBucket: 'sdkbinaries.tonlabs.io', toPath: "${file.path}"
-                        
                         }
                         s3Delete bucket: 'sdkbinaries.tonlabs.io', path: 'tmp_linker/'
                     }
-
                     def cause = "${currentBuild.getBuildCauses()}"
                     echo "${cause}"
-                    withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
-                        identity = awsIdentity()
-                        s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
-                    }
                     if(!cause.matches('upstream')) {
+                        withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                            identity = awsIdentity()
+                            s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
+                        }
                         sh "node tonVersion.js --release"
                         withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                             identity = awsIdentity()
@@ -415,11 +413,11 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                     }
                     def cause = "${currentBuild.getBuildCauses()}"
                     echo "${cause}"
-                    withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
-                        identity = awsIdentity()
-                        s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
-                    }
                     if(!cause.matches('upstream')) {
+                        withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                            identity = awsIdentity()
+                            s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
+                        }
                         sh "node tonVersion.js --decline"
                         withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                             identity = awsIdentity()
