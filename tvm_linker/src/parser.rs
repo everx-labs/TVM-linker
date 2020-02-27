@@ -21,7 +21,6 @@ use ton_types::{BuilderData, IBitstring, SliceData, Cell};
 use ton_types::dictionary::{HashmapE, HashmapType};
 use ton_vm::stack::integer::{IntegerData, serialization::{Encoding, SignedIntegerBigEndianEncoding}};
 use ton_vm::stack::serialization::Serializer;
-use std::sync::Arc;
 
 pub type Ptr = i64;
 
@@ -864,6 +863,7 @@ mod tests {
     use ton_vm::executor::Engine;
     use ton_vm::assembler::compile_code;
     use ton_vm::stack::{Stack, StackItem};
+    use std::sync::Arc;
 
     #[test]
     fn test_parser_testlib() {
