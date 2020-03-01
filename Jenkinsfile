@@ -393,7 +393,16 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                             identity = awsIdentity()
                             s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
                         }
-                        sh "node tonVersion.js --release"
+                        sh """
+                            echo const fs = require\\(\\'fs\\'\\)\\; > release.js
+                            echo const ver = JSON.parse\\(fs.readFileSync\\(\\'version.json\\'\\, \\'utf8\\'\\)\\)\\; >> release.js
+                            echo if\\(!ver.release\\) { throw new Error\\(\\'Empty release field\\'\\); } >> release.js
+                            echo if\\(ver.candidate\\) { ver.release = ver.candidate\\; ver.candidate = \\'\\'\\; } >> release.js
+                            echo fs.writeFileSync\\(\\'version.json\\', JSON.stringify\\(ver\\)\\)\\; >> release.js
+                            cat release.js
+                            cat version.json
+                            node release.js
+                        """
                         withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                             identity = awsIdentity()
                             s3Upload \
@@ -418,7 +427,16 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                             identity = awsIdentity()
                             s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
                         }
-                        sh "node tonVersion.js --decline"
+                        sh """
+                            echo const fs = require\\(\\'fs\\'\\)\\; > decline.js
+                            echo const ver = JSON.parse\\(fs.readFileSync\\(\\'version.json\\'\\, \\'utf8\\'\\)\\)\\; >> decline.js
+                            echo if\\(!ver.release\\) { throw new Error\\(\\'Unable to set decline version\\'\\)\\; } >> decline.js
+                            echo ver.candidate = \\'\\'\\; >> decline.js
+                            echo fs.writeFileSync\\(\\'version.json\\', JSON.stringify\\(ver\\)\\)\\; >> decline.js
+                            cat decline.js
+                            cat version.json
+                            node decline.js
+                        """
                         withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                             identity = awsIdentity()
                             s3Upload \
