@@ -11,18 +11,19 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
-use abi_json::json_abi::encode_function_call;
+use abi_json::json_abi::{encode_function_call, decode_function_response};
 use abi_json::Contract;
 use ed25519_dalek::Keypair;
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io::Read;
-use ton_types::BuilderData;
+use ton_types::{BuilderData, SliceData};
 
 pub fn build_abi_body(
     abi_file: &str,
     method: &str,
     params: &str,
+    header: Option<&str>,
     keypair: Option<Keypair>,
     internal: bool,
 ) -> Result<BuilderData, String> {
@@ -33,10 +34,28 @@ pub fn build_abi_body(
     encode_function_call(
         abi_json,
         method.to_owned(),
+        header.map(|v| v.to_owned()),
         params.to_owned(),
         internal,
         keypair.as_ref(),
     ).map_err(|e| format!("cannot encode abi body: {:?}", e))
+}
+
+pub fn decode_body(
+    abi_file: &str,
+    method: &str,
+    body: SliceData,
+    internal: bool,
+) -> Result<String, String> {
+    let mut abi_json = String::new();
+    let mut file = File::open(abi_file).map_err(|e| format!("cannot open abi file: {}", e))?;
+    file.read_to_string(&mut abi_json).map_err(|e| format!("failed to read abi file: {}", e))?;    
+    decode_function_response(
+        abi_json,   
+        method.to_owned(),
+        body,
+        internal,
+    ).map_err(|e| format!("cannot decode abi body: {:?}", e))
 }
 
 pub fn gen_abi_id(mut abi: Option<Contract>, func_name: &str) -> u32 {

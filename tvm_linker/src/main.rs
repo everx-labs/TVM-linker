@@ -41,7 +41,7 @@ mod resolver;
 mod methdict;
 mod testcall;
 
-use abi::build_abi_body;
+use abi::{build_abi_body, decode_body};
 use clap::ArgMatches;
 use keyman::KeypairManager;
 use parser::ParseEngine;
@@ -107,11 +107,13 @@ fn linker_main() -> Result<(), String> {
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
             (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
             (@arg INTERNAL: --internal +takes_value "Emulates inbound internal message with value instead of external message")
+            (@arg SRCADDR: --src + takes_value "Supplies message source address")
             (@arg TICKTOCK: --ticktock +takes_value conflicts_with[BODY] "Emulates ticktock transaction in masterchain, 0 for tick and -1 for tock")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[BODY] "Supplies the name of the calling contract method")
             (@arg ABI_PARAMS: -p --("abi-params") +takes_value conflicts_with[BODY] "Supplies ABI arguments for the contract method")
+            (@arg ABI_HEADER: -h --("abi-header") +takes_value conflicts_with[BODY] conflicts_with[INTERNAL] "Supplies ABI header")
         )
         (@subcommand message =>
             (@setting AllowNegativeNumbers)
@@ -124,91 +126,16 @@ fn linker_main() -> Result<(), String> {
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[DATA] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[DATA] "Supplies the name of the calling contract method")
             (@arg ABI_PARAMS: -p --("abi-params") +takes_value conflicts_with[DATA] "Supplies ABI arguments for the contract method")
+            (@arg ABI_HEADER: -h --("abi-header") +takes_value conflicts_with[DATA] "Supplies ABI header")
             (@arg SIGN: --setkey +takes_value "Loads existing keypair from the file")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name")
         )
         (@setting SubcommandRequired)
     ).get_matches();
 
-    //helper closure for building ABI body
-    let build_body = |matches: &ArgMatches| {
-        let mut mask = 0u8;
-        let abi_file = matches.value_of("ABI_JSON").map(|m| {mask |= 1; m });
-        let method_name = matches.value_of("ABI_METHOD").map(|m| {mask |= 2; m });
-        let params = matches.value_of("ABI_PARAMS").map(|m| {mask |= 4; m });
-        if mask == 0x7 {
-            let key_file = matches.value_of("SIGN").map(|path| {
-                let pair = KeypairManager::from_secret_file(path);
-                pair.drain()
-            });
-            let is_internal = matches.is_present("INTERNAL");            
-            let body: SliceData = build_abi_body(
-                abi_file.unwrap(), 
-                method_name.unwrap(), 
-                params.unwrap(), 
-                key_file,
-                is_internal
-            )?.into();            
-            Ok(Some(body))
-        } else if mask == 0 {
-            Ok(None)
-        } else {
-            Err("All ABI parameters must be supplied: ABI_JSON, ABI_METHOD, ABI_PARAMS".to_string())
-        }
-    };
-
     //SUBCOMMAND TEST
     if let Some(test_matches) = matches.subcommand_matches("test") {
-        let (body, sign) = match test_matches.value_of("BODY") {
-            Some(hex_str) => {
-                let mut hex_str = hex_str.to_string();
-                let mut parser = ParseEngine::new();
-
-                if let Some(source) = test_matches.value_of("SOURCE") {
-                    let file = File::open(source)
-                        .map_err(|e| format!("cannot opening source file: {}", e))?;
-                    let mut reader = BufReader::new(file);
-                    parser.parse_code(&mut reader, true)?;
-                }
-
-                hex_str = resolve_name(&hex_str, |name| {
-                    parser.global_by_name(name).map(|id| id.0)
-                })
-                .map_err(|e| format!("failed to resolve body {}: {}", hex_str, e))?;
-
-                let buf = hex::decode(&hex_str)
-                    .map_err(|_| format!("body {} is invalid hex string", hex_str))?;
-                let buf_bits = buf.len() * 8;
-                let body: SliceData = BuilderData::with_raw(buf, buf_bits)
-                    .map_err(|e| format!("failed to pack body in cell: {}", e))?
-                    .into();
-                (Some(body), Some(test_matches.value_of("SIGN")))
-            },
-            None => (build_body(test_matches)?, None),
-        };
-
-        let ticktock = test_matches.value_of("TICKTOCK");
-        if ticktock.is_some() {
-            //check for correct value of ticktock argument
-            let error_msg = "invalid ticktock value: enter 0 for tick and -1 for tock.".to_string();
-            let val = i8::from_str_radix(ticktock.unwrap(), 10).map_err(|_| error_msg.clone())?;
-            if val != 0 && val != -1 {
-                Err(error_msg)?;
-            }
-        }
-        
-        println!("TEST STARTED\nbody = {:?}", body);
-        perform_contract_call(
-            test_matches.value_of("INPUT").unwrap(), 
-            body, 
-            sign, 
-            test_matches.is_present("TRACE"), 
-            test_matches.is_present("DECODEC6"),
-            test_matches.value_of("INTERNAL"),
-            test_matches.value_of("TICKTOCK"),
-        );
-        println!("TEST COMPLETED");
-        return Ok(());
+        return run_test_subcmd(test_matches);
     }
 
     //SUBCOMMAND DECODE
@@ -310,4 +237,95 @@ fn linker_main() -> Result<(), String> {
     }
 
     unreachable!()
+}
+
+fn run_test_subcmd(test_matches: &ArgMatches) -> Result<(), String> {
+    let (body, sign) = match test_matches.value_of("BODY") {
+        Some(hex_str) => {
+            let mut hex_str = hex_str.to_string();
+            let mut parser = ParseEngine::new();
+
+            if let Some(source) = test_matches.value_of("SOURCE") {
+                let file = File::open(source)
+                    .map_err(|e| format!("cannot opening source file: {}", e))?;
+                let mut reader = BufReader::new(file);
+                parser.parse_code(&mut reader, true)?;
+            }
+
+            hex_str = resolve_name(&hex_str, |name| {
+                parser.global_by_name(name).map(|id| id.0)
+            })
+            .map_err(|e| format!("failed to resolve body {}: {}", hex_str, e))?;
+
+            let buf = hex::decode(&hex_str)
+                .map_err(|_| format!("body {} is invalid hex string", hex_str))?;
+            let buf_bits = buf.len() * 8;
+            let body: SliceData = BuilderData::with_raw(buf, buf_bits)
+                .map_err(|e| format!("failed to pack body in cell: {}", e))?
+                .into();
+            (Some(body), Some(test_matches.value_of("SIGN")))
+        },
+        None => (build_body(test_matches)?, None),
+    };
+
+    let ticktock = test_matches.value_of("TICKTOCK");
+    if ticktock.is_some() {
+        //check for correct value of ticktock argument
+        let error_msg = "invalid ticktock value: enter 0 for tick and -1 for tock.".to_string();
+        let val = i8::from_str_radix(ticktock.unwrap(), 10).map_err(|_| error_msg.clone())?;
+        if val != 0 && val != -1 {
+            Err(error_msg)?;
+        }
+    }
+    
+    println!("TEST STARTED\nbody = {:?}", body);
+    perform_contract_call(
+        test_matches.value_of("INPUT").unwrap(), 
+        body, 
+        sign, 
+        test_matches.is_present("TRACE"), 
+        test_matches.is_present("DECODEC6"),
+        test_matches.value_of("INTERNAL"),
+        test_matches.value_of("TICKTOCK"),
+        test_matches.value_of("SRCADDR"),
+        |body, is_int| {
+            let abi_file = test_matches.value_of("ABI_JSON");
+            let method = test_matches.value_of("ABI_METHOD");
+            if abi_file.is_some() && method.is_some() {
+                let result = decode_body(abi_file.unwrap(), method.unwrap(), body, is_int)
+                    .unwrap_or_default();
+                println!("{}", result);
+            }
+        }
+    );
+    println!("TEST COMPLETED");
+    return Ok(());
+}
+
+fn build_body(matches: &ArgMatches) -> Result<Option<SliceData>, String> {
+    let mut mask = 0u8;
+    let abi_file = matches.value_of("ABI_JSON").map(|m| {mask |= 1; m });
+    let method_name = matches.value_of("ABI_METHOD").map(|m| {mask |= 2; m });
+    let params = matches.value_of("ABI_PARAMS").map(|m| {mask |= 4; m });
+    let header = matches.value_of("ABI_HEADER");
+    if mask == 0x7 {
+        let key_file = matches.value_of("SIGN").map(|path| {
+            let pair = KeypairManager::from_secret_file(path);
+            pair.drain()
+        });
+        let is_internal = matches.is_present("INTERNAL");            
+        let body: SliceData = build_abi_body(
+            abi_file.unwrap(), 
+            method_name.unwrap(), 
+            params.unwrap(),
+            header,
+            key_file,
+            is_internal
+        )?.into();            
+        Ok(Some(body))
+    } else if mask == 0 {
+        Ok(None)
+    } else {
+        Err("All ABI parameters must be supplied: ABI_JSON, ABI_METHOD, ABI_PARAMS".to_string())
+    }
 }
