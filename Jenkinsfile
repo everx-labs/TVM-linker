@@ -115,7 +115,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                                 )
                             }
                         }
-                        docker.image("${G_docker_src_image}").push()
+                        app_src_image.push()
                     }
                 }
             }
@@ -123,6 +123,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
         stage('Prepare sources for agents') {
             agent {
                 dockerfile {
+                    registryCredentialsId "${G_docker_creds}"
                     additionalBuildArgs "--pull --target linker-src " + 
                                         "--build-arg \"TON_TYPES_IMAGE=${params.dockerImage_ton_labs_types}\" " +
                                         "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_labs_block}\" " + 
@@ -174,6 +175,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                     }*/
                     agent {
                         dockerfile {
+                            registryCredentialsId "${G_docker_creds}"
                             additionalBuildArgs "--pull --target build-ton-compiler " + 
                                         "--build-arg \"TON_TYPES_IMAGE=${params.dockerImage_ton_labs_types}\" " +
                                         "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_labs_block}\" " + 
