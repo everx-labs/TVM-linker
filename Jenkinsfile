@@ -111,7 +111,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                             withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=src-${env.BUILD_TAG}:${GIT_COMMIT}"]) {
                                 app_src_image = docker.build(
                                     "${G_docker_src_image}",
-                                    "--label \"git-commit=\${GIT_COMMIT}\" --target tvm-linker-src ."
+                                    "--pull --label \"git-commit=\${GIT_COMMIT}\" --target tvm-linker-src ."
                                 )
                             }
                         }
@@ -123,7 +123,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
         stage('Prepare sources for agents') {
             agent {
                 dockerfile {
-                    additionalBuildArgs "--target linker-src " + 
+                    additionalBuildArgs "--pull --target linker-src " + 
                                         "--build-arg \"TON_TYPES_IMAGE=${params.dockerImage_ton_labs_types}\" " +
                                         "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_labs_block}\" " + 
                                         "--build-arg \"TON_VM_IMAGE=${params.dockerImage_ton_labs_vm}\" " + 
@@ -153,7 +153,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                                     withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=${env.BUILD_TAG}:${GIT_COMMIT}"]) {
                                         app_image = docker.build(
                                             "${G_docker_pub_image}",
-                                            "--label \"git-commit=\${GIT_COMMIT}\" --ssh default " + 
+                                            "--pull --label \"git-commit=\${GIT_COMMIT}\" --ssh default " + 
                                             "--build-arg \"RUST_IMAGE=${"rust:latest"}\" " + 
                                             "--build-arg \"TON_TYPES_IMAGE=${params.dockerImage_ton_labs_types}\" " +
                                             "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_labs_block}\" " + 
@@ -174,7 +174,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                     }*/
                     agent {
                         dockerfile {
-                            additionalBuildArgs "--target build-ton-compiler " + 
+                            additionalBuildArgs "--pull --target build-ton-compiler " + 
                                         "--build-arg \"TON_TYPES_IMAGE=${params.dockerImage_ton_labs_types}\" " +
                                         "--build-arg \"TON_BLOCK_IMAGE=${params.dockerImage_ton_labs_block}\" " + 
                                         "--build-arg \"TON_VM_IMAGE=${params.dockerImage_ton_labs_vm}\" " + 
