@@ -7,6 +7,10 @@ tonlabs-cli works over tonlabs SDK.
 
     cargo build [--release]
 
+## How to test
+
+    cargo test
+
 ## How to run
 
 #### All platforms
