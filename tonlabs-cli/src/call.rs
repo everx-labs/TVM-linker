@@ -52,7 +52,7 @@ pub fn call_contract(
     let thrd = if local {
         println!("Running get-method...");
         thread::spawn(move || {
-            thread::sleep(Duration::from_secs(500));
+            thread::sleep(Duration::from_millis(500));
             let result =
                 ton.contracts.run_local(&ton_addr, None, &abi, &method_val, params_val.into(), None)
                         .map_err(|e| format!("run failed: {}", e.to_string()));
@@ -62,7 +62,7 @@ pub fn call_contract(
     } else {
         println!("Waiting...");
         thread::spawn(move || {
-            thread::sleep(Duration::from_secs(500));
+            thread::sleep(Duration::from_millis(500));
             let result =
                 ton.contracts.run(&ton_addr, &abi, &method_val, params_val.into(), keys.as_ref())
                     .map_err(|e| format!("transaction failed: {}", e.to_string()));
