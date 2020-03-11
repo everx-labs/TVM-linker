@@ -1,0 +1,22 @@
+{
+	"ABI version": 1,
+	"functions": [
+		{
+			"name": "grant",
+			"inputs": [
+				{"name":"addr","type":"address"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "constructor",
+			"inputs": [
+			],
+			"outputs": [
+			]
+		}
+	],
+	"events": [
+	]
+}
