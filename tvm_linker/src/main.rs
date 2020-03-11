@@ -50,6 +50,7 @@ use real_ton::{ decode_boc, compile_message };
 use resolver::resolve_name;
 use std::fs::File;
 use std::io::{BufReader, Read};
+use std::time::SystemTime;
 use testcall::perform_contract_call;
 use ton_types::{BuilderData, SliceData};
 
@@ -107,7 +108,8 @@ fn linker_main() -> Result<(), String> {
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
             (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
             (@arg INTERNAL: --internal +takes_value "Emulates inbound internal message with value instead of external message")
-            (@arg SRCADDR: --src + takes_value "Supplies message source address")
+            (@arg SRCADDR: --src +takes_value "Supplies message source address")
+            (@arg NOW: --now +takes_value "Supplies transaction creation unixtime")
             (@arg TICKTOCK: --ticktock +takes_value conflicts_with[BODY] "Emulates ticktock transaction in masterchain, 0 for tick and -1 for tock")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
@@ -278,6 +280,14 @@ fn run_test_subcmd(test_matches: &ArgMatches) -> Result<(), String> {
         }
     }
     
+    let now = match test_matches.value_of("NOW") {
+        Some(now_str) => {
+            u32::from_str_radix(now_str, 10)
+                .map_err(|e| format!("failed to parse \"now\" option: {}", e))?
+        },
+        None => SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32,
+    };
+
     println!("TEST STARTED\nbody = {:?}", body);
     perform_contract_call(
         test_matches.value_of("INPUT").unwrap(), 
@@ -288,6 +298,7 @@ fn run_test_subcmd(test_matches: &ArgMatches) -> Result<(), String> {
         test_matches.value_of("INTERNAL"),
         test_matches.value_of("TICKTOCK"),
         test_matches.value_of("SRCADDR"),
+        now,
         |body, is_int| {
             let abi_file = test_matches.value_of("ABI_JSON");
             let method = test_matches.value_of("ABI_METHOD");
