@@ -11,6 +11,8 @@ tonlabs-cli works over tonlabs SDK.
 
     cargo test
 
+Important: put giver ABI file and keys file into the root directory of tonlabs-cli
+
 ## How to run
 
 #### All platforms
