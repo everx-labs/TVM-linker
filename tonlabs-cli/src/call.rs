@@ -72,7 +72,7 @@ pub fn call_contract(
     };
 
     let mut success = false;
-    for x in 0..60 {
+    for _x in 0..60 {
         thread::sleep(Duration::from_millis(500));
         if atomic.load(Ordering::SeqCst) {
             success = true;
