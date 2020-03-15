@@ -16,7 +16,7 @@ VOLUME ["/tonlabs/tvm_linker"]
 FROM $TON_LABS_TYPES_IMAGE as ton-types-src
 FROM $TON_LABS_BLOCK_IMAGE as ton-block-src
 FROM $TON_LABS_VM_IMAGE as ton-vm-src
-FROM $TON_LABS_LABS_ABI_IMAGE as ton-labs-abi-src
+FROM $TON_LABS_ABI_IMAGE as ton-labs-abi-src
 FROM $TVM_LINKER_SRC_IMAGE as tvm-linker-src2
 
 FROM alpine as linker-src
