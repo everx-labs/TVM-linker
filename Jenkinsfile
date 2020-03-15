@@ -669,24 +669,9 @@ pipeline {
     }
     post {
         always {
-            node('master') {
-                script {
-                    DiscordDescription = """${C_COMMITER} pushed commit ${C_HASH} by ${C_AUTHOR} with a message '${C_TEXT}'
-Build number ${BUILD_NUMBER}
-Build: **${G_build}**
-Tests: **${G_test}**"""
-                    
-                    discordSend(
-                        title: DiscordTitle, 
-                        description: DiscordDescription, 
-                        footer: DiscordFooter, 
-                        link: RUN_DISPLAY_URL, 
-                        successful: currentBuild.resultIsBetterOrEqualTo('SUCCESS'), 
-                        webhookURL: DiscordURL
-                    )
-                    cleanWs notFailBuild: true
-                }
-            } 
+            notifyTeam(
+            buildstatus: G_buildstatus
+            )
         }
         success {
             script {
@@ -745,11 +730,6 @@ Tests: **${G_test}**"""
                     }
                 }
             }
-        }
-        always {
-            notifyTeam(
-                buildstatus: G_buildstatus
-            )
         }
         cleanup {
             script {
