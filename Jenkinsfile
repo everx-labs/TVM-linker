@@ -365,7 +365,48 @@ pipeline {
                 }
             }
         }
+        stage('Build sources image') {
+            steps {
+                script {
+                    G_docker_src_image = "${G_images['tvm-linker']}-src"
+                    docker.withRegistry('', G_docker_creds) {
+                        sshagent (credentials: [G_gitcred]) {
+                            withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=src-${env.BUILD_TAG}:${GIT_COMMIT}"]) {
+                                app_src_image = docker.build(
+                                    "${G_docker_src_image}",
+                                    "--pull --label \"git-commit=\${GIT_COMMIT}\" --target tvm-linker-src ."
+                                )
+                            }
+                        }
+                        app_src_image.push()
+                    }
+                }
+            }
+        }
+        stage('Prepare sources for agents') {
+            agent {
+                dockerfile {
+                    registryCredentialsId "${G_docker_creds}"
+                    additionalBuildArgs "--pull --target linker-src " + 
+                                        "--build-arg \"TON_LABS_TYPES_IMAGE=${G_images['ton-labs-types']}\" " +
+                                        "--build-arg \"TON_LABS_BLOCK_IMAGE=${G_images['ton-labs-block']}\" " + 
+                                        "--build-arg \"TON_LABS_VM_IMAGE=${G_images['ton-labs-vm']}\" " + 
+                                        "--build-arg \"TON_LABS_ABI_IMAGE=${G_images['ton-labs-abi']}\" " + 
+                                        "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\""
+                }
+            }
+            steps {
+                script {
+                    sh """
+                        zip -9 -r linker-src.zip /tonlabs/*
+                        chown jenkins:jenkins linker-src.zip
+                    """
+                    stash includes: '**/linker-src.zip', name: 'linker-src'
+                }
+            }
+        }
         stage('Build stages') {
+            failFast true
             parallel {
                 stage('Parallel stages') {
                     when {
@@ -382,279 +423,230 @@ pipeline {
                         }
                     }
                 }
-                stage('tvm-linker') {
-                    stages {
-                        stage('Build sources image') {
-                            steps {
-                                script {
-                                    G_docker_src_image = "${G_images['tvm-linker']}-src"
-                                    docker.withRegistry('', G_docker_creds) {
-                                        sshagent (credentials: [G_gitcred]) {
-                                            withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=src-${env.BUILD_TAG}:${GIT_COMMIT}"]) {
-                                                app_src_image = docker.build(
-                                                    "${G_docker_src_image}",
-                                                    "--pull --label \"git-commit=\${GIT_COMMIT}\" --target tvm-linker-src ."
-                                                )
-                                            }
-                                        }
-                                        app_src_image.push()
+                stage ('Build docker image') {
+                    steps {
+                        script {
+                            docker.withRegistry('', G_docker_creds) {
+                                sshagent (credentials: [G_gitcred]) {
+                                    withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=${env.BUILD_TAG}:${GIT_COMMIT}"]) {
+                                        app_image = docker.build(
+                                            "${G_images['tvm-linker']}",
+                                            "--pull --label \"git-commit=\${GIT_COMMIT}\" --ssh default " + 
+                                            "--build-arg \"RUST_IMAGE=${"rust:latest"}\" " + 
+                                            "--build-arg \"TON_LABS_TYPES_IMAGE=${G_images['ton-labs-types']}\" " +
+                                            "--build-arg \"TON_LABS_BLOCK_IMAGE=${G_images['ton-labs-block']}\" " + 
+                                            "--build-arg \"TON_LABS_VM_IMAGE=${G_images['ton-labs-vm']}\" " + 
+                                            "--build-arg \"TON_LABS_ABI_IMAGE=${G_images['ton-labs-abi']}\" " + 
+                                            "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\" " +
+                                            "."
+                                        )
                                     }
                                 }
                             }
                         }
-                        stage('Prepare sources for agents') {
-                            agent {
-                                dockerfile {
-                                    registryCredentialsId "${G_docker_creds}"
-                                    additionalBuildArgs "--pull --target linker-src " + 
-                                                        "--build-arg \"TON_LABS_TYPES_IMAGE=${G_images['ton-labs-types']}\" " +
-                                                        "--build-arg \"TON_LABS_BLOCK_IMAGE=${G_images['ton-labs-block']}\" " + 
-                                                        "--build-arg \"TON_LABS_VM_IMAGE=${G_images['ton-labs-vm']}\" " + 
-                                                        "--build-arg \"TON_LABS_ABI_IMAGE=${G_images['ton-labs-abi']}\" " + 
-                                                        "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\""
-                                }
+                    }
+                }
+                stage('Build linux') {
+                    /*when { 
+                        branch 'master'
+                    }*/
+                    agent {
+                        dockerfile {
+                            registryCredentialsId "${G_docker_creds}"
+                            additionalBuildArgs "--pull --target build-ton-compiler " + 
+                                        "--build-arg \"TON_LABS_TYPES_IMAGE=${G_images['ton-labs-types']}\" " +
+                                        "--build-arg \"TON_LABS_BLOCK_IMAGE=${G_images['ton-labs-block']}\" " + 
+                                        "--build-arg \"TON_LABS_VM_IMAGE=${G_images['ton-labs-vm']}\" " + 
+                                        "--build-arg \"TON_LABS_ABI_IMAGE=${G_images['ton-labs-abi']}\" " + 
+                                        "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\""
+                        }
+                    }
+                    steps {
+                        script {
+                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                                identity = awsIdentity()
+                                s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
                             }
-                            steps {
-                                script {
+                            sh 'node gzip.js ../../../../app/tvm_linker'
+                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                                identity = awsIdentity()
+                                s3Upload \
+                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    includePathPattern:'*.gz', path: 'tmp_linker', \
+                                    workingDir:'.'
+                                s3Upload \
+                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    includePathPattern:'tvm_linker.json', path: 'tmp_linker', \
+                                    workingDir:'.'
+                            }
+                        }
+                    }
+                    post {
+                        cleanup {script{cleanWs notFailBuild: true}}
+                    }
+                }
+                stage('Build darwin') {
+                    /*when { 
+                        branch 'master'
+                    }*/
+                    agent {
+                        label 'ios'
+                    }
+                    steps {
+                        script {
+                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                                identity = awsIdentity()
+                                s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
+                            }
+                            def C_PATH = sh (script: 'pwd', returnStdout: true).trim()
+                            
+                            unstash 'linker-src'
+                            sh """
+                                unzip linker-src.zip
+                                node pathFix.js tonlabs/ton-labs-block/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
+                                node pathFix.js tonlabs/ton-labs-vm/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
+                                node pathFix.js tonlabs/ton-labs-abi/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
+                                node pathFix.js tonlabs/tvm_linker/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
+                            """
+                            dir('tonlabs') {
+                                dir('tvm_linker') {
                                     sh """
-                                        zip -9 -r linker-src.zip /tonlabs/*
-                                        chown jenkins:jenkins linker-src.zip
+                                        cargo update
+                                        cargo build --release
+                                        chmod a+x target/release/tvm_linker
                                     """
-                                    stash includes: '**/linker-src.zip', name: 'linker-src'
                                 }
                             }
+                            sh 'node gzip.js tonlabs/tvm_linker/target/release/tvm_linker'
+                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                                identity = awsIdentity()
+                                s3Upload \
+                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    includePathPattern:'*.gz', path: 'tmp_linker', \
+                                    workingDir:'.'
+                                s3Upload \
+                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    includePathPattern:'tvm_linker.json', path: 'tmp_linker', \
+                                    workingDir:'.'
+                            }
                         }
-                        stage('Build') {
-                            failFast true
-                            parallel {
-                                stage ('Build docker image') {
-                                    steps {
-                                        script {
-                                            docker.withRegistry('', G_docker_creds) {
-                                                sshagent (credentials: [G_gitcred]) {
-                                                    withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=${env.BUILD_TAG}:${GIT_COMMIT}"]) {
-                                                        app_image = docker.build(
-                                                            "${G_images['tvm-linker']}",
-                                                            "--pull --label \"git-commit=\${GIT_COMMIT}\" --ssh default " + 
-                                                            "--build-arg \"RUST_IMAGE=${"rust:latest"}\" " + 
-                                                            "--build-arg \"TON_LABS_TYPES_IMAGE=${G_images['ton-labs-types']}\" " +
-                                                            "--build-arg \"TON_LABS_BLOCK_IMAGE=${G_images['ton-labs-block']}\" " + 
-                                                            "--build-arg \"TON_LABS_VM_IMAGE=${G_images['ton-labs-vm']}\" " + 
-                                                            "--build-arg \"TON_LABS_ABI_IMAGE=${G_images['ton-labs-abi']}\" " + 
-                                                            "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\" " +
-                                                            "."
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
+                    }
+                    post {
+                        cleanup {script{cleanWs notFailBuild: true}}
+                    }
+                }
+                stage('Build windows') {
+                    /*when { 
+                        branch 'master'
+                    }*/
+                    agent {
+                        label 'Win'
+                    }
+                    steps {
+                        script {
+                            def C_PATH = bat (script: '@echo off && echo %cd%', returnStdout: true).trim()
+                            echo "${C_PATH}"
+                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                                identity = awsIdentity()
+                                s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
+                            }
+                            unstash 'linker-src'
+                            bat """
+                                unzip linker-src.zip
+                                node pathFix.js tonlabs\\ton-labs-block\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
+                                node pathFix.js tonlabs\\ton-labs-vm\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
+                                node pathFix.js tonlabs\\ton-labs-abi\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
+                                node pathFix.js tonlabs\\tvm_linker\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
+                            """
+                            dir('tonlabs') {
+                                dir('tvm_linker') {
+                                    bat """
+                                        cargo update
+                                        cargo build --release
+                                        chmod a+x target/release/tvm_linker
+                                    """
                                 }
-                                stage('Build linux') {
-                                    /*when { 
-                                        branch 'master'
-                                    }*/
-                                    agent {
-                                        dockerfile {
-                                            registryCredentialsId "${G_docker_creds}"
-                                            additionalBuildArgs "--pull --target build-ton-compiler " + 
-                                                        "--build-arg \"TON_LABS_TYPES_IMAGE=${G_images['ton-labs-types']}\" " +
-                                                        "--build-arg \"TON_LABS_BLOCK_IMAGE=${G_images['ton-labs-block']}\" " + 
-                                                        "--build-arg \"TON_LABS_VM_IMAGE=${G_images['ton-labs-vm']}\" " + 
-                                                        "--build-arg \"TON_LABS_ABI_IMAGE=${G_images['ton-labs-abi']}\" " + 
-                                                        "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\""
-                                        }
-                                    }
-                                    steps {
-                                        script {
-                                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
-                                                identity = awsIdentity()
-                                                s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
-                                            }
-                                            sh 'node gzip.js ../../../../app/tvm_linker'
-                                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
-                                                identity = awsIdentity()
-                                                s3Upload \
-                                                    bucket: 'sdkbinaries.tonlabs.io', \
-                                                    includePathPattern:'*.gz', path: 'tmp_linker', \
-                                                    workingDir:'.'
-                                                s3Upload \
-                                                    bucket: 'sdkbinaries.tonlabs.io', \
-                                                    includePathPattern:'tvm_linker.json', path: 'tmp_linker', \
-                                                    workingDir:'.'
-                                            }
-                                        }
-                                    }
-                                    post {
-                                        cleanup {script{cleanWs notFailBuild: true}}
-                                    }
-                                }
-                                stage('Build darwin') {
-                                    /*when { 
-                                        branch 'master'
-                                    }*/
-                                    agent {
-                                        label 'ios'
-                                    }
-                                    steps {
-                                        script {
-                                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
-                                                identity = awsIdentity()
-                                                s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
-                                            }
-                                            def C_PATH = sh (script: 'pwd', returnStdout: true).trim()
-                                            
-                                            unstash 'linker-src'
-                                            sh """
-                                                unzip linker-src.zip
-                                                node pathFix.js tonlabs/ton-labs-block/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
-                                                node pathFix.js tonlabs/ton-labs-vm/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
-                                                node pathFix.js tonlabs/ton-labs-abi/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
-                                                node pathFix.js tonlabs/tvm_linker/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
-                                            """
-                                            dir('tonlabs') {
-                                                dir('tvm_linker') {
-                                                    sh """
-                                                        cargo update
-                                                        cargo build --release
-                                                        chmod a+x target/release/tvm_linker
-                                                    """
-                                                }
-                                            }
-                                            sh 'node gzip.js tonlabs/tvm_linker/target/release/tvm_linker'
-                                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
-                                                identity = awsIdentity()
-                                                s3Upload \
-                                                    bucket: 'sdkbinaries.tonlabs.io', \
-                                                    includePathPattern:'*.gz', path: 'tmp_linker', \
-                                                    workingDir:'.'
-                                                s3Upload \
-                                                    bucket: 'sdkbinaries.tonlabs.io', \
-                                                    includePathPattern:'tvm_linker.json', path: 'tmp_linker', \
-                                                    workingDir:'.'
-                                            }
-                                        }
-                                    }
-                                    post {
-                                        cleanup {script{cleanWs notFailBuild: true}}
-                                    }
-                                }
-                                stage('Build windows') {
-                                    /*when { 
-                                        branch 'master'
-                                    }*/
-                                    agent {
-                                        label 'Win'
-                                    }
-                                    steps {
-                                        script {
-                                            def C_PATH = bat (script: '@echo off && echo %cd%', returnStdout: true).trim()
-                                            echo "${C_PATH}"
-                                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
-                                                identity = awsIdentity()
-                                                s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
-                                            }
-                                            unstash 'linker-src'
-                                            bat """
-                                                unzip linker-src.zip
-                                                node pathFix.js tonlabs\\ton-labs-block\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
-                                                node pathFix.js tonlabs\\ton-labs-vm\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
-                                                node pathFix.js tonlabs\\ton-labs-abi\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
-                                                node pathFix.js tonlabs\\tvm_linker\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
-                                            """
-                                            dir('tonlabs') {
-                                                dir('tvm_linker') {
-                                                    bat """
-                                                        cargo update
-                                                        cargo build --release
-                                                        chmod a+x target/release/tvm_linker
-                                                    """
-                                                }
-                                            }
+                            }
 
-                                            bat "node gzip.js tonlabs\\tvm_linker\\target\\release\\tvm_linker.exe"
-                                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
-                                                identity = awsIdentity()
-                                                s3Upload \
-                                                    bucket: 'sdkbinaries.tonlabs.io', \
-                                                    includePathPattern:'*.gz', path: 'tmp_linker', \
-                                                    workingDir:'.'
-                                                s3Upload \
-                                                    bucket: 'sdkbinaries.tonlabs.io', \
-                                                    includePathPattern:'tvm_linker.json', path: 'tmp_linker', \
-                                                    workingDir:'.'
-                                            }
-                                        }
-                                    }
-                                    post {
-                                        cleanup {script{cleanWs notFailBuild: true}}
-                                    }
-                                }
+                            bat "node gzip.js tonlabs\\tvm_linker\\target\\release\\tvm_linker.exe"
+                            withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                                identity = awsIdentity()
+                                s3Upload \
+                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    includePathPattern:'*.gz', path: 'tmp_linker', \
+                                    workingDir:'.'
+                                s3Upload \
+                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    includePathPattern:'tvm_linker.json', path: 'tmp_linker', \
+                                    workingDir:'.'
                             }
                         }
-                        stage ('Test') {
-                            agent {
-                                docker {
-                                    image "${G_images['tvm-linker']}"
-                                    alwaysPull false
-                                    args '-u root'
-                                }
-                            }
-                            steps {
-                                script {
-                                    sh 'apk add python'
-                                    sh '/usr/bin/tvm_linker --version'
-                                    sh 'cd tvm_linker && python test_suite.py --linker-path=/usr/bin/tvm_linker'
-                                }
-                            }
-                        }
-                        stage('Push docker-image') {
-                            steps {
-                                script {
-                                    docker.withRegistry('', G_docker_creds) {
-                                        app_image.push()
-                                    }
-                                }
-                            }
-                            post {
-                                failure {script{G_buildstatus = "failure"}}
-                            }
-                        }
-                        stage('Test in compiler-kit') {
-                            steps {
-                                script {
-                                    def params = [
-                                    [$class: 'StringParameterValue', name: 'dockerimage_tvm_linker', value: "${G_images['tvm-linker']}"]
-                                    ]
-                                    build job : "Infrastructure/compilers/master", parameters : params
-                                }
-                            }
-                            post {
-                                success {
-                                    script{
-                                        G_buildstatus = "success"
-                                    }
-                                }
-                                failure {script{G_buildstatus = "failure"}}
-                            }
-                        }
-                        stage ('Tag as latest') {
-                            when {
-                                expression {
-                                    // GIT_BRANCH = 'origin/' + sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
-                                    GIT_BRANCH = "origin/${BRANCH_NAME}"
-                                    return GIT_BRANCH == G_promoted_branch || params.FORCE_PROMOTE_LATEST
-                                }
-                            }
-                            steps {
-                                script {
-                                    docker.withRegistry('', G_docker_creds) {
-                                        docker.image("${G_images['tvm-linker']}").push('latest')
-                                        docker.image("${G_docker_src_image}").push('src-latest')
-                                    }
-                                }
-                            }
-                        }
+                    }
+                    post {
+                        cleanup {script{cleanWs notFailBuild: true}}
+                    }
+                }
+            }
+        }
+        stage ('Test') {
+            agent {
+                docker {
+                    image "${G_images['tvm-linker']}"
+                    alwaysPull false
+                    args '-u root'
+                }
+            }
+            steps {
+                script {
+                    sh 'apk add python'
+                    sh '/usr/bin/tvm_linker --version'
+                    sh 'cd tvm_linker && python test_suite.py --linker-path=/usr/bin/tvm_linker'
+                }
+            }
+        }
+        stage('Push docker-image') {
+            steps {
+                script {
+                    docker.withRegistry('', G_docker_creds) {
+                        app_image.push()
+                    }
+                }
+            }
+            post {
+                failure {script{G_buildstatus = "failure"}}
+            }
+        }
+        stage('Test in compiler-kit') {
+            steps {
+                script {
+                    def params = [
+                    [$class: 'StringParameterValue', name: 'dockerimage_tvm_linker', value: "${G_images['tvm-linker']}"]
+                    ]
+                    build job : "Infrastructure/compilers/master", parameters : params
+                }
+            }
+            post {
+                success {
+                    script{
+                        G_buildstatus = "success"
+                    }
+                }
+                failure {script{G_buildstatus = "failure"}}
+            }
+        }
+        stage ('Tag as latest') {
+            when {
+                expression {
+                    // GIT_BRANCH = 'origin/' + sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
+                    GIT_BRANCH = "origin/${BRANCH_NAME}"
+                    return GIT_BRANCH == G_promoted_branch || params.FORCE_PROMOTE_LATEST
+                }
+            }
+            steps {
+                script {
+                    docker.withRegistry('', G_docker_creds) {
+                        docker.image("${G_images['tvm-linker']}").push('latest')
+                        docker.image("${G_docker_src_image}").push('src-latest')
                     }
                 }
             }
