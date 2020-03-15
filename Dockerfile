@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1.0.0-experimental
 
 ARG RUST_IMAGE=rust:latest
-ARG TON_TYPES_IMAGE=tonlabs/ton-labs-types:latest
-ARG TON_BLOCK_IMAGE=tonlabs/ton-labs-block:latest
-ARG TON_VM_IMAGE=tonlabs/ton-labs-vm:latest
+ARG TON_LABS_TYPES_IMAGE=tonlabs/ton-labs-types:latest
+ARG TON_LABS_BLOCK_IMAGE=tonlabs/ton-labs-block:latest
+ARG TON_LABS_VM_IMAGE=tonlabs/ton-labs-vm:latest
 ARG TON_LABS_ABI_IMAGE=tonlabs/ton-labs-abi:latest
 ARG TVM_LINKER_SRC_IMAGE=tonlabs/tvm_linker:src-latest
 
@@ -13,10 +13,10 @@ RUN addgroup --gid 1000 jenkins && \
 COPY --chown=jenkins:jenkins ./tvm_linker /tonlabs/tvm_linker
 VOLUME ["/tonlabs/tvm_linker"]
 
-FROM $TON_TYPES_IMAGE as ton-types-src
-FROM $TON_BLOCK_IMAGE as ton-block-src
-FROM $TON_VM_IMAGE as ton-vm-src
-FROM $TON_LABS_ABI_IMAGE as ton-labs-abi-src
+FROM $TON_LABS_TYPES_IMAGE as ton-types-src
+FROM $TON_LABS_BLOCK_IMAGE as ton-block-src
+FROM $TON_LABS_VM_IMAGE as ton-vm-src
+FROM $TON_LABS_LABS_ABI_IMAGE as ton-labs-abi-src
 FROM $TVM_LINKER_SRC_IMAGE as tvm-linker-src2
 
 FROM alpine as linker-src
