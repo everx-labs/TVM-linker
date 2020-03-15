@@ -78,11 +78,11 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) {
     *body = signed_body.into();
 }
 
-fn initialize_registers(data: SliceData, myself: MsgAddressInt) -> SaveList {
+fn initialize_registers(data: SliceData, myself: MsgAddressInt, now: u32) -> SaveList {
     let mut ctrls = SaveList::new();
     let mut info = SmartContractInfo::with_myself(myself.write_to_new_cell().unwrap().into());
     *info.balance_remaining_grams_mut() = 100_000_000_000;
-    *info.unix_time_mut() = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32;
+    *info.unix_time_mut() = now;
     ctrls.put(4, &mut StackItem::Cell(data.into_cell())).unwrap();
     ctrls.put(7, &mut info.into_temp_data()).unwrap();
     ctrls
@@ -106,6 +106,7 @@ pub fn perform_contract_call<F>(
     msg_value: Option<&str>,
     ticktock: Option<&str>,
     src_str: Option<&str>,
+    now: u32,
     decoder: F,
 ) -> i32
     where F: Fn(SliceData, bool) -> ()
@@ -174,7 +175,8 @@ pub fn perform_contract_call<F>(
     let workchain_id = if func_selector > -2 { 0 } else { -1 };
     let registers = initialize_registers(
         data,
-        MsgAddressInt::with_standart(None, workchain_id, addr.clone()).unwrap()
+        MsgAddressInt::with_standart(None, workchain_id, addr.clone()).unwrap(),
+        now,
     );
     
     if func_selector > -2 {
