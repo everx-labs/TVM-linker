@@ -444,7 +444,8 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                                     }
                                 }
                                 app_image.push()
-                                app_image.push(G_images['tvm-linker'])
+                                def secTag = G_images['tvm-linker'].replaceAll('tonlabs/tvm_linker:','')
+                                app_image.push(secTag)
                             }
                         }
                     }
