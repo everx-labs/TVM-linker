@@ -443,9 +443,9 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                                         )
                                     }
                                 }
+                                app_image.push()
+                                app_image.push(G_images['tvm-linker'])
                             }
-                            app_image.push()
-                            app_image.push(G_images['tvm-linker'])
                         }
                     }
                 }
