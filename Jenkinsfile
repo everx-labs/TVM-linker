@@ -13,7 +13,6 @@ C_PROJECT = "NotSet"
 C_COMMITER = "NotSet"
 C_HASH = "NotSet"
 C_TEXT = "NotSet"
-G_docker_creds = "TonJenDockerHub"
 G_images = [:]
 G_branches = [:]
 G_params = null
