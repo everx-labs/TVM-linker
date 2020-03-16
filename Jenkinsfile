@@ -2,7 +2,18 @@
 
 G_gitcred = "LaninSSHgit"
 G_docker_creds = 'dockerhubLanin'
-G_giturl = ""
+G_promoted_branch = 'origin/master'
+G_docker_src_image = null
+G_docker_pub_image = null
+G_dockerimage = null
+G_buildstatus = "NotSet"
+G_teststatus = "NotSet"
+G_binversion = "NotSet"
+C_PROJECT = "NotSet"
+C_COMMITER = "NotSet"
+C_HASH = "NotSet"
+C_TEXT = "NotSet"
+G_docker_creds = "TonJenDockerHub"
 G_images = [:]
 G_branches = [:]
 G_params = null
@@ -10,12 +21,6 @@ G_docker_image = null
 G_build = "none"
 G_test = "none"
 G_commit = ""
-G_promoted_branch = 'origin/master'
-G_buildstatus = 'NotSet'
-G_teststatus = 'NotSet'
-G_docker_src_image = null
-G_binversion = "NotSet"
-
 
 def isUpstream() {
     return currentBuild.getBuildCauses()[0]._class.toString() == 'hudson.model.Cause$UpstreamCause'
@@ -176,17 +181,6 @@ def buildParams() {
 }
 
 pipeline {
-    tools {nodejs "Node12.8.0"}
-    options {
-        buildDiscarder logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '1')
-        disableConcurrentBuilds()
-        parallelsAlwaysFailFast()
-    }
-    agent {
-        node {
-            label 'master'
-        }
-    }
     parameters {
         string(
             name:'common_version',
@@ -299,6 +293,15 @@ pipeline {
             description: 'sol2tvm branch'
         )
     }
+    agent {
+        node {label 'master'}
+    }
+    tools {nodejs "Node12.8.0"}
+    options {
+        buildDiscarder logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '10')
+        disableConcurrentBuilds()
+        parallelsAlwaysFailFast()
+    }
     stages {
         stage('Versioning') {
             steps {
@@ -307,12 +310,13 @@ pipeline {
                         identity = awsIdentity()
                         s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
                     }
+                    def folders = "./tvm_linker"
                     if(params.common_version) {
-                        G_binversion = sh (script: "node tonVersion.js --set ${params.common_version} ./", returnStdout: true).trim()
+                        G_binversion = sh (script: "node tonVersion.js --set ${params.common_version} ${folders}", returnStdout: true).trim()
                     } else {
-                        G_binversion = sh (script: "node tonVersion.js ./", returnStdout: true).trim()
+                        G_binversion = sh (script: "node tonVersion.js ${folders}", returnStdout: true).trim()
                     }
-                    echo "Version: ${G_binversion}"
+
 
                     withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                         identity = awsIdentity()
@@ -320,32 +324,6 @@ pipeline {
                             bucket: 'sdkbinaries.tonlabs.io', \
                             includePathPattern:'version.json', path: '', \
                             workingDir:'.'
-                    }
-                }
-            }
-        }
-        stage('Collect commit data') {
-            steps {
-                sshagent([G_gitcred]) {
-                    script {
-                        G_giturl = env.GIT_URL
-                        G_commit = GIT_COMMIT
-                        echo "${G_giturl}"
-                        C_PROJECT = env.GIT_URL.substring(19, env.GIT_URL.length() - 4)
-                        C_COMMITER = sh (script: 'git show -s --format=%cn ${GIT_COMMIT}', returnStdout: true).trim()
-                        C_TEXT = sh (script: 'git show -s --format=%s ${GIT_COMMIT}', returnStdout: true).trim()
-                        C_AUTHOR = sh (script: 'git show -s --format=%an ${GIT_COMMIT}', returnStdout: true).trim()
-                        C_HASH = sh (script: 'git show -s --format=%h ${GIT_COMMIT}', returnStdout: true).trim()
-                    
-                        DiscordURL = "https://discordapp.com/api/webhooks/496992026932543489/4exQIw18D4U_4T0H76bS3Voui4SyD7yCQzLP9IRQHKpwGRJK1-IFnyZLyYzDmcBKFTJw"
-                        string DiscordFooter = "Build duration is ${currentBuild.durationString}"
-                        DiscordTitle = "Job ${JOB_NAME} from GitHub ${C_PROJECT}"
-                        
-                        def buildCause = currentBuild.getBuildCauses()[0].shortDescription
-                        echo "Build cause: ${buildCause}"
-                        
-                        buildParams()
-                        echo "${G_params}"
                     }
                 }
             }
@@ -365,10 +343,25 @@ pipeline {
                 }
             }
         }
+        stage('Switch to file source') {
+            steps {
+                script {
+                    sh """
+(cat tvm_linker/Cargo.toml | \
+sed 's/ton_types = .*/ton_types = { path = \"\\/tonlabs\\/ton-labs-types\" }/g' | \
+sed 's/ton_block = .*/ton_block = { path = \"\\/tonlabs\\/ton-labs-block\" }/g' | \
+sed 's/ton_abi = .*/ton_abi = { path = \"\\/tonlabs\\/ton-labs-abi\" }/g' | \
+sed 's/ton_vm = .*/ton_vm = { path = \"\\/tonlabs\\/ton-labs-vm\", default-features = false }/g') > ./tvm_linker/tmp.toml
+rm ./tvm_linker/Cargo.toml
+mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
+                    """
+                }
+            }
+        }
         stage('Build sources image') {
             steps {
                 script {
-                    G_docker_src_image = "${G_images['tvm-linker']}-src"
+                    G_docker_src_image = "tonlabs/tvm_linker:src-${GIT_COMMIT}"
                     docker.withRegistry('', G_docker_creds) {
                         sshagent (credentials: [G_gitcred]) {
                             withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=src-${env.BUILD_TAG}:${GIT_COMMIT}"]) {
@@ -405,7 +398,7 @@ pipeline {
                 }
             }
         }
-        stage('Build stages') {
+        stage('Build') {
             failFast true
             parallel {
                 stage('Parallel stages') {
@@ -426,11 +419,12 @@ pipeline {
                 stage ('Build docker image') {
                     steps {
                         script {
+                            G_docker_pub_image = "tonlabs/tvm_linker:${GIT_COMMIT}"
                             docker.withRegistry('', G_docker_creds) {
                                 sshagent (credentials: [G_gitcred]) {
                                     withEnv(["DOCKER_BUILDKIT=1", "BUILD_INFO=${env.BUILD_TAG}:${GIT_COMMIT}"]) {
                                         app_image = docker.build(
-                                            "${G_images['tvm-linker']}",
+                                            "${G_docker_pub_image}",
                                             "--pull --label \"git-commit=\${GIT_COMMIT}\" --ssh default " + 
                                             "--build-arg \"RUST_IMAGE=${"rust:latest"}\" " + 
                                             "--build-arg \"TON_LABS_TYPES_IMAGE=${G_images['ton-labs-types']}\" " +
@@ -440,10 +434,11 @@ pipeline {
                                             "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\" " +
                                             "."
                                         )
-                                        app_image.push()
                                     }
                                 }
                             }
+                            app_image.push()
+                            app_image.push(G_images['tvm-linker'])
                         }
                     }
                 }
@@ -483,8 +478,8 @@ pipeline {
                         }
                     }
                     post {
-                        cleanup {script{cleanWs notFailBuild: true}}
-                    }
+						cleanup {script{cleanWs notFailBuild: true}}
+					}
                 }
                 stage('Build darwin') {
                     /*when { 
@@ -533,8 +528,8 @@ pipeline {
                         }
                     }
                     post {
-                        cleanup {script{cleanWs notFailBuild: true}}
-                    }
+						cleanup {script{cleanWs notFailBuild: true}}
+					}
                 }
                 stage('Build windows') {
                     /*when { 
@@ -584,15 +579,15 @@ pipeline {
                         }
                     }
                     post {
-                        cleanup {script{cleanWs notFailBuild: true}}
-                    }
+						cleanup {script{cleanWs notFailBuild: true}}
+					}
                 }
             }
         }
         stage ('Test') {
             agent {
                 docker {
-                    image "${G_images['tvm-linker']}"
+                    image "${G_docker_pub_image}"
                     alwaysPull false
                     args '-u root'
                 }
@@ -605,7 +600,7 @@ pipeline {
                 }
             }
         }
-        stage('Push docker-image') {
+	    stage('Push docker-image') {
             steps {
                 script {
                     docker.withRegistry('', G_docker_creds) {
@@ -620,8 +615,9 @@ pipeline {
         stage('Test in compiler-kit') {
             steps {
                 script {
+                    G_docker_pub_image = "tonlabs/tvm_linker:${GIT_COMMIT}"
                     def params = [
-                    [$class: 'StringParameterValue', name: 'dockerimage_tvm_linker', value: "${G_images['tvm-linker']}"]
+                      [$class: 'StringParameterValue', name: 'dockerimage_tvm_linker', value: "${G_docker_pub_image}"]
                     ]
                     build job : "Infrastructure/compilers/master", parameters : params
                 }
@@ -646,7 +642,7 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('', G_docker_creds) {
-                        docker.image("${G_images['tvm-linker']}").push('latest')
+                        docker.image("${G_docker_pub_image}").push('latest')
                         docker.image("${G_docker_src_image}").push('src-latest')
                     }
                 }
@@ -669,14 +665,9 @@ pipeline {
         }
     }
     post {
-        always {
-            notifyTeam(
-            buildstatus: G_buildstatus
-            )
-        }
         success {
-            script {
-                if(!isUpstream()) {
+            node ('master') {
+                script {
                     withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                         identity = awsIdentity()
                         list = s3FindFiles(bucket: 'sdkbinaries.tonlabs.io', path: 'tmp_linker/', glob: '*')
@@ -684,53 +675,72 @@ pipeline {
                             s3Copy fromBucket: 'sdkbinaries.tonlabs.io', fromPath: "tmp_linker/${file.path}", toBucket: 'sdkbinaries.tonlabs.io', toPath: "${file.path}"
                         }
                         s3Delete bucket: 'sdkbinaries.tonlabs.io', path: 'tmp_linker/'
-                        s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
                     }
-                    sh """
-                        echo const fs = require\\(\\'fs\\'\\)\\; > release.js
-                        echo const ver = JSON.parse\\(fs.readFileSync\\(\\'version.json\\'\\, \\'utf8\\'\\)\\)\\; >> release.js
-                        echo if\\(!ver.release\\) { throw new Error\\(\\'Empty release field\\'\\); } >> release.js
-                        echo if\\(ver.candidate\\) { ver.release = ver.candidate\\; ver.candidate = \\'\\'\\; } >> release.js
-                        echo fs.writeFileSync\\(\\'version.json\\', JSON.stringify\\(ver\\)\\)\\; >> release.js
-                        cat release.js
-                        cat version.json
-                        node release.js
-                    """
-                    withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
-                        identity = awsIdentity()
-                        s3Upload \
-                            bucket: 'sdkbinaries.tonlabs.io', \
-                            includePathPattern:'version.json', workingDir:'.'
+                    def cause = "${currentBuild.getBuildCauses()}"
+                    echo "${cause}"
+                    if(!cause.matches('upstream')) {
+                        withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                            identity = awsIdentity()
+                            s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
+                        }
+                        sh """
+                            echo const fs = require\\(\\'fs\\'\\)\\; > release.js
+                            echo const ver = JSON.parse\\(fs.readFileSync\\(\\'version.json\\'\\, \\'utf8\\'\\)\\)\\; >> release.js
+                            echo if\\(!ver.release\\) { throw new Error\\(\\'Empty release field\\'\\); } >> release.js
+                            echo if\\(ver.candidate\\) { ver.release = ver.candidate\\; ver.candidate = \\'\\'\\; } >> release.js
+                            echo fs.writeFileSync\\(\\'version.json\\', JSON.stringify\\(ver\\)\\)\\; >> release.js
+                            cat release.js
+                            cat version.json
+                            node release.js
+                        """
+                        withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                            identity = awsIdentity()
+                            s3Upload \
+                                bucket: 'sdkbinaries.tonlabs.io', \
+                                includePathPattern:'version.json', workingDir:'.'
+                        }
                     }
                 }
             }
         }
         failure {
-            script {
-                if(!isUpstream()) {
+            node ('master') {
+                script {
                     withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                         identity = awsIdentity()
                         s3Delete bucket: 'sdkbinaries.tonlabs.io', path: 'tmp_linker/'
-                        s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
                     }
-                    sh """
-                        echo const fs = require\\(\\'fs\\'\\)\\; > decline.js
-                        echo const ver = JSON.parse\\(fs.readFileSync\\(\\'version.json\\'\\, \\'utf8\\'\\)\\)\\; >> decline.js
-                        echo if\\(!ver.release\\) { throw new Error\\(\\'Unable to set decline version\\'\\)\\; } >> decline.js
-                        echo ver.candidate = \\'\\'\\; >> decline.js
-                        echo fs.writeFileSync\\(\\'version.json\\', JSON.stringify\\(ver\\)\\)\\; >> decline.js
-                        cat decline.js
-                        cat version.json
-                        node decline.js
-                    """
-                    withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
-                        identity = awsIdentity()
-                        s3Upload \
-                            bucket: 'sdkbinaries.tonlabs.io', \
-                            includePathPattern:'version.json', workingDir:'.'
+                    def cause = "${currentBuild.getBuildCauses()}"
+                    echo "${cause}"
+                    if(!cause.matches('upstream')) {
+                        withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                            identity = awsIdentity()
+                            s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
+                        }
+                        sh """
+                            echo const fs = require\\(\\'fs\\'\\)\\; > decline.js
+                            echo const ver = JSON.parse\\(fs.readFileSync\\(\\'version.json\\'\\, \\'utf8\\'\\)\\)\\; >> decline.js
+                            echo if\\(!ver.release\\) { throw new Error\\(\\'Unable to set decline version\\'\\)\\; } >> decline.js
+                            echo ver.candidate = \\'\\'\\; >> decline.js
+                            echo fs.writeFileSync\\(\\'version.json\\', JSON.stringify\\(ver\\)\\)\\; >> decline.js
+                            cat decline.js
+                            cat version.json
+                            node decline.js
+                        """
+                        withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                            identity = awsIdentity()
+                            s3Upload \
+                                bucket: 'sdkbinaries.tonlabs.io', \
+                                includePathPattern:'version.json', workingDir:'.'
+                        }
                     }
                 }
             }
+        }
+        always {
+            notifyTeam(
+                buildstatus: G_buildstatus
+            )
         }
         cleanup {
             script {
