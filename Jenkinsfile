@@ -440,6 +440,7 @@ pipeline {
                                             "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\" " +
                                             "."
                                         )
+                                        app_image.push()
                                     }
                                 }
                             }
