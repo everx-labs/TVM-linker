@@ -328,6 +328,14 @@ pipeline {
                 }
             }
         }
+        stage('Prepare') {
+            steps {
+                script {
+                    buildParams()
+                    echo "${G_params}"
+                }
+            }
+        }
         stage('Before stages') {
             when {
                 expression {
