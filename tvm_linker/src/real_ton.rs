@@ -83,7 +83,7 @@ pub fn compile_message(
     body: Option<SliceData>, 
     pack_code: bool, 
     suffix: &str,
-) -> Result<(), String> {
+) -> std::result::Result<(), String> {
     let wc = match wc {
         Some(w) => i8::from_str_radix(w, 10).map_err(|_| "workchain id is not a valid int8 number".to_string())?,
         None => -1,

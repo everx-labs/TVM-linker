@@ -21,7 +21,6 @@ extern crate clap;
 #[macro_use]
 extern crate log;
 use clap::{Arg, App,SubCommand};
-use std::error::Error;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Read;
@@ -29,6 +28,7 @@ use std::path::{Path,PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
+use tvm::error::TvmError;
 use tvm::executor::Engine;
 use tvm_tools::{
     Contract,
@@ -51,7 +51,7 @@ fn load_raw_contract(path: &Path) -> SliceData {
     let path_display = path.display();
     let mut contract_file = match File::open(path) {
         Ok(f) => f,
-        Err(e) => panic!("{}, error {}", path_display, e.description()),
+        Err(e) => panic!("{}, error {}", path_display, e.to_string()),
     };
     let mut contract: Vec<u8> = Vec::new();
     match contract_file.read_to_end(&mut contract) {
@@ -59,7 +59,7 @@ fn load_raw_contract(path: &Path) -> SliceData {
         Err(e) => panic!(
             "Cannot read contract {}, error {}",
             path_display,
-            e.description()
+            e.to_string()
         ),
     }
     println!("Contract: {:X?}", contract);
@@ -90,11 +90,13 @@ fn execute_contract(contract_path: &Path, initial_stack_state: Stack) {
     ctrls.put(4, &mut StackItem::Cell(data.into_cell())).unwrap();
     let mut engine = Engine::new().setup(code.clone(), Some(ctrls), Some(initial_stack_state), None);
     let exit_code = match engine.execute() {
-        Err(exc) => {
-            println!("Unhandled exception: {}", exc); 
-            exc.number
-        },
-        Ok(code) => code as usize,
+        Err(exc) => if let Ok(TvmError::TvmExceptionFull(exc)) = exc.downcast() {
+            println!("Unhandled exception: {}", exc);
+            exc.number as i32
+        } else {
+            -1
+        }
+        Ok(code) => code
     };
     println!("TVM terminated with exit code {}", exit_code);
     if exit_code != 0 && exit_code != 1 {
