@@ -21,6 +21,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::SystemTime;
 use ton_vm::executor::{Engine, gas::gas_state::Gas};
+use ton_vm::error::TvmError;
 use ton_vm::stack::integer::{IntegerData};
 use ton_vm::stack::{StackItem, Stack, SaveList};
 use ton_vm::SmartContractInfo;
@@ -210,11 +211,13 @@ pub fn perform_contract_call<F>(
     let exit_code: i32 = match engine.execute() {
         Ok(code) => {
             code as i32
-        },
-        Err(exc) => {
+        }
+        Err(exc) => if let Ok(TvmError::TvmExceptionFull(exc)) = exc.downcast() {
             println!("Unhandled exception: {}", exc);
             exc.number as i32
-        },
+        } else {
+            -1
+        }
     };
     println!("TVM terminated with exit code {}", exit_code);
     println!("Gas used: {}", engine.get_gas().get_gas_used());

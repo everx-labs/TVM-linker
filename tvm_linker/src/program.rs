@@ -46,7 +46,7 @@ impl Program {
         self.keypair = Some(pair);        
     }
 
-    pub fn data(&self) -> Result<SliceData, String> {
+    pub fn data(&self) -> std::result::Result<SliceData, String> {
         let bytes = 
             if let Some(ref pair) = self.keypair {
                 pair.public.to_bytes()
@@ -73,13 +73,13 @@ impl Program {
         self.engine.entry()
     }
 
-    pub fn internal_method_dict(&self) -> Result<Option<Cell>, String> {
+    pub fn internal_method_dict(&self) -> std::result::Result<Option<Cell>, String> {
         let dict = prepare_methods(&self.engine.privates())
             .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()) )?;
         Ok(dict.data().map(|cell| cell.clone()))
     }
 
-    pub fn public_method_dict(&self) -> Result<Option<Cell>, String> {
+    pub fn public_method_dict(&self) -> std::result::Result<Option<Cell>, String> {
         let mut dict = prepare_methods(&self.engine.internals())
             .map_err(|e| e.1.replace("_name_", &self.engine.internal_name(e.0).unwrap()) )?;
 
@@ -89,18 +89,18 @@ impl Program {
         Ok(dict.data().map(|cell| cell.clone()))
     }
    
-    pub fn compile_to_file(&self, wc: i8) -> Result<String, String> {
+    pub fn compile_to_file(&self, wc: i8) -> std::result::Result<String, String> {
         save_to_file(self.compile_to_state()?, None, wc)
     }
 
-    pub fn compile_to_state(&self) -> Result<StateInit, String> {
+    pub fn compile_to_state(&self) -> std::result::Result<StateInit, String> {
         let mut state = StateInit::default();
         state.set_code(self.compile_asm()?.cell().clone());
         state.set_data(self.data()?.cell().clone());
         Ok(state)
     }
 
-    pub fn compile_asm(&self) -> Result<SliceData, String> {
+    pub fn compile_asm(&self) -> std::result::Result<SliceData, String> {
         let mut internal_selector = compile_code(SELECTOR_INTERNAL)
             .map_err(|_| "unexpected TVM error while compiling internal selector".to_string())?;
         internal_selector.append_reference(self.internal_method_dict()?.unwrap_or_default().into());
@@ -122,7 +122,7 @@ impl Program {
     }
 }
 
-pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8) -> Result<String, String> {
+pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8) -> std::result::Result<String, String> {
     let root_cell = state.write_to_new_cell()
         .map_err(|e| format!("Serialization failed: {}", e))?
         .into();
