@@ -673,44 +673,6 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
         }
     }
     post {
-        success {
-            node ('master') {
-                script {
-                    withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
-                        identity = awsIdentity()
-                        list = s3FindFiles(bucket: 'sdkbinaries.tonlabs.io', path: 'tmp_linker/', glob: '*')
-                        for (def file : list) {
-                            s3Copy fromBucket: 'sdkbinaries.tonlabs.io', fromPath: "tmp_linker/${file.path}", toBucket: 'sdkbinaries.tonlabs.io', toPath: "${file.path}"
-                        }
-                        s3Delete bucket: 'sdkbinaries.tonlabs.io', path: 'tmp_linker/'
-                    }
-                    def cause = "${currentBuild.getBuildCauses()}"
-                    echo "${cause}"
-                    if(!cause.matches('upstream')) {
-                        withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
-                            identity = awsIdentity()
-                            s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
-                        }
-                        sh """
-                            echo const fs = require\\(\\'fs\\'\\)\\; > release.js
-                            echo const ver = JSON.parse\\(fs.readFileSync\\(\\'version.json\\'\\, \\'utf8\\'\\)\\)\\; >> release.js
-                            echo if\\(!ver.release\\) { throw new Error\\(\\'Empty release field\\'\\); } >> release.js
-                            echo if\\(ver.candidate\\) { ver.release = ver.candidate\\; ver.candidate = \\'\\'\\; } >> release.js
-                            echo fs.writeFileSync\\(\\'version.json\\', JSON.stringify\\(ver\\)\\)\\; >> release.js
-                            cat release.js
-                            cat version.json
-                            node release.js
-                        """
-                        withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
-                            identity = awsIdentity()
-                            s3Upload \
-                                bucket: 'sdkbinaries.tonlabs.io', \
-                                includePathPattern:'version.json', workingDir:'.'
-                        }
-                    }
-                }
-            }
-        }
         failure {
             node ('master') {
                 script {
