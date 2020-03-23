@@ -17,7 +17,15 @@ use crc16::*;
 use base64;
 use ton_client_rs::{TonClient, TonAddress};
 
-pub fn generate_address(conf: Config, tvc: &str, _wc_str: Option<&str>, keys_file: Option<&str>, new_keys: bool) -> Result<(), String> {
+pub fn generate_address(
+    conf: Config,
+    tvc: &str,
+    _wc_str: Option<&str>,
+    keys_file: Option<&str>,
+    new_keys: bool,
+    initial_data: Option<&str>,
+    update_tvc: bool,
+) -> Result<(), String> {
     let ton = TonClient::new_with_base_url(&conf.url)
         .map_err(|e| format!("failed to create tonclient: {}", e.to_string()))?;
 
