@@ -1,5 +1,5 @@
 pragma solidity >=0.6.0;
-pragma AbiHeader expire;
+pragma AbiHeader v1;
 
 contract TestData {
 
