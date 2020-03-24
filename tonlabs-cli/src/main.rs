@@ -54,6 +54,7 @@ fn main_internal() -> Result <(), String> {
             (version: "0.1")
             (author: "TONLabs")
             (@arg TVC: +required +takes_value "Compiled smart contract (tvc file).")
+            (@arg ABI: --abi +required +takes_value "Json file with contract ABI.")
             (@arg WC: --wc +takes_value "Workchain id used to generate user-friendly addresses (default -1).")
             (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file.")
             (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file.")
@@ -194,8 +195,9 @@ fn genaddr_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
     let keys = matches.value_of("GENKEY").or(matches.value_of("SETKEY"));
     let new_keys = matches.is_present("GENKEY");
     let initial_data = matches.value_of("DATA");
+    let abi = matches.value_of("ABI").unwrap();
     let update_tvc = matches.is_present("SAVE");
-    generate_address(config, tvc, wc, keys, new_keys, initial_data, update_tvc)
+    generate_address(config, tvc, abi, wc, keys, new_keys, initial_data, update_tvc)
 }
 
 fn account_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
