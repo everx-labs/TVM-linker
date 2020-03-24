@@ -88,6 +88,8 @@ pub fn generate_address(
         println!("Non-bounceable address (for init): {}", &calc_userfriendly_address(wc, &addr256, false, false));
         println!("Bounceable address (for later access): {}", &calc_userfriendly_address(wc, &addr256, true, false));
     }
+
+    println!("Succeded");
     Ok(())
 }
 
@@ -122,6 +124,7 @@ fn update_contract_state(tvc_file: &str, pubkey: &[u8], data: Option<String>, ab
 
     state_init.seek(std::io::SeekFrom::Start(0)).unwrap();
     state_init.write_all(&vec_bytes).unwrap();
+    println!("TVC file updated");
 
     Ok(())
 }

@@ -54,7 +54,7 @@ fn main_internal() -> Result <(), String> {
             (version: "0.1")
             (author: "TONLabs")
             (@arg TVC: +required +takes_value "Compiled smart contract (tvc file).")
-            (@arg ABI: --abi +required +takes_value "Json file with contract ABI.")
+            (@arg ABI: +required +takes_value "Json file with contract ABI.")
             (@arg WC: --wc +takes_value "Workchain id used to generate user-friendly addresses (default -1).")
             (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file.")
             (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file.")

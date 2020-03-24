@@ -18,3 +18,22 @@ fn test_call_giver() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+#[test]
+fn test_genaddr_initdata() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("tonlabs-cli")?;
+    cmd.arg("genaddr")
+        .arg("tests/data.tvc")
+        .arg("tests/data.abi.json")
+        .arg("--genkey")
+        .arg("key1")
+        .arg("--save")
+        .arg("--data")
+        .arg(r#"{"m_owner":"0x2e0d054dfe43198d971c0f8eaa5f98ca8d08928ecb48a362a900997faecff2e5"}"#);
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("TVC file updated"))
+        .stdout(predicate::str::contains("Succeded"));
+
+    Ok(())
+}
