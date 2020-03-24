@@ -49,7 +49,7 @@ fn test_genaddr_initdata() -> Result<(), Box<dyn std::error::Error>> {
         .arg("key1")
         .arg("--save")
         .arg("--data")
-        .arg(r#"{"m_owner":"0x2e0d054dfe43198d971c0f8eaa5f98ca8d08928ecb48a362a900997faecff2e5"}"#);
+        .arg(r#"{"m_id":"0x2e0d054dfe43198d971c0f8eaa5f98ca8d08928ecb48a362a900997faecff2e5"}"#);
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("TVC file updated"))
