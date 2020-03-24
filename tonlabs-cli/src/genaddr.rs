@@ -15,11 +15,16 @@ use crate::config::Config;
 use crate::helpers::read_keys;
 use crc16::*;
 use base64;
+use ed25519_dalek::PublicKey;
 use ton_client_rs::{TonClient, TonAddress};
+use serde_json;
+use std::fs::OpenOptions;
+use ton_sdk;
 
 pub fn generate_address(
     conf: Config,
     tvc: &str,
+    abi: &str,
     _wc_str: Option<&str>,
     keys_file: Option<&str>,
     new_keys: bool,
@@ -28,9 +33,12 @@ pub fn generate_address(
 ) -> Result<(), String> {
     let ton = TonClient::new_with_base_url(&conf.url)
         .map_err(|e| format!("failed to create tonclient: {}", e.to_string()))?;
-
+    
     let contract = std::fs::read(tvc)
         .map_err(|e| format!("failed to read smart contract file: {}", e.to_string()))?;
+
+    let abi = std::fs::read_to_string(abi)
+        .map_err(|e| format!("failed to read ABI file: {}", e.to_string()))?;
 
     let mut new_keys_file = None;
     let mut print_keys = false;
@@ -48,11 +56,21 @@ pub fn generate_address(
             .map_err(|e| format!("failed to generate keypair: {}", e.to_string()))?
     };
         
+    let initial_data = initial_data.map(|s| s.to_string());
+
     //TODO: use wc_str in address.
-    let addr = ton.contracts.get_deploy_address(&contract, &keys)
-        .map_err(|e| format!("failed to generate address: {}", e.to_string()))?;
+    let addr = ton.contracts.get_deploy_address(
+        &abi,
+        &contract,
+        initial_data.clone().map(|d| d.into()),
+        &keys,
+    ).map_err(|e| format!("failed to generate address: {}", e.to_string()))?;
 
     println!("Raw address: {}", addr);
+
+    if update_tvc {
+        update_contract_state(tvc, &keys.public.0, initial_data, &abi)?;
+    }
 
     let keys_json = serde_json::to_string_pretty(&keys).unwrap();
     if new_keys_file.is_some() {
@@ -82,4 +100,29 @@ fn calc_userfriendly_address(wc: i8, addr: &[u8], bounce: bool, testnet: bool) -
     let crc = State::<XMODEM>::calculate(&bytes);
     bytes.extend_from_slice(&crc.to_be_bytes());
     base64::encode(&bytes)
+}
+
+fn update_contract_state(tvc_file: &str, pubkey: &[u8], data: Option<String>, abi: &str) -> Result<(), String> {
+    use std::io::{Seek, Write};
+    let mut state_init = OpenOptions::new().read(true).write(true).open(tvc_file)
+        .map_err(|e| format!("unable to open contract file: {}", e))?;
+
+    let pubkey_object = PublicKey::from_bytes(pubkey)
+        .map_err(|e| format!("unable to load public key: {}", e))?;
+
+    let mut contract_image = ton_sdk::ContractImage::from_state_init_and_key(&mut state_init, &pubkey_object)
+        .map_err(|e| format!("unable to load contract image: {}", e))?;
+
+    if data.is_some() {
+        contract_image.update_data(&data.unwrap(), abi)
+            .map_err(|e| format!("unable to update contract image data: {}", e))?;
+    }
+
+    let vec_bytes = contract_image.serialize()
+        .map_err(|e| format!("unable to serialize contract image: {}", e))?;
+
+    state_init.seek(std::io::SeekFrom::Start(0)).unwrap();
+    state_init.write_all(&vec_bytes).unwrap();
+
+    Ok(())
 }
