@@ -47,36 +47,6 @@ pub fn decode_boc(file_name: &str, is_tvc: bool) {
 
 }
 
-#[allow(dead_code)]
-pub fn make_boc() {
-    println! ("Making real TON");
-    let address = AccountId::from_str("4e5756321b532011c422382c5478569d21bd15ef33d5ede4e7fc250408a926d2").unwrap();
-    let mut msg_hdr = ExternalInboundMessageHeader::default();
-    msg_hdr.dst = MsgAddressInt::AddrStd (MsgAddrStd::with_address(None, -1, address));
-    let mut msg = Message::with_ext_in_header (msg_hdr);
-
-    let left = BuilderData::new();
-    let right = BuilderData::new();
-    let mut node = BuilderData::new();
-    node.append_reference (left);
-    node.append_reference (right);
-    node.append_raw(&[0,0,1,35], 32).unwrap();
-
-    *msg.body_mut() = Some(node.into());
-
-    println!("Message = {:?}", msg);
-
-    let root_cell = msg.write_to_new_cell().unwrap().into();
-
-    let mode = BocSerialiseMode::Generic { index: false, crc: true, cache_bits: false, flags: 0 };
-    let boc = BagOfCells::with_roots([&root_cell].to_vec());
-    let mut bytes = Vec::with_capacity(100);
-    boc.write_to_ex(&mut bytes, mode.clone(), None, Some(4)).unwrap();
-
-    let bytes_len = bytes.len();
-    println!("Encoded message: {}, len = {}", hex::encode(bytes), bytes_len);
-}
-
 pub fn compile_message(
     address_str: &str, 
     wc: Option<&str>, 
@@ -117,4 +87,8 @@ pub fn compile_message(
 
     println!("boc file created: {}", output_file_name);
     Ok(())
+}
+
+fn set_initial_data(tvc: &str, data: &str) -> Result<(), String> {
+    
 }
