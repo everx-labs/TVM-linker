@@ -23,7 +23,7 @@ extern crate hex;
 use ton_block::*;
 use ton_types::types::{AccountId};
 use ton_types::cells_serialization::{BocSerialiseMode, BagOfCells, deserialize_cells_tree_ex };
-use ton_types::{BuilderData, SliceData};
+use ton_types::SliceData;
 
 pub fn decode_boc(file_name: &str, is_tvc: bool) {
     let mut orig_bytes = Vec::new();

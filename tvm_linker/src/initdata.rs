@@ -1,4 +1,4 @@
-use ed25519-dalek::PublicKey;
+use ed25519_dalek::PublicKey;
 use std::fs::OpenOptions;
 use ton_sdk;
 
@@ -8,7 +8,7 @@ pub fn set_initial_data(tvc: &str, pubkey: Option<[u8; 32]>, data: &str, abi: &s
         .map_err(|e| format!("unable to open contract file: {}", e))?;
 
     let mut contract_image = if let Some(key_bytes) = pubkey {
-        let pubkey_object = PublicKey::from_bytes(&pubkey)
+        let pubkey_object = PublicKey::from_bytes(&key_bytes)
             .map_err(|e| format!("unable to load public key: {}", e))?;
         ton_sdk::ContractImage::from_state_init_and_key(&mut state_init, &pubkey_object)
             .map_err(|e| format!("unable to load contract image: {}", e))?

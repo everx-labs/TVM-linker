@@ -30,8 +30,10 @@ extern crate ton_types;
 extern crate ton_vm;
 #[macro_use]
 extern crate log;
+extern crate ton_sdk;
 
 mod abi;
+mod initdata;
 mod keyman;
 mod parser;
 mod printer;
@@ -43,6 +45,7 @@ mod testcall;
 
 use abi::{build_abi_body, decode_body};
 use clap::ArgMatches;
+use initdata::set_initial_data;
 use keyman::KeypairManager;
 use parser::ParseEngine;
 use program::Program;
@@ -256,7 +259,7 @@ fn run_init_subcmd(matches: &ArgMatches) -> Result<(), String> {
     let tvc = matches.value_of("INPUT").unwrap();
     let vars = matches.value_of("DATA").unwrap();
     let abi = matches.value_of("ABI").unwrap();
-    set_initial_data(tvc, vars, abi)
+    set_initial_data(tvc, None, vars, abi)
 }
 
 
