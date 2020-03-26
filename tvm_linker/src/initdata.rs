@@ -1,10 +1,10 @@
 use ed25519_dalek::PublicKey;
+use program::save_to_file;
 use std::fs::OpenOptions;
 use ton_sdk;
 
 pub fn set_initial_data(tvc: &str, pubkey: Option<[u8; 32]>, data: &str, abi: &str) -> Result<(), String> {
-    use std::io::{Seek, Write};
-    let mut state_init = OpenOptions::new().read(true).write(true).open(tvc)
+    let mut state_init = OpenOptions::new().read(true).open(tvc)
         .map_err(|e| format!("unable to open contract file: {}", e))?;
     let abi = std::fs::read_to_string(abi)
         .map_err(|e| format!("unable to read ABI file: {}", e))?;
@@ -22,12 +22,6 @@ pub fn set_initial_data(tvc: &str, pubkey: Option<[u8; 32]>, data: &str, abi: &s
     contract_image.update_data(data, &abi)
         .map_err(|e| format!("unable to update contract image data: {}", e))?;
 
-    let vec_bytes = contract_image.serialize()
-        .map_err(|e| format!("unable to serialize contract image: {}", e))?;
-
-    state_init.seek(std::io::SeekFrom::Start(0)).unwrap();
-    state_init.write_all(&vec_bytes).unwrap();
-    println!("TVC file updated");
-
+    save_to_file(contract_image.state_init(), None, 0)?;
     Ok(())
 }

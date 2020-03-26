@@ -112,6 +112,17 @@ Example:
 	tvm_linker address test --body 00$main:X$ -s source
 	tvm_linker address test --body 00$main:x$ -s source
 
+### 5) Initialize public variables in compiled contract
+
+	tvm_linker init <tvc_file> <data_json> <abi_file>
+
+Updates contract data with values defined in `data_json` argument.
+
+Example:
+
+	tvm_linker init contract.tvc '{"var1":10}' contract.abi.json
+
+
 ### More Help
 Use `tvm_linker --help` for detailed description about all options, flags and subcommands.
 
