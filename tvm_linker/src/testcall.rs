@@ -224,6 +224,35 @@ pub fn perform_contract_call<F>(
     println!("");
     println!("{}", engine.dump_stack("Post-execution stack state", false));
     println!("{}", engine.dump_ctrls(false));
+    
+    if decode_actions {
+        if let StackItem::Cell(cell) = engine.get_actions() {
+            let actions: OutActions = OutActions::construct_from(&mut cell.into())
+                .expect("Failed to decode output actions");
+            println!("Output actions:\n----------------");
+            for act in actions {
+                match act {
+                    OutAction::SendMsg{mode: _, out_msg } => {
+                        println!("Action(SendMsg):\n{}", MsgPrinter{ msg: out_msg.clone() });
+                        if let Some(b) = out_msg.body() {
+                            decoder(b, out_msg.is_internal());
+                        }
+                    },
+                    OutAction::SetCode{ new_code: code } => {
+                        println!("Action(SetCode)");
+                        state_init.code = Some(code);
+                    },
+                    OutAction::ReserveCurrency { .. } => {
+                        println!("Action(ReserveCurrency)");
+                    },
+                    OutAction::ChangeLibrary { .. } => {
+                        println!("Action(ChangeLibrary)");
+                    },
+                    _ => println!("Action(Unknown)"),
+                };
+            }
+        }
+    }
 
     if exit_code == 0 || exit_code == 1 {
         state_init.data = match engine.get_committed_state().get_root() {
@@ -233,22 +262,7 @@ pub fn perform_contract_call<F>(
         save_to_file(state_init, Some(contract_file), 0).expect("error");
         println!("Contract persistent data updated");
     }
-    
-    if decode_actions {
-        if let StackItem::Cell(cell) = engine.get_actions() {
-            let actions: OutActions = OutActions::construct_from(&mut cell.into())
-                .expect("Failed to decode output actions");
-            println!("Output actions:\n----------------");
-            for act in actions {
-                if let OutAction::SendMsg{mode: _, out_msg } = act {
-                    println!("Action(SendMsg):\n{}", MsgPrinter{ msg: out_msg.clone() });
-                    if let Some(b) = out_msg.body() {
-                        decoder(b, out_msg.is_internal());
-                    }
-                }
-            }
-        }
-    }
+
     exit_code
 }
 
