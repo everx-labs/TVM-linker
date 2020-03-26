@@ -136,6 +136,7 @@ fn linker_main() -> Result<(), String> {
             (about: "initialize smart contract public variables")
             (@arg INPUT: +required +takes_value "Path to compiled smart contract file")
             (@arg DATA: +required +takes_value "Set of public variables with values in json format")
+            (@arg ABI: +required +takes_value "Path to smart contract ABI file")
         )
         (@setting SubcommandRequired)
     ).get_matches();
@@ -254,7 +255,8 @@ fn linker_main() -> Result<(), String> {
 fn run_init_subcmd(matches: &ArgMatches) -> Result<(), String> {
     let tvc = matches.value_of("INPUT").unwrap();
     let vars = matches.value_of("DATA").unwrap();
-    set_initial_data(tvc, vars)
+    let abi = matches.value_of("ABI").unwrap();
+    set_initial_data(tvc, vars, abi)
 }
 
 

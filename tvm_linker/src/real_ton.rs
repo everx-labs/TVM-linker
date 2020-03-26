@@ -88,7 +88,3 @@ pub fn compile_message(
     println!("boc file created: {}", output_file_name);
     Ok(())
 }
-
-fn set_initial_data(tvc: &str, data: &str) -> Result<(), String> {
-    
-}
