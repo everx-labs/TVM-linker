@@ -6,6 +6,8 @@ pub fn set_initial_data(tvc: &str, pubkey: Option<[u8; 32]>, data: &str, abi: &s
     use std::io::{Seek, Write};
     let mut state_init = OpenOptions::new().read(true).write(true).open(tvc)
         .map_err(|e| format!("unable to open contract file: {}", e))?;
+    let abi = std::fs::read_to_string(abi)
+        .map_err(|e| format!("unable to read ABI file: {}", e))?;
 
     let mut contract_image = if let Some(key_bytes) = pubkey {
         let pubkey_object = PublicKey::from_bytes(&key_bytes)
@@ -17,7 +19,7 @@ pub fn set_initial_data(tvc: &str, pubkey: Option<[u8; 32]>, data: &str, abi: &s
             .map_err(|e| format!("unable to load contract image: {}", e))?
     };
 
-    contract_image.update_data(data, abi)
+    contract_image.update_data(data, &abi)
         .map_err(|e| format!("unable to update contract image data: {}", e))?;
 
     let vec_bytes = contract_image.serialize()
