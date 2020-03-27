@@ -62,6 +62,7 @@ pub fn generate_address(conf: Config, tvc: &str, _wc_str: Option<&str>, keys_fil
         println!("Non-bounceable address (for init): {}", &calc_userfriendly_address(wc, &addr256, false, false));
         println!("Bounceable address (for later access): {}", &calc_userfriendly_address(wc, &addr256, true, false));
     }
+    println!("Succeded");
     Ok(())
 }
 
