@@ -30,8 +30,10 @@ extern crate ton_types;
 extern crate ton_vm;
 #[macro_use]
 extern crate log;
+extern crate ton_sdk;
 
 mod abi;
+mod initdata;
 mod keyman;
 mod parser;
 mod printer;
@@ -43,6 +45,7 @@ mod testcall;
 
 use abi::{build_abi_body, decode_body};
 use clap::ArgMatches;
+use initdata::set_initial_data;
 use keyman::KeypairManager;
 use parser::ParseEngine;
 use program::Program;
@@ -102,7 +105,7 @@ fn linker_main() -> Result<(), String> {
             (about: "execute contract in test environment")
             (version: "0.1")
             (author: "TONLabs")
-            (@arg SOURCE: -s --source +takes_value "contract source file")
+            (@arg SOURCE: -s --source +takes_value "Contract source file")
             (@arg BODY: --body +takes_value "Body for external inbound message (hex string)")
             (@arg SIGN: --sign +takes_value "Signs body with private key from defined file")
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
@@ -132,8 +135,19 @@ fn linker_main() -> Result<(), String> {
             (@arg SIGN: --setkey +takes_value "Loads existing keypair from the file")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name")
         )
+        (@subcommand init =>
+            (about: "initialize smart contract public variables")
+            (@arg INPUT: +required +takes_value "Path to compiled smart contract file")
+            (@arg DATA: +required +takes_value "Set of public variables with values in json format")
+            (@arg ABI: +required +takes_value "Path to smart contract ABI file")
+        )
         (@setting SubcommandRequired)
     ).get_matches();
+
+    //SUBCOMMAND INIT
+    if let Some(matches) = matches.subcommand_matches("init") {
+        return run_init_subcmd(matches);
+    }
 
     //SUBCOMMAND TEST
     if let Some(test_matches) = matches.subcommand_matches("test") {
@@ -240,6 +254,14 @@ fn linker_main() -> Result<(), String> {
 
     unreachable!()
 }
+
+fn run_init_subcmd(matches: &ArgMatches) -> Result<(), String> {
+    let tvc = matches.value_of("INPUT").unwrap();
+    let vars = matches.value_of("DATA").unwrap();
+    let abi = matches.value_of("ABI").unwrap();
+    set_initial_data(tvc, None, vars, abi)
+}
+
 
 fn run_test_subcmd(test_matches: &ArgMatches) -> Result<(), String> {
     let (body, sign) = match test_matches.value_of("BODY") {
