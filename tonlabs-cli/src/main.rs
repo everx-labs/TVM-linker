@@ -28,6 +28,24 @@ use config::{Config, set_config};
 use deploy::deploy_contract;
 use genaddr::generate_address;
 
+const VERBOSE_MODE: bool = true;
+
+macro_rules! print_args {
+    ($m:ident, $( $arg:ident ),* ) => {
+        if ($m.is_present("VERBOSE") || VERBOSE_MODE) {
+            println!("Input arguments:");
+            $(
+                println!(
+                    "{:>width$}: {}",
+                    stringify!($arg),
+                    if $arg.is_some() { $arg.as_ref().unwrap() } else { "None" },
+                    width=8
+                );
+            )*
+        }
+    };
+}
+
 fn main() -> Result<(), i32> {    
     main_internal().map_err(|err_str| {
         println!("Error: {}", err_str);
@@ -57,6 +75,7 @@ fn main_internal() -> Result <(), String> {
             (@arg WC: --wc +takes_value "Workchain id used to generate user-friendly addresses (default -1).")
             (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file.")
             (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file.")
+            (@arg VERBOSE: -v --verbose "Prints additional information about command execution.")
         )
         (@subcommand deploy =>
             (@setting AllowNegativeNumbers)
@@ -66,7 +85,8 @@ fn main_internal() -> Result <(), String> {
             (@arg TVC: +required +takes_value "Compiled smart contract (tvc file)")
             (@arg PARAMS: +required +takes_value "Constructor arguments.")
             (@arg ABI: --abi +takes_value "Json file with contract ABI.")
-            (@arg SIGN: --sign +takes_value "Keypair used to sign 'constructor message'.")            
+            (@arg SIGN: --sign +takes_value "Keypair used to sign 'constructor message'.")
+            (@arg VERBOSE: -v --verbose "Prints additional information about command execution.")
         )
         (@subcommand call =>
             (about: "Sends external message to contract with encoded function call.")
@@ -77,6 +97,7 @@ fn main_internal() -> Result <(), String> {
             (@arg PARAMS: +required +takes_value "Arguments for the contract method.")
             (@arg ABI: --abi +takes_value "Json file with contract ABI.")
             (@arg SIGN: --sign +takes_value "Keypair used to sign message.")
+            (@arg VERBOSE: -v --verbose "Prints additional information about command execution.")
         )
         (@subcommand run =>
             (about: "Runs contract's get-method.")
@@ -86,6 +107,7 @@ fn main_internal() -> Result <(), String> {
             (@arg METHOD: +required +takes_value conflicts_with[BODY] "Name of calling contract method.")
             (@arg PARAMS: +required +takes_value conflicts_with[BODY] "Arguments for the contract method.")
             (@arg ABI: --abi +takes_value conflicts_with[BODY] "Json file with contract ABI.")
+            (@arg VERBOSE: -v --verbose "Prints additional information about command execution.")
         )
         (@subcommand config =>
             (about: "Writes parameters to config file that can be used later in subcommands.")
@@ -94,13 +116,14 @@ fn main_internal() -> Result <(), String> {
             (@arg URL: --url +takes_value "Url to connect.")
             (@arg ABI: --abi +takes_value conflicts_with[DATA] "File with contract ABI.")
             (@arg KEYS: --keys +takes_value "File with keypair.")
-            (@arg ADDR: --addr +takes_value "Contract address.")
+            (@arg ADDR: --addr +takes_value "Contract address.")            
         )
         (@subcommand account =>
             (about: "Gets account information.")
             (version: "0.1")
             (author: "TONLabs")
             (@arg ADDRESS: +required +takes_value "Smart contract address.")
+            (@arg VERBOSE: -v --verbose "Prints additional information about command execution.")
         )
         (@setting SubcommandRequired)
     ).get_matches();
@@ -140,61 +163,76 @@ fn main_internal() -> Result <(), String> {
 }
 
 fn send_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
-    let addr = matches.value_of("ADDRESS").unwrap();
-    let method = matches.value_of("METHOD").unwrap();
-    let params = matches.value_of("PARAMS").unwrap();
-    let abi = matches.value_of("ABI")
-        .map(|s| s.to_string())
-        .or(config.abi_path.clone())
-        .ok_or("ABI file not defined. Supply it in config file or command line.".to_string())?;
+    let address = matches.value_of("ADDRESS");
+    let method = matches.value_of("METHOD");
+    let params = matches.value_of("PARAMS");
+    let abi = Some(
+        matches.value_of("ABI")
+            .map(|s| s.to_string())
+            .or(config.abi_path.clone())
+            .ok_or("ABI file not defined. Supply it in config file or command line.".to_string())?
+    );
     let keys = matches.value_of("SIGN")
         .map(|s| s.to_string())
         .or(config.keys_path.clone());
-    call_contract(config, addr, &abi, method, params, keys, false)
+    print_args!(matches, address, method, params, abi, keys);
+    call_contract(config, address.unwrap(), &abi.unwrap(), method.unwrap(), params.unwrap(), keys, false)
 }
 
 fn run_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
-    let addr = matches.value_of("ADDRESS").unwrap();
-    let method = matches.value_of("METHOD").unwrap();
-    let params = matches.value_of("PARAMS").unwrap();
-    let abi = matches.value_of("ABI")
+    let address = matches.value_of("ADDRESS");
+    let method = matches.value_of("METHOD");
+    let params = matches.value_of("PARAMS");
+    let abi = Some(
+        matches.value_of("ABI")
         .map(|s| s.to_string())
         .or(config.abi_path.clone())
-        .ok_or("ABI file not defined. Supply it in config file or command line.".to_string())?;
-    call_contract(config, addr, &abi, method, params, None, true)
+        .ok_or("ABI file not defined. Supply it in config file or command line.".to_string())?
+    );
+    let keys: Option<String> = None;
+    print_args!(matches, address, method, params, abi, keys);
+    call_contract(config, address.unwrap(), &abi.unwrap(), method.unwrap(), params.unwrap(), keys, true)
 }
 
 fn deploy_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
-    let tvc = matches.value_of("TVC").unwrap();
-    let params = matches.value_of("PARAMS").unwrap();
-    let abi = matches.value_of("ABI")
-        .map(|s| s.to_string())
-        .or(config.abi_path.clone())
-        .ok_or("ABI file not defined. Supply it in config file or command line.".to_string())?;
-    let keys = matches.value_of("SIGN")
-        .map(|s| s.to_string())
-        .or(config.keys_path.clone())
-        .ok_or("keypair file not defined. Supply it in config file or command line.".to_string())?;
-    deploy_contract(config, tvc, &abi, params, &keys)
+    let tvc = matches.value_of("TVC");
+    let params = matches.value_of("PARAMS");
+    let abi = Some(
+        matches.value_of("ABI")
+            .map(|s| s.to_string())
+            .or(config.abi_path.clone())
+            .ok_or("ABI file not defined. Supply it in config file or command line.".to_string())?
+    );
+    let keys = Some(
+        matches.value_of("SIGN")
+            .map(|s| s.to_string())
+            .or(config.keys_path.clone())
+            .ok_or("keypair file not defined. Supply it in config file or command line.".to_string())?
+    );
+    print_args!(matches, tvc, params, abi, keys);
+    deploy_contract(config, tvc.unwrap(), &abi.unwrap(), params.unwrap(), &keys.unwrap())
 }
 
 fn config_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
     let url = matches.value_of("URL");
-    let addr = matches.value_of("ADDR");
+    let address = matches.value_of("ADDR");
     let keys = matches.value_of("KEYS");
     let abi = matches.value_of("ABI");
-    set_config(config, "tonlabs-cli.conf.json", url, addr, abi, keys)
+    print_args!(matches, url, address, keys, abi);
+    set_config(config, "tonlabs-cli.conf.json", url, address, abi, keys)
 }
 
 fn genaddr_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
-    let tvc = matches.value_of("TVC").unwrap();
+    let tvc = matches.value_of("TVC");
     let wc = matches.value_of("WC");
     let keys = matches.value_of("GENKEY").or(matches.value_of("SETKEY"));
     let new_keys = matches.is_present("GENKEY");
-    generate_address(config, tvc, wc, keys, new_keys)
+    print_args!(matches, tvc, wc, keys);
+    generate_address(config, tvc.unwrap(), wc, keys, new_keys)
 }
 
 fn account_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
-    let addr = matches.value_of("ADDRESS").unwrap();
-    get_account(config, addr)
+    let address = matches.value_of("ADDRESS");
+    print_args!(matches, address);
+    get_account(config, address.unwrap())
 }

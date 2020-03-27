@@ -59,7 +59,7 @@ pub fn call_contract(
             result
         })
     } else {
-        println!("Waiting...");
+        println!("Calling method...");
         thread::spawn(move || {
             let result =
                 ton.contracts.run(&ton_addr, &abi, &method_val, params_val.into(), keys.as_ref())
