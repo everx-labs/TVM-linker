@@ -50,12 +50,12 @@ RUN apt-get update; \
 RUN rustup target add $TARGET
 COPY --from=linker-src --chown=root:root /tonlabs /tonlabs
 
-WORKDIR /tonlabs/tvm_linker
+WORKDIR /tonlabs/tvm_linker/tvm_linker
 
 RUN cargo update
 RUN cargo build --release --target $TARGET
 RUN mkdir -p /app
-RUN mv /tonlabs/tvm_linker/target/${TARGET}/release/tvm_linker /app
+RUN mv /tonlabs/tvm_linker/tvm_linker/target/${TARGET}/release/tvm_linker /app
 RUN chmod a+x /app/tvm_linker
 
 
