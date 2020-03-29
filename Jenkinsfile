@@ -531,7 +531,7 @@ cat tvm_linker/Cargo.toml
                                 node pathFix.js tonlabs/ton-labs-vm/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
                                 node pathFix.js tonlabs/ton-labs-abi/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
                                 node pathFix.js tonlabs/TON-SDK/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
-                                node pathFix.js tonlabs/tvm_linker/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
+                                node pathFix.js tonlabs/tvm_linker/tvm_linker/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
                             """
                             dir('tonlabs') {
                                 dir('tvm_linker') {
@@ -542,7 +542,7 @@ cat tvm_linker/Cargo.toml
                                     """
                                 }
                             }
-                            sh 'node gzip.js tonlabs/tvm_linker/target/release/tvm_linker'
+                            sh 'node gzip.js tonlabs/tvm_linker/tvm_linker/target/release/tvm_linker'
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
                                 s3Upload \
@@ -584,7 +584,7 @@ cat tvm_linker/Cargo.toml
                                 node pathFix.js tonlabs\\ton-labs-vm\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
                                 node pathFix.js tonlabs\\ton-labs-abi\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
                                 node pathFix.js tonlabs\\TON-SDK\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
-                                node pathFix.js tonlabs\\tvm_linker\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
+                                node pathFix.js tonlabs\\tvm_linker\\tvm_linker\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
                             """
                             dir('tonlabs') {
                                 dir('tvm_linker') {
@@ -596,7 +596,7 @@ cat tvm_linker/Cargo.toml
                                 }
                             }
 
-                            bat "node gzip.js tonlabs\\tvm_linker\\target\\release\\tvm_linker.exe"
+                            bat "node gzip.js tonlabs\\tvm_linker\\tvm_linker\\target\\release\\tvm_linker.exe"
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
                                 s3Upload \
