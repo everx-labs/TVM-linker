@@ -368,7 +368,7 @@ pipeline {
 sed 's/ton_types = .*/ton_types = { path = \"\\/tonlabs\\/ton-labs-types\" }/g' | \
 sed 's/ton_block = .*/ton_block = { path = \"\\/tonlabs\\/ton-labs-block\" }/g' | \
 sed 's/ton_abi = .*/ton_abi = { path = \"\\/tonlabs\\/ton-labs-abi\" }/g' | \
-sed 's/ton_sdk = .*/ton_sdk = { path = \"\\/tonlabs\\/TON-SDK\", default-features = false }/g' | \
+sed 's/ton_sdk = .*/ton_sdk = { path = \"\\/tonlabs\\/TON-SDK/ton_sdk\", default-features = false }/g' | \
 sed 's/ton_vm = .*/ton_vm = { path = \"\\/tonlabs\\/ton-labs-vm\", default-features = false }/g') > ./tvm_linker/tmp.toml
 rm ./tvm_linker/Cargo.toml
 mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
