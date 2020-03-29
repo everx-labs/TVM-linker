@@ -315,14 +315,14 @@ pipeline {
                     } else {
                         G_binversion = sh (script: "node tonVersion.js ${folders}", returnStdout: true).trim()
                     }
-
-
-                    withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
-                        identity = awsIdentity()
-                        s3Upload \
-                            bucket: 'sdkbinaries.tonlabs.io', \
-                            includePathPattern:'version.json', path: '', \
-                            workingDir:'.'
+                    if(!isUpstream() && (GIT_BRANCH == 'master' || GIT_BRANCH ==~ '^PR-[0-9]+')) {
+                        withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                            identity = awsIdentity()
+                            s3Upload \
+                                bucket: 'sdkbinaries.tonlabs.io', \
+                                includePathPattern:'version.json', path: '', \
+                                workingDir:'.'
+                        }
                     }
                 }
             }
@@ -338,7 +338,7 @@ pipeline {
         stage('Before stages') {
             when {
                 expression {
-                    return !isUpstream()
+                    return !isUpstream() && (GIT_BRANCH == 'master' || GIT_BRANCH ==~ '^PR-[0-9]+')
                 }
             }
             steps {
@@ -413,7 +413,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                 stage('Parallel stages') {
                     when {
                         expression {
-                            return !isUpstream()
+                            return !isUpstream() && (GIT_BRANCH == 'master' || GIT_BRANCH ==~ '^PR-[0-9]+')
                         }
                     }
                     steps {
@@ -454,9 +454,11 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                     }
                 }
                 stage('Build linux') {
-                    /*when { 
-                        branch 'master'
-                    }*/
+                    when { 
+                        expression {
+                            return !isUpstream() && (GIT_BRANCH == 'master' || GIT_BRANCH ==~ '^PR-[0-9]+')
+                        }
+                    }
                     agent {
                         dockerfile {
                             registryCredentialsId "${G_docker_creds}"
@@ -494,9 +496,11 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
 					}
                 }
                 stage('Build darwin') {
-                    /*when { 
-                        branch 'master'
-                    }*/
+                    when { 
+                        expression {
+                            return !isUpstream() && (GIT_BRANCH == 'master' || GIT_BRANCH ==~ '^PR-[0-9]+')
+                        }
+                    }
                     agent {
                         label 'ios'
                     }
@@ -545,9 +549,11 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
 					}
                 }
                 stage('Build windows') {
-                    /*when { 
-                        branch 'master'
-                    }*/
+                    when { 
+                        expression {
+                            return !isUpstream() && (GIT_BRANCH == 'master' || GIT_BRANCH ==~ '^PR-[0-9]+')
+                        }
+                    }
                     agent {
                         label 'Win'
                     }
@@ -649,8 +655,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
             when {
                 expression {
                     // GIT_BRANCH = 'origin/' + sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
-                    GIT_BRANCH = "origin/${BRANCH_NAME}"
-                    return GIT_BRANCH == G_promoted_branch || params.FORCE_PROMOTE_LATEST
+                    return (!isUpstream() && ("origin/${GIT_BRANCH}" == G_promoted_branch)) || params.FORCE_PROMOTE_LATEST
                 }
             }
             steps {
@@ -665,7 +670,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
         stage('After stages') {
             when {
                 expression {
-                    return !isUpstream()
+                    return !isUpstream() && (GIT_BRANCH == 'master' || GIT_BRANCH ==~ '^PR-[0-9]+')
                 }
             }
             steps {
