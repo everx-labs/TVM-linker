@@ -534,7 +534,7 @@ cat tvm_linker/Cargo.toml
                                 node pathFix.js tonlabs/tvm_linker/tvm_linker/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
                             """
                             dir('tonlabs') {
-                                dir('tvm_linker') {
+                                dir('tvm_linker/tvm_linker') {
                                     sh """
                                         cargo update
                                         cargo build --release
@@ -587,7 +587,7 @@ cat tvm_linker/Cargo.toml
                                 node pathFix.js tonlabs\\tvm_linker\\tvm_linker\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
                             """
                             dir('tonlabs') {
-                                dir('tvm_linker') {
+                                dir('tvm_linker/tvm_linker') {
                                     bat """
                                         cargo update
                                         cargo build --release
