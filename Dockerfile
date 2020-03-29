@@ -14,7 +14,7 @@ RUN addgroup --gid 1000 jenkins && \
 COPY --chown=jenkins:jenkins ./tvm_linker /tonlabs/tvm_linker/tvm_linker
 COPY --chown=jenkins:jenkins ./tonlabs-cli /tonlabs/tvm_linker/tonlabs-cli
 COPY --chown=jenkins:jenkins ./tvm-tools /tonlabs/tvm_linker/tvm-tools
-COPY --chown=jenkins:jenkins ./Cargo.* ./*.md ./*.rs /tonlabs/tvm_linker/
+COPY --chown=jenkins:jenkins ./*.md ./*.rs /tonlabs/tvm_linker/
 
 VOLUME ["/tonlabs/tvm_linker"]
 
