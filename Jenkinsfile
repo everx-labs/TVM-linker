@@ -157,6 +157,16 @@ def buildBranchesMap() {
 
 def buildParams() {
     buildImagesMap()
+    if(!isUpstream() && GIT_BRANCH != 'master' && !(GIT_BRANCH ==~ '^PR-[0-9]+')) {
+        G_images['ton-types'] = 'tonlabs/ton-types:latest'
+        G_images['ton-labs-types'] = 'tonlabs/ton-labs-types:latest'
+        G_images['ton-block'] = 'tonlabs/ton-block:latest'
+        G_images['ton-labs-block'] = 'tonlabs/ton-labs-block:latest'
+        G_images['ton-vm'] = 'tonlabs/ton-vm:latest'
+        G_images['ton-labs-vm'] = 'tonlabs/ton-labs-vm:latest'
+        G_images['ton-sdk'] = 'tonlabs/ton-sdk:latest'
+        G_images['ton-labs-abi'] = 'tonlabs/ton-labs-abi:latest'
+    }
     buildBranchesMap()
     G_params = []
     params.each { key, value ->
@@ -315,14 +325,14 @@ pipeline {
                     } else {
                         G_binversion = sh (script: "node tonVersion.js ${folders}", returnStdout: true).trim()
                     }
-
-
-                    withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
-                        identity = awsIdentity()
-                        s3Upload \
-                            bucket: 'sdkbinaries.tonlabs.io', \
-                            includePathPattern:'version.json', path: '', \
-                            workingDir:'.'
+                    if(!isUpstream() && (GIT_BRANCH == 'master' || GIT_BRANCH ==~ '^PR-[0-9]+')) {
+                        withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
+                            identity = awsIdentity()
+                            s3Upload \
+                                bucket: 'sdkbinaries.tonlabs.io', \
+                                includePathPattern:'version.json', path: '', \
+                                workingDir:'.'
+                        }
                     }
                 }
             }
@@ -338,7 +348,7 @@ pipeline {
         stage('Before stages') {
             when {
                 expression {
-                    return !isUpstream()
+                    return !isUpstream() && (GIT_BRANCH == 'master' || GIT_BRANCH ==~ '^PR-[0-9]+')
                 }
             }
             steps {
@@ -354,13 +364,16 @@ pipeline {
             steps {
                 script {
                     sh """
+cat tvm_linker/Cargo.toml
 (cat tvm_linker/Cargo.toml | \
 sed 's/ton_types = .*/ton_types = { path = \"\\/tonlabs\\/ton-labs-types\" }/g' | \
 sed 's/ton_block = .*/ton_block = { path = \"\\/tonlabs\\/ton-labs-block\" }/g' | \
 sed 's/ton_abi = .*/ton_abi = { path = \"\\/tonlabs\\/ton-labs-abi\" }/g' | \
+sed 's/ton_sdk = .*/ton_sdk = { path = \"\\/tonlabs\\/TON-SDK\\/ton_sdk\", default-features = false }/g' | \
 sed 's/ton_vm = .*/ton_vm = { path = \"\\/tonlabs\\/ton-labs-vm\", default-features = false }/g') > ./tvm_linker/tmp.toml
 rm ./tvm_linker/Cargo.toml
 mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
+cat tvm_linker/Cargo.toml
                     """
                 }
             }
@@ -392,6 +405,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                                         "--build-arg \"TON_LABS_BLOCK_IMAGE=${G_images['ton-labs-block']}\" " + 
                                         "--build-arg \"TON_LABS_VM_IMAGE=${G_images['ton-labs-vm']}\" " + 
                                         "--build-arg \"TON_LABS_ABI_IMAGE=${G_images['ton-labs-abi']}\" " + 
+                                        "--build-arg \"TON_SDK_IMAGE=${G_images['ton-sdk']}\" " + 
                                         "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\""
                 }
             }
@@ -411,7 +425,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                 stage('Parallel stages') {
                     when {
                         expression {
-                            return !isUpstream()
+                            return !isUpstream() && (GIT_BRANCH == 'master' || GIT_BRANCH ==~ '^PR-[0-9]+')
                         }
                     }
                     steps {
@@ -438,6 +452,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                                             "--build-arg \"TON_LABS_BLOCK_IMAGE=${G_images['ton-labs-block']}\" " + 
                                             "--build-arg \"TON_LABS_VM_IMAGE=${G_images['ton-labs-vm']}\" " + 
                                             "--build-arg \"TON_LABS_ABI_IMAGE=${G_images['ton-labs-abi']}\" " + 
+                                            "--build-arg \"TON_SDK_IMAGE=${G_images['ton-sdk']}\" " + 
                                             "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\" " +
                                             "."
                                         )
@@ -451,9 +466,11 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                     }
                 }
                 stage('Build linux') {
-                    /*when { 
-                        branch 'master'
-                    }*/
+                    when { 
+                        expression {
+                            return !isUpstream() && (GIT_BRANCH == 'master' || GIT_BRANCH ==~ '^PR-[0-9]+')
+                        }
+                    }
                     agent {
                         dockerfile {
                             registryCredentialsId "${G_docker_creds}"
@@ -462,6 +479,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                                         "--build-arg \"TON_LABS_BLOCK_IMAGE=${G_images['ton-labs-block']}\" " + 
                                         "--build-arg \"TON_LABS_VM_IMAGE=${G_images['ton-labs-vm']}\" " + 
                                         "--build-arg \"TON_LABS_ABI_IMAGE=${G_images['ton-labs-abi']}\" " + 
+                                        "--build-arg \"TON_SDK_IMAGE=${G_images['ton-sdk']}\" " + 
                                         "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\""
                         }
                     }
@@ -490,9 +508,11 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
 					}
                 }
                 stage('Build darwin') {
-                    /*when { 
-                        branch 'master'
-                    }*/
+                    when { 
+                        expression {
+                            return !isUpstream() && (GIT_BRANCH == 'master' || GIT_BRANCH ==~ '^PR-[0-9]+')
+                        }
+                    }
                     agent {
                         label 'ios'
                     }
@@ -510,6 +530,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                                 node pathFix.js tonlabs/ton-labs-block/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
                                 node pathFix.js tonlabs/ton-labs-vm/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
                                 node pathFix.js tonlabs/ton-labs-abi/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
+                                node pathFix.js tonlabs/TON-SDK/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
                                 node pathFix.js tonlabs/tvm_linker/Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}/tonlabs/\"
                             """
                             dir('tonlabs') {
@@ -540,9 +561,11 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
 					}
                 }
                 stage('Build windows') {
-                    /*when { 
-                        branch 'master'
-                    }*/
+                    when { 
+                        expression {
+                            return !isUpstream() && (GIT_BRANCH == 'master' || GIT_BRANCH ==~ '^PR-[0-9]+')
+                        }
+                    }
                     agent {
                         label 'Win'
                     }
@@ -560,6 +583,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
                                 node pathFix.js tonlabs\\ton-labs-block\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
                                 node pathFix.js tonlabs\\ton-labs-vm\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
                                 node pathFix.js tonlabs\\ton-labs-abi\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
+                                node pathFix.js tonlabs\\TON-SDK\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
                                 node pathFix.js tonlabs\\tvm_linker\\Cargo.toml \"{ path = \\\"/tonlabs/\" \"{ path = \\\"${C_PATH}\\tonlabs\\\\\"
                             """
                             dir('tonlabs') {
@@ -643,8 +667,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
             when {
                 expression {
                     // GIT_BRANCH = 'origin/' + sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
-                    GIT_BRANCH = "origin/${BRANCH_NAME}"
-                    return GIT_BRANCH == G_promoted_branch || params.FORCE_PROMOTE_LATEST
+                    return (!isUpstream() && ("origin/${GIT_BRANCH}" == G_promoted_branch)) || params.FORCE_PROMOTE_LATEST
                 }
             }
             steps {
@@ -659,7 +682,7 @@ mv ./tvm_linker/tmp.toml ./tvm_linker/Cargo.toml
         stage('After stages') {
             when {
                 expression {
-                    return !isUpstream()
+                    return !isUpstream() && (GIT_BRANCH == 'master' || GIT_BRANCH ==~ '^PR-[0-9]+')
                 }
             }
             steps {
