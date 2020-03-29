@@ -157,6 +157,16 @@ def buildBranchesMap() {
 
 def buildParams() {
     buildImagesMap()
+    if(!isUpstream() && GIT_BRANCH != 'master' && !(GIT_BRANCH ==~ '^PR-[0-9]+')) {
+        G_images['ton-types'] = 'tonlabs/ton-types:latest'
+        G_images['ton-labs-types'] = 'tonlabs/ton-labs-types:latest'
+        G_images['ton-block'] = 'tonlabs/ton-block:latest'
+        G_images['ton-labs-block'] = 'tonlabs/ton-labs-block:latest'
+        G_images['ton-vm'] = 'tonlabs/ton-vm:latest'
+        G_images['ton-labs-vm'] = 'tonlabs/ton-labs-vm:latest'
+        G_images['ton-sdk'] = 'tonlabs/ton-sdk:latest'
+        G_images['ton-labs-abi'] = 'tonlabs/ton-labs-abi:latest'
+    }
     buildBranchesMap()
     G_params = []
     params.each { key, value ->
