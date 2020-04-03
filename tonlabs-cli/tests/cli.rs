@@ -24,6 +24,7 @@ fn test_genaddr() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("tonlabs-cli")?;
     cmd.arg("genaddr")
         .arg("tests/samples/wallet.tvc")
+        .arg("tests/samples/wallet.abi.json")
         .arg("--genkey")
         .arg("tests/samples/wallet.keys.json")
         .arg("--verbose");

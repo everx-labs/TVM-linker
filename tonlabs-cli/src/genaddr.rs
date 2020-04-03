@@ -59,8 +59,8 @@ pub fn generate_address(
     let initial_data = initial_data.map(|s| s.to_string());
     let wc = i32::from_str_radix(wc_str.unwrap_or("0"), 10)
         .map_err(|e| format!("failed to parse workchain id: {}", e))?;
-    //TODO: use wc_str in address.
-    let addr = ton.contracts.get_deploy_address(
+
+        let addr = ton.contracts.get_deploy_address(
         &abi,
         &contract,
         initial_data.clone().map(|d| d.into()),
