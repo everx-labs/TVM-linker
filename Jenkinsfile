@@ -308,7 +308,7 @@ pipeline {
     tools {nodejs "Node12.8.0"}
     options {
         buildDiscarder logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '10')
-        disableConcurrentBuilds()
+        
         parallelsAlwaysFailFast()
     }
     stages {
