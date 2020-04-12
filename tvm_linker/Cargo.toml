@@ -11,8 +11,6 @@ repository = "https://github.com/tonlabs/TVM-linker"
 documentation = "https://docs.ton.dev"
 keywords = ["TON", "linker", "TVM", "tonlabs"]
 
-[workspace]
-
 [dependencies]
 base64 = "0.10.1"
 regex = "1"
