@@ -22,14 +22,13 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use ton_vm::executor::{Engine, gas::gas_state::Gas};
 use ton_vm::error::TvmError;
-use ton_vm::stack::integer::{IntegerData};
-use ton_vm::stack::{StackItem, Stack, savelist::SaveList};
+use ton_vm::stack::{StackItem, Stack, savelist::SaveList, integer::IntegerData};
 use ton_vm::SmartContractInfo;
 use ton_types::{AccountId, BuilderData, Cell, SliceData};
 use ton_block::{
     CurrencyCollection, Deserializable, ExternalInboundMessageHeader, Grams, 
     InternalMessageHeader, Message, MsgAddressExt, MsgAddressInt, OutAction, 
-    OutActions, Serializable, UnixTime32
+    OutActions, Serializable, StateInit, UnixTime32
 };
 
 #[allow(dead_code)]
@@ -53,11 +52,18 @@ fn create_external_inbound_msg(src_addr: MsgAddressExt, dst_addr: MsgAddressInt,
     msg
 }
 
-fn create_internal_msg(src_addr: MsgAddressInt, dst_addr: MsgAddressInt, value: u64, lt: u64, at: u32, body: Option<SliceData>) -> Message {
+fn create_internal_msg(
+    src_addr: MsgAddressInt,
+    dst_addr: MsgAddressInt,
+    value: CurrencyCollection,
+    lt: u64,
+    at: u32,
+    body: Option<SliceData>,
+) -> Message {
     let mut hdr = InternalMessageHeader::with_addresses(
         src_addr,
         dst_addr,
-        CurrencyCollection::with_grams(value),
+        value,
     );
     hdr.bounce = true;
     hdr.ihr_disabled = true;
@@ -101,73 +107,79 @@ fn init_logger(debug: bool) {
 }
 
 
+fn create_inbound_msg(
+    selector: i32,
+    src: Option<&str>,
+    dst: AccountId,
+    value: CurrencyCollection,
+    body: Option<SliceData>,
+) -> Option<Message> {
+    match selector {
+        0 => {
+            let src = match src {
+                Some(s) => MsgAddressInt::from_str(s).unwrap(),
+                None => MsgAddressInt::with_standart(None, 0, [0u8; 32].into()).unwrap(),
+            };
+            Some(create_internal_msg(
+                src,
+                MsgAddressInt::with_standart(None, 0, dst).unwrap(),
+                value,
+                1,
+                SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32,
+                body,
+            ))
+        },
+        -1 => {
+            let src = match src {
+                Some(s) => MsgAddressExt::from_str(s).unwrap(),
+                None => {
+                    MsgAddressExt::with_extern(
+                        BuilderData::with_raw(vec![0x55; 8], 64).unwrap().into()
+                    ).unwrap()
+                },
+            };
+            Some(create_external_inbound_msg(
+                src,
+                MsgAddressInt::with_standart(None, 0, dst.clone()).unwrap(), 
+                body,
+            ))
+        },
+        _ => None,
+    }
+}
 
-pub fn perform_contract_call<F>(
-    contract_file: &str, 
-    body: Option<SliceData>, 
-    key_file: Option<Option<&str>>, 
-    debug: bool, 
-    decode_actions: bool,
-    msg_value: Option<&str>,
-    ticktock: Option<&str>,
-    src_str: Option<&str>,
-    now: u32,
-    decoder: F,
-) -> i32
-    where F: Fn(SliceData, bool) -> ()
+fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: F) 
+    where F: Fn(SliceData, bool) -> () 
 {
-    let addr = AccountId::from_str(contract_file).unwrap();
-    let mut state_init = load_from_file(&format!("{}.tvc", contract_file));
-    
-    let mut stack = Stack::new();
-    let func_selector = match msg_value {
-        Some(_) => 0,    
-        None => if ticktock.is_some() { -2 } else { -1 },
-    };
-        
-    let mut value = 0;
-    if func_selector == 0 { 
-        value = u64::from_str_radix(msg_value.unwrap(), 10).unwrap_or(0);
+    if let StackItem::Cell(cell) = actions {
+        let actions: OutActions = OutActions::construct_from(&mut cell.into())
+            .expect("Failed to decode output actions");
+        println!("Output actions:\n----------------");
+        for act in actions {
+            match act {
+                OutAction::SendMsg{mode: _, out_msg } => {
+                    println!("Action(SendMsg):\n{}", MsgPrinter{ msg: out_msg.clone() });
+                    if let Some(b) = out_msg.body() {
+                        action_decoder(b, out_msg.is_internal());
+                    }
+                },
+                OutAction::SetCode{ new_code: code } => {
+                    println!("Action(SetCode)");
+                    state.code = Some(code);
+                },
+                OutAction::ReserveCurrency { .. } => {
+                    println!("Action(ReserveCurrency)");
+                },
+                OutAction::ChangeLibrary { .. } => {
+                    println!("Action(ChangeLibrary)");
+                },
+                _ => println!("Action(Unknown)"),
+            };
+        }
     }
+}
 
-    let msg = 
-        match func_selector {
-            0 => {
-                let src = match src_str {
-                    Some(s) => MsgAddressInt::from_str(s).unwrap(),
-                    None => MsgAddressInt::with_standart(None, 0, [0u8; 32].into()).unwrap(),
-                };
-                Some(create_internal_msg(
-                    src,
-                    MsgAddressInt::with_standart(None, 0, addr.clone()).unwrap(),
-                    value,
-                    1,
-                    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32,
-                    body.clone()
-                ))
-            },
-            -1 => {
-                let src = match src_str {
-                    Some(s) => MsgAddressExt::from_str(s).unwrap(),
-                    None => {
-                        MsgAddressExt::with_extern(
-                            BuilderData::with_raw(vec![0x55; 8], 64).unwrap().into()
-                        ).unwrap()
-                    },
-                };
-                Some(create_external_inbound_msg(
-                    src,
-                    MsgAddressInt::with_standart(None, 0, addr.clone()).unwrap(), 
-                    body.clone(),
-                ))
-            },
-            _ => None,
-        };
-    
-    if !log_enabled!(Error) {
-        init_logger(debug);
-    }
-
+fn load_code_and_data(state_init: &StateInit) -> (SliceData, SliceData) {
     let code: SliceData = state_init.code
             .clone()
             .unwrap_or(BuilderData::new().into())
@@ -176,14 +188,56 @@ pub fn perform_contract_call<F>(
             .clone()
             .unwrap_or(BuilderData::new().into())
             .into();
+    (code, data)
+}
 
+fn decode_balance(value: Option<&str>) -> (u64, CurrencyCollection) {
+    let value = value.unwrap_or("0");
+    (0, CurrencyCollection::with_grams(0))
+}
+
+pub fn perform_contract_call<F>(
+    contract_file: &str, 
+    body: Option<SliceData>, 
+    key_file: Option<Option<&str>>, 
+    debug: bool, 
+    decode_c5: bool,
+    msg_value: Option<&str>,
+    ticktock: Option<&str>,
+    src_str: Option<&str>,
+    balance: Option<&str>,
+    now: u32,
+    action_decoder: F,
+) -> i32
+    where F: Fn(SliceData, bool)
+{
+    let addr = AccountId::from_str(contract_file).unwrap();
+    
+    let func_selector = match msg_value {
+        Some(_) => 0,    
+        None => if ticktock.is_some() { -2 } else { -1 },
+    };
+    
+    let (value, msg_balance) = decode_balance(msg_value);
+    
+    let msg = create_inbound_msg(func_selector, src_str, addr.clone(), msg_balance, body.clone());
+        
+    if !log_enabled!(Error) {
+        init_logger(debug);
+    }
+    
+    let mut state_init = load_from_file(&format!("{}.tvc", contract_file));
+    let (code, data) = load_code_and_data(&state_init);
+    
     let workchain_id = if func_selector > -2 { 0 } else { -1 };
     let registers = initialize_registers(
         data,
         MsgAddressInt::with_standart(None, workchain_id, addr.clone()).unwrap(),
         now,
     );
-    
+
+    let (acc_value, account_balance) = decode_balance(balance);
+    let mut stack = Stack::new();
     if func_selector > -2 {
         let msg_cell = StackItem::Cell(msg.unwrap().write_to_new_cell().unwrap().into());
 
@@ -197,14 +251,14 @@ pub fn perform_contract_call<F>(
         }
 
         stack
-            .push(int!(100_000_000_000u64)) //contract balance: 100 grams
+            .push(int!(acc_value))
             .push(int!(value))              //msg balance
             .push(msg_cell)                 //msg
             .push(StackItem::Slice(body))   //msg.body
             .push(int!(func_selector));     //selector
     } else {
         stack
-            .push(int!(100_000_000_000u64)) //contract balance: 100 grams
+            .push(int!(acc_value))
             .push(StackItem::Integer(Arc::new(IntegerData::from_str_radix(contract_file, 16).unwrap()))) //contract address
             .push(int!(i8::from_str_radix(ticktock.unwrap(), 10).unwrap())) //tick or tock
             .push(int!(func_selector));
@@ -229,33 +283,8 @@ pub fn perform_contract_call<F>(
     println!("{}", engine.dump_stack("Post-execution stack state", false));
     println!("{}", engine.dump_ctrls(false));
     
-    if decode_actions {
-        if let StackItem::Cell(cell) = engine.get_actions() {
-            let actions: OutActions = OutActions::construct_from(&mut cell.into())
-                .expect("Failed to decode output actions");
-            println!("Output actions:\n----------------");
-            for act in actions {
-                match act {
-                    OutAction::SendMsg{mode: _, out_msg } => {
-                        println!("Action(SendMsg):\n{}", MsgPrinter{ msg: out_msg.clone() });
-                        if let Some(b) = out_msg.body() {
-                            decoder(b, out_msg.is_internal());
-                        }
-                    },
-                    OutAction::SetCode{ new_code: code } => {
-                        println!("Action(SetCode)");
-                        state_init.code = Some(code);
-                    },
-                    OutAction::ReserveCurrency { .. } => {
-                        println!("Action(ReserveCurrency)");
-                    },
-                    OutAction::ChangeLibrary { .. } => {
-                        println!("Action(ChangeLibrary)");
-                    },
-                    _ => println!("Action(Unknown)"),
-                };
-            }
-        }
+    if decode_c5 {
+        decode_actions(engine.get_actions(), &mut state_init, action_decoder);
     }
 
     if exit_code == 0 || exit_code == 1 {
@@ -287,7 +316,7 @@ mod tests {
         let msg2 = create_internal_msg(
             MsgAddressInt::with_standart(None, 0, [0x11; 32].into()).unwrap(),
             MsgAddressInt::with_standart(None, 0, [0x22; 32].into()).unwrap(),
-            12345678,
+            CurrencyCollection::with_grams(12345678),
             1,
             2,
             None,
