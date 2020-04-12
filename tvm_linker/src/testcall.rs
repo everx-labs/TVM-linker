@@ -25,8 +25,12 @@ use ton_vm::error::TvmError;
 use ton_vm::stack::integer::{IntegerData};
 use ton_vm::stack::{StackItem, Stack, savelist::SaveList};
 use ton_vm::SmartContractInfo;
-use ton_types::{BuilderData, Cell, SliceData};
-use ton_block::*;//AccountId
+use ton_types::{AccountId, BuilderData, Cell, SliceData};
+use ton_block::{
+    CurrencyCollection, Deserializable, ExternalInboundMessageHeader, Grams, 
+    InternalMessageHeader, Message, MsgAddressExt, MsgAddressInt, OutAction, 
+    OutActions, Serializable, UnixTime32
+};
 
 #[allow(dead_code)]
 fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Cell {
