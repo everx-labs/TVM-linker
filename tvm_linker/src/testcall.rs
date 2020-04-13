@@ -32,6 +32,8 @@ use ton_block::{
     OutActions, Serializable, StateInit, UnixTime32
 };
 
+const DEFAULT_ACCOUNT_BALANCE: &str = "100000000000";
+
 #[allow(dead_code)]
 fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Cell {
     let mut builder = BuilderData::new();
@@ -195,7 +197,7 @@ fn load_code_and_data(state_init: &StateInit) -> (SliceData, SliceData) {
 
 
 fn decode_balance(value: Option<&str>) -> Result<(u64, CurrencyCollection), String> {
-    let value = value.unwrap_or("0");
+    let value = value.unwrap_or(DEFAULT_ACCOUNT_BALANCE);
     if let Ok(main) = u64::from_str_radix(value, 10) {
         Ok((main, CurrencyCollection::with_grams(main)))
     } else {
@@ -353,4 +355,40 @@ mod tests {
         println!("SendMsg action:\n{}", MsgPrinter{ msg: Arc::new(msg2) });
     }
 
+    #[test]
+    fn test_decode_balance() {
+        let (main, balance) = decode_balance(Some(r#"{ "main": 100, "extra": {"0": 33, "50": 99} }"#)).unwrap();
+        assert_eq!(main, 100);
+        let mut expected_balance = CurrencyCollection::with_grams(100);
+        expected_balance.set_other(0, 33);
+        expected_balance.set_other(50, 99);
+        assert_eq!(balance, expected_balance);
+
+        let (main, balance) = decode_balance(Some("101")).unwrap();
+        assert_eq!(main, 101);
+        assert_eq!(balance, CurrencyCollection::with_grams(101));
+    }
+
+    #[test]
+    fn test_decode_balance_default() {
+        let (main, balance) = decode_balance(None).unwrap();
+        let expected = u64::from_str_radix(DEFAULT_ACCOUNT_BALANCE, 10).unwrap();
+        assert_eq!(main, expected);
+        assert_eq!(balance, CurrencyCollection::with_grams(expected));
+    }
+
+    #[test]
+    fn test_decode_balance_invalid() {
+        let err = decode_balance(Some(r#"{ "main": 100 }"#));
+        assert_eq!(err.is_err(), true);
+
+        let err = decode_balance(Some(r#"{ "main": qwe }"#));
+        assert_eq!(err.is_err(), true);
+
+        let err = decode_balance(Some(r#"{ "main": 0, extra: {"dd": 10} }"#));
+        assert_eq!(err.is_err(), true);
+
+        let err = decode_balance(Some(r#"{ "main": 0, extra: {"0": qwe} }"#));
+        assert_eq!(err.is_err(), true);
+    }
 }
