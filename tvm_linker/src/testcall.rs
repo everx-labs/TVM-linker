@@ -90,10 +90,11 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) {
     *body = signed_body.into();
 }
 
-fn initialize_registers(data: SliceData, myself: MsgAddressInt, now: u32) -> SaveList {
+fn initialize_registers(data: SliceData, myself: MsgAddressInt, now: u32, balance: (u64, CurrencyCollection)) -> SaveList {
     let mut ctrls = SaveList::new();
     let mut info = SmartContractInfo::with_myself(myself.write_to_new_cell().unwrap().into());
-    *info.balance_remaining_grams_mut() = 100_000_000_000;
+    *info.balance_remaining_grams_mut() = balance.0 as u128;
+    *info.balance_remaining_other_mut() = balance.1.other;
     *info.unix_time_mut() = now;
     ctrls.put(4, &mut StackItem::Cell(data.into_cell())).unwrap();
     ctrls.put(7, &mut info.into_temp_data()).unwrap();
@@ -255,13 +256,14 @@ pub fn perform_contract_call<F>(
     let (code, data) = load_code_and_data(&state_init);
     
     let workchain_id = if func_selector > -2 { 0 } else { -1 };
+    let (acc_value, account_balance) = decode_balance(balance).unwrap();
     let registers = initialize_registers(
         data,
         MsgAddressInt::with_standart(None, workchain_id, addr.clone()).unwrap(),
         now,
+        (acc_value.clone(), account_balance),
     );
 
-    let (acc_value, account_balance) = decode_balance(balance).unwrap();
     let mut stack = Stack::new();
     if func_selector > -2 {
         let msg_cell = StackItem::Cell(msg.unwrap().write_to_new_cell().unwrap().into());
