@@ -111,6 +111,7 @@ fn linker_main() -> Result<(), String> {
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
             (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
             (@arg INTERNAL: --internal +takes_value "Emulates inbound internal message with value instead of external message")
+            (@arg BALANCE: --balance +takes_value "Emulates supplied account balance")
             (@arg SRCADDR: --src +takes_value "Supplies message source address")
             (@arg NOW: --now +takes_value "Supplies transaction creation unixtime")
             (@arg TICKTOCK: --ticktock +takes_value conflicts_with[BODY] "Emulates ticktock transaction in masterchain, 0 for tick and -1 for tock")
@@ -263,13 +264,13 @@ fn run_init_subcmd(matches: &ArgMatches) -> Result<(), String> {
 }
 
 
-fn run_test_subcmd(test_matches: &ArgMatches) -> Result<(), String> {
-    let (body, sign) = match test_matches.value_of("BODY") {
+fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
+    let (body, sign) = match matches.value_of("BODY") {
         Some(hex_str) => {
             let mut hex_str = hex_str.to_string();
             let mut parser = ParseEngine::new();
 
-            if let Some(source) = test_matches.value_of("SOURCE") {
+            if let Some(source) = matches.value_of("SOURCE") {
                 let file = File::open(source)
                     .map_err(|e| format!("cannot opening source file: {}", e))?;
                 let mut reader = BufReader::new(file);
@@ -287,12 +288,12 @@ fn run_test_subcmd(test_matches: &ArgMatches) -> Result<(), String> {
             let body: SliceData = BuilderData::with_raw(buf, buf_bits)
                 .map_err(|e| format!("failed to pack body in cell: {}", e))?
                 .into();
-            (Some(body), Some(test_matches.value_of("SIGN")))
+            (Some(body), Some(matches.value_of("SIGN")))
         },
-        None => (build_body(test_matches)?, None),
+        None => (build_body(matches)?, None),
     };
 
-    let ticktock = test_matches.value_of("TICKTOCK");
+    let ticktock = matches.value_of("TICKTOCK");
     if ticktock.is_some() {
         //check for correct value of ticktock argument
         let error_msg = "invalid ticktock value: enter 0 for tick and -1 for tock.".to_string();
@@ -302,7 +303,7 @@ fn run_test_subcmd(test_matches: &ArgMatches) -> Result<(), String> {
         }
     }
     
-    let now = match test_matches.value_of("NOW") {
+    let now = match matches.value_of("NOW") {
         Some(now_str) => {
             u32::from_str_radix(now_str, 10)
                 .map_err(|e| format!("failed to parse \"now\" option: {}", e))?
@@ -312,18 +313,19 @@ fn run_test_subcmd(test_matches: &ArgMatches) -> Result<(), String> {
 
     println!("TEST STARTED\nbody = {:?}", body);
     perform_contract_call(
-        test_matches.value_of("INPUT").unwrap(), 
+        matches.value_of("INPUT").unwrap(), 
         body, 
         sign, 
-        test_matches.is_present("TRACE"), 
-        test_matches.is_present("DECODEC6"),
-        test_matches.value_of("INTERNAL"),
-        test_matches.value_of("TICKTOCK"),
-        test_matches.value_of("SRCADDR"),
+        matches.is_present("TRACE"),
+        matches.is_present("DECODEC6"),
+        matches.value_of("INTERNAL"),
+        matches.value_of("TICKTOCK"),
+        matches.value_of("SRCADDR"),
+        matches.value_of("BALANCE"),
         now,
         |body, is_int| {
-            let abi_file = test_matches.value_of("ABI_JSON");
-            let method = test_matches.value_of("ABI_METHOD");
+            let abi_file = matches.value_of("ABI_JSON");
+            let method = matches.value_of("ABI_METHOD");
             if abi_file.is_some() && method.is_some() {
                 let result = decode_body(abi_file.unwrap(), method.unwrap(), body, is_int)
                     .unwrap_or_default();

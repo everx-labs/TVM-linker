@@ -83,7 +83,7 @@ By default, -1 is used as a workchain id in contract address. To use another one
 
 Linker can emulate compute phase of blockchain transaction. It is useful for contract debugging.
 
-	tvm_linker test <contract-address> --body XXXX... [--sign key-file] [--trace] [--decode-c6] [--internal value] [--src address] [--now unixtime] [-s source-file]
+	tvm_linker test <contract-address> --body XXXX... [--sign key-file] [--trace] [--decode-c6] [--internal <value>] [--src address] [--now unixtime] [-s source-file] [--balance <value>]
 
 Loads contract from file by contract address `address` and emulates contract call sending external inbound message (by default) with body defined after `--body` parameter to the contract. `XXXX...` is a hex string. 
 
@@ -93,7 +93,11 @@ Use `--trace` flag to trace VM execution: stack, registers and gas will be print
 
 Use `--decode-c6` to see output actions in user friendly format.
 
+Use `--balance <value>` to define account balance in nanograms. It will be available  at the bottom of initial stake and in SmartContractInfo tuple from c7 register .
+
 Use `--internal` to send internal message to the contract with defined nanograms in `value`. By default, source address in internal message in zero address (`0000...0000`), to define another address use option `--src <address>`, where address should be in the format <wc>:<bytes32> (i.e. "0:1122...AABB"). 
+
+Account and message balance can have extended format with extra currencies: `{ "main": int, "extra": {"i": int, ...} }`.
 
 Example: `--internal 100000 --src "0:6011b66a47238cf992f1033fe6aff00ce0f850df387ee92468d9c26b5564ba53"`
 
