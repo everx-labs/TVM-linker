@@ -16,6 +16,7 @@ use log::Level::Error;
 use printer::MsgPrinter;
 use program::{load_from_file, save_to_file};
 use simplelog::{SimpleLogger, Config, LevelFilter};
+use serde_json::Value;
 use sha2::Sha512;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -191,9 +192,33 @@ fn load_code_and_data(state_init: &StateInit) -> (SliceData, SliceData) {
     (code, data)
 }
 
-fn decode_balance(value: Option<&str>) -> (u64, CurrencyCollection) {
+
+fn decode_balance(value: Option<&str>) -> Result<(u64, CurrencyCollection), String> {
     let value = value.unwrap_or("0");
-    (0, CurrencyCollection::with_grams(0))
+    if let Ok(main) = u64::from_str_radix(value, 10) {
+        Ok((main, CurrencyCollection::with_grams(main)))
+    } else {
+        let err_msg = "invalid extra currencies";
+        let v: Value = serde_json::from_str(value).map_err(|_| err_msg.to_owned())?;
+
+        let main = v.get("main").and_then(|main| { main.as_u64() })
+            .ok_or("invalid main currency".to_owned())?;
+
+        let mut currencies = CurrencyCollection::with_grams(main);
+
+        v.get("extra").and_then(|extra| {
+            extra.as_object().and_then(|extra| {
+                for (i, val) in extra {
+                    let key = u32::from_str_radix(i, 10).ok()?;
+                    let amount = val.as_u64()?;
+                    currencies.set_other(key, amount as u128);
+                }
+                Some(())
+            })
+        }).ok_or(err_msg.to_owned())?;
+
+        Ok((main, currencies))
+    }
 }
 
 pub fn perform_contract_call<F>(
@@ -218,7 +243,7 @@ pub fn perform_contract_call<F>(
         None => if ticktock.is_some() { -2 } else { -1 },
     };
     
-    let (value, msg_balance) = decode_balance(msg_value);
+    let (value, msg_balance) = decode_balance(msg_value).unwrap();
     
     let msg = create_inbound_msg(func_selector, src_str, addr.clone(), msg_balance, body.clone());
         
@@ -236,7 +261,7 @@ pub fn perform_contract_call<F>(
         now,
     );
 
-    let (acc_value, account_balance) = decode_balance(balance);
+    let (acc_value, account_balance) = decode_balance(balance).unwrap();
     let mut stack = Stack::new();
     if func_selector > -2 {
         let msg_cell = StackItem::Cell(msg.unwrap().write_to_new_cell().unwrap().into());
