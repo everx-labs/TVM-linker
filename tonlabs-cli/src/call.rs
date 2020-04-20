@@ -53,7 +53,7 @@ pub fn call_contract(
         println!("Running get-method...");
         thread::spawn(move || {
             let result =
-                ton.contracts.run_local(&ton_addr, None, &abi, &method_val, params_val.into(), None)
+                ton.contracts.run_local(&ton_addr, None, &abi, &method_val, None, params_val.into(), None)
                         .map_err(|e| format!("run failed: {}", e.to_string()));
             atomic_clone.store(true, Ordering::SeqCst);
             result
@@ -62,7 +62,7 @@ pub fn call_contract(
         println!("Calling method...");
         thread::spawn(move || {
             let result =
-                ton.contracts.run(&ton_addr, &abi, &method_val, params_val.into(), keys.as_ref())
+                ton.contracts.run(&ton_addr, &abi, &method_val, None, params_val.into(), keys.as_ref())
                     .map_err(|e| format!("transaction failed: {}", e.to_string()));
             atomic_clone.store(true, Ordering::SeqCst);
             result
