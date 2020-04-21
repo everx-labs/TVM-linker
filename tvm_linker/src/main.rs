@@ -54,7 +54,7 @@ use resolver::resolve_name;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::time::SystemTime;
-use testcall::perform_contract_call;
+use testcall::{call_contract, MsgInfo};
 use ton_types::{BuilderData, SliceData};
 
 fn main() -> Result<(), i32> {
@@ -111,6 +111,7 @@ fn linker_main() -> Result<(), String> {
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
             (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
             (@arg INTERNAL: --internal +takes_value "Emulates inbound internal message with value instead of external message")
+            (@arg BOUNCED: --bounced "Emulates bounced message, can be used only with --iternal option.")
             (@arg BALANCE: --balance +takes_value "Emulates supplied account balance")
             (@arg SRCADDR: --src +takes_value "Supplies message source address")
             (@arg NOW: --now +takes_value "Supplies transaction creation unixtime")
@@ -256,13 +257,42 @@ fn linker_main() -> Result<(), String> {
     unreachable!()
 }
 
+fn parse_now(now: Option<&str>) -> Result<u32, String> {    
+    let now = match now {
+        Some(now_str) => {
+            u32::from_str_radix(now_str, 10)
+                .map_err(|e| format!(r#"failed to parse "now" option: {}"#, e))?
+        },
+        None => {
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as u32
+        },
+    };
+    Ok(now)
+}
+
+fn parse_ticktock(ticktock: Option<&str>) -> Result<Option<i8>, String> {
+    let error = "invalid ticktock value: must be 0 for tick and -1 for tock.";
+    if let Some(tt) = ticktock {
+        let tt = i8::from_str_radix(tt, 10).map_err(|_| error.to_string())?;
+        if tt != 0 && tt != -1 {
+            Err(error.to_string())
+        } else {
+            Ok(Some(tt))
+        }
+    } else {
+        Ok(None)
+    }
+}
+
 fn run_init_subcmd(matches: &ArgMatches) -> Result<(), String> {
     let tvc = matches.value_of("INPUT").unwrap();
     let vars = matches.value_of("DATA").unwrap();
     let abi = matches.value_of("ABI").unwrap();
     set_initial_data(tvc, None, vars, abi)
 }
-
 
 fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
     let (body, sign) = match matches.value_of("BODY") {
@@ -293,45 +323,38 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         None => (build_body(matches)?, None),
     };
 
-    let ticktock = matches.value_of("TICKTOCK");
-    if ticktock.is_some() {
-        //check for correct value of ticktock argument
-        let error_msg = "invalid ticktock value: enter 0 for tick and -1 for tock.".to_string();
-        let val = i8::from_str_radix(ticktock.unwrap(), 10).map_err(|_| error_msg.clone())?;
-        if val != 0 && val != -1 {
-            Err(error_msg)?;
+    let ticktock = parse_ticktock(matches.value_of("TICKTOCK"))?;
+    let now = parse_now(matches.value_of("NOW"))?;
+
+    let action_decoder = |body, is_internal| {
+        let abi_file = matches.value_of("ABI_JSON");
+        let method = matches.value_of("ABI_METHOD");
+        if abi_file.is_some() && method.is_some() {
+            let result = decode_body(abi_file.unwrap(), method.unwrap(), body, is_internal)
+                .unwrap_or_default();
+            println!("{}", result);
         }
-    }
-    
-    let now = match matches.value_of("NOW") {
-        Some(now_str) => {
-            u32::from_str_radix(now_str, 10)
-                .map_err(|e| format!("failed to parse \"now\" option: {}", e))?
-        },
-        None => SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32,
     };
 
-    println!("TEST STARTED\nbody = {:?}", body);
-    perform_contract_call(
+    println!("TEST STARTED");
+    println!("body = {:?}", body);
+
+    let msg_info = MsgInfo {
+        balance: matches.value_of("INTERNAL"),
+        src: matches.value_of("SRCADDR"),
+        now: now,
+        bounced: matches.is_present("BOUNCED"),
+        body: body,
+    };
+
+    call_contract(
         matches.value_of("INPUT").unwrap(), 
-        body, 
-        sign, 
-        matches.is_present("TRACE"),
-        matches.is_present("DECODEC6"),
-        matches.value_of("INTERNAL"),
-        matches.value_of("TICKTOCK"),
-        matches.value_of("SRCADDR"),
         matches.value_of("BALANCE"),
-        now,
-        |body, is_int| {
-            let abi_file = matches.value_of("ABI_JSON");
-            let method = matches.value_of("ABI_METHOD");
-            if abi_file.is_some() && method.is_some() {
-                let result = decode_body(abi_file.unwrap(), method.unwrap(), body, is_int)
-                    .unwrap_or_default();
-                println!("{}", result);
-            }
-        }
+        msg_info, 
+        sign, 
+        ticktock,
+        if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
+        matches.is_present("TRACE"),
     );
     println!("TEST COMPLETED");
     return Ok(());

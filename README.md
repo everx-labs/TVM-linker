@@ -103,6 +103,8 @@ Example: `--internal 100000 --src "0:6011b66a47238cf992f1033fe6aff00ce0f850df387
 
 Use `--now <unixtime>` option to define transaction creation time. By default, current time is used.
 
+Use `--bounced` flag to emulate bounced internal message, use this flag only with `--internal` option.
+
 An ABI body can be generated if `abi-params`, `abi-json` and `abi-method` will be used instead of `--body XXXX...`.
 
 If `--body` is used, contract's public function ids can be encoded by their names using `$...$` syntax:`$name:[0len][type]$`, 
