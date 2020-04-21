@@ -62,13 +62,15 @@ fn create_internal_msg(
     lt: u64,
     at: u32,
     body: Option<SliceData>,
+    bounced: bool,
 ) -> Message {
     let mut hdr = InternalMessageHeader::with_addresses(
         src_addr,
         dst_addr,
         value,
     );
-    hdr.bounce = true;
+    hdr.bounce = !bounced;
+    hdr.bounced = bounced;
     hdr.ihr_disabled = true;
     hdr.ihr_fee = Grams::from(0u64);
     hdr.created_lt = lt;
@@ -113,14 +115,13 @@ fn init_logger(debug: bool) {
 
 fn create_inbound_msg(
     selector: i32,
-    src: Option<&str>,
-    dst: AccountId,
-    value: CurrencyCollection,
-    body: Option<SliceData>,
+    msg_info: &MsgInfo,
+    dst: AccountId,    
 ) -> Option<Message> {
+    let (_, value) = decode_balance(msg_info.balance).unwrap();
     match selector {
         0 => {
-            let src = match src {
+            let src = match msg_info.src {
                 Some(s) => MsgAddressInt::from_str(s).unwrap(),
                 None => MsgAddressInt::with_standart(None, 0, [0u8; 32].into()).unwrap(),
             };
@@ -130,11 +131,12 @@ fn create_inbound_msg(
                 value,
                 1,
                 SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32,
-                body,
+                msg_info.body.clone(),
+                msg_info.bounced,
             ))
         },
         -1 => {
-            let src = match src {
+            let src = match msg_info.src {
                 Some(s) => MsgAddressExt::from_str(s).unwrap(),
                 None => {
                     MsgAddressExt::with_extern(
@@ -145,7 +147,7 @@ fn create_inbound_msg(
             Some(create_external_inbound_msg(
                 src,
                 MsgAddressInt::with_standart(None, 0, dst.clone()).unwrap(), 
-                body,
+                msg_info.body.clone(),
             ))
         },
         _ => None,
@@ -224,53 +226,57 @@ fn decode_balance(value: Option<&str>) -> Result<(u64, CurrencyCollection), Stri
     }
 }
 
-pub fn perform_contract_call<F>(
-    contract_file: &str, 
-    body: Option<SliceData>, 
-    key_file: Option<Option<&str>>, 
-    debug: bool, 
-    decode_c5: bool,
-    msg_value: Option<&str>,
-    ticktock: Option<&str>,
-    src_str: Option<&str>,
-    balance: Option<&str>,
-    now: u32,
-    action_decoder: F,
-) -> i32
+pub struct MsgInfo<'a> {
+    pub balance: Option<&'a str>,
+    pub src: Option<&'a str>,
+    pub now: u32,
+    pub bounced: bool,
+    pub body: Option<SliceData>,
+}
+
+pub fn call_contract<F>(
+    smc_file: &str,
+    smc_balance: Option<&str>,
+    msg_info: MsgInfo,
+    key_file: Option<Option<&str>>,
+    ticktock: Option<i8>,
+    action_decoder: Option<F>,
+    debug: bool,
+) -> i32 
     where F: Fn(SliceData, bool)
 {
-    let addr = AccountId::from_str(contract_file).unwrap();
+    let addr = AccountId::from_str(smc_file).unwrap();
     
-    let func_selector = match msg_value {
+    let func_selector = match msg_info.balance {
         Some(_) => 0,    
         None => if ticktock.is_some() { -2 } else { -1 },
     };
     
-    let (value, msg_balance) = decode_balance(msg_value).unwrap();
+    let (value, _) = decode_balance(msg_info.balance).unwrap();
     
-    let msg = create_inbound_msg(func_selector, src_str, addr.clone(), msg_balance, body.clone());
+    let msg = create_inbound_msg(func_selector, &msg_info, addr.clone());
         
     if !log_enabled!(Error) {
         init_logger(debug);
     }
     
-    let mut state_init = load_from_file(&format!("{}.tvc", contract_file));
+    let mut state_init = load_from_file(&format!("{}.tvc", smc_file));
     let (code, data) = load_code_and_data(&state_init);
     
     let workchain_id = if func_selector > -2 { 0 } else { -1 };
-    let (acc_value, account_balance) = decode_balance(balance).unwrap();
+    let (smc_value, smc_balance) = decode_balance(smc_balance).unwrap();
     let registers = initialize_registers(
         data,
         MsgAddressInt::with_standart(None, workchain_id, addr.clone()).unwrap(),
-        now,
-        (acc_value.clone(), account_balance),
+        msg_info.now,
+        (smc_value.clone(), smc_balance),
     );
 
     let mut stack = Stack::new();
     if func_selector > -2 {
         let msg_cell = StackItem::Cell(msg.unwrap().write_to_new_cell().unwrap().into());
 
-        let mut body: SliceData = match body {
+        let mut body: SliceData = match msg_info.body {
             Some(b) => b.into(),
             None => BuilderData::new().into(),
         };
@@ -280,16 +286,16 @@ pub fn perform_contract_call<F>(
         }
 
         stack
-            .push(int!(acc_value))
+            .push(int!(smc_value))
             .push(int!(value))              //msg balance
             .push(msg_cell)                 //msg
             .push(StackItem::Slice(body))   //msg.body
             .push(int!(func_selector));     //selector
     } else {
         stack
-            .push(int!(acc_value))
-            .push(StackItem::Integer(Arc::new(IntegerData::from_str_radix(contract_file, 16).unwrap()))) //contract address
-            .push(int!(i8::from_str_radix(ticktock.unwrap(), 10).unwrap())) //tick or tock
+            .push(int!(smc_value))
+            .push(StackItem::Integer(Arc::new(IntegerData::from_str_radix(smc_file, 16).unwrap()))) //contract address
+            .push(int!(ticktock.unwrap())) //tick or tock
             .push(int!(func_selector));
     }
 
@@ -312,8 +318,8 @@ pub fn perform_contract_call<F>(
     println!("{}", engine.dump_stack("Post-execution stack state", false));
     println!("{}", engine.dump_ctrls(false));
     
-    if decode_c5 {
-        decode_actions(engine.get_actions(), &mut state_init, action_decoder);
+    if let Some(decoder) = action_decoder {
+        decode_actions(engine.get_actions(), &mut state_init, decoder);
     }
 
     if exit_code == 0 || exit_code == 1 {
@@ -321,11 +327,44 @@ pub fn perform_contract_call<F>(
             StackItem::Cell(root_cell) => Some(root_cell),
             _ => panic!("cannot get root data: c4 register is not a cell."),
         };
-        save_to_file(state_init, Some(contract_file), 0).expect("error");
+        save_to_file(state_init, Some(smc_file), 0).expect("error");
         println!("Contract persistent data updated");
     }
 
     exit_code
+}
+
+#[cfg(test)]
+pub fn perform_contract_call<F>(
+    contract_file: &str, 
+    body: Option<SliceData>, 
+    key_file: Option<Option<&str>>, 
+    debug: bool, 
+    decode_c5: bool,
+    msg_balance: Option<&str>,
+    ticktock: Option<i8>,
+    src: Option<&str>,
+    balance: Option<&str>,
+    now: u32,
+    action_decoder: F,
+) -> i32
+    where F: Fn(SliceData, bool)
+{   
+    call_contract(
+        contract_file,
+        balance,
+        MsgInfo{ 
+            balance: msg_balance,
+            src: src,
+            now: now,
+            bounced: false,
+            body: body
+        },
+        key_file,
+        ticktock,
+        if decode_c5 { Some(action_decoder) } else { None },
+        debug
+    )
 }
 
 #[cfg(test)]
@@ -349,6 +388,7 @@ mod tests {
             1,
             2,
             None,
+            false,
         );
 
         println!("SendMsg action:\n{}", MsgPrinter{ msg: Arc::new(msg) });
