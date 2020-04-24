@@ -98,7 +98,7 @@ fn initialize_registers(data: SliceData, myself: MsgAddressInt, now: u32, balanc
     let mut ctrls = SaveList::new();
     let mut info = SmartContractInfo::with_myself(myself.write_to_new_cell().unwrap().into());
     *info.balance_remaining_grams_mut() = balance.0 as u128;
-    *info.balance_remaining_other_mut() = balance.1.other;
+    *info.balance_remaining_other_mut() = balance.1.other_as_hashmap().clone();
     *info.unix_time_mut() = now;
     ctrls.put(4, &mut StackItem::Cell(data.into_cell())).unwrap();
     ctrls.put(7, &mut info.into_temp_data()).unwrap();
@@ -216,7 +216,7 @@ fn decode_balance(value: Option<&str>) -> Result<(u64, CurrencyCollection), Stri
                 for (i, val) in extra {
                     let key = u32::from_str_radix(i, 10).ok()?;
                     let amount = val.as_u64()?;
-                    currencies.set_other(key, amount as u128);
+                    currencies.set_other(key, amount as u128).unwrap();
                 }
                 Some(())
             })
