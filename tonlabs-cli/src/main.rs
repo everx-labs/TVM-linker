@@ -13,9 +13,14 @@
  */
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
 
 mod account;
 mod config;
+mod crypto;
 mod deploy;
 mod genaddr;
 mod helpers;
@@ -25,6 +30,7 @@ use account::get_account;
 use call::call_contract;
 use clap::ArgMatches;
 use config::{Config, set_config};
+use crypto::{generate_mnemonic, extract_pubkey};
 use deploy::deploy_contract;
 use genaddr::generate_address;
 
@@ -66,6 +72,15 @@ fn main_internal() -> Result <(), String> {
         (@subcommand version =>
             (about: "Prints build and version info.")
         )
+        (@subcommand genphrase =>
+            (about: "Generates seed phrase.")
+            (author: "TONLabs")
+        )
+        (@subcommand genpubkey =>
+            (about: "Generates seed phrase.")
+            (author: "TONLabs")
+            (@arg PHRASE: +required +takes_value "Seed phrase (12 words)")
+        )        
         (@subcommand genaddr =>
             (@setting AllowNegativeNumbers)
             (about: "Calculates smart contract address in different formats. By default, input tvc file isn't modified.")
@@ -151,6 +166,12 @@ fn main_internal() -> Result <(), String> {
     if let Some(m) = matches.subcommand_matches("account") {
         return account_command(m, conf);
     }
+    if let Some(m) = matches.subcommand_matches("genphrase") {
+        return genphrase_command(m, conf);
+    }
+    if let Some(m) = matches.subcommand_matches("genpubkey") {
+        return genpubkey_command(m, conf);
+    }
     if let Some(_) = matches.subcommand_matches("version") {
         println!(
             "tonlabs-cli {}\nCOMMIT_ID: {}\nBUILD_DATE: {}\nCOMMIT_DATE: {}\nGIT_BRANCH: {}",
@@ -163,6 +184,15 @@ fn main_internal() -> Result <(), String> {
         return Ok(());
     }
     Err("invalid arguments".to_string())
+}
+
+fn genphrase_command(_matches: &ArgMatches, _config: Config) -> Result<(), String> {
+    generate_mnemonic()
+}
+
+fn genpubkey_command(matches: &ArgMatches, _config: Config) -> Result<(), String> {
+    let mnemonic = matches.value_of("PHRASE").unwrap();
+    extract_pubkey(mnemonic)
 }
 
 fn send_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
