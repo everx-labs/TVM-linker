@@ -3,15 +3,28 @@ use predicates::prelude::*;
 use std::process::Command;
 
 #[test]
+fn test_config_url() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("tonlabs-cli")?;
+    cmd.arg("config")
+        .arg("--url")
+        .arg("http://0.0.0.0");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Succeeded"));
+
+    Ok(())
+}
+
+#[test]
 fn test_call_giver() -> Result<(), Box<dyn std::error::Error>> {
-    let giver_abi_name = "Garant100.abi";
+    let giver_abi_name = "tests/samples/giver.abi.json";
     let mut cmd = Command::cargo_bin("tonlabs-cli")?;
     cmd.arg("call")
         .arg("--abi")
         .arg(giver_abi_name)
-        .arg("0:4e533d33972ae0cf29c560e1ef4dab7d437cddbf3f9bc0930a170db029f663f6")
-        .arg("grant")
-        .arg(r#"{"addr":"0:4e533d33972ae0cf29c560e1ef4dab7d437cddbf3f9bc0930a170db029f663f6"}"#);
+        .arg("0:841288ed3b55d9cdafa806807f02a0ae0c169aa5edfe88a789a6482429756a94")
+        .arg("sendGrams")
+        .arg(r#"{"dest":"0:841288ed3b55d9cdafa806807f02a0ae0c169aa5edfe88a789a6482429756a94","amount":1000000000}"#);
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("Succeded"));

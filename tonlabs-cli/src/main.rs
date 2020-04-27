@@ -27,7 +27,7 @@ mod helpers;
 mod call;
 
 use account::get_account;
-use call::call_contract;
+use call::{call_contract, call_contract_with_msg, generate_message};
 use clap::ArgMatches;
 use config::{Config, set_config};
 use crypto::{generate_mnemonic, extract_pubkey};
@@ -35,6 +35,12 @@ use deploy::deploy_contract;
 use genaddr::generate_address;
 
 const VERBOSE_MODE: bool = true;
+const DEF_MSG_LIFETIME: u32 = 30;
+enum CallType {
+    Run,
+    Call,
+    Msg,
+}
 
 macro_rules! print_args {
     ($m:ident, $( $arg:ident ),* ) => {
@@ -72,6 +78,12 @@ fn main_internal() -> Result <(), String> {
         (@subcommand version =>
             (about: "Prints build and version info.")
         )
+        (@subcommand convert =>
+            (@subcommand tokens =>
+                (about: "Converts tokens to nanotokens.")
+                (@arg AMOUNT: +required +takes_value "Token amount value")
+            )    
+        )
         (@subcommand genphrase =>
             (about: "Generates seed phrase.")
             (author: "TONLabs")
@@ -107,6 +119,7 @@ fn main_internal() -> Result <(), String> {
             (@arg VERBOSE: -v --verbose "Prints additional information about command execution.")
         )
         (@subcommand call =>
+            (@setting AllowLeadingHyphen)
             (about: "Sends external message to contract with encoded function call.")
             (version: "0.1")
             (author: "TONLabs")
@@ -117,7 +130,27 @@ fn main_internal() -> Result <(), String> {
             (@arg SIGN: --sign +takes_value "Keypair used to sign message.")
             (@arg VERBOSE: -v --verbose "Prints additional information about command execution.")
         )
+        (@subcommand send =>
+            (about: "Sends prepared message to contract.")
+            (version: "0.1")
+            (author: "TONLabs")
+            (@arg MESSAGE: +required +takes_value "Message to send.")
+            (@arg ABI: --abi +takes_value "Json file with contract ABI.")
+            (@arg VERBOSE: -v --verbose "Prints additional information about command execution.")
+        )
+        (@subcommand message =>
+            (about: "Generates a signed message with encoded function call.")
+            (author: "TONLabs")
+            (@arg ADDRESS: +required +takes_value "Contract address.")
+            (@arg METHOD: +required +takes_value "Name of calling contract method.")
+            (@arg PARAMS: +required +takes_value "Arguments for the contract method.")
+            (@arg ABI: --abi +takes_value "Json file with contract ABI.")
+            (@arg SIGN: --sign +takes_value "Keypair used to sign message.")
+            (@arg LIFETIME: --lifetime +takes_value "Period of time in seconds while message is valid.")
+            (@arg VERBOSE: -v --verbose "Prints additional information about command execution.")
+        )
         (@subcommand run =>
+            (@setting AllowLeadingHyphen)
             (about: "Runs contract's get-method.")
             (version: "0.1")
             (author: "TONLabs")
@@ -137,6 +170,7 @@ fn main_internal() -> Result <(), String> {
             (@arg ADDR: --addr +takes_value "Contract address.")            
         )
         (@subcommand account =>
+            (@setting AllowLeadingHyphen)
             (about: "Gets account information.")
             (version: "0.1")
             (author: "TONLabs")
@@ -148,11 +182,22 @@ fn main_internal() -> Result <(), String> {
 
     let conf = Config::from_file("tonlabs-cli.conf.json").unwrap_or(Config::new());
 
+    if let Some(m) = matches.subcommand_matches("convert") {
+        if let Some(m) = m.subcommand_matches("tokens") {
+            return convert_tokens(m);
+        }
+    }
     if let Some(m) = matches.subcommand_matches("call") {
-        return send_command(m, conf);
+        return call_command(m, conf, CallType::Call);
     }
     if let Some(m) = matches.subcommand_matches("run") {
-        return run_command(m, conf);
+        return call_command(m, conf, CallType::Run);
+    }
+    if let Some(m) = matches.subcommand_matches("message") {
+        return call_command(m, conf, CallType::Msg);
+    }
+    if let Some(m) = matches.subcommand_matches("send") {
+        return send_command(m, conf);
     }
     if let Some(m) = matches.subcommand_matches("deploy") {        
         return deploy_command(m, conf);
@@ -186,6 +231,29 @@ fn main_internal() -> Result <(), String> {
     Err("invalid arguments".to_string())
 }
 
+fn convert_tokens(matches: &ArgMatches) -> Result<(), String> {
+    let amount = matches.value_of("AMOUNT").unwrap();
+    let parts: Vec<&str> = amount.split(".").collect();
+    if parts.len() >= 1 && parts.len() <= 2 {
+        let mut result = String::new();
+        result += parts[0];
+        if parts.len() == 2 {
+            let fraction = format!("{:0<9}", parts[1]);
+            if fraction.len() != 9 {
+                return Err("invalid fractional part".to_string());
+            }
+            result += &fraction;
+        } else {
+            result += "000000000";
+        }
+        u64::from_str_radix(&result, 10)
+            .map_err(|e| format!("failed to parse amount: {}", e))?;
+        println!("{}", result);
+        return Ok(());
+    }
+    return Err("Invalid amout value".to_string());
+}
+
 fn genphrase_command(_matches: &ArgMatches, _config: Config) -> Result<(), String> {
     generate_mnemonic()
 }
@@ -196,35 +264,81 @@ fn genpubkey_command(matches: &ArgMatches, _config: Config) -> Result<(), String
 }
 
 fn send_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
-    let address = matches.value_of("ADDRESS");
-    let method = matches.value_of("METHOD");
-    let params = matches.value_of("PARAMS");
+    let message = matches.value_of("MESSAGE");
     let abi = Some(
         matches.value_of("ABI")
             .map(|s| s.to_string())
             .or(config.abi_path.clone())
             .ok_or("ABI file not defined. Supply it in config file or command line.".to_string())?
     );
-    let keys = matches.value_of("SIGN")
-        .map(|s| s.to_string())
-        .or(config.keys_path.clone());
-    print_args!(matches, address, method, params, abi, keys);
-    call_contract(config, address.unwrap(), &abi.unwrap(), method.unwrap(), params.unwrap(), keys, false)
+    
+    print_args!(matches, message, abi);
+
+    let abi = std::fs::read_to_string(abi.unwrap())
+        .map_err(|e| format!("failed to read ABI file: {}", e.to_string()))?;
+
+    call_contract_with_msg(config, message.unwrap().to_owned(), abi)
 }
 
-fn run_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
+fn call_command(matches: &ArgMatches, config: Config, call: CallType) -> Result<(), String> {
     let address = matches.value_of("ADDRESS");
     let method = matches.value_of("METHOD");
     let params = matches.value_of("PARAMS");
+    let lifetime = matches.value_of("LIFETIME");
     let abi = Some(
         matches.value_of("ABI")
-        .map(|s| s.to_string())
-        .or(config.abi_path.clone())
-        .ok_or("ABI file not defined. Supply it in config file or command line.".to_string())?
+            .map(|s| s.to_string())
+            .or(config.abi_path.clone())
+            .ok_or("ABI file not defined. Supply it in config file or command line.".to_string())?
     );
-    let keys: Option<String> = None;
-    print_args!(matches, address, method, params, abi, keys);
-    call_contract(config, address.unwrap(), &abi.unwrap(), method.unwrap(), params.unwrap(), keys, true)
+    
+    let keys = match call {
+        CallType::Call | CallType::Msg => {
+            matches.value_of("SIGN")
+                .map(|s| s.to_string())
+                .or(config.keys_path.clone())
+        },
+        CallType::Run => {
+            None
+        }
+    };
+
+    print_args!(matches, address, method, params, abi, keys, lifetime);
+
+    let abi = std::fs::read_to_string(abi.unwrap())
+        .map_err(|e| format!("failed to read ABI file: {}", e.to_string()))?;
+    
+    match call {
+        CallType::Call | CallType::Run => {
+            let local = if let CallType::Call = call { false } else { true };
+            call_contract(
+                config,
+                address.unwrap(),
+                abi,
+                method.unwrap(),
+                params.unwrap(),
+                keys,
+                local
+            )
+        },
+        CallType::Msg => {
+            let lifetime = lifetime.map(|val| {
+                    u32::from_str_radix(val, 10)
+                        .map_err(|e| format!("failed to parse lifetime: {}", e))
+                })
+                .transpose()?
+                .unwrap_or(DEF_MSG_LIFETIME);
+
+            generate_message(
+                config,
+                address.unwrap(),
+                abi,
+                method.unwrap(),
+                params.unwrap(),
+                keys,
+                lifetime)
+        },
+    }
 }
 
 fn deploy_command(matches: &ArgMatches, config: Config) -> Result<(), String> {
