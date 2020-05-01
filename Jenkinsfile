@@ -317,7 +317,7 @@ pipeline {
                 script {
                     withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                         identity = awsIdentity()
-                        s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
+                        s3Download bucket: 'sdkbinaries-ws.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
                     }
                     def folders = "./tvm_linker"
                     if(params.common_version) {
@@ -329,7 +329,7 @@ pipeline {
                         withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                             identity = awsIdentity()
                             s3Upload \
-                                bucket: 'sdkbinaries.tonlabs.io', \
+                                bucket: 'sdkbinaries-ws.tonlabs.io', \
                                 includePathPattern:'version.json', path: '', \
                                 workingDir:'.'
                         }
@@ -487,17 +487,17 @@ cat tvm_linker/Cargo.toml
                         script {
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
-                                s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
+                                s3Download bucket: 'sdkbinaries-ws.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
                             }
                             sh 'node gzip.js ../../../../app/tvm_linker'
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
                                 s3Upload \
-                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    bucket: 'sdkbinaries-ws.tonlabs.io', \
                                     includePathPattern:'*.gz', path: 'tmp_linker', \
                                     workingDir:'.'
                                 s3Upload \
-                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    bucket: 'sdkbinaries-ws.tonlabs.io', \
                                     includePathPattern:'tvm_linker.json', path: 'tmp_linker', \
                                     workingDir:'.'
                             }
@@ -520,7 +520,7 @@ cat tvm_linker/Cargo.toml
                         script {
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
-                                s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
+                                s3Download bucket: 'sdkbinaries-ws.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
                             }
                             def C_PATH = sh (script: 'pwd', returnStdout: true).trim()
                             
@@ -546,11 +546,11 @@ cat tvm_linker/Cargo.toml
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
                                 s3Upload \
-                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    bucket: 'sdkbinaries-ws.tonlabs.io', \
                                     includePathPattern:'*.gz', path: 'tmp_linker', \
                                     workingDir:'.'
                                 s3Upload \
-                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    bucket: 'sdkbinaries-ws.tonlabs.io', \
                                     includePathPattern:'tvm_linker.json', path: 'tmp_linker', \
                                     workingDir:'.'
                             }
@@ -575,7 +575,7 @@ cat tvm_linker/Cargo.toml
                             echo "${C_PATH}"
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
-                                s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
+                                s3Download bucket: 'sdkbinaries-ws.tonlabs.io', file: 'tvm_linker.json', force: true, path: 'tvm_linker.json'
                             }
                             unstash 'linker-src'
                             bat """
@@ -600,11 +600,11 @@ cat tvm_linker/Cargo.toml
                             withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                                 identity = awsIdentity()
                                 s3Upload \
-                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    bucket: 'sdkbinaries-ws.tonlabs.io', \
                                     includePathPattern:'*.gz', path: 'tmp_linker', \
                                     workingDir:'.'
                                 s3Upload \
-                                    bucket: 'sdkbinaries.tonlabs.io', \
+                                    bucket: 'sdkbinaries-ws.tonlabs.io', \
                                     includePathPattern:'tvm_linker.json', path: 'tmp_linker', \
                                     workingDir:'.'
                             }
@@ -701,14 +701,14 @@ cat tvm_linker/Cargo.toml
                 script {
                     withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                         identity = awsIdentity()
-                        s3Delete bucket: 'sdkbinaries.tonlabs.io', path: 'tmp_linker/'
+                        s3Delete bucket: 'sdkbinaries-ws.tonlabs.io', path: 'tmp_linker/'
                     }
                     def cause = "${currentBuild.getBuildCauses()}"
                     echo "${cause}"
                     if(!cause.matches('upstream')) {
                         withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                             identity = awsIdentity()
-                            s3Download bucket: 'sdkbinaries.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
+                            s3Download bucket: 'sdkbinaries-ws.tonlabs.io', file: 'version.json', force: true, path: 'version.json'
                         }
                         sh """
                             echo const fs = require\\(\\'fs\\'\\)\\; > decline.js
@@ -723,7 +723,7 @@ cat tvm_linker/Cargo.toml
                         withAWS(credentials: 'CI_bucket_writer', region: 'eu-central-1') {
                             identity = awsIdentity()
                             s3Upload \
-                                bucket: 'sdkbinaries.tonlabs.io', \
+                                bucket: 'sdkbinaries-ws.tonlabs.io', \
                                 includePathPattern:'version.json', workingDir:'.'
                         }
                     }
