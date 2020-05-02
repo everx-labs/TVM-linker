@@ -10,7 +10,7 @@ readme = "README.md"
 license-file = "LICENSE.md"
 keywords = ["TON", "SDK", "smart contract", "tonlabs"]
 edition = "2018"
-version = "0.1.0"
+version = "0.2.0"
 
 [dependencies]
 base64 = "0.10.1"
@@ -20,13 +20,12 @@ ed25519-dalek = "^0.9.1"
 hex = "0.3.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde_derive = "1.0.91"
 
 ton-client-rs = "0.21.0"
 ton_sdk = { git = 'https://github.com/tonlabs/TON-SDK.git', default-features = false }
+ton_client = { git = 'https://github.com/tonlabs/TON-SDK.git',  default_features = false, features = ["node_interaction"]}
 
 [dev-dependencies]
 assert_cmd = "0.11"
 predicates = "1"
-
-[patch.crates-io]
-ton-client-rs = { git = 'https://github.com/tonlabs/ton-client-rs.git', branch = '0.21.0-rc' }
