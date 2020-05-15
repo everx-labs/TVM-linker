@@ -155,6 +155,9 @@ pub fn extract_pubkey(mnemonic: &str) -> Result<(), String> {
     let keypair = generate_keypair_from_mnemonic(mnemonic)?;
     println!("Succeeded.");
     println!("Public key: {}", keypair.public);
+    println!();
+    qr2term::print_qr(&keypair.public).unwrap();
+    println!();
     Ok(())
 }
 
