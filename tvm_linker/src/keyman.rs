@@ -12,7 +12,6 @@
  */
 use ed25519_dalek::{Keypair, PublicKey, SecretKey};
 use rand::rngs::OsRng;
-use sha2::Sha512;
 use std::fs::File;
 use std::io::{Read, Write};
 
@@ -67,5 +66,6 @@ impl KeypairManager {
 }
 
 fn generate_keypair() -> Keypair {
-    Keypair::generate::<Sha512, _>(&mut OsRng::new().unwrap())
+    let mut csprng = OsRng{};
+    Keypair::generate(&mut csprng)
 }

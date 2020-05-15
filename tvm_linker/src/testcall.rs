@@ -16,7 +16,6 @@ use printer::MsgPrinter;
 use program::{load_from_file, save_to_file};
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use serde_json::Value;
-use sha2::Sha512;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -85,7 +84,7 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) {
     if let Some(f) = key_file {
         let pair = KeypairManager::from_secret_file(f).drain();
         let pub_key = pair.public.to_bytes();
-        let signature = pair.sign::<Sha512>(body.cell().repr_hash().as_slice()).to_bytes();
+        let signature = pair.sign(body.cell().repr_hash().as_slice()).to_bytes();
         sign_builder.append_raw(&signature, signature.len() * 8).unwrap();
         sign_builder.append_raw(&pub_key, pub_key.len() * 8).unwrap();
     }
@@ -399,8 +398,8 @@ mod tests {
         let (main, balance) = decode_balance(Some(r#"{ "main": 100, "extra": {"0": 33, "50": 99} }"#)).unwrap();
         assert_eq!(main, 100);
         let mut expected_balance = CurrencyCollection::with_grams(100);
-        expected_balance.set_other(0, 33);
-        expected_balance.set_other(50, 99);
+        expected_balance.set_other(0, 33).unwrap();
+        expected_balance.set_other(50, 99).unwrap();
         assert_eq!(balance, expected_balance);
 
         let (main, balance) = decode_balance(Some("101")).unwrap();
