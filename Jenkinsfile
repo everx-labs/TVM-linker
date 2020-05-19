@@ -74,6 +74,12 @@ def buildImagesMap() {
         G_images.put('ton-executor', params.image_ton_executor)
     }
 
+    if (params.image_ton_labs_executor == '') {
+        G_images.put('ton-labs-executor', "tonlabs/ton-labs-executor:tvm-linker-${GIT_COMMIT}")
+    } else {
+        G_images.put('ton-labs-executor', params.image_ton_labs_executor)
+    }
+
     if (params.image_ton_sdk == '') {
         G_images.put('ton-sdk', "tonlabs/ton-sdk:tvm-linker-${GIT_COMMIT}")
     } else {
@@ -166,6 +172,7 @@ def buildParams() {
         G_images['ton-labs-vm'] = 'tonlabs/ton-labs-vm:latest'
         G_images['ton-sdk'] = 'tonlabs/ton-sdk:latest'
         G_images['ton-labs-abi'] = 'tonlabs/ton-labs-abi:latest'
+        G_images['ton-labs-executor'] = 'tonlabs/ton-labs-executor:latest'
     }
     buildBranchesMap()
     G_params = []
@@ -275,6 +282,11 @@ pipeline {
             name:'image_ton_executor',
             defaultValue: '',
             description: 'ton-executor image name'
+        )
+        string(
+            name:'image_ton_labs_executor',
+            defaultValue: '',
+            description: 'ton-labs-executor image name'
         )
         string(
             name:'branch_tvm_linker',
@@ -406,6 +418,7 @@ cat tvm_linker/Cargo.toml
                                         "--build-arg \"TON_LABS_VM_IMAGE=${G_images['ton-labs-vm']}\" " + 
                                         "--build-arg \"TON_LABS_ABI_IMAGE=${G_images['ton-labs-abi']}\" " + 
                                         "--build-arg \"TON_SDK_IMAGE=${G_images['ton-sdk']}\" " + 
+                                        "--build-arg \"TON_LABS_EXECUTOR_IMAGE=${G_images['ton-labs-executor']}\" " + 
                                         "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\""
                 }
             }
@@ -452,6 +465,7 @@ cat tvm_linker/Cargo.toml
                                             "--build-arg \"TON_LABS_BLOCK_IMAGE=${G_images['ton-labs-block']}\" " + 
                                             "--build-arg \"TON_LABS_VM_IMAGE=${G_images['ton-labs-vm']}\" " + 
                                             "--build-arg \"TON_LABS_ABI_IMAGE=${G_images['ton-labs-abi']}\" " + 
+                                            "--build-arg \"TON_LABS_EXECUTOR_IMAGE=${G_images['ton-labs-executor']}\" " + 
                                             "--build-arg \"TON_SDK_IMAGE=${G_images['ton-sdk']}\" " + 
                                             "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\" " +
                                             "."
@@ -479,6 +493,7 @@ cat tvm_linker/Cargo.toml
                                         "--build-arg \"TON_LABS_BLOCK_IMAGE=${G_images['ton-labs-block']}\" " + 
                                         "--build-arg \"TON_LABS_VM_IMAGE=${G_images['ton-labs-vm']}\" " + 
                                         "--build-arg \"TON_LABS_ABI_IMAGE=${G_images['ton-labs-abi']}\" " + 
+                                        "--build-arg \"TON_LABS_EXECUTOR_IMAGE=${G_images['ton-labs-executor']}\" " + 
                                         "--build-arg \"TON_SDK_IMAGE=${G_images['ton-sdk']}\" " + 
                                         "--build-arg \"TVM_LINKER_SRC_IMAGE=${G_docker_src_image}\""
                         }
