@@ -10,28 +10,18 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
-use std::fmt;
-use std::sync::Arc;
 use ton_block::*;
 use ton_types::cells_serialization::serialize_tree_of_cells;
 use ton_types::Cell;
 
-pub struct StateInitPrinter<'a> {
-    pub state: &'a StateInit,
-}
-
-impl fmt::Display for StateInitPrinter<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "StateInit\n split_depth: {}\n special: {}\n data: {}\n code: {}\n lib:  {}\n",
-            self.state.split_depth.as_ref().map(|x| format!("{:?}", x)).unwrap_or("None".to_string()),
-            self.state.special.as_ref().map(|x| format!("{:?}", x)).unwrap_or("None".to_string()),
-            tree_of_cells_into_base64(self.state.data.as_ref()),
-            tree_of_cells_into_base64(self.state.code.as_ref()),
-            tree_of_cells_into_base64(self.state.library.as_ref()),
-        )
-    }    
+pub fn state_init_printer(state: &StateInit) -> String {
+    format!("StateInit\n split_depth: {}\n special: {}\n data: {}\n code: {}\n lib:  {}\n",
+        state.split_depth.as_ref().map(|x| format!("{:?}", x)).unwrap_or("None".to_string()),
+        state.special.as_ref().map(|x| format!("{:?}", x)).unwrap_or("None".to_string()),
+        tree_of_cells_into_base64(state.data.as_ref()),
+        tree_of_cells_into_base64(state.code.as_ref()),
+        tree_of_cells_into_base64(state.library.as_ref()),
+    )
 }
 
 fn tree_of_cells_into_base64(root_cell: Option<&Cell>) -> String {
@@ -40,38 +30,30 @@ fn tree_of_cells_into_base64(root_cell: Option<&Cell>) -> String {
             let mut bytes = Vec::new();
             serialize_tree_of_cells(cell, &mut bytes).unwrap();
             base64::encode(&bytes)
-        },
-        None => "None".to_string(),
+        }
+        None => "None".to_string()
     }
 }
 
-pub struct MsgPrinter {
-    pub msg: Arc<Message>,
-}
-
-impl fmt::Display for MsgPrinter {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "message header\n{}init  : {}\nbody  : {}\nbody_hex: {}\nbody_base64: {}\n",
-            print_msg_header(&self.msg.header()),
-            self.msg.state_init().as_ref().map(|x| {
-                format!("{}", StateInitPrinter{ state: x })
-            }).unwrap_or("None".to_string()),
-            match self.msg.body() {
-                Some(slice) => format!("{:.2}", slice.into_cell()),
-                None => "None".to_string(),
-            },
-            self.msg.body()
-                .map(|b| hex::encode(b.get_bytestring(0)))
-                .unwrap_or("None".to_string()),
-            tree_of_cells_into_base64(
-                self.msg.body()
-                    .map(|slice| slice.into_cell())
-                    .as_ref(),
-            ),
-        )
-    }    
+pub fn msg_printer(msg: &Message) -> String {
+    format!("message header\n{}init  : {}\nbody  : {}\nbody_hex: {}\nbody_base64: {}\n",
+        print_msg_header(&msg.header()),
+        msg.state_init().as_ref().map(|x| {
+            format!("{}", state_init_printer(x))
+        }).unwrap_or("None".to_string()),
+        match msg.body() {
+            Some(slice) => format!("{:.2}", slice.into_cell()),
+            None => "None".to_string(),
+        },
+        msg.body()
+            .map(|b| hex::encode(b.get_bytestring(0)))
+            .unwrap_or("None".to_string()),
+        tree_of_cells_into_base64(
+            msg.body()
+                .map(|slice| slice.into_cell())
+                .as_ref(),
+        ),
+    )
 }
 
 fn print_msg_header(header: &CommonMsgInfo) -> String {

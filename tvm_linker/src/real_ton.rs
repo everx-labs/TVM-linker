@@ -10,12 +10,11 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
-use printer::{MsgPrinter, StateInitPrinter};
+use crate::printer::*;
 use program::load_from_file;
 use std::str::FromStr;
 use std::io::Cursor;
 use std::str;
-use std::sync::Arc;
 use std::io::prelude::*;
 use std::fs::File;
 extern crate hex;
@@ -37,11 +36,11 @@ pub fn decode_boc(file_name: &str, is_tvc: bool) {
     
     println!("Encoded: {}\n", hex::encode(orig_bytes));
     if is_tvc {
-        let state: StateInit = StateInit::construct_from(&mut root_slice).expect("cannot read state_init from slice");
-        println!("Decoded:\n{}", StateInitPrinter{ state: &state });
+        let state = StateInit::construct_from(&mut root_slice).expect("cannot read state_init from slice");
+        println!("Decoded:\n{}", state_init_printer(&state));
     } else {
-        let msg: Message = Message::construct_from(&mut root_slice).expect("cannot read message from slice");
-        println!("Decoded:\n{}", MsgPrinter{ msg: Arc::new(msg) });
+        let msg = Message::construct_from(&mut root_slice).expect("cannot read message from slice");
+        println!("Decoded:\n{}", msg_printer(&msg));
     }
 
 }
