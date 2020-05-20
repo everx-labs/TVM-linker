@@ -12,7 +12,7 @@
  */
 use keyman::KeypairManager;
 use log::Level::Error;
-use printer::MsgPrinter;
+use crate::printer::msg_printer;
 use program::{load_from_file, save_to_file};
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use serde_json::Value;
@@ -162,7 +162,7 @@ fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: 
         for act in actions {
             match act {
                 OutAction::SendMsg{mode: _, out_msg } => {
-                    println!("Action(SendMsg):\n{}", MsgPrinter{ msg: Arc::new(out_msg.clone()) });
+                    println!("Action(SendMsg):\n{}", msg_printer(&out_msg));
                     if let Some(b) = out_msg.body() {
                         action_decoder(b, out_msg.is_internal());
                     }
@@ -389,8 +389,8 @@ mod tests {
             false,
         );
 
-        println!("SendMsg action:\n{}", MsgPrinter{ msg: Arc::new(msg) });
-        println!("SendMsg action:\n{}", MsgPrinter{ msg: Arc::new(msg2) });
+        println!("SendMsg action:\n{}", msg_printer(&msg));
+        println!("SendMsg action:\n{}", msg_printer(&msg));
     }
 
     #[test]
