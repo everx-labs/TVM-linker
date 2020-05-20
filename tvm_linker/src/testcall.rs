@@ -162,7 +162,7 @@ fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: 
         for act in actions {
             match act {
                 OutAction::SendMsg{mode: _, out_msg } => {
-                    println!("Action(SendMsg):\n{}", MsgPrinter{ msg: out_msg.clone() });
+                    println!("Action(SendMsg):\n{}", MsgPrinter{ msg: Arc::new(out_msg.clone()) });
                     if let Some(b) = out_msg.body() {
                         action_decoder(b, out_msg.is_internal());
                     }
