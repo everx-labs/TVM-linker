@@ -47,12 +47,11 @@ use clap::ArgMatches;
 use initdata::set_initial_data;
 use keyman::KeypairManager;
 use parser::ParseEngine;
-use program::Program;
+use program::{Program, get_now};
 use real_ton::{ decode_boc, compile_message };
 use resolver::resolve_name;
 use std::fs::File;
 use std::io::{BufReader, Read};
-use std::time::SystemTime;
 use testcall::{call_contract, MsgInfo};
 use ton_types::{BuilderData, SliceData};
 
@@ -76,11 +75,11 @@ fn linker_main() -> Result<(), String> {
         Some(s) => s,
         None => "",
     };
-    let matches = clap_app! (tvm_linker =>        
+    let matches = clap_app! (tvm_linker =>
         (version: &*format!("0.1 ({})", build_info))
         (author: "TONLabs")
         (about: "Linker for TVM assembly")
-        (@subcommand decode => 
+        (@subcommand decode =>
             (about: "Decode real TON message")
             (version: "0.1")
             (author: "TONLabs")
@@ -94,9 +93,10 @@ fn linker_main() -> Result<(), String> {
             (author: "TONLabs")
             (@arg INPUT: +required +takes_value "TVM assembler source file")
             (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids")
+            (@arg CTOR_PARAMS: -p --("ctor-params") +takes_value requires[ABI] "Supplies arguments for the constructor")
             (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file")
             (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
-            (@arg WC: -w +takes_value "Workchain id used to print contract address, -1 by default.")            
+            (@arg WC: -w +takes_value "Workchain id used to print contract address, -1 by default.")
             (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
             (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file")
         )
@@ -174,7 +174,7 @@ fn linker_main() -> Result<(), String> {
         if msg_matches.is_present("DATA") || msg_matches.is_present("ABI_JSON") {
             suffix += "-body";
         }
-        suffix += ".boc"; 
+        suffix += ".boc";
 
         let msg_body = match msg_matches.value_of("DATA") {
             Some(data) => {
@@ -189,27 +189,27 @@ fn linker_main() -> Result<(), String> {
                 build_body(msg_matches)?
             },
         };
-        
+
         return compile_message(
-            msg_matches.value_of("INPUT").unwrap(), 
-            msg_matches.value_of("WORKCHAIN"), 
-            msg_body, 
-            msg_matches.is_present("INIT"), 
+            msg_matches.value_of("INPUT").unwrap(),
+            msg_matches.value_of("WORKCHAIN"),
+            msg_body,
+            msg_matches.is_present("INIT"),
             &suffix,
         )
     }
-    
+
     //SUBCOMMAND COMPILE
     if let Some(compile_matches) = matches.subcommand_matches("compile") {
         let mut parser = ParseEngine::new();
-        let abi_json = 
-            if compile_matches.is_present("ABI") {
-                let abi_file_name = compile_matches.value_of("ABI").unwrap();
+        let abi_file = compile_matches.value_of("ABI");
+        let abi_json =
+            if let Some(abi_file_name) = abi_file {
                 let mut f = File::open(abi_file_name).map_err(|e| format!("cannot open abi file: {}", e))?;
-                let mut abi = String::new(); 
+                let mut abi = String::new();
                 Some(f.read_to_string(&mut abi).map(|_| abi).map_err(|e| format!("failed to read abi: {}", e))?)
-            } else { 
-                None 
+            } else {
+                None
             };
             let libs = compile_matches.values_of("LIB")
                 .unwrap_or_default()
@@ -239,35 +239,33 @@ fn linker_main() -> Result<(), String> {
                 },
                 None => (),
             },
-       };
-       
-        if compile_matches.is_present("DEBUG") {
-           prog.debug_print();        
+        };
+
+        let debug = compile_matches.is_present("DEBUG");
+
+        if debug {
+           prog.debug_print();
         }
 
         let wc = compile_matches.value_of("WC")
             .map(|wc| i8::from_str_radix(wc, 10).unwrap_or(-1))
             .unwrap_or(-1);
-         
-        prog.compile_to_file(wc)?;
+
+        let ctor_params = compile_matches.value_of("CTOR_PARAMS");
+        prog.compile_to_file_ex(wc, abi_file, ctor_params, debug)?;
         return Ok(());
     }
 
     unreachable!()
 }
 
-fn parse_now(now: Option<&str>) -> Result<u32, String> {    
+fn parse_now(now: Option<&str>) -> Result<u32, String> {
     let now = match now {
         Some(now_str) => {
             u32::from_str_radix(now_str, 10)
                 .map_err(|e| format!(r#"failed to parse "now" option: {}"#, e))?
         },
-        None => {
-            SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs() as u32
-        },
+        None => get_now(),
     };
     Ok(now)
 }
@@ -347,10 +345,10 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
     };
 
     call_contract(
-        matches.value_of("INPUT").unwrap(), 
+        matches.value_of("INPUT").unwrap(),
         matches.value_of("BALANCE"),
-        msg_info, 
-        sign, 
+        msg_info,
+        sign,
         ticktock,
         if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
         matches.is_present("TRACE"),
@@ -370,15 +368,15 @@ fn build_body(matches: &ArgMatches) -> Result<Option<SliceData>, String> {
             let pair = KeypairManager::from_secret_file(path);
             pair.drain()
         });
-        let is_internal = matches.is_present("INTERNAL");            
+        let is_internal = matches.is_present("INTERNAL");
         let body: SliceData = build_abi_body(
-            abi_file.unwrap(), 
-            method_name.unwrap(), 
+            abi_file.unwrap(),
+            method_name.unwrap(),
             params.unwrap(),
             header,
             key_file,
             is_internal
-        )?.into();            
+        )?.into();
         Ok(Some(body))
     } else if mask == 0 {
         Ok(None)
