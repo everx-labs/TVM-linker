@@ -13,12 +13,11 @@
 use keyman::KeypairManager;
 use log::Level::Error;
 use crate::printer::msg_printer;
-use program::{load_from_file, save_to_file};
+use program::{load_from_file, save_to_file, get_now};
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use serde_json::Value;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::SystemTime;
 use ton_vm::executor::{Engine, gas::gas_state::Gas};
 use ton_vm::error::TvmError;
 use ton_vm::stack::{StackItem, Stack, savelist::SaveList, integer::IntegerData};
@@ -128,7 +127,7 @@ fn create_inbound_msg(
                 MsgAddressInt::with_standart(None, 0, dst).unwrap(),
                 value,
                 1,
-                SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32,
+                get_now(),
                 msg_info.body.clone(),
                 msg_info.bounced,
             ))
@@ -244,7 +243,31 @@ pub fn call_contract<F>(
     where F: Fn(SliceData, bool)
 {
     let addr = AccountId::from_str(smc_file).unwrap();
-    
+    let addr_int = IntegerData::from_str_radix(smc_file, 16).unwrap();
+    let state_init = load_from_file(&format!("{}.tvc", smc_file));
+    let (exit_code, state_init) = call_contract_ex(
+        addr, addr_int, state_init, smc_balance, 
+        msg_info, key_file, ticktock, action_decoder, debug);
+    if exit_code == 0 || exit_code == 1 {
+        save_to_file(state_init, Some(smc_file), 0).expect("error");
+        println!("Contract persistent data updated");
+    }
+    exit_code
+}
+
+pub fn call_contract_ex<F>(
+    addr: AccountId,
+    addr_int: IntegerData,
+    state_init: StateInit,
+    smc_balance: Option<&str>,
+    msg_info: MsgInfo,
+    key_file: Option<Option<&str>>,
+    ticktock: Option<i8>,
+    action_decoder: Option<F>,
+    debug: bool,
+) -> (i32, StateInit)
+    where F: Fn(SliceData, bool)
+{
     let func_selector = match msg_info.balance {
         Some(_) => 0,    
         None => if ticktock.is_some() { -2 } else { -1 },
@@ -258,7 +281,7 @@ pub fn call_contract<F>(
         init_logger(debug);
     }
     
-    let mut state_init = load_from_file(&format!("{}.tvc", smc_file));
+    let mut state_init = state_init;
     let (code, data) = load_code_and_data(&state_init);
     
     let workchain_id = if func_selector > -2 { 0 } else { -1 };
@@ -292,7 +315,7 @@ pub fn call_contract<F>(
     } else {
         stack
             .push(int!(smc_value))
-            .push(StackItem::Integer(Arc::new(IntegerData::from_str_radix(smc_file, 16).unwrap()))) //contract address
+            .push(StackItem::Integer(Arc::new(addr_int))) //contract address
             .push(int!(ticktock.unwrap())) //tick or tock
             .push(int!(func_selector));
     }
@@ -325,11 +348,9 @@ pub fn call_contract<F>(
             StackItem::Cell(root_cell) => Some(root_cell),
             _ => panic!("cannot get root data: c4 register is not a cell."),
         };
-        save_to_file(state_init, Some(smc_file), 0).expect("error");
-        println!("Contract persistent data updated");
     }
 
-    exit_code
+    (exit_code, state_init)
 }
 
 #[cfg(test)]

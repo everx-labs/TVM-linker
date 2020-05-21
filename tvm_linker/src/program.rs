@@ -15,6 +15,7 @@ use crc16::*;
 use ed25519_dalek::{Keypair, PUBLIC_KEY_LENGTH};
 use std::io::Cursor;
 use std::io::Write;
+use std::time::SystemTime;
 use methdict::*;
 use ton_block::*;
 use ton_vm::assembler::compile_code;
@@ -35,24 +36,24 @@ const SELECTOR_INTERNAL: &str = "
 
 impl Program {
     pub fn new(parser: ParseEngine) -> Self {
-        Program { 
+        Program {
             engine: parser,
             keypair: None,
         }
     }
 
     pub fn set_keypair(&mut self, pair: Keypair) {
-        self.keypair = Some(pair);        
+        self.keypair = Some(pair);
     }
 
     pub fn data(&self) -> std::result::Result<SliceData, String> {
-        let bytes = 
+        let bytes =
             if let Some(ref pair) = self.keypair {
                 pair.public.to_bytes()
             } else {
                 [0u8; PUBLIC_KEY_LENGTH]
             };
-            
+
         let mut data_dict = HashmapE::with_hashmap(64, self.engine.data());
         data_dict.set(
             ptr_to_builder(self.engine.persistent_base)?.into(),
@@ -87,9 +88,74 @@ impl Program {
 
         Ok(dict.data().map(|cell| cell.clone()))
     }
-   
+
+    #[allow(dead_code)]
     pub fn compile_to_file(&self, wc: i8) -> std::result::Result<String, String> {
-        save_to_file(self.compile_to_state()?, None, wc)
+        self.compile_to_file_ex(wc, None, None, false)
+    }
+
+    pub fn compile_to_file_ex(
+        &self,
+        wc: i8,
+        abi_file: Option<&str>,
+        ctor_params: Option<&str>,
+        trace: bool
+    ) -> std::result::Result<String, String> {
+        let mut state_init = self.compile_to_state()?;
+        if let Some(ctor_params) = ctor_params {
+            state_init = self.apply_constructor(state_init, abi_file.unwrap(), ctor_params, trace)?;
+        }
+        save_to_file(state_init, None, wc)
+    }
+
+    fn apply_constructor(
+        &self,
+        state_init: StateInit,
+        abi_file: &str,
+        ctor_params : &str,
+        trace: bool
+    ) -> std::result::Result<StateInit, String> {
+        use ton_types::{AccountId, UInt256};
+        use ton_vm::stack::integer::IntegerData;
+        use testcall::{call_contract_ex, MsgInfo};
+        use abi;
+
+        let action_decoder = |_b,_i| {};
+
+        let body: SliceData = abi::build_abi_body(
+            abi_file,
+            "constructor",
+            ctor_params,
+            None,   // header,
+            None,   // key_file,
+            false   // is_internal
+        )?.into();
+
+        let (exit_code, state_init) = call_contract_ex(
+            AccountId::from(UInt256::default()),
+            IntegerData::zero(),
+            state_init,
+            None, // balance,
+            MsgInfo{
+                balance: None,
+                src: None,
+                now: get_now(),
+                bounced: false,
+                body: Some(body),
+            },
+            None, // key_file,
+            None, // ticktock,
+            Some(action_decoder),
+            trace
+        );
+
+        if exit_code == 0 || exit_code == 1 {
+            // TODO: check that no action is fired.
+            // TODO: remove constructor from dictionary of methods.
+            Ok(state_init)
+        } else {
+            Err(format!("Constructor failed ec = {}", exit_code))
+        }
     }
 
     pub fn compile_to_state(&self) -> std::result::Result<StateInit, String> {
@@ -103,14 +169,14 @@ impl Program {
         let mut internal_selector = compile_code(SELECTOR_INTERNAL)
             .map_err(|_| "unexpected TVM error while compiling internal selector".to_string())?;
         internal_selector.append_reference(self.internal_method_dict()?.unwrap_or_default().into());
-        
+
         let mut main_selector = compile_code(self.engine.entry())
             .map_err(|e| format_compilation_error_string(e, self.engine.entry()).replace("_name_", "selector"))?;
         main_selector.append_reference(self.public_method_dict()?.unwrap_or_default().into());
         main_selector.append_reference(internal_selector);
 
         Ok(main_selector)
-    }   
+    }
 
     pub fn debug_print(&self) {
         self.engine.debug_print();
@@ -125,7 +191,7 @@ pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8) -> std::result
     let root_cell = state.write_to_new_cell()
         .map_err(|e| format!("Serialization failed: {}", e))?
         .into();
-    let mut buffer = vec![]; 
+    let mut buffer = vec![];
     BagOfCells::with_root(&root_cell).write_to(&mut buffer, false)
         .map_err(|e| format!("BOC failed: {}", e))?;
 
@@ -140,6 +206,7 @@ pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8) -> std::result
 
     let mut file = std::fs::File::create(&file_name).unwrap();
     file.write_all(&buffer).map_err(|e| format!("Write to file failed: {}", e))?;
+
     if print_filename {
         println! ("Saved contract to file {}", &file_name);
         println!("testnet:");
@@ -168,6 +235,9 @@ pub fn load_from_file(contract_file: &str) -> StateInit {
     StateInit::construct_from(&mut cell.into()).unwrap()
 }
 
+pub fn get_now() -> u32 {
+    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32
+}
 
 
 #[cfg(test)]
@@ -195,7 +265,7 @@ mod tests {
         assert_eq!(perform_contract_call(name, body, Some(None), false, false, None, None, None, None, 0, |_b,_i| {}), 0);
     }
 
-    #[test]    
+    #[test]
     fn test_asciz_var() {
         let mut parser = ParseEngine::new();
         let source = File::open("./tests/asci_test1.s").unwrap();
@@ -228,7 +298,7 @@ mod tests {
         };
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
-        
+
         assert_eq!(perform_contract_call(name, body, Some(Some("key1")), false, false, None, None, None, None, 0, |_b,_i| {}), 0);
     }
 
@@ -248,7 +318,7 @@ mod tests {
         let prog = Program::new(parser);
         let contract_file = prog.compile_to_file(-1).unwrap();
         let name = contract_file.split('.').next().unwrap();
-        
+
         assert_eq!(perform_contract_call(name, None, None, false, false, None, Some(-1), None, None, 0, |_b,_i| {}), 0);
     }
 
@@ -266,7 +336,7 @@ mod tests {
             b.append_u32(abi::gen_abi_id(None, "main")).unwrap();
             Some(b.into())
         };
-        
+
         assert_eq!(perform_contract_call(name, body, Some(Some("key1")), false, false, None, None, None, None, 0, |_b,_i| {}), 0);
     }
 
@@ -291,7 +361,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            parser.parse(source, vec![lib], Some(abi_str)), 
+            parser.parse(source, vec![lib], Some(abi_str)),
             Ok(())
         );
 
@@ -304,7 +374,7 @@ mod tests {
             b.append_reference(BuilderData::new());
             Some(b.into())
         };
-        
+
         assert_eq!(perform_contract_call(name, body1, None, false, false, None, None, None, None, 0, |_b,_i| {}), 0);
 
         let body2 = {
