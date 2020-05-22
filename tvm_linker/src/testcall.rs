@@ -327,7 +327,7 @@ pub fn call_contract_ex<F>(
             code as i32
         }
         Err(exc) => if let Ok(TvmError::TvmExceptionFull(exc)) = exc.downcast() {
-            println!("Unhandled exception: {}", exc);
+            println!("Unhandled exception: {:?}", exc);
             exc.number as i32
         } else {
             -1
