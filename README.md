@@ -27,9 +27,11 @@ tvm_linker has several modes of work:
     tvm_linker compile [--lib <lib_file>] [--abi-json <abi_file>] [--genkey | --setkey <keyfile>] [-w <workchain_id>] [--debug] <source>
 
 Here `source` is a name of tvm assembly source file, `library` is a runtime library file (can be more than one: `--lib` 
-should be supplied for every file).
+should be supplied for every file). If `--lib` option is not specified linker looks for environment variable `TVM_LINKER_LIB_PATH`,
+if it is set that path is used to load a library.
 
 If there is an ABI file, it is better to use `--abi-json` option to supply a contract ABI file. Function ID's are generated according to function signatures in the ABI.
+If neither `-a` nor `--abi-json` option is specified, linker checks whether file `source`(without extension) + `.abi.json` exists. If file exists linker loads ABI from it.
 
 Linker generates an `address.tvc` file, where `address` is a hash from initial data and code of the contract.
 
