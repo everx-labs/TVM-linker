@@ -54,6 +54,7 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use testcall::{call_contract, MsgInfo};
 use ton_types::{BuilderData, SliceData};
+use std::env;
 
 fn main() -> Result<(), i32> {
     println!(
@@ -92,13 +93,13 @@ fn linker_main() -> Result<(), String> {
             (version: "0.1")
             (author: "TONLabs")
             (@arg INPUT: +required +takes_value "TVM assembler source file")
-            (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids")
-            (@arg CTOR_PARAMS: -p --("ctor-params") +takes_value requires[ABI] "Supplies arguments for the constructor")
+            (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids. If not specified abi is loaded from file path obtained from <INPUT> path if it exists.")
+            (@arg CTOR_PARAMS: -p --("ctor-params") +takes_value "Supplies arguments for the constructor")
             (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file")
             (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
             (@arg WC: -w +takes_value "Workchain id used to print contract address, -1 by default.")
             (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
-            (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file")
+            (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file. If not specified lib is loaded from environment variable TVM_LINKER_LIB_PATH if it exists.")
         )
         (@subcommand test =>
             (about: "execute contract in test environment")
@@ -202,7 +203,12 @@ fn linker_main() -> Result<(), String> {
     //SUBCOMMAND COMPILE
     if let Some(compile_matches) = matches.subcommand_matches("compile") {
         let mut parser = ParseEngine::new();
-        let abi_file = compile_matches.value_of("ABI");
+        let input = compile_matches.value_of("INPUT").unwrap();
+        let abi_from_input = format!("{}{}", input.trim_end_matches("code"), "abi.json");
+        let abi_file = compile_matches.value_of("ABI").or_else(|| {
+            println!("ABI_PATH (obtained from INPUT): {}", abi_from_input);
+            Some(abi_from_input.as_ref())
+        });
         let abi_json =
             if let Some(abi_file_name) = abi_file {
                 let mut f = File::open(abi_file_name).map_err(|e| format!("cannot open abi file: {}", e))?;
@@ -211,16 +217,26 @@ fn linker_main() -> Result<(), String> {
             } else {
                 None
             };
-            let libs = compile_matches.values_of("LIB")
-                .unwrap_or_default()
-                .map(|lib| {
-                    File::open(lib)
-                        .map_err(|e| format!("cannot open library file: {}", e))
-                        .expect("error")
-                })
-                .collect();
-            let source = File::open(compile_matches.value_of("INPUT").unwrap())
-                .map_err(|e| format!("cannot open source file: {}", e))?;
+
+        let mut libs: Vec<File> = compile_matches.values_of("LIB")
+            .unwrap_or_default()
+            .map(|lib| {
+                File::open(lib)
+                    .map_err(|e| format!("cannot open library file: {}", e))
+                    .expect("error")
+            })
+            .collect();
+
+        if libs.is_empty() {
+            if let Ok(lib_path) = env::var("TVM_LINKER_LIB_PATH") {
+                println!("TVM_LINKER_LIB_PATH: {:?}", lib_path);
+                libs.push(File::open(lib_path)
+                            .map_err(|e| format!("cannot open library file: {}", e))?
+                        );
+            }
+        }
+
+        let source = File::open(input).map_err(|e| format!("cannot open source file: {}", e))?;
 
         parser.parse(source, libs, abi_json)?;
         let mut prog = Program::new(parser);
@@ -252,6 +268,10 @@ fn linker_main() -> Result<(), String> {
             .unwrap_or(-1);
 
         let ctor_params = compile_matches.value_of("CTOR_PARAMS");
+        if ctor_params.is_some() && !abi_file.is_some() {
+            let msg = "ABI is mandatory when CTOR_PARAMS is specified.";
+            return Err(msg.to_string());
+        }
         prog.compile_to_file_ex(wc, abi_file, ctor_params, debug)?;
         return Ok(());
     }
