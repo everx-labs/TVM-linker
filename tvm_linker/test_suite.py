@@ -68,10 +68,12 @@ def compile1(source_file, lib_file):
 	cmd = "{} compile ./tests/{} {} --debug > compile_log.tmp".format(TVM_PATH, source_file, lib)
 	# print cmd
 	ec = os.system(cmd)
+	if os.path.isfile("compile_log.tmp"):
+		lines = [l.rstrip() for l in open("compile_log.tmp").readlines()]
 	if ec != 0:
-		error("COMPILATION FAILED!")
+		fLog = "".join("{}\n".format(l) for l in lines)
+		error("COMPILATION FAILED!\n{}".format(fLog))
 
-	lines = [l.rstrip() for l in open("compile_log.tmp").readlines()]
 	# os.remove("compile_log.tmp")
 
 	functions = dict()
@@ -90,10 +92,12 @@ def compile2(source_name, directory = "tests_sol", lib_file = STDLIB_SOL):
 	cmd = cmd.format(TVM_PATH, source_file, abi_file, lib_file)
 	# print cmd
 	ec = os.system(cmd)
+	if os.path.isfile("compile_log.tmp"):
+		lines = [l.rstrip() for l in open("compile_log.tmp").readlines()]
 	if ec != 0:
-		error("COMPILATION FAILED!")
+		fLog = "".join("{}\n".format(l) for l in lines)
+		error("COMPILATION FAILED!\n{}".format(fLog))
 
-	lines = [l.rstrip() for l in open("compile_log.tmp").readlines()]
 	# os.remove("compile_log.tmp")
 
 	functions = dict()
