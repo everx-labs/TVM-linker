@@ -39,7 +39,7 @@ where
         let val = compile_code(&pair.1).map_err(|e| {
             (pair.0.clone(), format_compilation_error_string(e, &pair.1))
         })?;
-        map.set(key, &val).map_err(|e| {
+        map.setref(key, &val.into_cell()).map_err(|e| {
             (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
         })?;
     }
