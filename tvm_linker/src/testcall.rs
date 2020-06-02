@@ -400,7 +400,7 @@ mod tests {
             Some(create_inbound_body(10, 20, 0x11223344).into()),
         );
 
-        let msg2 = create_internal_msg(
+        let _msg2 = create_internal_msg(
             MsgAddressInt::with_standart(None, 0, [0x11; 32].into()).unwrap(),
             MsgAddressInt::with_standart(None, 0, [0x22; 32].into()).unwrap(),
             CurrencyCollection::with_grams(12345678),
