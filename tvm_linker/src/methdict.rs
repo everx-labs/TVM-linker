@@ -35,13 +35,15 @@ where
     T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash,
 {
     for pair in methods.iter() {
-        let key = pair.0.clone().write_to_new_cell().unwrap().into();
+        let key : SliceData = pair.0.clone().write_to_new_cell().unwrap().into();
         let val = compile_code(&pair.1).map_err(|e| {
             (pair.0.clone(), format_compilation_error_string(e, &pair.1))
         })?;
-        map.setref(key, &val.into_cell()).map_err(|e| {
-            (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
-        })?;
+        if map.set(key.clone(), &val).is_err() {
+            map.setref(key, &val.into_cell()).map_err(|e| {
+                (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
+            })?;
+        }
     }
     Ok(())
 }
