@@ -10,7 +10,7 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
-use abi::gen_abi_id;
+use abi::{gen_abi_id, load_abi_contract};
 use abi_json::Contract;
 use regex::Regex;
 use resolver::resolve_name;
@@ -252,7 +252,7 @@ impl ParseEngine {
 
     pub fn parse<T: Read + Seek>(&mut self, source: T, libs: Vec<T>, abi_json: Option<String>) -> Result<(), String> {
         if let Some(s) = abi_json {
-            self.abi = Some(Contract::load(s.as_bytes()).map_err(|e| format!("cannot parse contract abi: {:?}", e))?);
+            self.abi = Some(load_abi_contract(&s)?);
         }
 
         self.preinit()?;

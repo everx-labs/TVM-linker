@@ -2,12 +2,12 @@ use ed25519_dalek::PublicKey;
 use program::save_to_file;
 use std::fs::OpenOptions;
 use ton_sdk;
+use abi::load_abi_json_string;
 
 pub fn set_initial_data(tvc: &str, pubkey: Option<[u8; 32]>, data: &str, abi: &str) -> Result<(), String> {
     let mut state_init = OpenOptions::new().read(true).open(tvc)
         .map_err(|e| format!("unable to open contract file: {}", e))?;
-    let abi = std::fs::read_to_string(abi)
-        .map_err(|e| format!("unable to read ABI file: {}", e))?;
+    let abi = load_abi_json_string(abi)?;
 
     let mut contract_image = if let Some(key_bytes) = pubkey {
         let pubkey_object = PublicKey::from_bytes(&key_bytes)
