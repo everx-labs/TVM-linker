@@ -342,23 +342,12 @@ mod tests {
 
     #[test]
     fn test_public_and_private() {
-        use abi_json::Contract;
-        use std::io::Read;
-
         let mut parser = ParseEngine::new();
         let source = File::open("./tests/test_public.code").unwrap();
         let lib = File::open("./stdlib.tvm").unwrap();
-        let abi = Contract::load(
-            std::fs::read("./tests/test_public.abi.json")
-                .unwrap()
-                .as_slice()
-        ).unwrap();
 
-        let mut abi_str = String::new();
-        File::open("./tests/test_public.abi.json")
-            .unwrap()
-            .read_to_string(&mut abi_str)
-            .unwrap();
+        let abi_str = abi::load_abi_json_string("./tests/test_public.abi.json").unwrap();
+        let abi = abi::load_abi_contract(&abi_str).unwrap();
 
         assert_eq!(
             parser.parse(source, vec![lib], Some(abi_str)),

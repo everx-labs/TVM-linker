@@ -42,7 +42,7 @@ mod resolver;
 mod methdict;
 mod testcall;
 
-use abi::{build_abi_body, decode_body};
+use abi::{build_abi_body, decode_body, load_abi_json_string};
 use clap::ArgMatches;
 use initdata::set_initial_data;
 use keyman::KeypairManager;
@@ -51,7 +51,7 @@ use program::{Program, get_now};
 use real_ton::{ decode_boc, compile_message };
 use resolver::resolve_name;
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::{BufReader};
 use testcall::{call_contract, MsgInfo};
 use ton_types::{BuilderData, SliceData};
 use std::env;
@@ -209,14 +209,10 @@ fn linker_main() -> Result<(), String> {
             println!("ABI_PATH (obtained from INPUT): {}", abi_from_input);
             Some(abi_from_input.as_ref())
         });
-        let abi_json =
-            if let Some(abi_file_name) = abi_file {
-                let mut f = File::open(abi_file_name).map_err(|e| format!("cannot open abi file: {}", e))?;
-                let mut abi = String::new();
-                Some(f.read_to_string(&mut abi).map(|_| abi).map_err(|e| format!("failed to read abi: {}", e))?)
-            } else {
-                None
-            };
+        let abi_json = match abi_file {
+            Some(abi_file_name) => Some(load_abi_json_string(abi_file_name)?),
+            None => None
+        };
 
         let mut libs: Vec<File> = compile_matches.values_of("LIB")
             .unwrap_or_default()
