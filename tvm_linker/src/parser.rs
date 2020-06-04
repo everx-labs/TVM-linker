@@ -23,6 +23,45 @@ use ton_vm::stack::serialization::Serializer;
 
 pub type Ptr = i64;
 
+pub struct ParseEngineResults {
+    engine: ParseEngine,
+}
+
+impl ParseEngineResults {
+    pub fn new(parser: ParseEngine) -> Self {
+        ParseEngineResults {
+            engine: parser
+        }
+    }
+    pub fn entry(&self) -> &str {
+        self.engine.entry()
+    }
+    pub fn publics(&self) -> HashMap<u32, String> {
+        self.engine.publics()
+    }
+    pub fn privates(&self) -> HashMap<u32, String> {
+        self.engine.privates()
+    }
+    pub fn internals(&self) -> HashMap<i32, String> {
+        self.engine.internals()
+    }
+    pub fn global_name(&self, id: u32) -> Option<String> {
+        self.engine.global_name(id)
+    }
+    pub fn internal_name(&self, id: i32) -> Option<String> {
+        self.engine.internal_name(id)
+    }
+    pub fn global_by_name(&self, name: &str) -> Option<(u32, String)> {
+        self.engine.global_by_name(name)
+    }    
+    pub fn persistent_data(&self) -> (i64, Option<Cell>) {
+        (self.engine.persistent_base, self.engine.data())
+    }
+    pub fn debug_print(&self) {
+        self.engine.debug_print()
+    }
+}
+
 pub fn ptr_to_builder(n: Ptr) -> Result<BuilderData, String> {
     let mut b = BuilderData::new();
     b.append_i64(n).map_err(|_| format!("failed to serialize an i64 to buidler"))?;
@@ -111,6 +150,7 @@ enum DataValue {
     Number((IntegerData, usize)),
     Slice(SliceData),
 }
+
 impl std::fmt::Display for DataValue {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         
@@ -195,7 +235,7 @@ pub struct ParseEngine {
     globl_base: Ptr,
     /// key for next object in global memory dictionary
     globl_ptr: Ptr,
-    pub persistent_base: Ptr,
+    persistent_base: Ptr,
     persistent_ptr: Ptr,
     ///Contract ABI info, used for correct function id calculation
     abi: Option<Contract>,
@@ -277,15 +317,15 @@ impl ParseEngine {
         Ok(())
     }    
 
-    pub fn data(&self) -> Option<Cell> {
+    fn data(&self) -> Option<Cell> {
         self.build_data()
     }
 
-    pub fn entry(&self) -> &str {
+    fn entry(&self) -> &str {
         &self.entry_point
     }
 
-    pub fn internals(&self) -> HashMap<i32, String> {
+    fn internals(&self) -> HashMap<i32, String> {
         let mut funcs = HashMap::new();
         self.internals.iter().for_each(|x| {
             funcs.insert(x.0.clone(), x.1.body.clone());
@@ -293,22 +333,22 @@ impl ParseEngine {
         funcs
     }
 
-    pub fn internal_name(&self, id: i32) -> Option<String> {
+    fn internal_name(&self, id: i32) -> Option<String> {
         self.intrefs.iter().find(|i| *i.1 == id).map(|i| i.0.clone())
     }
 
     #[allow(dead_code)]
-    pub fn internal_by_name(&self, name: &str) -> Option<(i32, String)> {
+    fn internal_by_name(&self, name: &str) -> Option<(i32, String)> {
         let id = self.intrefs.get(name)?;
         let body = self.internals.get(id).map(|f| f.body.to_owned())?;
         Some((*id, body))
     }
 
-    pub fn publics(&self) -> HashMap<u32, String> {
+    fn publics(&self) -> HashMap<u32, String> {
         self.globals(true)
     }
 
-    pub fn privates(&self) -> HashMap<u32, String> {
+    fn privates(&self) -> HashMap<u32, String> {
         self.globals(false)
     }
 
@@ -329,7 +369,7 @@ impl ParseEngine {
         funcs
     }
 
-    pub fn global_name(&self, id: u32) -> Option<String> {
+    fn global_name(&self, id: u32) -> Option<String> {
         self.globals.iter().find(|item| {
             if let Some(func) = item.1.dtype.func() {
                 func.id == id
@@ -340,7 +380,7 @@ impl ParseEngine {
         .map(|i| i.0.clone())
     }
 
-    pub fn global_by_name(&self, name: &str) -> Option<(u32, String)> {
+    fn global_by_name(&self, name: &str) -> Option<(u32, String)> {
         self.globals.get(name).and_then(|v| {
             v.dtype.func().and_then(|func| Some((func.id.clone(), func.body.clone()) ))
         })
@@ -393,7 +433,7 @@ impl ParseEngine {
         data.addr = self.persistent_base; 
     }
 
-    pub fn parse_code<R: BufRead>(&mut self, reader: &mut R, first_pass: bool) -> Result<(), String> {
+    fn parse_code<R: BufRead>(&mut self, reader: &mut R, first_pass: bool) -> Result<(), String> {
         let globl_regex = Regex::new(PATTERN_GLOBL).unwrap();
         let internal_regex = Regex::new(PATTERN_INTERNAL).unwrap();
         let selector_regex = Regex::new(PATTERN_SELECTOR).unwrap();
@@ -829,7 +869,7 @@ impl ParseEngine {
         }
     }
 
-    pub fn debug_print(&self) {
+    fn debug_print(&self) {
         let line = "--------------------------";
         println!("Entry point:\n{}\n{}\n{}", line, self.entry(), line);
         println!("General-purpose functions:\n{}", line);

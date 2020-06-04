@@ -22,10 +22,10 @@ use ton_vm::assembler::compile_code;
 use ton_types::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use ton_types::{Cell, SliceData, BuilderData, IBitstring};
 use ton_types::dictionary::{HashmapE, HashmapType};
-use parser::{ptr_to_builder, ParseEngine};
+use parser::{ptr_to_builder, ParseEngine, ParseEngineResults};
 
 pub struct Program {
-    engine: ParseEngine,
+    engine: ParseEngineResults,
     keypair: Option<Keypair>,
 }
 
@@ -37,7 +37,7 @@ const SELECTOR_INTERNAL: &str = "
 impl Program {
     pub fn new(parser: ParseEngine) -> Self {
         Program {
-            engine: parser,
+            engine: ParseEngineResults::new(parser),
             keypair: None,
         }
     }
@@ -54,9 +54,10 @@ impl Program {
                 [0u8; PUBLIC_KEY_LENGTH]
             };
 
-        let mut data_dict = HashmapE::with_hashmap(64, self.engine.data());
+        let (persistent_base, persistent_data) = self.engine.persistent_data();
+        let mut data_dict = HashmapE::with_hashmap(64, persistent_data);
         data_dict.set(
-            ptr_to_builder(self.engine.persistent_base)?.into(),
+            ptr_to_builder(persistent_base)?.into(),
             &BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8)
                 .map_err(|e| format!("failed to pack pubkey to data dictionary: {}", e))?
                 .into(),
@@ -170,8 +171,8 @@ impl Program {
             .map_err(|_| "unexpected TVM error while compiling internal selector".to_string())?;
         internal_selector.append_reference(self.internal_method_dict()?.unwrap_or_default().into());
 
-        let mut main_selector = compile_code(self.engine.entry())
-            .map_err(|e| format_compilation_error_string(e, self.engine.entry()).replace("_name_", "selector"))?;
+        let mut main_selector = compile_code(self.entry())
+            .map_err(|e| format_compilation_error_string(e, self.entry()).replace("_name_", "selector"))?;
         main_selector.append_reference(self.public_method_dict()?.unwrap_or_default().into());
         main_selector.append_reference(internal_selector);
 

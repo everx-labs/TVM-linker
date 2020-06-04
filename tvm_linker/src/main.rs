@@ -46,12 +46,11 @@ use abi::{build_abi_body, decode_body, load_abi_json_string};
 use clap::ArgMatches;
 use initdata::set_initial_data;
 use keyman::KeypairManager;
-use parser::ParseEngine;
+use parser::{ParseEngine, ParseEngineResults};
 use program::{Program, get_now};
-use real_ton::{ decode_boc, compile_message };
+use real_ton::{decode_boc, compile_message};
 use resolver::resolve_name;
 use std::fs::File;
-use std::io::{BufReader};
 use testcall::{call_contract, MsgInfo};
 use ton_types::{BuilderData, SliceData};
 use std::env;
@@ -202,7 +201,6 @@ fn linker_main() -> Result<(), String> {
 
     //SUBCOMMAND COMPILE
     if let Some(compile_matches) = matches.subcommand_matches("compile") {
-        let mut parser = ParseEngine::new();
         let input = compile_matches.value_of("INPUT").unwrap();
         let abi_from_input = format!("{}{}", input.trim_end_matches("code"), "abi.json");
         let abi_file = compile_matches.value_of("ABI").or_else(|| {
@@ -234,6 +232,7 @@ fn linker_main() -> Result<(), String> {
 
         let source = File::open(input).map_err(|e| format!("cannot open source file: {}", e))?;
 
+        let mut parser = ParseEngine::new();
         parser.parse(source, libs, abi_json)?;
         let mut prog = Program::new(parser);
 
@@ -315,13 +314,14 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
 
             if let Some(source) = matches.value_of("SOURCE") {
                 let file = File::open(source)
-                    .map_err(|e| format!("cannot opening source file: {}", e))?;
-                let mut reader = BufReader::new(file);
-                parser.parse_code(&mut reader, true)?;
+                    .map_err(|e| format!("Cannot open source file: {}", e))?;
+                parser.parse(file, vec![], None)?;
             }
 
+            let parse_results = ParseEngineResults::new(parser); 
+
             hex_str = resolve_name(&hex_str, |name| {
-                parser.global_by_name(name).map(|id| id.0)
+                parse_results.global_by_name(name).map(|id| id.0)
             })
             .map_err(|e| format!("failed to resolve body {}: {}", hex_str, e))?;
 
