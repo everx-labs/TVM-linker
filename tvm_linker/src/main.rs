@@ -232,9 +232,9 @@ fn linker_main() -> Result<(), String> {
 
         let source = File::open(input).map_err(|e| format!("cannot open source file: {}", e))?;
 
-        let mut parser = ParseEngine::new();
-        parser.parse(source, libs, abi_json)?;
-        let mut prog = Program::new(parser);
+        let mut prog = Program::new(
+            ParseEngine::new(source, libs, abi_json)?
+        );
 
         match compile_matches.value_of("GENKEY") {
             Some(file) => {
@@ -310,15 +310,14 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
     let (body, sign) = match matches.value_of("BODY") {
         Some(hex_str) => {
             let mut hex_str = hex_str.to_string();
-            let mut parser = ParseEngine::new();
 
-            if let Some(source) = matches.value_of("SOURCE") {
-                let file = File::open(source)
-                    .map_err(|e| format!("Cannot open source file: {}", e))?;
-                parser.parse(file, vec![], None)?;
-            }
+            let source = matches.value_of("SOURCE")
+                .ok_or("Internal error: missing SOURCE".to_owned())?;
 
-            let parse_results = ParseEngineResults::new(parser); 
+            let file = File::open(source).map_err(|e| format!("Cannot open source file: {}", e))?;
+            let parse_results = ParseEngineResults::new(
+                ParseEngine::new(file, vec![], None)?
+            ); 
 
             hex_str = resolve_name(&hex_str, |name| {
                 parse_results.global_by_name(name).map(|id| id.0)

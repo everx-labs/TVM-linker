@@ -250,11 +250,11 @@ mod tests {
 
     #[test]
     fn test_comm_var_addresses() {
-        let mut parser = ParseEngine::new();
         let source = File::open("./tests/comm_test2.s").unwrap();
         let lib = File::open("./stdlib.tvm").unwrap();
-        assert_eq!(parser.parse(source, vec![lib], None), Ok(()));
-        let prog = Program::new(parser);
+        let parser = ParseEngine::new(source, vec![lib], None);
+        assert_eq!(parser.is_ok(), true);
+        let prog = Program::new(parser.unwrap());
         let body = {
             let mut b = BuilderData::new();
             b.append_u32(abi::gen_abi_id(None, "main")).unwrap();
@@ -268,11 +268,11 @@ mod tests {
 
     #[test]
     fn test_asciz_var() {
-        let mut parser = ParseEngine::new();
         let source = File::open("./tests/asci_test1.s").unwrap();
         let lib = File::open("./stdlib.tvm").unwrap();
-        assert_eq!(parser.parse(source, vec![lib], None), Ok(()));
-        let prog = Program::new(parser);
+        let parser = ParseEngine::new(source, vec![lib], None);
+        assert_eq!(parser.is_ok(), true);
+        let prog = Program::new(parser.unwrap());
         let body = {
             let mut b = BuilderData::new();
             b.append_u32(abi::gen_abi_id(None, "main")).unwrap();
@@ -287,11 +287,11 @@ mod tests {
     #[ignore]
     //TODO: use when stdlib will be modified to store sender key.
     fn test_sender_pubkey() {
-        let mut parser = ParseEngine::new();
         let source = File::open("./tests/sign-test.s").unwrap();
         let lib = File::open("./stdlib_c.tvm").unwrap();
-        assert_eq!(parser.parse(source, vec![lib], None), Ok(()));
-        let prog = Program::new(parser);
+        let parser = ParseEngine::new(source, vec![lib], None);
+        assert_eq!(parser.is_ok(), true);
+        let prog = Program::new(parser.unwrap());
         let body = {
             let buf = hex::decode("000D6E4079").unwrap();
             let buf_bits = buf.len() * 8;
@@ -312,11 +312,11 @@ mod tests {
 
     #[test]
     fn test_ticktock() {
-        let mut parser = ParseEngine::new();
         let source = File::open("./tests/ticktock.code").unwrap();
         let lib = File::open("./stdlib_sol.tvm").unwrap();
-        assert_eq!(parser.parse(source, vec![lib], None), Ok(()));
-        let prog = Program::new(parser);
+        let parser = ParseEngine::new(source, vec![lib], None);
+        assert_eq!(parser.is_ok(), true);
+        let prog = Program::new(parser.unwrap());
         let contract_file = prog.compile_to_file(-1).unwrap();
         let name = contract_file.split('.').next().unwrap();
 
@@ -325,11 +325,11 @@ mod tests {
 
     #[test]
     fn test_recursive_call() {
-        let mut parser = ParseEngine::new();
         let lib1 = File::open("./stdlib.tvm").unwrap();
         let source = File::open("./tests/test_recursive.code").unwrap();
-        assert_eq!(parser.parse(source, vec![lib1], None), Ok(()));
-        let prog = Program::new(parser);
+        let parser = ParseEngine::new(source, vec![lib1], None);
+        assert_eq!(parser.is_ok(), true);
+        let prog = Program::new(parser.unwrap());
         let contract_file = prog.compile_to_file(-1).unwrap();
         let name = contract_file.split('.').next().unwrap();
         let body = {
@@ -343,19 +343,16 @@ mod tests {
 
     #[test]
     fn test_public_and_private() {
-        let mut parser = ParseEngine::new();
         let source = File::open("./tests/test_public.code").unwrap();
         let lib = File::open("./stdlib.tvm").unwrap();
 
         let abi_str = abi::load_abi_json_string("./tests/test_public.abi.json").unwrap();
         let abi = abi::load_abi_contract(&abi_str).unwrap();
 
-        assert_eq!(
-            parser.parse(source, vec![lib], Some(abi_str)),
-            Ok(())
-        );
+        let parser = ParseEngine::new(source, vec![lib], Some(abi_str));
+        assert_eq!(parser.is_ok(), true);
+        let prog = Program::new(parser.unwrap());
 
-        let prog = Program::new(parser);
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
         let body1 = {
