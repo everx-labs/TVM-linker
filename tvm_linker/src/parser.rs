@@ -258,22 +258,22 @@ const PATTERN_ASCIZ:    &'static str = r#"^[\t\s]*\.asciz[\t\s]+"(.+)""#;
 const PATTERN_MACRO:    &'static str = r"^[\t\s]*\.macro[\t\s]+([a-zA-Z0-9_\.:]+)";
 const PATTERN_IGNORED:  &'static str = r"^[\t\s]+\.(p2align|align|text|file|ident|section)";
 
-const GLOBL:    &'static str = ".globl";
-const INTERNAL: &'static str = ".internal";
-const MACROS:    &'static str = ".macro";
-const SELECTOR: &'static str = ".selector";
+const GLOBL:            &'static str = ".globl";
+const INTERNAL:         &'static str = ".internal";
+const MACROS:           &'static str = ".macro";
+const SELECTOR:         &'static str = ".selector";
 
 const DATA_TYPENAME:    &'static str = "object";
 
 const PERSISTENT_DATA_SUFFIX: &'static str = "_persistent";
 
-const PUBKEY_NAME: &'static str = "tvm_public_key";
-const SCI_NAME: &'static str = "tvm_contract_info";
+const PUBKEY_NAME:      &'static str = "tvm_public_key";
+const SCI_NAME:         &'static str = "tvm_contract_info";
 
 impl ParseEngine {
 
-    pub fn new() -> Self {
-        ParseEngine {
+    pub fn new<T: Read + Seek>(source: T, libs: Vec<T>, abi_json: Option<String>) -> Result<Self, String> {
+        let mut engine = ParseEngine {
             xrefs:      HashMap::new(), 
             intrefs:    HashMap::new(), 
             aliases:    HashMap::new(),
@@ -287,10 +287,12 @@ impl ParseEngine {
             persistent_base: 0,
             persistent_ptr: 0,
             abi: None,
-        }
+        };
+        engine.parse(source, libs, abi_json)?;
+        Ok(engine)
     }
 
-    pub fn parse<T: Read + Seek>(&mut self, source: T, libs: Vec<T>, abi_json: Option<String>) -> Result<(), String> {
+    fn parse<T: Read + Seek>(&mut self, source: T, libs: Vec<T>, abi_json: Option<String>) -> Result<(), String> {
         if let Some(s) = abi_json {
             self.abi = Some(load_abi_contract(&s)?);
         }
@@ -906,9 +908,11 @@ mod tests {
 
     #[test]
     fn test_parser_testlib() {
-        let mut parser = ParseEngine::new();
         let source = File::open("./tests/test.tvm").unwrap();
-        assert_eq!(parser.parse(source, vec![], None), Ok(()));  
+        let parser = ParseEngine::new(source, vec![], None);
+        assert_eq!(parser.is_ok(), true);
+        let parser = parser.unwrap();
+        
         let mut data_dict = BuilderData::new();
         data_dict.append_bit_one().unwrap().checked_append_reference(parser.data().unwrap()).unwrap();
 
@@ -1007,52 +1011,52 @@ mod tests {
 
     #[test]
     fn test_parser_var_without_globl() {
-        let mut parser = ParseEngine::new();
         let source_file = File::open("./tests/local_global_var.code").unwrap();
         let lib_file = File::open("./stdlib.tvm").unwrap();
-        assert_eq!(parser.parse(source_file, vec![lib_file], None), Ok(()));
+        let parser = ParseEngine::new(source_file, vec![lib_file], None);
+        assert_eq!(parser.is_ok(), true);
     }   
 
     #[test]
     fn test_parser_var_with_comm() {
-        let mut parser = ParseEngine::new();
         let source_file = File::open("./tests/comm_test1.s").unwrap();
         let lib_file = File::open("./stdlib.tvm").unwrap();
-        assert_eq!(parser.parse(source_file, vec![lib_file], None), Ok(()));
+        let parser = ParseEngine::new(source_file, vec![lib_file], None);
+        assert_eq!(parser.is_ok(), true);
     }
 
     #[test]
     fn test_parser_bss() {
-        let mut parser = ParseEngine::new();
         let source = File::open("./tests/bss_test1.s").unwrap();
         let lib = File::open("./stdlib.tvm").unwrap();
-        assert_eq!(parser.parse(source, vec![lib], None), Ok(()));
+        let parser = ParseEngine::new(source, vec![lib], None);
+        assert_eq!(parser.is_ok(), true);
     }
 
     #[test]
     fn test_multilibs() {
-        let mut parser = ParseEngine::new();
         let lib1 = File::open("./tests/testlib1.tvm").unwrap();
         let lib2 = File::open("./tests/testlib2.tvm").unwrap();
         let source = File::open("./tests/hello.code").unwrap();
-        assert_eq!(parser.parse(source, vec![lib1, lib2], None), Ok(()));
+        let parser = ParseEngine::new(source, vec![lib1, lib2], None);
+        assert_eq!(parser.is_ok(), true);
     }
 
     #[test]
     fn test_external_linking() {
-        let mut parser = ParseEngine::new();
         let lib1 = File::open("./tests/test_extlink_lib.tvm").unwrap();
         let source = File::open("./tests/test_extlink_source.s").unwrap();
-        assert_eq!(parser.parse(source, vec![lib1], None), Ok(()));
+        let parser = ParseEngine::new(source, vec![lib1], None);
+        assert_eq!(parser.is_ok(), true);
     }
 
     #[test]
     fn test_macros() {
-        let mut parser = ParseEngine::new();
         let lib1 = File::open("./stdlib.tvm").unwrap();
         let source = File::open("./tests/test_macros.code").unwrap();
-        assert_eq!(parser.parse(source, vec![lib1], None), Ok(()));
-        let publics = parser.publics();
+        let parser = ParseEngine::new(source, vec![lib1], None);
+        assert_eq!(parser.is_ok(), true);
+        let publics = parser.unwrap().publics();
         let body = publics.get(&0x0D6E4079).unwrap();
 
         assert_eq!(

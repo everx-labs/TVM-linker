@@ -107,6 +107,7 @@ fn init_logger(debug: bool) {
         if debug {LevelFilter::Trace } else { LevelFilter::Info }, 
         Config { time: None, level: None, target: None, location: None, time_format: None },
     ).unwrap();
+    // TODO: it crashes sometimes here...
 }
 
 
