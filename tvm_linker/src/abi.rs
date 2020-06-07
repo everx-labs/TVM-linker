@@ -24,9 +24,8 @@ pub fn build_abi_body(
     keypair: Option<Keypair>,
     internal: bool,
 ) -> Result<BuilderData, String> {
-    let abi_json = load_abi_json_string(abi_file)?;
     encode_function_call(
-        abi_json,
+        load_abi_json_string(abi_file)?,
         method.to_owned(),
         header.map(|v| v.to_owned()),
         params.to_owned(),
