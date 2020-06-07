@@ -311,16 +311,22 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         Some(hex_str) => {
             let mut hex_str = hex_str.to_string();
 
-            let source = matches.value_of("SOURCE")
-                .ok_or("Internal error: missing SOURCE".to_owned())?;
-
-            let file = File::open(source).map_err(|e| format!("Cannot open source file: {}", e))?;
-            let parse_results = ParseEngineResults::new(
-                ParseEngine::new(file, vec![], None)?
-            ); 
+            let parse_results = match matches.value_of("SOURCE") {
+                Some(source) => {
+                    let file = File::open(source).map_err(|e| format!("Cannot open source file: {}", e))?;
+                    Some(ParseEngineResults::new(
+                        ParseEngine::new(file, vec![], None)?
+                    ))
+                },
+                None => None
+            };
 
             hex_str = resolve_name(&hex_str, |name| {
-                parse_results.global_by_name(name).map(|id| id.0)
+                let id = match &parse_results {
+                    Some(parse_results) => parse_results.global_by_name(name),
+                    None => None
+                };
+                id.map(|id| id.0)
             })
             .map_err(|e| format!("failed to resolve body {}: {}", hex_str, e))?;
 
