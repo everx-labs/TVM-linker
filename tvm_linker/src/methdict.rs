@@ -55,7 +55,7 @@ pub fn format_compilation_error_string(err: CompileError, func_code: &str) -> St
         CompileError::Operation(position @ _, _, _) => position.line,
     };
     format!(
-        "compilation failed: \"_name_\":{}:\"{}\"", 
+        "Compilation failed: \"_name_\":{}:\"{}\"", 
         err,
         func_code.lines().nth(line_num - 1).unwrap(),
     )

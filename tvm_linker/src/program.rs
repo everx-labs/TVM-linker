@@ -82,11 +82,16 @@ impl Program {
         Ok(dict.data().map(|cell| cell.clone()))
     }
 
-    pub fn public_method_dict(&self) -> std::result::Result<Option<Cell>, String> {
+    pub fn public_method_dict(&self, remove_ctor: bool) -> std::result::Result<Option<Cell>, String> {
         let mut dict = prepare_methods(&self.engine.internals())
             .map_err(|e| e.1.replace("_name_", &self.engine.internal_name(e.0).unwrap()) )?;
 
-        insert_methods(&mut dict, &self.engine.publics())
+        let publics = self.engine.publics().into_iter()
+            .filter(|(k, _)| 
+                !(remove_ctor && self.engine.global_name(*k).unwrap_or_default() == "constructor")
+            ).collect();
+
+        insert_methods(&mut dict, &publics)
             .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()) )?;
 
         Ok(dict.data().map(|cell| cell.clone()))
@@ -134,7 +139,7 @@ impl Program {
             false   // is_internal
         )?.into();
 
-        let (exit_code, state_init) = call_contract_ex(
+        let (exit_code, mut state_init) = call_contract_ex(
             AccountId::from(UInt256::default()),
             IntegerData::zero(),
             state_init,
@@ -154,39 +159,36 @@ impl Program {
 
         if exit_code == 0 || exit_code == 1 {
             // TODO: check that no action is fired.
-            // TODO: remove constructor from dictionary of methods.
+            // Rebuild code with removed constructor
+            state_init.set_code(self.compile_asm(true)?);
             Ok(state_init)
         } else {
             Err(format!("Constructor failed ec = {}", exit_code))
         }
     }
 
-    pub fn compile_to_state(&self) -> std::result::Result<StateInit, String> {
+    fn compile_to_state(&self) -> std::result::Result<StateInit, String> {
         let mut state = StateInit::default();
-        state.set_code(self.compile_asm()?.cell().clone());
+        state.set_code(self.compile_asm(false)?);
         state.set_data(self.data()?.cell().clone());
         Ok(state)
     }
 
-    pub fn compile_asm(&self) -> std::result::Result<SliceData, String> {
+    fn compile_asm(&self, remove_ctor: bool) -> std::result::Result<Cell, String> {
         let mut internal_selector = compile_code(SELECTOR_INTERNAL)
             .map_err(|_| "unexpected TVM error while compiling internal selector".to_string())?;
         internal_selector.append_reference(self.internal_method_dict()?.unwrap_or_default().into());
 
         let mut main_selector = compile_code(self.entry())
             .map_err(|e| format_compilation_error_string(e, self.entry()).replace("_name_", "selector"))?;
-        main_selector.append_reference(self.public_method_dict()?.unwrap_or_default().into());
+        main_selector.append_reference(self.public_method_dict(remove_ctor)?.unwrap_or_default().into());
         main_selector.append_reference(internal_selector);
 
-        Ok(main_selector)
+        Ok(main_selector.cell().clone())
     }
 
     pub fn debug_print(&self) {
         self.engine.debug_print();
-        let line = "--------------------------";
-        if let Ok(cell) = self.public_method_dict() {
-            println! ("Dictionary of methods:\n{}\n{}", line, cell.unwrap_or_default());
-        }
     }
 }
 
