@@ -54,8 +54,10 @@ impl Program {
                 [0u8; PUBLIC_KEY_LENGTH]
             };
 
-        let (persistent_base, persistent_data) = self.engine.persistent_data();
-        let mut data_dict = HashmapE::with_hashmap(64, persistent_data);
+        // Persistent data feature is obsolete and should be removed.
+        // Off-chain constructor should be used to create data layout instead.
+        let (persistent_base, _persistent_data) = self.engine.persistent_data();
+        let mut data_dict = HashmapE::with_hashmap(64, None);
         data_dict.set(
             ptr_to_builder(persistent_base)?.into(),
             &BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8)
