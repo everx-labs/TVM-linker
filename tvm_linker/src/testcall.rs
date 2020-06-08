@@ -10,6 +10,7 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
+
 use keyman::KeypairManager;
 use log::Level::Error;
 use crate::printer::msg_printer;
@@ -18,14 +19,14 @@ use simplelog::{SimpleLogger, Config, LevelFilter};
 use serde_json::Value;
 use std::str::FromStr;
 use std::sync::Arc;
-use ton_vm::executor::{Engine, gas::gas_state::Gas};
+use ton_vm::executor::{Engine, EngineTraceInfo, gas::gas_state::Gas};
 use ton_vm::error::TvmError;
 use ton_vm::stack::{StackItem, Stack, savelist::SaveList, integer::IntegerData};
 use ton_vm::SmartContractInfo;
 use ton_types::{AccountId, BuilderData, Cell, SliceData};
 use ton_block::{
-    CurrencyCollection, Deserializable, ExternalInboundMessageHeader, Grams, 
-    InternalMessageHeader, Message, MsgAddressExt, MsgAddressInt, OutAction, 
+    CurrencyCollection, Deserializable, ExternalInboundMessageHeader, Grams,
+    InternalMessageHeader, Message, MsgAddressExt, MsgAddressInt, OutAction,
     OutActions, Serializable, StateInit, UnixTime32
 };
 
@@ -104,7 +105,7 @@ fn initialize_registers(data: SliceData, myself: MsgAddressInt, now: u32, balanc
 
 fn init_logger(debug: bool) {
     SimpleLogger::init(
-        if debug {LevelFilter::Trace } else { LevelFilter::Info }, 
+        if debug {LevelFilter::Trace } else { LevelFilter::Info },
         Config { time: None, level: None, target: None, location: None, time_format: None },
     ).unwrap();
     // TODO: it crashes sometimes here...
@@ -114,7 +115,7 @@ fn init_logger(debug: bool) {
 fn create_inbound_msg(
     selector: i32,
     msg_info: &MsgInfo,
-    dst: AccountId,    
+    dst: AccountId,
 ) -> Option<Message> {
     let (_, value) = decode_balance(msg_info.balance).unwrap();
     match selector {
@@ -144,7 +145,7 @@ fn create_inbound_msg(
             };
             Some(create_external_inbound_msg(
                 src,
-                MsgAddressInt::with_standart(None, 0, dst.clone()).unwrap(), 
+                MsgAddressInt::with_standart(None, 0, dst.clone()).unwrap(),
                 msg_info.body.clone(),
             ))
         },
@@ -152,8 +153,8 @@ fn create_inbound_msg(
     }
 }
 
-fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: F) 
-    where F: Fn(SliceData, bool) -> () 
+fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: F)
+    where F: Fn(SliceData, bool) -> ()
 {
     if let StackItem::Cell(cell) = actions {
         let actions: OutActions = OutActions::construct_from(&mut cell.into())
@@ -240,20 +241,43 @@ pub fn call_contract<F>(
     ticktock: Option<i8>,
     action_decoder: Option<F>,
     debug: bool,
-) -> i32 
+) -> i32
     where F: Fn(SliceData, bool)
 {
     let addr = AccountId::from_str(smc_file).unwrap();
     let addr_int = IntegerData::from_str_radix(smc_file, 16).unwrap();
     let state_init = load_from_file(&format!("{}.tvc", smc_file));
     let (exit_code, state_init) = call_contract_ex(
-        addr, addr_int, state_init, smc_balance, 
+        addr, addr_int, state_init, smc_balance,
         msg_info, key_file, ticktock, action_decoder, debug);
     if exit_code == 0 || exit_code == 1 {
         save_to_file(state_init, Some(smc_file), 0).expect("error");
         println!("Contract persistent data updated");
     }
     exit_code
+}
+
+fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool) {
+    println!("{}: {}",
+        info.step,
+        info.cmd_str
+    );
+    if extended {
+        println!("{} {}",
+            info.cmd_code.remaining_bits(),
+            info.cmd_code.to_hex_string()
+        );
+    }
+    println!("\nGas: {} ({})",
+        info.gas_used,
+        info.gas_cmd
+    );
+
+    println!("\n--- Stack trace ------------------------");
+    for item in info.stack.iter() {
+        println!("{}", item);
+    }
+    println!("----------------------------------------\n");
 }
 
 pub fn call_contract_ex<F>(
@@ -270,21 +294,21 @@ pub fn call_contract_ex<F>(
     where F: Fn(SliceData, bool)
 {
     let func_selector = match msg_info.balance {
-        Some(_) => 0,    
+        Some(_) => 0,
         None => if ticktock.is_some() { -2 } else { -1 },
     };
-    
+
     let (value, _) = decode_balance(msg_info.balance).unwrap();
-    
+
     let msg = create_inbound_msg(func_selector, &msg_info, addr.clone());
-        
+
     if !log_enabled!(Error) {
         init_logger(debug);
     }
-    
+
     let mut state_init = state_init;
     let (code, data) = load_code_and_data(&state_init);
-    
+
     let workchain_id = if func_selector > -2 { 0 } else { -1 };
     let (smc_value, smc_balance) = decode_balance(smc_balance).unwrap();
     let registers = initialize_registers(
@@ -302,7 +326,7 @@ pub fn call_contract_ex<F>(
             Some(b) => b.into(),
             None => BuilderData::new().into(),
         };
-        
+
         if func_selector == -1 {
             key_file.map(|key| sign_body(&mut body, key));
         }
@@ -322,7 +346,10 @@ pub fn call_contract_ex<F>(
     }
 
     let mut engine = Engine::new().setup(code, Some(registers), Some(stack), Some(Gas::test()));
-    engine.set_trace(if debug {Engine::TRACE_ALL} else {0});
+    engine.set_trace(0);
+    if debug { 
+        engine.set_trace_callback(move |engine, info| { trace_callback(engine, info, true); })
+    }
     let exit_code: i32 = match engine.execute() {
         Ok(code) => {
             code as i32
@@ -339,7 +366,7 @@ pub fn call_contract_ex<F>(
     println!("");
     println!("{}", engine.dump_stack("Post-execution stack state", false));
     println!("{}", engine.dump_ctrls(false));
-    
+
     if let Some(decoder) = action_decoder {
         decode_actions(engine.get_actions(), &mut state_init, decoder);
     }
@@ -356,10 +383,10 @@ pub fn call_contract_ex<F>(
 
 #[cfg(test)]
 pub fn perform_contract_call<F>(
-    contract_file: &str, 
-    body: Option<SliceData>, 
-    key_file: Option<Option<&str>>, 
-    debug: bool, 
+    contract_file: &str,
+    body: Option<SliceData>,
+    key_file: Option<Option<&str>>,
+    debug: bool,
     decode_c5: bool,
     msg_balance: Option<&str>,
     ticktock: Option<i8>,
@@ -369,11 +396,12 @@ pub fn perform_contract_call<F>(
     action_decoder: F,
 ) -> i32
     where F: Fn(SliceData, bool)
-{   
+{
     call_contract(
         contract_file,
+        None,
         balance,
-        MsgInfo{ 
+        MsgInfo{
             balance: msg_balance,
             src: src,
             now: now,
