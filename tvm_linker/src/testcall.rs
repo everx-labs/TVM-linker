@@ -251,7 +251,8 @@ pub fn call_contract<F>(
         addr, addr_int, state_init, smc_balance,
         msg_info, key_file, ticktock, action_decoder, debug);
     if exit_code == 0 || exit_code == 1 {
-        save_to_file(state_init, Some(smc_file), 0).expect("error");
+        let smc_name = smc_file.to_owned() + ".tvc";
+        save_to_file(state_init, Some(&smc_name), 0).expect("error");
         println!("Contract persistent data updated");
     }
     exit_code

@@ -99,6 +99,7 @@ fn linker_main() -> Result<(), String> {
             (@arg WC: -w +takes_value "Workchain id used to print contract address, -1 by default.")
             (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
             (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file. If not specified lib is loaded from environment variable TVM_LINKER_LIB_PATH if it exists.")
+            (@arg OUT_FILE: -o +takes_value "Output file name")
         )
         (@subcommand test =>
             (about: "execute contract in test environment")
@@ -211,6 +212,7 @@ fn linker_main() -> Result<(), String> {
             Some(abi_file_name) => Some(load_abi_json_string(abi_file_name)?),
             None => None
         };
+        let out_file = compile_matches.value_of("OUT_FILE");
 
         let mut libs: Vec<File> = compile_matches.values_of("LIB")
             .unwrap_or_default()
@@ -267,7 +269,7 @@ fn linker_main() -> Result<(), String> {
             let msg = "ABI is mandatory when CTOR_PARAMS is specified.";
             return Err(msg.to_string());
         }
-        prog.compile_to_file_ex(wc, abi_file, ctor_params, debug)?;
+        prog.compile_to_file_ex(wc, abi_file, ctor_params, out_file, debug)?;
         return Ok(());
     }
 
