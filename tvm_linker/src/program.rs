@@ -92,7 +92,7 @@ impl Program {
 
     #[allow(dead_code)]
     pub fn compile_to_file(&self, wc: i8) -> std::result::Result<String, String> {
-        self.compile_to_file_ex(wc, None, None, false)
+        self.compile_to_file_ex(wc, None, None, None, false)
     }
 
     pub fn compile_to_file_ex(
@@ -100,13 +100,14 @@ impl Program {
         wc: i8,
         abi_file: Option<&str>,
         ctor_params: Option<&str>,
+        out_file: Option<&str>,
         trace: bool
     ) -> std::result::Result<String, String> {
         let mut state_init = self.compile_to_state()?;
         if let Some(ctor_params) = ctor_params {
             state_init = self.apply_constructor(state_init, abi_file.unwrap(), ctor_params, trace)?;
         }
-        save_to_file(state_init, None, wc)
+        save_to_file(state_init, out_file, wc)
     }
 
     fn apply_constructor(
@@ -199,7 +200,7 @@ pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8) -> std::result
     let mut print_filename = false;
     let address = state.hash().unwrap();
     let file_name = if name.is_some() {
-        format!("{}.tvc", name.unwrap())
+        format!("{}", name.unwrap())
     } else {
         print_filename = true;
         format!("{:x}.tvc", address)
