@@ -29,6 +29,7 @@ use ton_block::{
     InternalMessageHeader, Message, MsgAddressExt, MsgAddressInt, OutAction,
     OutActions, Serializable, StateInit, UnixTime32
 };
+use debug_info::{load_debug_info, ContractDebugInfo};
 
 const DEFAULT_ACCOUNT_BALANCE: &str = "100000000000";
 
@@ -247,8 +248,9 @@ pub fn call_contract<F>(
     let addr = AccountId::from_str(smc_file).unwrap();
     let addr_int = IntegerData::from_str_radix(smc_file, 16).unwrap();
     let state_init = load_from_file(&format!("{}.tvc", smc_file));
+    let debug_info = load_debug_info(&state_init);
     let (exit_code, state_init) = call_contract_ex(
-        addr, addr_int, state_init, smc_balance,
+        addr, addr_int, state_init, debug_info, smc_balance,
         msg_info, key_file, ticktock, action_decoder, debug);
     if exit_code == 0 || exit_code == 1 {
         let smc_name = smc_file.to_owned() + ".tvc";
@@ -258,7 +260,7 @@ pub fn call_contract<F>(
     exit_code
 }
 
-fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool) {
+fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debug_info: &Option<ContractDebugInfo>) {
     println!("{}: {}",
         info.step,
         info.cmd_str
@@ -274,6 +276,15 @@ fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool) {
         info.gas_cmd
     );
 
+    if let Some(debug_info) = debug_info {
+        // TODO: move
+        let fname = match debug_info.hash2function.get(&info.cmd_code.cell().repr_hash()) {
+            Some(fname) => fname,
+            None => "n/a"
+        };
+        println!("function: {}", fname);
+    }
+
     println!("\n--- Stack trace ------------------------");
     for item in info.stack.iter() {
         println!("{}", item);
@@ -285,6 +296,7 @@ pub fn call_contract_ex<F>(
     addr: AccountId,
     addr_int: IntegerData,
     state_init: StateInit,
+    debug_info: Option<ContractDebugInfo>,
     smc_balance: Option<&str>,
     msg_info: MsgInfo,
     key_file: Option<Option<&str>>,
@@ -349,7 +361,7 @@ pub fn call_contract_ex<F>(
     let mut engine = Engine::new().setup(code, Some(registers), Some(stack), Some(Gas::test()));
     engine.set_trace(0);
     if debug { 
-        engine.set_trace_callback(move |engine, info| { trace_callback(engine, info, true); })
+        engine.set_trace_callback(move |engine, info| { trace_callback(engine, info, true, &debug_info); })
     }
     let exit_code: i32 = match engine.execute() {
         Ok(code) => {
