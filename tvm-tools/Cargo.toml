@@ -1,5 +1,5 @@
 [package]
-build = "../build.rs"
+build = "build.rs"
 name = "tvm_tools"
 version = "0.1.0"
 

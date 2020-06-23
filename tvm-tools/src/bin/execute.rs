@@ -15,11 +15,13 @@
 
 extern crate ton_vm as tvm;
 extern crate tvm_tools;
+extern crate ton_types;
 extern crate clap;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate log;
 use clap::{Arg, App,SubCommand};
+use std::error::Error;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Read;
@@ -27,17 +29,20 @@ use std::path::{Path,PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
-use tvm::error::TvmError;
 use tvm::executor::Engine;
 use tvm_tools::{
     Contract,
     ContractsRepository,
     FileBasedContractsRepository
 };
+
+use ton_types::{SliceData, types::AccountId};
+
 use tvm::stack::{
-    IntegerData, SliceData, Stack, StackItem, SaveList
+    integer::IntegerData, Stack, StackItem, savelist::SaveList
 };
-use tvm::types::AccountId;
+
+use tvm::error::TvmError;
 
 fn as_contract_id(filename: &OsStr) -> AccountId {
     AccountId::from_str(
@@ -50,7 +55,7 @@ fn load_raw_contract(path: &Path) -> SliceData {
     let path_display = path.display();
     let mut contract_file = match File::open(path) {
         Ok(f) => f,
-        Err(e) => panic!("{}, error {}", path_display, e.to_string()),
+        Err(e) => panic!("{}, error {}", path_display, e.description()),
     };
     let mut contract: Vec<u8> = Vec::new();
     match contract_file.read_to_end(&mut contract) {
@@ -58,7 +63,7 @@ fn load_raw_contract(path: &Path) -> SliceData {
         Err(e) => panic!(
             "Cannot read contract {}, error {}",
             path_display,
-            e.to_string()
+            e.description()
         ),
     }
     println!("Contract: {:X?}", contract);

@@ -26,10 +26,11 @@ use std::path::{
     Path,
     PathBuf,
 };
-use tvm::stack::SliceData;
+
+use ton_types::{SliceData, types::AccountId};
 
 use ton_types::cells_serialization::deserialize_tree_of_cells;
-use tvm::types::AccountId;
+
 use tvm_tools::{
     Contract,
     ContractsRepository,
