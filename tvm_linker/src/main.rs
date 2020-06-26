@@ -20,6 +20,7 @@ extern crate ed25519_dalek;
 extern crate lazy_static;
 extern crate rand;
 extern crate regex;
+extern crate serde;
 extern crate serde_json;
 extern crate sha2;
 extern crate simplelog;
@@ -41,8 +42,9 @@ mod real_ton;
 mod resolver;
 mod methdict;
 mod testcall;
+mod debug_info;
 
-use abi::{build_abi_body, decode_body, load_abi_json_string};
+use abi::{build_abi_body, decode_body, load_abi_json_string, load_abi_contract};
 use clap::ArgMatches;
 use initdata::set_initial_data;
 use keyman::KeypairManager;
@@ -269,7 +271,9 @@ fn linker_main() -> Result<(), String> {
             let msg = "ABI is mandatory when CTOR_PARAMS is specified.";
             return Err(msg.to_string());
         }
-        prog.compile_to_file_ex(wc, abi_file, ctor_params, out_file, debug)?;
+        // TODO: temporarily disabled. Later take it from command line
+        let debug_info = false;
+        prog.compile_to_file_ex(wc, abi_file, ctor_params, out_file, debug, debug_info)?;
         return Ok(());
     }
 
@@ -355,6 +359,11 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
             println!("{}", result);
         }
     };
+    
+    let _abi_contract = match matches.value_of("ABI_JSON") {
+        Some(abi_file) => Some(load_abi_contract(&load_abi_json_string(abi_file)?)?),
+        None => None
+    };
 
     println!("TEST STARTED");
     println!("body = {:?}", body);
@@ -376,6 +385,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
         matches.is_present("TRACE"),
     );
+
     println!("TEST COMPLETED");
     return Ok(());
 }

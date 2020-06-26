@@ -15,6 +15,7 @@ use crc16::*;
 use ed25519_dalek::{Keypair, PUBLIC_KEY_LENGTH};
 use std::io::Cursor;
 use std::io::Write;
+use std::collections::HashMap;
 use std::time::SystemTime;
 use methdict::*;
 use ton_block::*;
@@ -23,6 +24,7 @@ use ton_types::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use ton_types::{Cell, SliceData, BuilderData, IBitstring};
 use ton_types::dictionary::{HashmapE, HashmapType};
 use parser::{ptr_to_builder, ParseEngine, ParseEngineResults};
+use debug_info::{save_debug_info, DebugInfoFunction, DebugInfo};
 
 pub struct Program {
     engine: ParseEngineResults,
@@ -81,17 +83,39 @@ impl Program {
             .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()) )?;
         Ok(dict.data().map(|cell| cell.clone()))
     }
+    
+    fn publics_filtered(&self, remove_ctor: bool) -> HashMap<u32, String> {
+        self.engine.publics().into_iter()
+            .filter(|(k, _)| 
+                !(remove_ctor && self.engine.global_name(*k).unwrap_or_default() == "constructor")
+            ).collect()
+    }
+    
+    fn save_debug_info(&self) {
+        let mut debug_info = DebugInfo::new();
+        for pair in self.publics_filtered(false).iter() {
+            let id = *pair.0;
+            let name = self.engine.global_name(id).unwrap();
+            debug_info.publics.push(DebugInfoFunction{id: id as i64, name: name});
+        }
+        for pair in self.engine.privates().iter() {
+            let id = *pair.0;
+            let name = self.engine.global_name(id).unwrap();
+            debug_info.privates.push(DebugInfoFunction{id: id as i64, name: name});
+        }
+        for pair in self.engine.internals().iter() {
+            let id = *pair.0;
+            let name = self.engine.internal_name(id).unwrap();
+            debug_info.internals.push(DebugInfoFunction{id: id as i64, name: name});
+        }
+        save_debug_info(debug_info);
+    }
 
     pub fn public_method_dict(&self, remove_ctor: bool) -> std::result::Result<Option<Cell>, String> {
         let mut dict = prepare_methods(&self.engine.internals())
             .map_err(|e| e.1.replace("_name_", &self.engine.internal_name(e.0).unwrap()) )?;
 
-        let publics = self.engine.publics().into_iter()
-            .filter(|(k, _)| 
-                !(remove_ctor && self.engine.global_name(*k).unwrap_or_default() == "constructor")
-            ).collect();
-
-        insert_methods(&mut dict, &publics)
+        insert_methods(&mut dict, &self.publics_filtered(remove_ctor))
             .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()) )?;
 
         Ok(dict.data().map(|cell| cell.clone()))
@@ -99,7 +123,7 @@ impl Program {
 
     #[allow(dead_code)]
     pub fn compile_to_file(&self, wc: i8) -> std::result::Result<String, String> {
-        self.compile_to_file_ex(wc, None, None, None, false)
+        self.compile_to_file_ex(wc, None, None, None, false, false)
     }
 
     pub fn compile_to_file_ex(
@@ -108,11 +132,15 @@ impl Program {
         abi_file: Option<&str>,
         ctor_params: Option<&str>,
         out_file: Option<&str>,
-        trace: bool
+        trace: bool,
+        debug_info: bool,
     ) -> std::result::Result<String, String> {
         let mut state_init = self.compile_to_state()?;
         if let Some(ctor_params) = ctor_params {
             state_init = self.apply_constructor(state_init, abi_file.unwrap(), ctor_params, trace)?;
+        }
+        if debug_info {
+            self.save_debug_info();
         }
         save_to_file(state_init, out_file, wc)
     }
@@ -144,6 +172,7 @@ impl Program {
             AccountId::from(UInt256::default()),
             IntegerData::zero(),
             state_init,
+            None, // debug_info
             None, // balance,
             MsgInfo{
                 balance: None,
@@ -245,6 +274,16 @@ pub fn get_now() -> u32 {
     SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32
 }
 
+// Debug function to dump structured cell content with hashes
+#[allow(dead_code)]
+fn dump_cell(cell: &Cell, pfx: &str) {
+    println!("{}# {:?}", pfx, cell.repr_hash());
+    println!("{}{}", pfx, cell.to_hex_string(false));
+    for i in 0..cell.references_count() {
+        let child = cell.reference(i).unwrap();
+        dump_cell(&child, &(pfx.to_owned() + "  "));
+    }
+}
 
 #[cfg(test)]
 mod tests {
