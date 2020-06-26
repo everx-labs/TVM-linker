@@ -23,6 +23,7 @@ log = "0.4.6"
 simplelog = "0.5.3"
 rand = "0.7.3"
 sha2 = "0.8.0"
+serde = { version = "1.0.100", features = ["derive"]  }
 serde_json = "1.0.41"
 
 ton_abi = { git = "https://github.com/tonlabs/ton-labs-abi.git" }
