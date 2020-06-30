@@ -20,7 +20,7 @@ pub fn state_init_printer(state: &StateInit) -> String {
         state.special.as_ref().map(|x| format!("{:?}", x)).unwrap_or("None".to_string()),
         tree_of_cells_into_base64(state.data.as_ref()),
         tree_of_cells_into_base64(state.code.as_ref()),
-        tree_of_cells_into_base64(state.library.as_ref()),
+        tree_of_cells_into_base64(state.library.root()),
     )
 }
 
