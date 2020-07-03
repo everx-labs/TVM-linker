@@ -94,11 +94,12 @@ fn execute_contract(contract_path: &Path, initial_stack_state: Stack) {
     ctrls.put(4, &mut StackItem::Cell(data.into_cell())).unwrap();
     let mut engine = Engine::new().setup(code.clone(), Some(ctrls), Some(initial_stack_state), None);
     let exit_code = match engine.execute() {
-        Err(exc) => if let Ok(TvmError::TvmExceptionFull(exc)) = exc.downcast() {
-            println!("Unhandled exception: {}", exc);
-            exc.number as i32
-        } else {
-            -1
+        Err(exc) => match tvm_exception(exc) {
+            Ok(exc) => {
+                println!("Unhandled exception: {}", exc);
+                exc.number as i32
+            }
+            _ => -1
         }
         Ok(code) => code
     };
