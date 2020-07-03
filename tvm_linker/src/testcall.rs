@@ -20,7 +20,7 @@ use serde_json::Value;
 use std::str::FromStr;
 use std::sync::Arc;
 use ton_vm::executor::{Engine, EngineTraceInfo, gas::gas_state::Gas};
-use ton_vm::error::TvmError;
+use ton_vm::error::{tvm_exception, TvmError};
 use ton_vm::stack::{StackItem, Stack, savelist::SaveList, integer::IntegerData};
 use ton_vm::SmartContractInfo;
 use ton_types::{AccountId, BuilderData, Cell, SliceData};
@@ -363,16 +363,15 @@ pub fn call_contract_ex<F>(
     if debug { 
         engine.set_trace_callback(move |engine, info| { trace_callback(engine, info, true, &debug_info); })
     }
-    let exit_code: i32 = match engine.execute() {
-        Ok(code) => {
-            code as i32
+    let exit_code = match engine.execute() {
+        Err(exc) => match tvm_exception(exc) {
+            Ok(exc) => {
+                println!("Unhandled exception: {}", exc);
+                exc.number as i32
+            }
+            _ => -1
         }
-        Err(exc) => if let Ok(TvmError::TvmExceptionFull(exc)) = exc.downcast() {
-            println!("Unhandled exception: {:?}", exc);
-            exc.number as i32
-        } else {
-            -1
-        }
+        Ok(code) => code as i32
     };
     println!("TVM terminated with exit code {}", exit_code);
     println!("Gas used: {}", engine.get_gas().get_gas_used());
