@@ -48,7 +48,7 @@ impl Program {
         self.keypair = Some(pair);
     }
 
-    pub fn data(&self) -> std::result::Result<SliceData, String> {
+    pub fn data(&self) -> std::result::Result<Cell, String> {
         let bytes =
             if let Some(ref pair) = self.keypair {
                 pair.public.to_bytes()
@@ -58,19 +58,17 @@ impl Program {
 
         // Persistent data feature is obsolete and should be removed.
         // Off-chain constructor should be used to create data layout instead.
-        let (persistent_base, _persistent_data) = self.engine.persistent_data();
-        let mut data_dict = HashmapE::with_hashmap(64, None);
-        data_dict.set(
-            ptr_to_builder(persistent_base)?.into(),
-            &BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8)
-                .map_err(|e| format!("failed to pack pubkey to data dictionary: {}", e))?
-                .into(),
-        ).unwrap();
-        let mut data_cell = BuilderData::new();
-        data_cell
+        let (persistent_base, persistent_data) = self.engine.persistent_data();
+        let mut data_dict = HashmapE::with_hashmap(64, persistent_data);
+        let key = ptr_to_builder(persistent_base)?.into();
+        BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8)
+            .and_then(|data| data_dict.set(key, &data.into()))
+            .map_err(|e| format!("failed to pack pubkey to data dictionary: {}", e))?;
+        let mut builder = BuilderData::new();
+        builder
             .append_bit_one().unwrap()
             .checked_append_reference(data_dict.data().unwrap().clone()).unwrap();
-        Ok(data_cell.into())
+        Ok(builder.into())
     }
 
     #[allow(dead_code)]
@@ -200,7 +198,7 @@ impl Program {
     fn compile_to_state(&self) -> std::result::Result<StateInit, String> {
         let mut state = StateInit::default();
         state.set_code(self.compile_asm(false)?);
-        state.set_data(self.data()?.cell().clone());
+        state.set_data(self.data()?);
         Ok(state)
     }
 
