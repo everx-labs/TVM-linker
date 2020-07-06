@@ -21,7 +21,6 @@ extern crate clap;
 #[macro_use]
 extern crate log;
 use clap::{Arg, App,SubCommand};
-use std::error::Error;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Read;
@@ -42,7 +41,7 @@ use tvm::stack::{
     integer::IntegerData, Stack, StackItem, savelist::SaveList
 };
 
-use tvm::error::TvmError;
+use tvm::error::tvm_exception;
 
 fn as_contract_id(filename: &OsStr) -> AccountId {
     AccountId::from_str(
@@ -55,7 +54,7 @@ fn load_raw_contract(path: &Path) -> SliceData {
     let path_display = path.display();
     let mut contract_file = match File::open(path) {
         Ok(f) => f,
-        Err(e) => panic!("{}, error {}", path_display, e.description()),
+        Err(e) => panic!("{}, error {}", path_display, e),
     };
     let mut contract: Vec<u8> = Vec::new();
     match contract_file.read_to_end(&mut contract) {
@@ -63,7 +62,7 @@ fn load_raw_contract(path: &Path) -> SliceData {
         Err(e) => panic!(
             "Cannot read contract {}, error {}",
             path_display,
-            e.description()
+            e
         ),
     }
     println!("Contract: {:X?}", contract);

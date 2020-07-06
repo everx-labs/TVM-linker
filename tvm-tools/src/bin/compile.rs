@@ -17,7 +17,6 @@ extern crate ton_types;
 extern crate ton_vm as tvm;
 extern crate clap;
 
-use std::error::Error;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
@@ -34,7 +33,7 @@ fn save(data: Vec<u8>, destination: &Path) {
         Err(why) => panic!(
             "couldn't create {}: {}",
             destination_path_display,
-            why.description()
+            why
         ),
         Ok(file) => file,
     };
@@ -43,7 +42,7 @@ fn save(data: Vec<u8>, destination: &Path) {
         Err(why) => panic!(
             "couldn't write to {}: {}",
             destination_path_display,
-            why.description()
+            why
         ),
         Ok(_) => println!("successfully saved to {}", destination_path_display),
     }
