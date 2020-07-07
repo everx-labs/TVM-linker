@@ -20,7 +20,7 @@ use serde_json::Value;
 use std::str::FromStr;
 use std::sync::Arc;
 use ton_vm::executor::{Engine, EngineTraceInfo, gas::gas_state::Gas};
-use ton_vm::error::{tvm_exception, TvmError};
+use ton_vm::error::tvm_exception;
 use ton_vm::stack::{StackItem, Stack, savelist::SaveList, integer::IntegerData};
 use ton_vm::SmartContractInfo;
 use ton_types::{AccountId, BuilderData, Cell, SliceData};
@@ -411,7 +411,6 @@ pub fn perform_contract_call<F>(
 {
     call_contract(
         contract_file,
-        None,
         balance,
         MsgInfo{
             balance: msg_balance,
