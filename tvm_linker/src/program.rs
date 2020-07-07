@@ -181,6 +181,7 @@ impl Program {
             },
             None, // key_file,
             None, // ticktock,
+            None, // gas_limit,
             Some(action_decoder),
             trace
         );
@@ -288,7 +289,7 @@ mod tests {
     use abi;
     use super::*;
     use std::fs::File;
-    use testcall::perform_contract_call;
+    use testcall::{perform_contract_call, call_contract, MsgInfo};
 
     #[test]
     fn test_comm_var_addresses() {
@@ -421,5 +422,39 @@ mod tests {
             Some(b.into())
         };
         assert_eq!(perform_contract_call(name, body3, None, false, false, None, None, None, None, 0, |_b,_i| {}), 0);
+    }
+
+    #[test]
+    fn test_call_with_gas_limit() {
+        let source = File::open("./tests/Wallet.code").unwrap();
+        let lib = File::open("./stdlib_sol.tvm").unwrap();
+        let abi = abi::load_abi_json_string("./tests/Wallet.abi.json").unwrap();
+
+        let parser = ParseEngine::new(source, vec![lib], Some(abi));
+        assert_eq!(parser.is_ok(), true);
+        let prog = Program::new(parser.unwrap());
+
+        let contract_file = prog.compile_to_file(0).unwrap();
+        let name = contract_file.split('.').next().unwrap();
+        let body = abi::build_abi_body("./tests/Wallet.abi.json", "constructor", "{}", None, None, false)
+            .unwrap();
+        let exit_code = call_contract(
+            &name,
+            Some("10000000000"), //account balance 10T
+            MsgInfo {
+                balance: Some("1000000000"), // msg balance = 1T
+                src: None,
+                now: 1,
+                bounced: false,
+                body: Some(body.into())
+            },
+            None,
+            None,
+            Some(3000), // gas limit
+            Some(|_, _| {}),
+            false
+        );
+        // must equal to out of gas exception
+        assert_eq!(exit_code, 13);
     }
 }

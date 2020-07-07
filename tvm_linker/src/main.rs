@@ -118,6 +118,7 @@ fn linker_main() -> Result<(), String> {
             (@arg SRCADDR: --src +takes_value "Supplies message source address")
             (@arg NOW: --now +takes_value "Supplies transaction creation unixtime")
             (@arg TICKTOCK: --ticktock +takes_value conflicts_with[BODY] "Emulates ticktock transaction in masterchain, 0 for tick and -1 for tock")
+            (@arg GASLIMIT: -l --("gas-limit") +takes_value "Defines gas limit for tvm execution")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[BODY] "Supplies the name of the calling contract method")
@@ -376,12 +377,18 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         body: body,
     };
 
+    let gas_limit = matches.value_of("GASLIMIT")
+        .map(|v| i64::from_str_radix(v, 10))
+        .transpose()
+        .map_err(|e| format!("cannot parse gas limit value: {}", e))?;
+    
     call_contract(
         matches.value_of("INPUT").unwrap(),
         matches.value_of("BALANCE"),
         msg_info,
         sign,
         ticktock,
+        gas_limit,
         if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
         matches.is_present("TRACE"),
     );

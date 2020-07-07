@@ -240,6 +240,7 @@ pub fn call_contract<F>(
     msg_info: MsgInfo,
     key_file: Option<Option<&str>>,
     ticktock: Option<i8>,
+    gas_limit: Option<i64>,
     action_decoder: Option<F>,
     debug: bool,
 ) -> i32
@@ -251,7 +252,7 @@ pub fn call_contract<F>(
     let debug_info = load_debug_info(&state_init);
     let (exit_code, state_init) = call_contract_ex(
         addr, addr_int, state_init, debug_info, smc_balance,
-        msg_info, key_file, ticktock, action_decoder, debug);
+        msg_info, key_file, ticktock, gas_limit, action_decoder, debug);
     if exit_code == 0 || exit_code == 1 {
         let smc_name = smc_file.to_owned() + ".tvc";
         save_to_file(state_init, Some(&smc_name), 0).expect("error");
@@ -301,6 +302,7 @@ pub fn call_contract_ex<F>(
     msg_info: MsgInfo,
     key_file: Option<Option<&str>>,
     ticktock: Option<i8>,
+    gas_limit: Option<i64>,
     action_decoder: Option<F>,
     debug: bool,
 ) -> (i32, StateInit)
@@ -358,7 +360,15 @@ pub fn call_contract_ex<F>(
             .push(int!(func_selector));
     }
 
-    let mut engine = Engine::new().setup(code, Some(registers), Some(stack), Some(Gas::test()));
+    let gas = if let Some(gas_limit) = gas_limit {
+        let mut tmp_gas = Gas::test();
+        tmp_gas.new_gas_limit(gas_limit);
+        tmp_gas
+    } else {
+        Gas::test()
+    };
+
+    let mut engine = Engine::new().setup(code, Some(registers), Some(stack), Some(gas));
     engine.set_trace(0);
     if debug { 
         engine.set_trace_callback(move |engine, info| { trace_callback(engine, info, true, &debug_info); })
@@ -421,6 +431,7 @@ pub fn perform_contract_call<F>(
         },
         key_file,
         ticktock,
+        None,
         if decode_c5 { Some(action_decoder) } else { None },
         debug
     )
