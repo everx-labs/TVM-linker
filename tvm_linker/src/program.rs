@@ -48,7 +48,7 @@ impl Program {
         self.keypair = Some(pair);
     }
 
-    pub fn data(&self) -> std::result::Result<SliceData, String> {
+    pub fn data(&self) -> std::result::Result<Cell, String> {
         let bytes =
             if let Some(ref pair) = self.keypair {
                 pair.public.to_bytes()
@@ -60,17 +60,15 @@ impl Program {
         // Off-chain constructor should be used to create data layout instead.
         let (persistent_base, _persistent_data) = self.engine.persistent_data();
         let mut data_dict = HashmapE::with_hashmap(64, None);
-        data_dict.set(
-            ptr_to_builder(persistent_base)?.into(),
-            &BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8)
-                .map_err(|e| format!("failed to pack pubkey to data dictionary: {}", e))?
-                .into(),
-        ).unwrap();
-        let mut data_cell = BuilderData::new();
-        data_cell
+        let key = ptr_to_builder(persistent_base)?.into();
+        BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8)
+            .and_then(|data| data_dict.set(key, &data.into()))
+            .map_err(|e| format!("failed to pack pubkey to data dictionary: {}", e))?;
+        let mut builder = BuilderData::new();
+        builder
             .append_bit_one().unwrap()
             .checked_append_reference(data_dict.data().unwrap().clone()).unwrap();
-        Ok(data_cell.into())
+        Ok(builder.into())
     }
 
     #[allow(dead_code)]
@@ -183,6 +181,7 @@ impl Program {
             },
             None, // key_file,
             None, // ticktock,
+            None, // gas_limit,
             Some(action_decoder),
             trace
         );
@@ -200,7 +199,7 @@ impl Program {
     fn compile_to_state(&self) -> std::result::Result<StateInit, String> {
         let mut state = StateInit::default();
         state.set_code(self.compile_asm(false)?);
-        state.set_data(self.data()?.cell().clone());
+        state.set_data(self.data()?);
         Ok(state)
     }
 
@@ -290,8 +289,9 @@ mod tests {
     use abi;
     use super::*;
     use std::fs::File;
-    use testcall::perform_contract_call;
+    use testcall::{perform_contract_call, call_contract, MsgInfo};
 
+    #[ignore] // due to offline constructor
     #[test]
     fn test_comm_var_addresses() {
         let source = File::open("./tests/comm_test2.s").unwrap();
@@ -310,6 +310,7 @@ mod tests {
         assert_eq!(perform_contract_call(name, body, Some(None), false, false, None, None, None, None, 0, |_b,_i| {}), 0);
     }
 
+    #[ignore] // due to offline constructor
     #[test]
     fn test_asciz_var() {
         let source = File::open("./tests/asci_test1.s").unwrap();
@@ -367,6 +368,7 @@ mod tests {
         assert_eq!(perform_contract_call(name, None, None, false, false, None, Some(-1), None, None, 0, |_b,_i| {}), 0);
     }
 
+    #[ignore] // due to offline constructor
     #[test]
     fn test_recursive_call() {
         let lib1 = File::open("./stdlib.tvm").unwrap();
@@ -385,6 +387,7 @@ mod tests {
         assert_eq!(perform_contract_call(name, body, Some(Some("key1")), false, false, None, None, None, None, 0, |_b,_i| {}), 0);
     }
 
+    #[ignore] // due to offline constructor
     #[test]
     fn test_public_and_private() {
         let source = File::open("./tests/test_public.code").unwrap();
@@ -423,5 +426,39 @@ mod tests {
             Some(b.into())
         };
         assert_eq!(perform_contract_call(name, body3, None, false, false, None, None, None, None, 0, |_b,_i| {}), 0);
+    }
+
+    #[test]
+    fn test_call_with_gas_limit() {
+        let source = File::open("./tests/Wallet.code").unwrap();
+        let lib = File::open("./stdlib_sol.tvm").unwrap();
+        let abi = abi::load_abi_json_string("./tests/Wallet.abi.json").unwrap();
+
+        let parser = ParseEngine::new(source, vec![lib], Some(abi));
+        assert_eq!(parser.is_ok(), true);
+        let prog = Program::new(parser.unwrap());
+
+        let contract_file = prog.compile_to_file(0).unwrap();
+        let name = contract_file.split('.').next().unwrap();
+        let body = abi::build_abi_body("./tests/Wallet.abi.json", "constructor", "{}", None, None, false)
+            .unwrap();
+        let exit_code = call_contract(
+            &name,
+            Some("10000000000"), //account balance 10T
+            MsgInfo {
+                balance: Some("1000000000"), // msg balance = 1T
+                src: None,
+                now: 1,
+                bounced: false,
+                body: Some(body.into())
+            },
+            None,
+            None,
+            Some(3000), // gas limit
+            Some(|_, _| {}),
+            false
+        );
+        // must equal to out of gas exception
+        assert_eq!(exit_code, 13);
     }
 }

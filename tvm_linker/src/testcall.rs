@@ -20,7 +20,7 @@ use serde_json::Value;
 use std::str::FromStr;
 use std::sync::Arc;
 use ton_vm::executor::{Engine, EngineTraceInfo, gas::gas_state::Gas};
-use ton_vm::error::TvmError;
+use ton_vm::error::tvm_exception;
 use ton_vm::stack::{StackItem, Stack, savelist::SaveList, integer::IntegerData};
 use ton_vm::SmartContractInfo;
 use ton_types::{AccountId, BuilderData, Cell, SliceData};
@@ -240,6 +240,7 @@ pub fn call_contract<F>(
     msg_info: MsgInfo,
     key_file: Option<Option<&str>>,
     ticktock: Option<i8>,
+    gas_limit: Option<i64>,
     action_decoder: Option<F>,
     debug: bool,
 ) -> i32
@@ -251,7 +252,7 @@ pub fn call_contract<F>(
     let debug_info = load_debug_info(&state_init);
     let (exit_code, state_init) = call_contract_ex(
         addr, addr_int, state_init, debug_info, smc_balance,
-        msg_info, key_file, ticktock, action_decoder, debug);
+        msg_info, key_file, ticktock, gas_limit, action_decoder, debug);
     if exit_code == 0 || exit_code == 1 {
         let smc_name = smc_file.to_owned() + ".tvc";
         save_to_file(state_init, Some(&smc_name), 0).expect("error");
@@ -301,6 +302,7 @@ pub fn call_contract_ex<F>(
     msg_info: MsgInfo,
     key_file: Option<Option<&str>>,
     ticktock: Option<i8>,
+    gas_limit: Option<i64>,
     action_decoder: Option<F>,
     debug: bool,
 ) -> (i32, StateInit)
@@ -358,21 +360,28 @@ pub fn call_contract_ex<F>(
             .push(int!(func_selector));
     }
 
-    let mut engine = Engine::new().setup_with_libraries(code, Some(registers), Some(stack), Some(Gas::test()), vec![]);
+    let gas = if let Some(gas_limit) = gas_limit {
+        let mut tmp_gas = Gas::test();
+        tmp_gas.new_gas_limit(gas_limit);
+        tmp_gas
+    } else {
+        Gas::test()
+    };
+
+    let mut engine = Engine::new().setup_with_libraries(code, Some(registers), Some(stack), Some(gas), vec![]);
     engine.set_trace(0);
     if debug { 
         engine.set_trace_callback(move |engine, info| { trace_callback(engine, info, true, &debug_info); })
     }
-    let exit_code: i32 = match engine.execute() {
-        Ok(code) => {
-            code as i32
+    let exit_code = match engine.execute() {
+        Err(exc) => match tvm_exception(exc) {
+            Ok(exc) => {
+                println!("Unhandled exception: {}", exc);
+                exc.number as i32
+            }
+            _ => -1
         }
-        Err(exc) => if let Ok(TvmError::TvmExceptionFull(exc)) = exc.downcast() {
-            println!("Unhandled exception: {:?}", exc);
-            exc.number as i32
-        } else {
-            -1
-        }
+        Ok(code) => code as i32
     };
     println!("TVM terminated with exit code {}", exit_code);
     println!("Gas used: {}", engine.get_gas().get_gas_used());
@@ -412,7 +421,6 @@ pub fn perform_contract_call<F>(
 {
     call_contract(
         contract_file,
-        None,
         balance,
         MsgInfo{
             balance: msg_balance,
@@ -423,6 +431,7 @@ pub fn perform_contract_call<F>(
         },
         key_file,
         ticktock,
+        None,
         if decode_c5 { Some(action_decoder) } else { None },
         debug
     )
