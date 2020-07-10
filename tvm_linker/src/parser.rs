@@ -997,7 +997,7 @@ mod tests {
         let mut stack = Stack::new();
         stack.push(StackItem::Slice(data_dict.into()));
 
-        let mut engine = Engine::new().setup(code, None, Some(stack), None);
+        let mut engine = Engine::new().setup_with_libraries(code, None, Some(stack), None, vec![]);
         engine.set_trace(Engine::TRACE_ALL);
         engine.execute().unwrap();
 

@@ -368,7 +368,7 @@ pub fn call_contract_ex<F>(
         Gas::test()
     };
 
-    let mut engine = Engine::new().setup(code, Some(registers), Some(stack), Some(gas));
+    let mut engine = Engine::new().setup_with_libraries(code, Some(registers), Some(stack), Some(gas), vec![]);
     engine.set_trace(0);
     if debug { 
         engine.set_trace_callback(move |engine, info| { trace_callback(engine, info, true, &debug_info); })

@@ -91,7 +91,7 @@ fn execute_contract(contract_path: &Path, initial_stack_state: Stack) {
 
     let mut ctrls = SaveList::new();
     ctrls.put(4, &mut StackItem::Cell(data.into_cell())).unwrap();
-    let mut engine = Engine::new().setup(code.clone(), Some(ctrls), Some(initial_stack_state), None);
+    let mut engine = Engine::new().setup_with_libraries(code.clone(), Some(ctrls), Some(initial_stack_state), None, vec![]);
     let exit_code = match engine.execute() {
         Err(exc) => match tvm_exception(exc) {
             Ok(exc) => {
