@@ -11,6 +11,7 @@
  * limitations under the License.
  */
 
+use ed25519::signature::Signer;
 use keyman::KeypairManager;
 use log::Level::Error;
 use crate::printer::msg_printer;

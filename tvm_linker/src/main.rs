@@ -15,6 +15,7 @@ extern crate base64;
 #[macro_use]
 extern crate clap;
 extern crate crc16;
+extern crate ed25519;
 extern crate ed25519_dalek;
 #[macro_use]
 extern crate lazy_static;
