@@ -378,11 +378,11 @@ pub fn call_contract_ex<F>(
         Err(exc) => match tvm_exception(exc) {
             Ok(exc) => {
                 println!("Unhandled exception: {}", exc);
-                exc.number as i32
+                exc.exception_or_custom_code()
             }
             _ => -1
         }
-        Ok(code) => code as i32
+        Ok(code) => code,
     };
     println!("TVM terminated with exit code {}", exit_code);
     println!("Gas used: {}", engine.get_gas().get_gas_used());

@@ -27,6 +27,7 @@ use parser::{ptr_to_builder, ParseEngine, ParseEngineResults};
 use debug_info::{save_debug_info, DebugInfoFunction, DebugInfo};
 
 pub struct Program {
+    language: Option<String>,
     engine: ParseEngineResults,
     keypair: Option<Keypair>,
 }
@@ -39,6 +40,7 @@ const SELECTOR_INTERNAL: &str = "
 impl Program {
     pub fn new(parser: ParseEngine) -> Self {
         Program {
+            language: None,
             engine: ParseEngineResults::new(parser),
             keypair: None,
         }
@@ -46,6 +48,10 @@ impl Program {
 
     pub fn set_keypair(&mut self, pair: Keypair) {
         self.keypair = Some(pair);
+    }
+
+    pub fn set_language(&mut self, lang: Option<&str>) {
+        self.language = lang.map(|s| s.to_owned());
     }
 
     pub fn data(&self) -> std::result::Result<Cell, String> {
@@ -58,8 +64,13 @@ impl Program {
 
         // Persistent data feature is obsolete and should be removed.
         // Off-chain constructor should be used to create data layout instead.
-        let (persistent_base, _persistent_data) = self.engine.persistent_data();
+        let (persistent_base, persistent_data) = self.engine.persistent_data();
         let mut data_dict = HashmapE::with_hashmap(64, None);
+        if let Some(ref lang) = self.language {
+            if lang == "C" || lang == "c" {
+                data_dict = HashmapE::with_hashmap(64, persistent_data)
+            }
+        }
         let key = ptr_to_builder(persistent_base)?.into();
         BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8)
             .and_then(|data| data_dict.set(key, &data.into()))
