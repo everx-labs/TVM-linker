@@ -96,7 +96,7 @@ fn execute_contract(contract_path: &Path, initial_stack_state: Stack) {
         Err(exc) => match tvm_exception(exc) {
             Ok(exc) => {
                 println!("Unhandled exception: {}", exc);
-                exc.number as i32
+                exc.exception_or_custom_code()
             }
             _ => -1
         }
