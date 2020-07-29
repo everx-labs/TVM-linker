@@ -93,7 +93,7 @@ fn print_cc(cc: &CurrencyCollection) -> String {
     if !cc.other.is_empty() {
         result += " other: {";
         cc.other.iterate_with_keys(|key: u32, value| {
-            result += &format!(" {} => {},", key, value.0);
+            result += &format!(" \"{}\": \"{}\",", key, value.0);
             Ok(true)
         }).ok();
         result.pop(); // remove extra comma
@@ -111,6 +111,5 @@ fn check_output_for_money() {
     cc.set_other_ex(17, &VarUInteger32::from_two_u128(1, 1900).unwrap()).unwrap();
     cc.set_other_ex(std::u32::MAX, &VarUInteger32::from_two_u128(std::u128::MAX >> 8, std::u128::MAX).unwrap()).unwrap();
     assert_eq!(print_grams(&cc.grams), "72057594037927935");
-    assert_eq!(print_cc(&cc), "72057594037927935 other: { 12 => 125, 17 => 340282366920938463463374607431768213356, \
-        4294967295 => 452312848583266388373324160190187140051835877600158453279131187530910662655 }");
+    assert_eq!(print_cc(&cc), r#"72057594037927935 other: { "12": "125", "17": "340282366920938463463374607431768213356", "4294967295": "452312848583266388373324160190187140051835877600158453279131187530910662655" }"#);
 }
