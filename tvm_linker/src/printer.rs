@@ -64,16 +64,16 @@ fn print_msg_header(header: &CommonMsgInfo) -> String {
             &format!("   bounced     : {}\n", header.bounced) +
             &format!("   source      : {}\n", &header.src) +
             &format!("   destination : {}\n", &header.dst) +
-            &format!("   value       : {}\n", header.value) +
-            &format!("   ihr_fee     : {}\n", header.ihr_fee) +
-            &format!("   fwd_fee     : {}\n", header.fwd_fee) +
+            &format!("   value       : {}\n", print_cc(&header.value)) +
+            &format!("   ihr_fee     : {}\n", print_grams(&header.ihr_fee)) +
+            &format!("   fwd_fee     : {}\n", print_grams(&header.fwd_fee)) +
             &format!("   created_lt  : {}\n", header.created_lt) +
             &format!("   created_at  : {}\n", header.created_at)
         },
         CommonMsgInfo::ExtInMsgInfo(header) => {
             format!( "   source      : {}\n", &header.src) +
             &format!("   destination : {}\n", &header.dst) +
-            &format!("   import_fee  : {}\n", header.import_fee)
+            &format!("   import_fee  : {}\n", print_grams(&header.import_fee))
         },
         CommonMsgInfo::ExtOutMsgInfo(header) => {
             format!( "   source      : {}\n", &header.src) +
@@ -82,4 +82,34 @@ fn print_msg_header(header: &CommonMsgInfo) -> String {
             &format!("   created_at  : {}\n", header.created_at)
         }
     }
+}
+
+fn print_grams(grams: &Grams) -> String {
+    grams.0.to_string()
+}
+
+fn print_cc(cc: &CurrencyCollection) -> String {
+    let mut result = print_grams(&cc.grams);
+    if !cc.other.is_empty() {
+        result += " other: {";
+        cc.other.iterate_with_keys(|key: u32, value| {
+            result += &format!(" \"{}\": \"{}\",", key, value.0);
+            Ok(true)
+        }).ok();
+        result.pop(); // remove extra comma
+        result += " }";
+    }
+    result
+}
+
+#[test]
+fn check_output_for_money() {
+    let mut cc = CurrencyCollection::with_grams(std::u64::MAX >> 8);
+    assert_eq!(print_grams(&cc.grams), "72057594037927935");
+    assert_eq!(print_cc(&cc), "72057594037927935");
+    cc.set_other(12, 125).unwrap();
+    cc.set_other_ex(17, &VarUInteger32::from_two_u128(1, 1900).unwrap()).unwrap();
+    cc.set_other_ex(std::u32::MAX, &VarUInteger32::from_two_u128(std::u128::MAX >> 8, std::u128::MAX).unwrap()).unwrap();
+    assert_eq!(print_grams(&cc.grams), "72057594037927935");
+    assert_eq!(print_cc(&cc), r#"72057594037927935 other: { "12": "125", "17": "340282366920938463463374607431768213356", "4294967295": "452312848583266388373324160190187140051835877600158453279131187530910662655" }"#);
 }
