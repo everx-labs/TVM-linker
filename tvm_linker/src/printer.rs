@@ -64,16 +64,16 @@ fn print_msg_header(header: &CommonMsgInfo) -> String {
             &format!("   bounced     : {}\n", header.bounced) +
             &format!("   source      : {}\n", &header.src) +
             &format!("   destination : {}\n", &header.dst) +
-            &format!("   value       : {}\n", header.value) +
-            &format!("   ihr_fee     : {}\n", header.ihr_fee) +
-            &format!("   fwd_fee     : {}\n", header.fwd_fee) +
+            &format!("   value       : {}\n", print_cc(&header.value)) +
+            &format!("   ihr_fee     : {}\n", print_grams(&header.ihr_fee)) +
+            &format!("   fwd_fee     : {}\n", print_grams(&header.fwd_fee)) +
             &format!("   created_lt  : {}\n", header.created_lt) +
             &format!("   created_at  : {}\n", header.created_at)
         },
         CommonMsgInfo::ExtInMsgInfo(header) => {
             format!( "   source      : {}\n", &header.src) +
             &format!("   destination : {}\n", &header.dst) +
-            &format!("   import_fee  : {}\n", header.import_fee)
+            &format!("   import_fee  : {}\n", print_grams(&header.import_fee))
         },
         CommonMsgInfo::ExtOutMsgInfo(header) => {
             format!( "   source      : {}\n", &header.src) +
@@ -82,4 +82,22 @@ fn print_msg_header(header: &CommonMsgInfo) -> String {
             &format!("   created_at  : {}\n", header.created_at)
         }
     }
+}
+
+fn print_grams(grams: &Grams) -> String {
+    grams.0.to_string()
+}
+
+fn print_cc(cc: &CurrencyCollection) -> String {
+    let mut result = print_grams(&cc.grams);
+    if !cc.other.is_empty() {
+        result += " other: {";
+        cc.other.iterate_with_keys(|key: u32, value| {
+            result += &format!("{}:{},", key, value);
+            Ok(true)
+        }).ok();
+        result.pop(); // remove extra comma
+        result += " }";
+    }
+    result
 }
