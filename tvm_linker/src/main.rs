@@ -103,6 +103,7 @@ fn linker_main() -> Result<(), String> {
             (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
             (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file. If not specified lib is loaded from environment variable TVM_LINKER_LIB_PATH if it exists.")
             (@arg OUT_FILE: -o +takes_value "Output file name")
+            (@arg LANGUAGE: --language +takes_value "Enable language-specific features in linkage")
         )
         (@subcommand test =>
             (about: "execute contract in test environment")
@@ -259,6 +260,7 @@ fn linker_main() -> Result<(), String> {
         };
 
         let debug = compile_matches.is_present("DEBUG");
+        prog.set_language(compile_matches.value_of("LANGUAGE"));
 
         if debug {
            prog.debug_print();

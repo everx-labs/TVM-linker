@@ -382,7 +382,7 @@ pub fn call_contract_ex<F>(
             }
             _ => -1
         }
-        Ok(code) => code as i32
+        Ok(code) => code,
     };
     println!("TVM terminated with exit code {}", exit_code);
     println!("Gas used: {}", engine.get_gas().get_gas_used());
