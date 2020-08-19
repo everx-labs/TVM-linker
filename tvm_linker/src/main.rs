@@ -121,7 +121,7 @@ fn linker_main() -> Result<(), String> {
             (@arg NOW: --now +takes_value "Supplies transaction creation unixtime")
             (@arg TICKTOCK: --ticktock +takes_value conflicts_with[BODY] "Emulates ticktock transaction in masterchain, 0 for tick and -1 for tock")
             (@arg GASLIMIT: -l --("gas-limit") +takes_value "Defines gas limit for tvm execution")
-            (@arg CONFIG: --config +takes_value "Imports config parameters from data.boc of a config contract")
+            (@arg CONFIG: --config +takes_value "Imports config parameters from a config contract boc")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[BODY] "Supplies the name of the calling contract method")

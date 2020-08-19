@@ -281,12 +281,6 @@ pub fn load_from_file(contract_file: &str) -> StateInit {
     StateInit::construct_from(&mut cell.into()).unwrap()
 }
 
-pub fn load_config_from_file(config_file: &str) -> Cell {
-    let mut csor = Cursor::new(std::fs::read(config_file).unwrap());
-    // config dictionary is located in the first reference of the root cell
-    deserialize_cells_tree(&mut csor).unwrap()[0].reference(0).unwrap()
-}
-
 pub fn get_now() -> u32 {
     SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32
 }

@@ -15,7 +15,7 @@ use ed25519::signature::Signer;
 use keyman::KeypairManager;
 use log::Level::Error;
 use crate::printer::msg_printer;
-use program::{load_from_file, load_config_from_file, save_to_file, get_now};
+use program::{load_from_file, save_to_file, get_now};
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use serde_json::Value;
 use std::str::FromStr;
@@ -255,7 +255,12 @@ pub fn call_contract<F>(
     let addr_int = IntegerData::from_str_radix(smc_file, 16).unwrap();
     let state_init = load_from_file(&format!("{}.tvc", smc_file));
     let debug_info = load_debug_info(&state_init);
-    let config_cell = config_file.map(|filename| { load_config_from_file(filename) });
+    let config_cell = config_file.map(|filename| {
+        let state = load_from_file(filename);
+        let (_code, data) = load_code_and_data(&state);
+        // config dictionary is located in the first reference of the storage root cell
+        data.into_cell().reference(0).unwrap()
+    });
     let (exit_code, state_init) = call_contract_ex(
         addr, addr_int, state_init, debug_info, smc_balance,
         msg_info, config_cell, key_file, ticktock, gas_limit, action_decoder, debug);
