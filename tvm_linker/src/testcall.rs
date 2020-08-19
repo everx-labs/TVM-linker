@@ -239,6 +239,7 @@ pub fn call_contract<F>(
     smc_file: &str,
     smc_balance: Option<&str>,
     msg_info: MsgInfo,
+    wid: Option<i8>,
     key_file: Option<Option<&str>>,
     ticktock: Option<i8>,
     gas_limit: Option<i64>,
@@ -252,7 +253,7 @@ pub fn call_contract<F>(
     let state_init = load_from_file(&format!("{}.tvc", smc_file));
     let debug_info = load_debug_info(&state_init);
     let (exit_code, state_init) = call_contract_ex(
-        addr, addr_int, state_init, debug_info, smc_balance,
+        addr, addr_int, wid, state_init, debug_info, smc_balance,
         msg_info, key_file, ticktock, gas_limit, action_decoder, debug);
     if exit_code == 0 || exit_code == 1 {
         let smc_name = smc_file.to_owned() + ".tvc";
@@ -297,6 +298,7 @@ fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debu
 pub fn call_contract_ex<F>(
     addr: AccountId,
     addr_int: IntegerData,
+    wid: Option<i8>,
     state_init: StateInit,
     debug_info: Option<ContractDebugInfo>,
     smc_balance: Option<&str>,
@@ -325,7 +327,10 @@ pub fn call_contract_ex<F>(
     let mut state_init = state_init;
     let (code, data) = load_code_and_data(&state_init);
 
-    let workchain_id = if func_selector > -2 { 0 } else { -1 };
+    let workchain_id = match wid {
+        Some(id) => id,
+        None => -1,
+    };
     let (smc_value, smc_balance) = decode_balance(smc_balance).unwrap();
     let registers = initialize_registers(
         data,
@@ -430,6 +435,7 @@ pub fn perform_contract_call<F>(
             bounced: false,
             body: body
         },
+        None,
         key_file,
         ticktock,
         None,

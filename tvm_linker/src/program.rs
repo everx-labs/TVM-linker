@@ -180,6 +180,7 @@ impl Program {
         let (exit_code, mut state_init) = call_contract_ex(
             AccountId::from(UInt256::default()),
             IntegerData::zero(),
+            None, // wid
             state_init,
             None, // debug_info
             None, // balance,

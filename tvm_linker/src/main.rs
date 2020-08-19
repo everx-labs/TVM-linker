@@ -121,6 +121,7 @@ fn linker_main() -> Result<(), String> {
             (@arg NOW: --now +takes_value "Supplies transaction creation unixtime")
             (@arg TICKTOCK: --ticktock +takes_value conflicts_with[BODY] "Emulates ticktock transaction in masterchain, 0 for tick and -1 for tock")
             (@arg GASLIMIT: -l --("gas-limit") +takes_value "Defines gas limit for tvm execution")
+            (@arg WC: -w +takes_value "Sets workchain id, -1 by default")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[BODY] "Supplies the name of the calling contract method")
@@ -384,11 +385,15 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         .map(|v| i64::from_str_radix(v, 10))
         .transpose()
         .map_err(|e| format!("cannot parse gas limit value: {}", e))?;
-    
+
+    let wid = matches.value_of("WC")
+        .map(|wc| i8::from_str_radix(wc, 10).unwrap());
+
     call_contract(
         matches.value_of("INPUT").unwrap(),
         matches.value_of("BALANCE"),
         msg_info,
+        wid,
         sign,
         ticktock,
         gas_limit,
