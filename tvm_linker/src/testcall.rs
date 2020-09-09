@@ -244,13 +244,14 @@ pub fn call_contract<F>(
     gas_limit: Option<i64>,
     action_decoder: Option<F>,
     debug: bool,
+    debug_info_filename: String,
 ) -> i32
     where F: Fn(SliceData, bool)
 {
     let addr = AccountId::from_str(smc_file).unwrap();
     let addr_int = IntegerData::from_str_radix(smc_file, 16).unwrap();
     let state_init = load_from_file(&format!("{}.tvc", smc_file));
-    let debug_info = load_debug_info(&state_init);
+    let debug_info = load_debug_info(&state_init, debug_info_filename);
     let (exit_code, state_init) = call_contract_ex(
         addr, addr_int, state_init, debug_info, smc_balance,
         msg_info, key_file, ticktock, gas_limit, action_decoder, debug);
@@ -434,7 +435,8 @@ pub fn perform_contract_call<F>(
         ticktock,
         None,
         if decode_c5 { Some(action_decoder) } else { None },
-        debug
+        debug,
+        String::from("")
     )
 }
 
