@@ -275,9 +275,8 @@ fn linker_main() -> Result<(), String> {
             let msg = "ABI is mandatory when CTOR_PARAMS is specified.";
             return Err(msg.to_string());
         }
-        // TODO: temporarily disabled. Later take it from command line
-        let debug_info = false;
-        prog.compile_to_file_ex(wc, abi_file, ctor_params, out_file, debug, debug_info)?;
+
+        prog.compile_to_file_ex(wc, abi_file, ctor_params, out_file, debug, debug)?;
         return Ok(());
     }
 
@@ -364,10 +363,14 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         }
     };
     
-    let _abi_contract = match matches.value_of("ABI_JSON") {
+    let abi_json = matches.value_of("ABI_JSON");
+
+    let _abi_contract = match abi_json {
         Some(abi_file) => Some(load_abi_contract(&load_abi_json_string(abi_file)?)?),
         None => None
     };
+
+    let debug_info_filename = format!("{}{}", abi_json.map_or("debug_info.", |a| a.trim_end_matches("abi.json")), "debug.json");
 
     println!("TEST STARTED");
     println!("body = {:?}", body);
@@ -394,6 +397,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         gas_limit,
         if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
         matches.is_present("TRACE"),
+        debug_info_filename,
     );
 
     println!("TEST COMPLETED");

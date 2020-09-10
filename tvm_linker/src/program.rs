@@ -100,7 +100,7 @@ impl Program {
             ).collect()
     }
     
-    fn save_debug_info(&self) {
+    fn save_debug_info(&self, filename: String) {
         let mut debug_info = DebugInfo::new();
         for pair in self.publics_filtered(false).iter() {
             let id = *pair.0;
@@ -117,7 +117,7 @@ impl Program {
             let name = self.engine.internal_name(id).unwrap();
             debug_info.internals.push(DebugInfoFunction{id: id as i64, name: name});
         }
-        save_debug_info(debug_info);
+        save_debug_info(debug_info, filename);
     }
 
     pub fn public_method_dict(&self, remove_ctor: bool) -> std::result::Result<Option<Cell>, String> {
@@ -149,7 +149,8 @@ impl Program {
             state_init = self.apply_constructor(state_init, abi_file.unwrap(), ctor_params, trace)?;
         }
         if debug_info {
-            self.save_debug_info();
+            let debug_info_filename = format!("{}{}", abi_file.map_or("debug_info.", |a| a.trim_end_matches("abi.json")), "debug.json");
+            self.save_debug_info(debug_info_filename);
         }
         save_to_file(state_init, out_file, wc)
     }
@@ -467,7 +468,8 @@ mod tests {
             None,
             Some(3000), // gas limit
             Some(|_, _| {}),
-            false
+            false,
+            String::from("")
         );
         // must equal to out of gas exception
         assert_eq!(exit_code, 13);
