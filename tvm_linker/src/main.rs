@@ -106,6 +106,7 @@ fn linker_main() -> Result<(), String> {
             (@arg LANGUAGE: --language +takes_value "Enable language-specific features in linkage")
         )
         (@subcommand test =>
+            (@setting AllowLeadingHyphen)
             (about: "execute contract in test environment")
             (version: "0.1")
             (author: "TONLabs")
