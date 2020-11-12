@@ -1,1 +1,3 @@
 *.tmp
+*.debug.json
+*.tvc
