@@ -1012,7 +1012,7 @@ mod tests {
     #[test]
     fn test_parser_var_without_globl() {
         let source_file = File::open("./tests/local_global_var.code").unwrap();
-        let lib_file = File::open("./stdlib.tvm").unwrap();
+        let lib_file = File::open("./tests/test_stdlib.tvm").unwrap();
         let parser = ParseEngine::new(source_file, vec![lib_file], None);
         assert_eq!(parser.is_ok(), true);
     }   
@@ -1020,7 +1020,7 @@ mod tests {
     #[test]
     fn test_parser_var_with_comm() {
         let source_file = File::open("./tests/comm_test1.s").unwrap();
-        let lib_file = File::open("./stdlib.tvm").unwrap();
+        let lib_file = File::open("./tests/test_stdlib.tvm").unwrap();
         let parser = ParseEngine::new(source_file, vec![lib_file], None);
         assert_eq!(parser.is_ok(), true);
     }
@@ -1028,7 +1028,7 @@ mod tests {
     #[test]
     fn test_parser_bss() {
         let source = File::open("./tests/bss_test1.s").unwrap();
-        let lib = File::open("./stdlib.tvm").unwrap();
+        let lib = File::open("./tests/test_stdlib.tvm").unwrap();
         let parser = ParseEngine::new(source, vec![lib], None);
         assert_eq!(parser.is_ok(), true);
     }
@@ -1052,7 +1052,7 @@ mod tests {
 
     #[test]
     fn test_macros() {
-        let lib1 = File::open("./stdlib.tvm").unwrap();
+        let lib1 = File::open("./tests/test_stdlib.tvm").unwrap();
         let source = File::open("./tests/test_macros.code").unwrap();
         let parser = ParseEngine::new(source, vec![lib1], None);
         assert_eq!(parser.is_ok(), true);
