@@ -32,6 +32,7 @@ extern crate ton_vm;
 #[macro_use]
 extern crate log;
 extern crate ton_sdk;
+extern crate ton_labs_assembler;
 
 mod abi;
 mod initdata;

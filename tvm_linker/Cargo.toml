@@ -29,6 +29,7 @@ serde_json = "1.0.41"
 
 ton_abi = { git = "https://github.com/tonlabs/ton-labs-abi.git" }
 ton_block = { git = "https://github.com/tonlabs/ton-labs-block.git" }
+ton_labs_assembler = { git = "https://github.com/tonlabs/ton-labs-assembler.git" }
 ton_sdk = { git = "https://github.com/tonlabs/ton-sdk.git", default-features = false }
 ton_types = { git = "https://github.com/tonlabs/ton-labs-types.git" }
 ton_vm = { git = "https://github.com/tonlabs/ton-labs-vm.git", default-features = false }
