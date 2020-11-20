@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 use methdict::*;
 use ton_block::*;
-use ton_vm::assembler::compile_code;
+use ton_labs_assembler::compile_code;
 use ton_types::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use ton_types::{Cell, SliceData, BuilderData, IBitstring};
 use ton_types::dictionary::{HashmapE, HashmapType};

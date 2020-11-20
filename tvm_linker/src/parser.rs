@@ -902,7 +902,7 @@ mod tests {
     use super::*;
     use std::fs::File;
     use ton_vm::executor::Engine;
-    use ton_vm::assembler::compile_code;
+    use ton_labs_assembler::compile_code;
     use ton_vm::stack::{Stack, StackItem};
     use std::sync::Arc;
 
