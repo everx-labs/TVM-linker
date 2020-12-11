@@ -16,7 +16,7 @@ use ton_types::Cell;
 
 pub fn state_init_printer(state: &StateInit) -> String {
     format!("StateInit\n split_depth: {}\n special: {}\n data: {}\n code: {}\n lib:  {}\n",
-        state.split_depth.as_ref().map(|x| format!("{:?}", x)).unwrap_or("None".to_string()),
+        state.split_depth.as_ref().map(|x| format!("{:?}", (x.0 as u8))).unwrap_or("None".to_string()),
         state.special.as_ref().map(|x| format!("{:?}", x)).unwrap_or("None".to_string()),
         tree_of_cells_into_base64(state.data.as_ref()),
         tree_of_cells_into_base64(state.code.as_ref()),
