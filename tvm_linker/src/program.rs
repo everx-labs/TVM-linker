@@ -117,6 +117,9 @@ impl Program {
             let name = self.engine.internal_name(id).unwrap();
             debug_info.internals.push(DebugInfoFunction{id: id as i64, name: name});
         }
+        debug_info.publics.sort_by(|a, b| a.id.cmp(&b.id));
+        debug_info.privates.sort_by(|a, b| a.id.cmp(&b.id));
+        debug_info.internals.sort_by(|a, b| a.id.cmp(&b.id));
         save_debug_info(debug_info, filename);
     }
 
