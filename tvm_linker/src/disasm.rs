@@ -35,6 +35,11 @@ pub fn create_disasm_command<'a, 'b>() -> App<'a, 'b> {
             .arg(Arg::with_name("TVC")
                     .required(true)
                     .help("Path to tvc file")))
+        .subcommand(SubCommand::with_name("fun-c")
+            .about("dumps tree of cells for the given tvc")
+            .arg(Arg::with_name("TVC")
+                    .required(true)
+                    .help("Path to tvc file")))
 }
 
 pub fn disasm_command(m: &ArgMatches) -> Result<(), String> {
@@ -42,6 +47,8 @@ pub fn disasm_command(m: &ArgMatches) -> Result<(), String> {
         return disasm_dump_command(m);
     } else if let Some(m) = m.subcommand_matches("solidity") {
         return disasm_solidity_command(m);
+    } else if let Some(m) = m.subcommand_matches("fun-c") {
+        return disasm_fun_c_command(m);
     }
     Err("unknown command".to_owned())
 }
@@ -74,11 +81,11 @@ fn disasm_solidity_command(m: &ArgMatches) -> Result<(), String> {
     let code = roots.unwrap().remove(0).reference(0).unwrap();
 
     println!(";; selector");
-    let mut data = SliceData::from(code);
-    let asm = disasm(&mut data, false);
-    print!("{}", asm);
+    let mut sel = SliceData::from(code.clone());
+    sel.shrink_references(..0);
+    print!("{}", disasm(&mut sel));
 
-    let dict1_cell = data.reference(0).unwrap();
+    let dict1_cell = code.reference(0).unwrap();
     let dict1 = HashmapE::with_hashmap(32, Some(dict1_cell));
     if dict1.len().is_err() {
         println!(";; failed to recognize methods dictionary");
@@ -91,16 +98,17 @@ fn disasm_solidity_command(m: &ArgMatches) -> Result<(), String> {
         let id = key_slice.get_next_u32().unwrap();
         println!();
         println!(";; method {:x}", id);
-        print!("{}", disasm(&mut method, true));
+        print!("{}", disasm(&mut method));
     }
 
     println!();
     println!(";; c3 continuation (current dictionary)");
-    let c3 = data.reference(1).unwrap();
-    let mut c3_slice = SliceData::from(c3);
-    print!("{}", disasm(&mut c3_slice, false));
+    let c3 = code.reference(1).unwrap();
+    let mut c3_slice = SliceData::from(c3.clone());
+    c3_slice.shrink_references(..0);
+    print!("{}", disasm(&mut c3_slice));
 
-    let dict2_cell = c3_slice.reference(0).unwrap();
+    let dict2_cell = c3.reference(0).unwrap();
     if dict2_cell == Cell::default() {
         println!(";; current dictionary is empty");
         return Ok(())
@@ -113,7 +121,46 @@ fn disasm_solidity_command(m: &ArgMatches) -> Result<(), String> {
         let id = key_slice.get_next_u32().unwrap();
         println!();
         println!(";; function {}", id);
-        print!("{}", disasm(&mut func, true));
+        print!("{}", disasm(&mut func));
+    }
+
+    Ok(())
+}
+
+fn disasm_fun_c_command(m: &ArgMatches) -> Result<(), String> {
+    let filename = m.value_of("TVC");
+    let tvc = filename.map(|f| std::fs::read(f))
+        .transpose()
+        .map_err(|e| format!(" failed to read tvc file: {}", e))?
+        .unwrap();
+    let mut csor = Cursor::new(tvc);
+    let roots = deserialize_cells_tree(&mut csor);
+    if roots.is_err() {
+        println!(";; failed to deserialize the tvc");
+        return Ok(())
+    }
+    let code = roots.unwrap().remove(0).reference(0).unwrap();
+
+    println!(";; selector");
+    let mut sel = SliceData::from(code.clone());
+    sel.shrink_references(..0);
+    let asm = disasm(&mut sel);
+    print!("{}", asm);
+
+    let dict1_cell = code.reference(0).unwrap();
+    let dict1 = HashmapE::with_hashmap(19, Some(dict1_cell));
+    if dict1.len().is_err() {
+        println!(";; failed to recognize methods dictionary");
+        return Ok(())
+    }
+
+    for entry in dict1.into_iter() {
+        let (key, mut method) = entry.unwrap();
+        let mut key_slice = SliceData::from(key.into_cell().unwrap());
+        let id = key_slice.get_next_int(19).unwrap();
+        println!();
+        println!(";; method {:x}", id);
+        print!("{}", disasm(&mut method));
     }
 
     Ok(())
@@ -161,18 +208,18 @@ fn indent(text: String) -> String {
     indented
 }
 
-fn disasm(slice: &mut SliceData, cont: bool) -> String {
+fn disasm(slice: &mut SliceData) -> String {
     let mut disasm = String::new();
     let handlers = Handlers::new_code_page_0();
-    let mut stop = false;
-    if slice.is_empty() && cont {
-        if slice.remaining_references() == 1 {
-            *slice = SliceData::from(slice.reference(0).unwrap())
-        } else if slice.remaining_references() > 1 {
-            panic!();
+    loop {
+        if slice.is_empty() {
+            assert!(slice.remaining_references() < 2);
+            if slice.remaining_references() > 0 {
+                *slice = SliceData::from(slice.reference(0).unwrap())
+            } else {
+                break;
+            }
         }
-    }
-    while !slice.is_empty() {
         while let Ok(handler) = handlers.get_handler(&mut slice.clone()) {
             if let Some(insn) = handler(slice) {
                 disasm += &insn;
@@ -181,16 +228,8 @@ fn disasm(slice: &mut SliceData, cont: bool) -> String {
                 disasm += "> ";
                 disasm += &slice.to_hex_string();
                 disasm += "\n";
-                stop = true;
-                break;
+                return disasm;
             }
-        }
-        if stop || !cont {
-            break;
-        }
-        assert!(slice.remaining_references() < 2);
-        if slice.remaining_references() > 0 {
-            *slice = SliceData::from(slice.reference(0).unwrap());
         }
     }
     disasm
@@ -234,6 +273,20 @@ macro_rules! create_handler_2t {
             let opc = slice.get_next_int(16).unwrap();
             assert!(opc == $opc);
             Some(format!("{}{}", $mnemonic, T::suffix()).to_string())
+        }
+    };
+}
+
+macro_rules! create_handler_2r {
+    ($func_name:ident, $opc:literal, $mnemonic:literal) => {
+        fn $func_name(slice: &mut SliceData) -> Option<String> {
+            let opc = slice.get_next_int(16).unwrap();
+            assert!(opc == $opc);
+            let cell = slice.reference(0).unwrap();
+            let mut subslice = SliceData::from(cell);
+            let body = &indent(disasm(&mut subslice));
+            slice.shrink_references(1..);
+            Some(format!("{} {{\n{}}}", $mnemonic.to_string(), body).to_string())
         }
     };
 }
@@ -388,8 +441,8 @@ impl Handlers {
                 .set(0xFF, disasm_blkpush)
             )
             .set(0x60, disasm_pick)
-            .set(0x61, disasm_roll)
-            .set(0x62, disasm_rollrev)
+            .set(0x61, disasm_rollx)
+            .set(0x62, disasm_rollrevx)
             .set(0x63, disasm_blkswx)
             .set(0x64, disasm_revx)
             .set(0x65, disasm_dropx)
@@ -1250,7 +1303,7 @@ fn disasm_puxc(slice: &mut SliceData) -> Option<String> {
     assert!(opc == 0x52);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
-    Some(format!("PUXC s{}, s{}", i, j - 1).to_string())
+    Some(format!("PUXC s{}, s{}", i, j as i64 - 1).to_string())
 }
 fn disasm_push2(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
@@ -1273,7 +1326,7 @@ fn disasm_xcpuxc(slice: &mut SliceData) -> Option<String> {
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     let k = slice.get_next_int(4).unwrap();
-    Some(format!("XCPUXC s{}, s{}, s{}", i, j, k - 1).to_string())
+    Some(format!("XCPUXC s{}, s{}, s{}", i, j, k as i64 - 1).to_string())
 }
 fn disasm_xcpu2(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
@@ -1289,7 +1342,7 @@ fn disasm_puxc2(slice: &mut SliceData) -> Option<String> {
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     let k = slice.get_next_int(4).unwrap();
-    Some(format!("PUXC2 s{}, s{}, s{}", i, j - 1, k - 1).to_string())
+    Some(format!("PUXC2 s{}, s{}, s{}", i, j as i64 - 1, k as i64 - 1).to_string())
 }
 fn disasm_puxcpu(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
@@ -1297,7 +1350,7 @@ fn disasm_puxcpu(slice: &mut SliceData) -> Option<String> {
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     let k = slice.get_next_int(4).unwrap();
-    Some(format!("PUXCPU s{}, s{}, s{}", i, j - 1, k - 1).to_string())
+    Some(format!("PUXCPU s{}, s{}, s{}", i, j as i64 - 1, k as i64 - 1).to_string())
 }
 fn disasm_pu2xc(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
@@ -1305,7 +1358,7 @@ fn disasm_pu2xc(slice: &mut SliceData) -> Option<String> {
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     let k = slice.get_next_int(4).unwrap();
-    Some(format!("PU2XC s{}, s{}, s{}", i, j - 1, k - 2).to_string())
+    Some(format!("PU2XC s{}, s{}, s{}", i, j as i64 - 1, k as i64 - 2).to_string())
 }
 fn disasm_push3(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
@@ -1361,8 +1414,8 @@ fn disasm_blkpush(slice: &mut SliceData) -> Option<String> {
     Some(format!("BLKPUSH {}, {}", i, j).to_string())
 }
 create_handler_1!(disasm_pick,     0x60, "PICK");
-create_handler_1!(disasm_roll,     0x61, "ROLL");
-create_handler_1!(disasm_rollrev,  0x62, "ROLLREV");
+create_handler_1!(disasm_rollx,    0x61, "ROLLX");
+create_handler_1!(disasm_rollrevx, 0x62, "ROLLREVX");
 create_handler_1!(disasm_blkswx,   0x63, "BLKSWX");
 create_handler_1!(disasm_revx,     0x64, "REVX");
 create_handler_1!(disasm_dropx,    0x65, "DROPX");
@@ -1474,9 +1527,9 @@ fn disasm_pushint(slice: &mut SliceData) -> Option<String> {
     if opc <= 0x7a {
         x = opc as i16 - 0x70;
     } else if opc < 0x80 {
-        x = -(opc as i16 - 0x7f + 1);
+        x = opc as i16 - 0x80;
     } else if opc == 0x80 {
-        x = slice.get_next_int(8).unwrap() as i16;
+        x = (slice.get_next_int(8).unwrap() as i8) as i16;
     } else if opc == 0x81 {
         x = slice.get_next_int(16).unwrap() as i16;
     }
@@ -1510,20 +1563,25 @@ fn disasm_pushnegpow2(slice: &mut SliceData) -> Option<String> {
 fn disasm_pushref(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
     assert!(opc == 0x88);
-    // TODO shrink?
+    slice.shrink_references(1..);
+    // TODO print ref
     Some("PUSHREF".to_string())
 }
 fn disasm_pushrefslice(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
     assert!(opc == 0x89);
-    // TODO shrink?
+    slice.shrink_references(1..);
+    // TODO print ref
     Some("PUSHREFSLICE".to_string())
 }
 fn disasm_pushrefcont(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
     assert!(opc == 0x8a);
-    // TODO shrink?
-    Some("PUSHREFCONT".to_string())
+    let cell = slice.reference(0).unwrap_or(Cell::default());
+    let mut subslice = SliceData::from(cell);
+    let text = indent(disasm(&mut subslice));
+    slice.shrink_references(1..);
+    Some(format!("PUSHREFCONT {{\n{}}}", text).to_string())
 }
 fn disasm_pushslice_short(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
@@ -1557,26 +1615,25 @@ fn disasm_pushcont_long(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(7).unwrap();
     assert!(opc << 1 == 0x8e);
     let r = slice.get_next_int(2).unwrap() as usize;
-    let xx = slice.get_next_int(7).unwrap();
-    let mut d = "".to_string();
-    for i in 0..r {
-        let c = slice.reference(i as usize).unwrap();
-        let mut s = SliceData::from(c);
-        d += &indent(disasm(&mut s, true));
-    }
-    if r > 0 {
-        slice.shrink_references(r..);
-    }
-    let mut body = slice.get_next_slice(xx as usize * 8).unwrap();
-    d += &indent(disasm(&mut body, false));
+    let xx = slice.get_next_int(7).unwrap() as usize;
+    let bits = xx * 8;
+
+    let mut subslice = slice.clone();
+    subslice.shrink_data(..bits);
+    subslice.shrink_references(..r);
+    let d = indent(disasm(&mut subslice));
+
+    slice.shrink_data(bits..);
+    slice.shrink_references(r..);
+
     Some(format!("PUSHCONT {{\n{}}}", d).to_string())
 }
 fn disasm_pushcont_short(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(4).unwrap();
     assert!(opc == 0x9);
-    let x = slice.get_next_int(4).unwrap();
-    let mut body = slice.get_next_slice(x as usize * 8).unwrap();
-    let d = indent(disasm(&mut body, false));
+    let x = slice.get_next_int(4).unwrap() as usize;
+    let mut body = slice.get_next_slice(x * 8).unwrap();
+    let d = indent(disasm(&mut body));
     Some(format!("PUSHCONT {{\n{}}}", d).to_string())
 }
 create_handler_1t!(disasm_add,    0xa0, "ADD");
@@ -1718,28 +1775,28 @@ fn disasm_eqint<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(8).unwrap();
     assert!(opc == 0xc0);
-    let yy = slice.get_next_int(8).unwrap();
+    let yy = slice.get_next_int(8).unwrap() as i8;
     Some(format!("EQINT{} {}", T::suffix(), yy).to_string())
 }
 fn disasm_lessint<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(8).unwrap();
     assert!(opc == 0xc1);
-    let yy = slice.get_next_int(8).unwrap();
+    let yy = slice.get_next_int(8).unwrap() as i8;
     Some(format!("LESSINT{} {}", T::suffix(), yy).to_string())
 }
 fn disasm_gtint<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(8).unwrap();
     assert!(opc == 0xc2);
-    let yy = slice.get_next_int(8).unwrap();
+    let yy = slice.get_next_int(8).unwrap() as i8;
     Some(format!("GTINT{} {}", T::suffix(), yy).to_string())
 }
 fn disasm_neqint<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(8).unwrap();
     assert!(opc == 0xc3);
-    let yy = slice.get_next_int(8).unwrap();
+    let yy = slice.get_next_int(8).unwrap() as i8;
     Some(format!("NEQINT{} {}", T::suffix(), yy).to_string())
 }
 create_handler_1!(disasm_isnan,  0xc4, "ISNAN");
@@ -1878,7 +1935,8 @@ fn disasm_stsliceconst(slice: &mut SliceData) -> Option<String> {
     let x = slice.get_next_int(2).unwrap();
     assert!(x == 0);
     let y = slice.get_next_int(3).unwrap();
-    let sss = slice.get_next_slice(y as usize * 8 + 2).unwrap();
+    let mut sss = slice.get_next_slice(y as usize * 8 + 2).unwrap();
+    sss.trim_right();
     Some(format!("STSLICECONST x{}", sss.into_cell().to_hex_string(true)).to_string())
 }
 create_handler_1!(disasm_ctos, 0xd0, "CTOS");
@@ -2092,9 +2150,9 @@ create_handler_2!(disasm_callxva,    0xdb38, "CALLXVARARGS");
 create_handler_2!(disasm_retva,      0xdb39, "RETVARARGS");
 create_handler_2!(disasm_jmpxva,     0xdb3a, "JMPXVARARGS");
 create_handler_2!(disasm_callccva,   0xdb3b, "CALLCCVARARGS");
-create_handler_2!(disasm_callref,    0xdb3c, "CALLREF");
-create_handler_2!(disasm_jmpref,     0xdb3d, "JMPREF");
-create_handler_2!(disasm_jmprefdata, 0xdb3e, "JMPREFDATA");
+create_handler_2r!(disasm_callref,    0xdb3c, "CALLREF");
+create_handler_2r!(disasm_jmpref,     0xdb3d, "JMPREF");
+create_handler_2r!(disasm_jmprefdata, 0xdb3e, "JMPREFDATA");
 create_handler_2!(disasm_retdata,    0xdb3f, "RETDATA");
 create_handler_1!(disasm_ifret,    0xdc, "IFRET");
 create_handler_1!(disasm_ifnotret, 0xdd, "IFNOTRET");
@@ -2103,17 +2161,17 @@ create_handler_1!(disasm_ifnot,    0xdf, "IFNOT");
 create_handler_1!(disasm_ifjmp,    0xe0, "IFJMP");
 create_handler_1!(disasm_ifnotjmp, 0xe1, "IFNOTJMP");
 create_handler_1!(disasm_ifelse,   0xe2, "IFELSE");
-create_handler_2!(disasm_ifref,        0xe300, "IFREF");
-create_handler_2!(disasm_ifnotref,     0xe301, "IFNOTREF");
-create_handler_2!(disasm_ifjmpref,     0xe302, "IFJMPREF");
-create_handler_2!(disasm_ifnotjmpref,  0xe303, "IFNOTJMPREF");
+create_handler_2r!(disasm_ifref,       0xe300, "IFREF");
+create_handler_2r!(disasm_ifnotref,    0xe301, "IFNOTREF");
+create_handler_2r!(disasm_ifjmpref,    0xe302, "IFJMPREF");
+create_handler_2r!(disasm_ifnotjmpref, 0xe303, "IFNOTJMPREF");
 create_handler_2!(disasm_condsel,      0xe304, "CONDSEL");
 create_handler_2!(disasm_condselchk,   0xe305, "CONDSELCHK");
 create_handler_2!(disasm_ifretalt,     0xe308, "IFRETALT");
 create_handler_2!(disasm_ifnotretalt,  0xe309, "IFNOTRETALT");
-create_handler_2!(disasm_ifrefelse,    0xe30d, "IFREFELSE");
-create_handler_2!(disasm_ifelseref,    0xe30e, "IFELSEREF");
-create_handler_2!(disasm_ifrefelseref, 0xe30f, "IFREFELSEREF");
+create_handler_2r!(disasm_ifrefelse,      0xe30d, "IFREFELSE");
+create_handler_2r!(disasm_ifelseref,      0xe30e, "IFELSEREF");
+create_handler_2r!(disasm_ifrefelseref,   0xe30f, "IFREFELSEREF");
 create_handler_2!(disasm_repeat_break,    0xe314, "REPEATBRK");
 create_handler_2!(disasm_repeatend_break, 0xe315, "REPEATENDBRK");
 create_handler_2!(disasm_until_break,     0xe316, "UNTILBRK");
@@ -2453,7 +2511,7 @@ create_handler_2!(disasm_dictdelget,         0xf462, "DICTDELGET");
 create_handler_2!(disasm_dictdelgetref,      0xf443, "DICTDELGETREF");
 create_handler_2!(disasm_dictidelget,        0xf444, "DICTIDELGET");
 create_handler_2!(disasm_dictidelgetref,     0xf445, "DICTIDELGETREF");
-create_handler_2!(disasm_dictudelget,        0xf446, "DICTUDELGET");
+create_handler_2!(disasm_dictudelget,        0xf466, "DICTUDELGET");
 create_handler_2!(disasm_dictudelgetref,     0xf467, "DICTUDELGETREF");
 create_handler_2!(disasm_dictgetoptref,      0xf469, "DICTGETOPTREF");
 create_handler_2!(disasm_dictigetoptref,     0xf46a, "DICTIGETOPTREF");
@@ -2509,7 +2567,7 @@ fn disasm_dictpushconst(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(14).unwrap();
     assert!(opc << 2 == 0xf4a4);
     let n = slice.get_next_int(10).unwrap();
-    // TODO shrink?
+    slice.shrink_references(1..);
     Some(format!("DICTPUSHCONST {}", n).to_string())
 }
 create_handler_2!(disasm_pfxdictgetq,    0xf4a8, "PFXDICTGETQ");
@@ -2520,7 +2578,7 @@ fn disasm_pfxdictswitch(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(14).unwrap();
     assert!(opc << 2 == 0xf4ac);
     let n = slice.get_next_int(10).unwrap();
-    // TODO shrink?
+    slice.shrink_references(1..);
     Some(format!("PFXDICTSWITCH {}", n).to_string())
 }
 create_handler_2!(disasm_subdictget,    0xf4b1, "SUBDICTGET");
@@ -2627,14 +2685,54 @@ fn disasm_dump_string(slice: &mut SliceData) -> Option<String> {
         _ => {
             if mode == 0x00 {
                 let s = slice.get_next_slice(n as usize * 8).unwrap();
-                Some(format!("LOGSTR {}", s.to_hex_string()).to_string())
+                let ss = String::from_utf8(s.get_bytestring(0)).unwrap();
+                Some(format!("LOGSTR {}", ss).to_string())
             } else if mode == 0x01 {
                 let s = slice.get_next_slice(n as usize * 8).unwrap();
-                Some(format!("PRINTSTR {}", s.to_hex_string()).to_string())
+                let ss = String::from_utf8(s.get_bytestring(0)).unwrap();
+                Some(format!("PRINTSTR {}", ss).to_string())
             } else {
                 println!("dump_string?");
                 None
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn round_trip_test(raw0: &str) {
+        let bin0 = base64::decode(raw0).unwrap();
+        let toc0 = ton_types::deserialize_tree_of_cells(&mut std::io::Cursor::new(bin0)).unwrap();
+        let asm0 = disasm(&mut SliceData::from(toc0.clone()));
+        let toc1 = ton_labs_assembler::compile_code_to_cell(&asm0.clone()).unwrap();
+        let asm1 = disasm(&mut SliceData::from(toc1.clone()));
+        if asm0 != asm1 {
+            println!(">>>");
+            print!("{}", asm0);
+            println!("<<<");
+            print!("{}", asm1);
+        }
+        assert_eq!(asm0, asm1);
+
+        let bin1 = ton_types::serialize_toc(&toc1).unwrap();
+        let raw1 = base64::encode(&bin1);
+        if raw0 != raw1 {
+            println!("{}", asm0);
+            print_tree_of_cells(&toc0);
+            print_tree_of_cells(&toc1);
+        }
+        assert_eq!(raw0, raw1);
+    }
+
+    #[test]
+    fn round_trip_tests() {
+        for n in 0..104 {
+            let filename = format!("tests/disasm/{:03}.b64", n);
+            let raw = std::fs::read_to_string(filename).unwrap();
+            round_trip_test(&raw);
         }
     }
 }
