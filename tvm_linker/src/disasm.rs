@@ -2663,14 +2663,14 @@ fn disasm_dump_var(slice: &mut SliceData) -> Option<String> {
     assert!(opc == 0xfe2);
     let n = slice.get_next_int(4).unwrap();
     assert!(n < 15);
-    Some(format!("DUMP s{}", n).to_string())
+    Some(format!("DUMP {}", n).to_string())
 }
 fn disasm_print_var(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
     assert!(opc == 0xfe3);
     let n = slice.get_next_int(4).unwrap();
     assert!(n < 15);
-    Some(format!("PRINT s{}", n).to_string())
+    Some(format!("PRINT {}", n).to_string())
 }
 fn disasm_dump_string(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
@@ -2703,7 +2703,7 @@ fn disasm_dump_string(slice: &mut SliceData) -> Option<String> {
 mod tests {
     use super::*;
 
-    fn round_trip_test(raw0: &str) {
+    fn round_trip_test(raw0: &str, check_bin: bool) {
         let bin0 = base64::decode(raw0).unwrap();
         let toc0 = ton_types::deserialize_tree_of_cells(&mut std::io::Cursor::new(bin0)).unwrap();
         let asm0 = disasm(&mut SliceData::from(toc0.clone()));
@@ -2717,22 +2717,29 @@ mod tests {
         }
         assert_eq!(asm0, asm1);
 
-        let bin1 = ton_types::serialize_toc(&toc1).unwrap();
-        let raw1 = base64::encode(&bin1);
-        if raw0 != raw1 {
-            println!("{}", asm0);
-            print_tree_of_cells(&toc0);
-            print_tree_of_cells(&toc1);
+        if check_bin {
+            let bin1 = ton_types::serialize_toc(&toc1).unwrap();
+            let raw1 = base64::encode(&bin1);
+            if raw0 != raw1 {
+                println!("{}", asm0);
+                print_tree_of_cells(&toc0);
+                print_tree_of_cells(&toc1);
+            }
+            assert_eq!(raw0, raw1);
         }
-        assert_eq!(raw0, raw1);
     }
 
     #[test]
     fn round_trip_tests() {
-        for n in 0..104 {
+        for n in 0..105 {
             let filename = format!("tests/disasm/{:03}.b64", n);
             let raw = std::fs::read_to_string(filename).unwrap();
-            round_trip_test(&raw);
+            round_trip_test(&raw, true);
+        }
+        for n in 105..130 {
+            let filename = format!("tests/disasm/{:03}.b64", n);
+            let raw = std::fs::read_to_string(filename).unwrap();
+            round_trip_test(&raw, false);
         }
     }
 }
