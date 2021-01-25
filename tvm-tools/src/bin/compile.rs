@@ -13,6 +13,7 @@
 
 #![cfg_attr(feature = "ci_run", deny(warnings))]
 
+extern crate ton_labs_assembler;
 extern crate ton_types;
 extern crate ton_vm as tvm;
 extern crate clap;
@@ -22,7 +23,7 @@ use std::io::Read;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use ton_types::cells_serialization::serialize_tree_of_cells;
-use tvm::assembler::compile_code;
+use ton_labs_assembler::compile_code;
 use clap::{Arg, App};
 
 fn save(data: Vec<u8>, destination: &Path) {

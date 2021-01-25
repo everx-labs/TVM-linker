@@ -8,7 +8,7 @@ args = args_parser.parse_args()
 
 TVM_PATH = args.linker_path
 
-STDLIB_SOL = 'stdlib_sol.tvm'
+STDLIB_SOL = 'tests/test_stdlib_sol.tvm'
 
 def getFunctions():
 	global functions

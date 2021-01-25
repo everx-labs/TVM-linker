@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 use methdict::*;
 use ton_block::*;
-use ton_vm::assembler::compile_code;
+use ton_labs_assembler::compile_code;
 use ton_types::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use ton_types::{Cell, SliceData, BuilderData, IBitstring};
 use ton_types::dictionary::{HashmapE, HashmapType};
@@ -100,7 +100,7 @@ impl Program {
             ).collect()
     }
     
-    fn save_debug_info(&self) {
+    fn save_debug_info(&self, filename: String) {
         let mut debug_info = DebugInfo::new();
         for pair in self.publics_filtered(false).iter() {
             let id = *pair.0;
@@ -117,7 +117,10 @@ impl Program {
             let name = self.engine.internal_name(id).unwrap();
             debug_info.internals.push(DebugInfoFunction{id: id as i64, name: name});
         }
-        save_debug_info(debug_info);
+        debug_info.publics.sort_by(|a, b| a.id.cmp(&b.id));
+        debug_info.privates.sort_by(|a, b| a.id.cmp(&b.id));
+        debug_info.internals.sort_by(|a, b| a.id.cmp(&b.id));
+        save_debug_info(debug_info, filename);
     }
 
     pub fn public_method_dict(&self, remove_ctor: bool) -> std::result::Result<Option<Cell>, String> {
@@ -149,7 +152,8 @@ impl Program {
             state_init = self.apply_constructor(state_init, abi_file.unwrap(), ctor_params, trace)?;
         }
         if debug_info {
-            self.save_debug_info();
+            let debug_info_filename = format!("{}{}", abi_file.map_or("debug_info.", |a| a.trim_end_matches("abi.json")), "debug.json");
+            self.save_debug_info(debug_info_filename);
         }
         save_to_file(state_init, out_file, wc)
     }
@@ -307,7 +311,7 @@ mod tests {
     #[test]
     fn test_comm_var_addresses() {
         let source = File::open("./tests/comm_test2.s").unwrap();
-        let lib = File::open("./stdlib.tvm").unwrap();
+        let lib = File::open("./tests/test_stdlib.tvm").unwrap();
         let parser = ParseEngine::new(source, vec![lib], None);
         assert_eq!(parser.is_ok(), true);
         let prog = Program::new(parser.unwrap());
@@ -326,7 +330,7 @@ mod tests {
     #[test]
     fn test_asciz_var() {
         let source = File::open("./tests/asci_test1.s").unwrap();
-        let lib = File::open("./stdlib.tvm").unwrap();
+        let lib = File::open("./tests/test_stdlib.tvm").unwrap();
         let parser = ParseEngine::new(source, vec![lib], None);
         assert_eq!(parser.is_ok(), true);
         let prog = Program::new(parser.unwrap());
@@ -345,7 +349,7 @@ mod tests {
     //TODO: use when stdlib will be modified to store sender key.
     fn test_sender_pubkey() {
         let source = File::open("./tests/sign-test.s").unwrap();
-        let lib = File::open("./stdlib_c.tvm").unwrap();
+        let lib = File::open("./tests/test_stdlib_c.tvm").unwrap();
         let parser = ParseEngine::new(source, vec![lib], None);
         assert_eq!(parser.is_ok(), true);
         let prog = Program::new(parser.unwrap());
@@ -370,7 +374,7 @@ mod tests {
     #[test]
     fn test_ticktock() {
         let source = File::open("./tests/ticktock.code").unwrap();
-        let lib = File::open("./stdlib_sol.tvm").unwrap();
+        let lib = File::open("./tests/test_stdlib_sol.tvm").unwrap();
         let parser = ParseEngine::new(source, vec![lib], None);
         assert_eq!(parser.is_ok(), true);
         let prog = Program::new(parser.unwrap());
@@ -383,7 +387,7 @@ mod tests {
     #[ignore] // due to offline constructor
     #[test]
     fn test_recursive_call() {
-        let lib1 = File::open("./stdlib.tvm").unwrap();
+        let lib1 = File::open("./tests/test_stdlib.tvm").unwrap();
         let source = File::open("./tests/test_recursive.code").unwrap();
         let parser = ParseEngine::new(source, vec![lib1], None);
         assert_eq!(parser.is_ok(), true);
@@ -403,7 +407,7 @@ mod tests {
     #[test]
     fn test_public_and_private() {
         let source = File::open("./tests/test_public.code").unwrap();
-        let lib = File::open("./stdlib.tvm").unwrap();
+        let lib = File::open("./tests/test_stdlib.tvm").unwrap();
 
         let abi_str = abi::load_abi_json_string("./tests/test_public.abi.json").unwrap();
         let abi = abi::load_abi_contract(&abi_str).unwrap();
@@ -443,7 +447,7 @@ mod tests {
     #[test]
     fn test_call_with_gas_limit() {
         let source = File::open("./tests/Wallet.code").unwrap();
-        let lib = File::open("./stdlib_sol.tvm").unwrap();
+        let lib = File::open("./tests/test_stdlib_sol.tvm").unwrap();
         let abi = abi::load_abi_json_string("./tests/Wallet.abi.json").unwrap();
 
         let parser = ParseEngine::new(source, vec![lib], Some(abi));
@@ -468,7 +472,8 @@ mod tests {
             None,
             Some(3000), // gas limit
             Some(|_, _| {}),
-            false
+            false,
+            String::from("")
         );
         // must equal to out of gas exception
         assert_eq!(exit_code, 13);

@@ -32,6 +32,8 @@ extern crate ton_vm;
 #[macro_use]
 extern crate log;
 extern crate ton_sdk;
+extern crate ton_labs_assembler;
+extern crate num_traits;
 
 mod abi;
 mod initdata;
@@ -44,6 +46,7 @@ mod resolver;
 mod methdict;
 mod testcall;
 mod debug_info;
+mod disasm;
 
 use abi::{build_abi_body, decode_body, load_abi_json_string, load_abi_contract};
 use clap::ArgMatches;
@@ -57,6 +60,7 @@ use std::fs::File;
 use testcall::{call_contract, MsgInfo};
 use ton_types::{BuilderData, SliceData};
 use std::env;
+use disasm::{create_disasm_command, disasm_command};
 
 fn main() -> Result<(), i32> {
     println!(
@@ -101,11 +105,13 @@ fn linker_main() -> Result<(), String> {
             (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
             (@arg WC: -w +takes_value "Workchain id used to print contract address, -1 by default.")
             (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
+            (@arg DEBUG_INFO: --("debug-info") "Generates file with debug information")
             (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file. If not specified lib is loaded from environment variable TVM_LINKER_LIB_PATH if it exists.")
             (@arg OUT_FILE: -o +takes_value "Output file name")
             (@arg LANGUAGE: --language +takes_value "Enable language-specific features in linkage")
         )
         (@subcommand test =>
+            (@setting AllowLeadingHyphen)
             (about: "execute contract in test environment")
             (version: "0.1")
             (author: "TONLabs")
@@ -115,7 +121,7 @@ fn linker_main() -> Result<(), String> {
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
             (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
             (@arg INTERNAL: --internal +takes_value "Emulates inbound internal message with value instead of external message")
-            (@arg BOUNCED: --bounced "Emulates bounced message, can be used only with --internal option.")
+            (@arg BOUNCED: --bounced requires[INTERNAL] "Emulates bounced message, can be used only with --internal option.")
             (@arg BALANCE: --balance +takes_value "Emulates supplied account balance")
             (@arg SRCADDR: --src +takes_value "Supplies message source address")
             (@arg NOW: --now +takes_value "Supplies transaction creation unixtime")
@@ -149,6 +155,7 @@ fn linker_main() -> Result<(), String> {
             (@arg DATA: +required +takes_value "Set of public variables with values in json format")
             (@arg ABI: +required +takes_value "Path to smart contract ABI file")
         )
+        (subcommand: create_disasm_command())
         (@setting SubcommandRequired)
     ).get_matches();
 
@@ -267,6 +274,8 @@ fn linker_main() -> Result<(), String> {
            prog.debug_print();
         }
 
+        let debug_info = compile_matches.is_present("DEBUG_INFO");
+
         let wc = compile_matches.value_of("WC")
             .map(|wc| i8::from_str_radix(wc, 10).unwrap_or(-1))
             .unwrap_or(-1);
@@ -276,10 +285,13 @@ fn linker_main() -> Result<(), String> {
             let msg = "ABI is mandatory when CTOR_PARAMS is specified.";
             return Err(msg.to_string());
         }
-        // TODO: temporarily disabled. Later take it from command line
-        let debug_info = false;
+
         prog.compile_to_file_ex(wc, abi_file, ctor_params, out_file, debug, debug_info)?;
         return Ok(());
+    }
+
+    if let Some(m) = matches.subcommand_matches("disasm") {
+        return disasm_command(m);
     }
 
     unreachable!()
@@ -365,10 +377,14 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         }
     };
     
-    let _abi_contract = match matches.value_of("ABI_JSON") {
+    let abi_json = matches.value_of("ABI_JSON");
+
+    let _abi_contract = match abi_json {
         Some(abi_file) => Some(load_abi_contract(&load_abi_json_string(abi_file)?)?),
         None => None
     };
+
+    let debug_info_filename = format!("{}{}", abi_json.map_or("debug_info.", |a| a.trim_end_matches("abi.json")), "debug.json");
 
     println!("TEST STARTED");
     println!("body = {:?}", body);
@@ -396,6 +412,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         gas_limit,
         if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
         matches.is_present("TRACE"),
+        debug_info_filename,
     );
 
     println!("TEST COMPLETED");

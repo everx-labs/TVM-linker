@@ -12,7 +12,7 @@
  */
 use std::collections::HashMap;
 use ton_block::Serializable;
-use ton_vm::assembler::{compile_code, CompileError};
+use ton_labs_assembler::{compile_code, CompileError};
 use ton_types::{SliceData, dictionary::HashmapE};
 
 pub fn prepare_methods<T>(
