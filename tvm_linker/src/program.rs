@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 use methdict::*;
 use ton_block::*;
-use ton_vm::assembler::compile_code;
+use ton_labs_assembler::compile_code;
 use ton_types::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use ton_types::{Cell, SliceData, BuilderData, IBitstring};
 use ton_types::dictionary::{HashmapE, HashmapType};
@@ -117,6 +117,9 @@ impl Program {
             let name = self.engine.internal_name(id).unwrap();
             debug_info.internals.push(DebugInfoFunction{id: id as i64, name: name});
         }
+        debug_info.publics.sort_by(|a, b| a.id.cmp(&b.id));
+        debug_info.privates.sort_by(|a, b| a.id.cmp(&b.id));
+        debug_info.internals.sort_by(|a, b| a.id.cmp(&b.id));
         save_debug_info(debug_info, filename);
     }
 
