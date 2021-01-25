@@ -33,6 +33,7 @@ extern crate ton_vm;
 extern crate log;
 extern crate ton_sdk;
 extern crate ton_labs_assembler;
+extern crate num_traits;
 
 mod abi;
 mod initdata;
@@ -45,6 +46,7 @@ mod resolver;
 mod methdict;
 mod testcall;
 mod debug_info;
+mod disasm;
 
 use abi::{build_abi_body, decode_body, load_abi_json_string, load_abi_contract};
 use clap::ArgMatches;
@@ -58,6 +60,7 @@ use std::fs::File;
 use testcall::{call_contract, MsgInfo};
 use ton_types::{BuilderData, SliceData};
 use std::env;
+use disasm::{create_disasm_command, disasm_command};
 
 fn main() -> Result<(), i32> {
     println!(
@@ -102,6 +105,7 @@ fn linker_main() -> Result<(), String> {
             (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
             (@arg WC: -w +takes_value "Workchain id used to print contract address, -1 by default.")
             (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
+            (@arg DEBUG_INFO: --("debug-info") "Generates file with debug information")
             (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file. If not specified lib is loaded from environment variable TVM_LINKER_LIB_PATH if it exists.")
             (@arg OUT_FILE: -o +takes_value "Output file name")
             (@arg LANGUAGE: --language +takes_value "Enable language-specific features in linkage")
@@ -150,6 +154,7 @@ fn linker_main() -> Result<(), String> {
             (@arg DATA: +required +takes_value "Set of public variables with values in json format")
             (@arg ABI: +required +takes_value "Path to smart contract ABI file")
         )
+        (subcommand: create_disasm_command())
         (@setting SubcommandRequired)
     ).get_matches();
 
@@ -268,6 +273,8 @@ fn linker_main() -> Result<(), String> {
            prog.debug_print();
         }
 
+        let debug_info = compile_matches.is_present("DEBUG_INFO");
+
         let wc = compile_matches.value_of("WC")
             .map(|wc| i8::from_str_radix(wc, 10).unwrap_or(-1))
             .unwrap_or(-1);
@@ -278,8 +285,12 @@ fn linker_main() -> Result<(), String> {
             return Err(msg.to_string());
         }
 
-        prog.compile_to_file_ex(wc, abi_file, ctor_params, out_file, debug, debug)?;
+        prog.compile_to_file_ex(wc, abi_file, ctor_params, out_file, debug, debug_info)?;
         return Ok(());
+    }
+
+    if let Some(m) = matches.subcommand_matches("disasm") {
+        return disasm_command(m);
     }
 
     unreachable!()
