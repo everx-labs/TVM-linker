@@ -226,14 +226,13 @@ fn linker_main() -> Result<(), String> {
         };
         let out_file = compile_matches.value_of("OUT_FILE");
 
-        let mut libs: Vec<File> = compile_matches.values_of("LIB")
-            .unwrap_or_default()
-            .map(|lib| {
-                File::open(lib)
-                    .map_err(|e| format!("cannot open library file: {}", e))
-                    .expect("error")
-            })
-            .collect();
+        let mut libs = Vec::new();
+        for lib in compile_matches.values_of("LIB")
+            .unwrap_or_default() {
+            libs.push(File::open(lib)
+                        .map_err(|e| format!("cannot open library file({}): {}", lib, e))?
+                    );
+        }
 
         if libs.is_empty() {
             if let Ok(lib_path) = env::var("TVM_LINKER_LIB_PATH") {
