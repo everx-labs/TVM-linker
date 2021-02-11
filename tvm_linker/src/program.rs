@@ -12,14 +12,15 @@
  */
 use base64::encode;
 use crc16::*;
-use ed25519_dalek::{Keypair, PUBLIC_KEY_LENGTH};
+use ed25519_dalek::*;
 use std::io::Cursor;
 use std::io::Write;
 use std::collections::HashMap;
 use std::time::SystemTime;
 use methdict::*;
 use ton_block::*;
-use ton_labs_assembler::compile_code;
+use parser::{Lines, lines_to_string};
+use ton_labs_assembler::{compile_code};
 use ton_types::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use ton_types::{Cell, SliceData, BuilderData, IBitstring};
 use ton_types::dictionary::{HashmapE, HashmapType};
@@ -83,7 +84,7 @@ impl Program {
     }
 
     #[allow(dead_code)]
-    pub fn entry(&self) -> &str {
+    pub fn entry(&self) -> Lines {
         self.engine.entry()
     }
 
@@ -93,7 +94,7 @@ impl Program {
         Ok(dict.data().map(|cell| cell.clone()))
     }
     
-    fn publics_filtered(&self, remove_ctor: bool) -> HashMap<u32, String> {
+    fn publics_filtered(&self, remove_ctor: bool) -> HashMap<u32, Lines> {
         self.engine.publics().into_iter()
             .filter(|(k, _)| 
                 !(remove_ctor && self.engine.global_name(*k).unwrap_or_default() == "constructor")
@@ -223,8 +224,9 @@ impl Program {
             .map_err(|_| "unexpected TVM error while compiling internal selector".to_string())?;
         internal_selector.append_reference(self.internal_method_dict()?.unwrap_or_default().into());
 
-        let mut main_selector = compile_code(self.entry())
-            .map_err(|e| format_compilation_error_string(e, self.entry()).replace("_name_", "selector"))?;
+        let entry = lines_to_string(&self.entry());
+        let mut main_selector = compile_code(entry.as_str())
+            .map_err(|e| format_compilation_error_string(e, &self.entry()).replace("_name_", "selector"))?;
         main_selector.append_reference(self.public_method_dict(remove_ctor)?.unwrap_or_default().into());
         main_selector.append_reference(internal_selector);
 
@@ -302,16 +304,16 @@ fn dump_cell(cell: &Cell, pfx: &str) {
 #[cfg(test)]
 mod tests {
     use abi;
+    use std::path::Path;
     use super::*;
-    use std::fs::File;
     use testcall::{perform_contract_call, call_contract, MsgInfo};
 
     #[ignore] // due to offline constructor
     #[test]
     fn test_comm_var_addresses() {
-        let source = File::open("./tests/comm_test2.s").unwrap();
-        let lib = File::open("./tests/test_stdlib.tvm").unwrap();
-        let parser = ParseEngine::new(source, vec![lib], None);
+        let sources = vec![Path::new("./tests/test_stdlib.tvm"),
+                                     Path::new("./tests/comm_test2.s")];
+        let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let prog = Program::new(parser.unwrap());
         let body = {
@@ -328,9 +330,9 @@ mod tests {
     #[ignore] // due to offline constructor
     #[test]
     fn test_asciz_var() {
-        let source = File::open("./tests/asci_test1.s").unwrap();
-        let lib = File::open("./tests/test_stdlib.tvm").unwrap();
-        let parser = ParseEngine::new(source, vec![lib], None);
+        let sources = vec![Path::new("./tests/test_stdlib.tvm"),
+                                     Path::new("./tests/asci_test1.s")];
+        let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let prog = Program::new(parser.unwrap());
         let body = {
@@ -347,9 +349,9 @@ mod tests {
     #[ignore]
     //TODO: use when stdlib will be modified to store sender key.
     fn test_sender_pubkey() {
-        let source = File::open("./tests/sign-test.s").unwrap();
-        let lib = File::open("./tests/test_stdlib_c.tvm").unwrap();
-        let parser = ParseEngine::new(source, vec![lib], None);
+        let sources = vec![Path::new("./tests/test_stdlib_c.tvm"),
+                                     Path::new("./tests/sign-test.s")];
+        let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let prog = Program::new(parser.unwrap());
         let body = {
@@ -372,9 +374,9 @@ mod tests {
 
     #[test]
     fn test_ticktock() {
-        let source = File::open("./tests/ticktock.code").unwrap();
-        let lib = File::open("./tests/test_stdlib_sol.tvm").unwrap();
-        let parser = ParseEngine::new(source, vec![lib], None);
+        let sources = vec![Path::new("./tests/test_stdlib_sol.tvm"),
+                                     Path::new("./tests/ticktock.code")];
+        let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let prog = Program::new(parser.unwrap());
         let contract_file = prog.compile_to_file(-1).unwrap();
@@ -386,9 +388,9 @@ mod tests {
     #[ignore] // due to offline constructor
     #[test]
     fn test_recursive_call() {
-        let lib1 = File::open("./tests/test_stdlib.tvm").unwrap();
-        let source = File::open("./tests/test_recursive.code").unwrap();
-        let parser = ParseEngine::new(source, vec![lib1], None);
+        let sources = vec![Path::new("./tests/test_stdlib.tvm"),
+                                     Path::new("./tests/test_recursive.code")];
+        let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let prog = Program::new(parser.unwrap());
         let contract_file = prog.compile_to_file(-1).unwrap();
@@ -405,13 +407,13 @@ mod tests {
     #[ignore] // due to offline constructor
     #[test]
     fn test_public_and_private() {
-        let source = File::open("./tests/test_public.code").unwrap();
-        let lib = File::open("./tests/test_stdlib.tvm").unwrap();
+        let sources = vec![Path::new("./tests/test_stdlib.tvm"),
+                                     Path::new("./tests/test_public.code")];
 
         let abi_str = abi::load_abi_json_string("./tests/test_public.abi.json").unwrap();
         let abi = abi::load_abi_contract(&abi_str).unwrap();
 
-        let parser = ParseEngine::new(source, vec![lib], Some(abi_str));
+        let parser = ParseEngine::new(sources, Some(abi_str));
         assert_eq!(parser.is_ok(), true);
         let prog = Program::new(parser.unwrap());
 
@@ -445,11 +447,11 @@ mod tests {
 
     #[test]
     fn test_call_with_gas_limit() {
-        let source = File::open("./tests/Wallet.code").unwrap();
-        let lib = File::open("./tests/test_stdlib_sol.tvm").unwrap();
+        let sources = vec![Path::new("./tests/test_stdlib_sol.tvm"),
+                                     Path::new("./tests/Wallet.code")];
         let abi = abi::load_abi_json_string("./tests/Wallet.abi.json").unwrap();
 
-        let parser = ParseEngine::new(source, vec![lib], Some(abi));
+        let parser = ParseEngine::new(sources, Some(abi));
         assert_eq!(parser.is_ok(), true);
         let prog = Program::new(parser.unwrap());
 
