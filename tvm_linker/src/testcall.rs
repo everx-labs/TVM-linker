@@ -20,7 +20,7 @@ use simplelog::{SimpleLogger, Config, LevelFilter};
 use serde_json::Value;
 use std::str::FromStr;
 use std::sync::Arc;
-use ton_vm::executor::{Engine, EngineTraceInfo, gas::gas_state::Gas};
+use ton_vm::executor::{Engine, EngineTraceInfo, EngineTraceInfoType, gas::gas_state::Gas};
 use ton_vm::error::tvm_exception;
 use ton_vm::stack::{StackItem, Stack, savelist::SaveList, integer::IntegerData};
 use ton_vm::SmartContractInfo;
@@ -264,6 +264,12 @@ pub fn call_contract<F>(
 }
 
 fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debug_info: &Option<ContractDebugInfo>) {
+
+    if info.info_type == EngineTraceInfoType::Dump {
+        println!("{}", info.cmd_str);
+        return;
+    }
+
     println!("{}: {}",
         info.step,
         info.cmd_str
@@ -372,7 +378,7 @@ pub fn call_contract_ex<F>(
 
     let mut engine = Engine::new().setup_with_libraries(code, Some(registers), Some(stack), Some(gas), vec![]);
     engine.set_trace(0);
-    if debug { 
+    if debug {
         engine.set_trace_callback(move |engine, info| { trace_callback(engine, info, true, &debug_info); })
     }
     let exit_code = match engine.execute() {
