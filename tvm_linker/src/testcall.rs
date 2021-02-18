@@ -263,10 +263,20 @@ pub fn call_contract<F>(
     exit_code
 }
 
-fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debug_info: &Option<ContractDebugInfo>) {
+fn trace_callback(
+    _engine: &Engine,
+    info: &EngineTraceInfo,
+    trace_on: bool,
+    extended: bool,
+    debug_info: &Option<ContractDebugInfo>,
+) {
 
     if info.info_type == EngineTraceInfoType::Dump {
         println!("{}", info.cmd_str);
+        return;
+    }
+
+    if !trace_on {
         return;
     }
 
@@ -378,9 +388,9 @@ pub fn call_contract_ex<F>(
 
     let mut engine = Engine::new().setup_with_libraries(code, Some(registers), Some(stack), Some(gas), vec![]);
     engine.set_trace(0);
-    if debug {
-        engine.set_trace_callback(move |engine, info| { trace_callback(engine, info, true, &debug_info); })
-    }
+    engine.set_trace_callback(move |engine, info| {
+        trace_callback(engine, info, debug, true, &debug_info);
+    });
     let exit_code = match engine.execute() {
         Err(exc) => match tvm_exception(exc) {
             Ok(exc) => {
