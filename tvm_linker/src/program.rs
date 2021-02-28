@@ -105,17 +105,17 @@ impl Program {
         for pair in self.publics_filtered(false).iter() {
             let id = *pair.0;
             let name = self.engine.global_name(id).unwrap();
-            debug_info.publics.push(DebugInfoFunction{id: id as i64, name: name});
+            debug_info.publics.push(DebugInfoFunction{id: id as i64, name });
         }
         for pair in self.engine.privates().iter() {
             let id = *pair.0;
             let name = self.engine.global_name(id).unwrap();
-            debug_info.privates.push(DebugInfoFunction{id: id as i64, name: name});
+            debug_info.privates.push(DebugInfoFunction{id: id as i64, name });
         }
         for pair in self.engine.internals().iter() {
             let id = *pair.0;
             let name = self.engine.internal_name(id).unwrap();
-            debug_info.internals.push(DebugInfoFunction{id: id as i64, name: name});
+            debug_info.internals.push(DebugInfoFunction{id: id as i64, name });
         }
         debug_info.publics.sort_by(|a, b| a.id.cmp(&b.id));
         debug_info.privates.sort_by(|a, b| a.id.cmp(&b.id));

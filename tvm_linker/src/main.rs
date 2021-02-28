@@ -390,9 +390,9 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
     let msg_info = MsgInfo {
         balance: matches.value_of("INTERNAL"),
         src: matches.value_of("SRCADDR"),
-        now: now,
+        now,
         bounced: matches.is_present("BOUNCED"),
-        body: body,
+        body,
     };
 
     let gas_limit = matches.value_of("GASLIMIT")
