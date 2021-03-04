@@ -13,12 +13,12 @@ STDLIB_SOL = 'tests/test_stdlib_sol.tvm'
 def getFunctions():
 	global functions
 	for l in lines:
-		match = re.search(r"Function (\S+)\s+: id=([0-9A-F]+)", l);
+		match = re.search(r"Function (\S+)\s+: id=([0-9A-F]+)", l)
 		if match:
 			functions[match.group(1)] = match.group(2)
 			# print match.group(1), match.group(2) 
 	for l in lines:
-		match = re.search(r"Function (\S+)_external\s+: id=([0-9A-F]+)", l);
+		match = re.search(r"Function (\S+)_external\s+: id=([0-9A-F]+)", l)
 		if match:
 			functions[match.group(1)] = match.group(2)
 			# print match.group(1), match.group(2) 
@@ -26,7 +26,7 @@ def getFunctions():
 def getExitCode():
 	for l in lines:
 		# print l
-		match = re.match(r"TVM terminated with exit code (\d+)", l);
+		match = re.match(r"TVM terminated with exit code (\d+)", l)
 		if match:
 			return int(match.group(1))
 	assert False
@@ -35,7 +35,7 @@ def getExitCode():
 def getContractAddress():
 	for l in lines:
 		# print l
-		match = re.match(r"Saved contract to file (.*)\.tvc", l);
+		match = re.match(r"Saved contract to file (.*)\.tvc", l)
 		if match:
 			return match.group(1)
 	assert False
@@ -133,7 +133,7 @@ def build_cmd_exec_and_parse(method, params, expected_ec, options):
 	global SIGN
 	if "--trace" not in options:
 		options = options + " --trace"
-	sign = ("--sign " + SIGN) if SIGN else "";
+	sign = ("--sign " + SIGN) if SIGN else ""
 	if method and method not in functions:
 		error("Cannot find method '{}'".format(method)) 
 	if method == None:
@@ -182,7 +182,7 @@ def expect_success2(abi_json_file, abi_method, abi_params, expected_stack, tvm_l
 
 def expect_output(regex):
 	for l in lines:
-		match = re.search(regex, l);
+		match = re.search(regex, l)
 		if match:
 			print "> ", match.group(0)
 			return
@@ -265,8 +265,8 @@ def testArrays():
 	#it maybe '--sign key1' or '--internal 0' - test will work correctly
 	linker_options = "--trace --decode-c6"
 	compile2('test_arrays', 'tests')
-	ar1 = '1,'*1000 + "1";
-	ar2 = '2,'*1000 + "2";
+	ar1 = '1,'*1000 + "1"
+	ar2 = '2,'*1000 + "2"
 	expect_success2("test_arrays", "pair8", '{"arr1": [' + ar1 + '], "arr2": [' + ar2 + ']}', "3", linker_options)
 	#expect_success2("test_arrays", "pair64", '{"arr1": [1,2,3,4,5,6,7,8,9,10], "arr2": [1,2,3,4,5,6]}', "2", linker_options)
 	#expect_success2("test_arrays", "pair64", '{"arr1": [1,2,3,4,5,6,7,8,9,10], "arr2": [1,2,3,4,5,6]}', "2", linker_options)

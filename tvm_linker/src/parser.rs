@@ -300,17 +300,21 @@ impl ParseEngine {
         self.preinit()?;
         let mut sources: Vec<_> = libs.into_iter().map(|buf| BufReader::new(buf)).collect();
         sources.push(BufReader::new(source));
-        for lib in &mut sources {
-            self.parse_code(lib, true)?;
-            lib.seek(SeekFrom::Start(0))
+        for src in &mut sources {
+            self.parse_code(src, true)?;
+            src.seek(SeekFrom::Start(0))
                 .map_err(|e| format!("error while seeking source file: {}", e))?;            
         }
 
         self.next_private_globl_funcid = 0;
-        for lib in &mut sources {
-            self.parse_code(lib, false)?;
+        for src in &mut sources {
+            // TODO we read files twice! Read once and then run resolvers.
+            // We can't resolver, for example, nested macros in so way
+            self.parse_code(src, false)?;
         }
-        
+
+        self.replace_all_macros()?;
+
         if self.entry_point.is_empty() {
             return Err("Selector not found".to_string());
         }
@@ -572,6 +576,55 @@ impl ParseEngine {
         self.update(&section_name, &obj_name, &obj_body, first_pass)
             .map_err(|e| format!("line {}: {}", lnum, e))?;
         Ok(())
+    }
+
+    fn replace_all_macros(&mut self) -> Result<(), String> {
+        let mut iter = 0;
+        loop {
+            iter += 1;
+            if iter >= 50 {
+                return Err("There are recursive macros or level of nested macros >= 50".to_string());
+            }
+            match self.replace_macro() {
+                Ok(do_continue) if do_continue => {
+                    continue;
+                }
+                Ok(_) => {
+                    return Ok(());
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+
+    // return true, if at least one macro was replaced
+    fn replace_macro(&mut self) -> Result<bool, String> {
+        let mut did_some = false;
+
+        for (_name, object) in &mut self.globals {
+            if let ObjectType::Function(f) = &mut object.dtype {
+                let lines = f.body.split("\n");
+                let mut new_lines : Vec<String> = vec![];
+                for l in lines {
+                    let mut name = String::new();
+                    resolve_name(l, |n| { name = n.to_string(); Some(0)}).unwrap();
+                    let new_line;
+                    if name != "" && self.macros.contains_key(&name) {
+                        new_line = self.macros.get(&name).unwrap().to_string();
+                        did_some = true;
+                    } else {
+                        new_line = l.to_string();
+                    }
+                    new_lines.push(new_line);
+                }
+                f.body = new_lines.join("\n");
+            }
+        }
+
+        Ok(did_some)
     }
 
     fn create_function_id(&mut self, func: &str) -> u32 {
@@ -858,12 +911,23 @@ impl ParseEngine {
 
     fn enum_calling_funcs(&self, func: &Func, ids: &mut HashSet<u32>) {
         ids.insert(func.id);
+
+        let mut privat_func_id = HashSet::<u32>::new();
         for id in &func.calls {
-            if ids.insert(id.clone()) {
-                let subfunc = self.globals.iter().find(|obj| {
-                    obj.1.dtype.func().map(|f| f.id == *id).unwrap_or(false)
+            privat_func_id.insert(*id);
+        }
+        let reg = Regex::new(r"CALL\s+(?P<id>\d+)").unwrap();
+        for caps in reg.captures_iter(&func.body) {
+            let id = caps["id"].parse::<u32>().unwrap();
+            privat_func_id.insert(id);
+        }
+
+        for id in privat_func_id {
+            if ids.insert(id) {
+                let subfunc = self.globals.iter().find(|(_name, obj)| {
+                    obj.dtype.func().map(|f| f.id == id).unwrap_or(false)
                 })
-                .map(|x| x.1.dtype.func().unwrap());
+                    .map(|(_name, obj)| obj.dtype.func().unwrap());
                 if subfunc.is_some() {
                     self.enum_calling_funcs(&subfunc.unwrap(), ids);
                 }
@@ -1062,6 +1126,25 @@ mod tests {
         assert_eq!(
             body.lines().collect::<Vec<&str>>(),
             vec!["PUSHINT 10", "DROP", "PUSHINT 1", "PUSHINT 2", "ADD", "PUSHINT 3"],
+        );
+    }
+
+    #[test]
+    fn test_macros_02() {
+        let lib1 = File::open("./tests/test_stdlib.tvm").unwrap();
+        let source = File::open("./tests/test_macros_02.code").unwrap();
+        let parser = ParseEngine::new(source, vec![lib1], None).unwrap();
+        let publics = parser.publics();
+        let body = publics.get(&0x0D6E4079).unwrap();
+        let internal = parser.globals(false);
+
+        assert_eq!(
+            body.lines().collect::<Vec<&str>>(),
+            vec!["PUSHINT 10", "DROP", "PUSHINT 1", "PUSHINT 2", "ADD", "PUSHINT 3", "CALL 2"],
+        );
+        assert_eq!(
+            internal.get(&2).unwrap().lines().collect::<Vec<&str>>(),
+            vec!["PUSHINT 1", "PUSHINT 2", "ADD"],
         );
     }
 }

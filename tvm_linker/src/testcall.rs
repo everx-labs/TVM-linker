@@ -393,7 +393,7 @@ pub fn call_contract_ex<F>(
     };
     println!("TVM terminated with exit code {}", exit_code);
     println!("Gas used: {}", engine.get_gas().get_gas_used());
-    println!("");
+    println!();
     println!("{}", engine.dump_stack("Post-execution stack state", false));
     println!("{}", engine.dump_ctrls(false));
 
