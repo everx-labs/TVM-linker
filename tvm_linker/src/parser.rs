@@ -911,12 +911,23 @@ impl ParseEngine {
 
     fn enum_calling_funcs(&self, func: &Func, ids: &mut HashSet<u32>) {
         ids.insert(func.id);
+
+        let mut privat_func_id = HashSet::<u32>::new();
         for id in &func.calls {
-            if ids.insert(id.clone()) {
-                let subfunc = self.globals.iter().find(|obj| {
-                    obj.1.dtype.func().map(|f| f.id == *id).unwrap_or(false)
+            privat_func_id.insert(*id);
+        }
+        let reg = Regex::new(r"CALL\s+(?P<id>\d+)").unwrap();
+        for caps in reg.captures_iter(&func.body) {
+            let id = caps["id"].parse::<u32>().unwrap();
+            privat_func_id.insert(id);
+        }
+
+        for id in privat_func_id {
+            if ids.insert(id) {
+                let subfunc = self.globals.iter().find(|(_name, obj)| {
+                    obj.dtype.func().map(|f| f.id == id).unwrap_or(false)
                 })
-                .map(|x| x.1.dtype.func().unwrap());
+                    .map(|(_name, obj)| obj.dtype.func().unwrap());
                 if subfunc.is_some() {
                     self.enum_calling_funcs(&subfunc.unwrap(), ids);
                 }
