@@ -56,12 +56,11 @@ use parser::{ParseEngine, ParseEngineResults};
 use program::{Program, get_now};
 use real_ton::{decode_boc, compile_message};
 use resolver::resolve_name;
-use std::path::Path;
+use std::fs::File;
 use testcall::{call_contract, MsgInfo};
 use ton_types::{BuilderData, SliceData};
 use std::env;
 use disasm::{create_disasm_command, disasm_command};
-use parser::Line;
 
 fn main() -> Result<(), i32> {
     println!(
@@ -227,22 +226,27 @@ fn linker_main() -> Result<(), String> {
         };
         let out_file = compile_matches.value_of("OUT_FILE");
 
-        let mut sources = Vec::new();
-        for lib in compile_matches.values_of("LIB").unwrap_or_default() {
-            let path = Path::new(lib);
-            if !path.exists() {
-                return Err(format!("File {} doesn't exist", lib));
+        let mut libs = Vec::new();
+        for lib in compile_matches.values_of("LIB")
+            .unwrap_or_default() {
+            libs.push(File::open(lib)
+                        .map_err(|e| format!("cannot open library file({}): {}", lib, e))?
+                    );
+        }
+
+        if libs.is_empty() {
+            if let Ok(lib_path) = env::var("TVM_LINKER_LIB_PATH") {
+                println!("TVM_LINKER_LIB_PATH: {:?}", lib_path);
+                libs.push(File::open(lib_path)
+                            .map_err(|e| format!("cannot open library file: {}", e))?
+                        );
             }
-            sources.push(path);
         }
-        let path = Path::new(input);
-        if !path.exists() {
-            return Err(format!("File {} doesn't exist", input));
-        }
-        sources.push(path);
+
+        let source = File::open(input).map_err(|e| format!("cannot open source file: {}", e))?;
 
         let mut prog = Program::new(
-            ParseEngine::new(sources, abi_json)?
+            ParseEngine::new(source, libs, abi_json)?
         );
 
         match compile_matches.value_of("GENKEY") {
@@ -330,19 +334,15 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
 
             let parse_results = match matches.value_of("SOURCE") {
                 Some(source) => {
-                    let path = Path::new(source);
-                    if !path.exists() {
-                        return Err(format!("File {} doesn't exist", source));
-                    }
+                    let file = File::open(source).map_err(|e| format!("Cannot open source file: {}", e))?;
                     Some(ParseEngineResults::new(
-                        ParseEngine::new(vec![path], None)?
+                        ParseEngine::new(file, vec![], None)?
                     ))
                 },
                 None => None
             };
 
-            let line = Line { text: hex_str.clone(), filename: "".to_string(), line: 0 };
-            let resolved = resolve_name(&line, |name| {
+            hex_str = resolve_name(&hex_str, |name| {
                 let id = match &parse_results {
                     Some(parse_results) => parse_results.global_by_name(name),
                     None => None
@@ -350,7 +350,6 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
                 id.map(|id| id.0)
             })
             .map_err(|e| format!("failed to resolve body {}: {}", hex_str, e))?;
-            hex_str = resolved[0].text.clone();
 
             let buf = hex::decode(&hex_str)
                 .map_err(|_| format!("body {} is invalid hex string", hex_str))?;
