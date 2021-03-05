@@ -25,8 +25,8 @@ pub fn resolve_name<F, T>(line: &Line, mut get: F) -> Result<Lines, String>
         T: LowerHex + UpperHex + Display + TryFrom<isize> + std::ops::AddAssign {
     let mut res_str = String::new();
     let mut end = 0;
-    let text_rem = line.text.find(';').and_then(|idx| line.text.get(idx..)).unwrap_or("");
-    let text_old = line.text.find(';').and_then(|idx| line.text.get(..idx)).unwrap_or(line.text.as_str());
+    let semicolon_pos = line.text.find(';').unwrap_or(line.text.len());
+    let (text_old, text_rem) = line.text.split_at(semicolon_pos);
     for cap in NAMES.captures_iter(text_old) {
         if cap.name("id").is_none() {
             return Err("invalid syntax: object name not found".to_string());
@@ -68,6 +68,9 @@ pub fn resolve_name<F, T>(line: &Line, mut get: F) -> Result<Lines, String>
         end = cap.get(0).unwrap().end();
     }
     res_str += text_old.get(end..).unwrap();
+    if !res_str.ends_with(' ') && !text_rem.is_empty() {
+        res_str += " ";
+    }
     res_str += text_rem;
     let res = Line { text: res_str, filename: line.filename.clone(), line: line.line };
     Ok(vec![res])
@@ -154,6 +157,6 @@ mod tests {
 
     #[test]
     fn test_resolve_with_comments() {
-        assert_eq!(resolve_name("text; ignore this $ctor$", id_by_name), Ok("text; ignore this $ctor$".to_string()));
+        assert_eq!(resolve_name("text; ignore this $ctor$", id_by_name), Ok("text ; ignore this $ctor$".to_string()));
     }
 }
