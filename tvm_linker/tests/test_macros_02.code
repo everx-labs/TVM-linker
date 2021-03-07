@@ -1,0 +1,21 @@
+.globl  main
+.public main
+.type main, @function
+main:
+PUSHINT 10
+DROP
+CALL $sum$
+PUSHINT 3
+CALL $getCredit_internal$
+
+.macro sum
+CALL $pi1$
+PUSHINT 2
+ADD
+
+.macro pi1
+PUSHINT 1
+
+.globl	getCredit_internal
+.type	getCredit_internal, @function
+CALL $sum$

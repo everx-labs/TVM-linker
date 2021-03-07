@@ -35,6 +35,11 @@ pub fn create_disasm_command<'a, 'b>() -> App<'a, 'b> {
             .arg(Arg::with_name("TVC")
                     .required(true)
                     .help("Path to tvc file")))
+        .subcommand(SubCommand::with_name("fun-c")
+            .about("dumps tree of cells for the given tvc")
+            .arg(Arg::with_name("TVC")
+                    .required(true)
+                    .help("Path to tvc file")))
 }
 
 pub fn disasm_command(m: &ArgMatches) -> Result<(), String> {
@@ -42,6 +47,8 @@ pub fn disasm_command(m: &ArgMatches) -> Result<(), String> {
         return disasm_dump_command(m);
     } else if let Some(m) = m.subcommand_matches("solidity") {
         return disasm_solidity_command(m);
+    } else if let Some(m) = m.subcommand_matches("fun-c") {
+        return disasm_fun_c_command(m);
     }
     Err("unknown command".to_owned())
 }
@@ -74,11 +81,11 @@ fn disasm_solidity_command(m: &ArgMatches) -> Result<(), String> {
     let code = roots.unwrap().remove(0).reference(0).unwrap();
 
     println!(";; selector");
-    let mut data = SliceData::from(code);
-    let asm = disasm(&mut data, false);
-    print!("{}", asm);
+    let mut sel = SliceData::from(code.clone());
+    sel.shrink_references(..0);
+    print!("{}", disasm(&mut sel));
 
-    let dict1_cell = data.reference(0).unwrap();
+    let dict1_cell = code.reference(0).unwrap();
     let dict1 = HashmapE::with_hashmap(32, Some(dict1_cell));
     if dict1.len().is_err() {
         println!(";; failed to recognize methods dictionary");
@@ -91,16 +98,17 @@ fn disasm_solidity_command(m: &ArgMatches) -> Result<(), String> {
         let id = key_slice.get_next_u32().unwrap();
         println!();
         println!(";; method {:x}", id);
-        print!("{}", disasm(&mut method, true));
+        print!("{}", disasm(&mut method));
     }
 
     println!();
     println!(";; c3 continuation (current dictionary)");
-    let c3 = data.reference(1).unwrap();
-    let mut c3_slice = SliceData::from(c3);
-    print!("{}", disasm(&mut c3_slice, false));
+    let c3 = code.reference(1).unwrap();
+    let mut c3_slice = SliceData::from(c3.clone());
+    c3_slice.shrink_references(..0);
+    print!("{}", disasm(&mut c3_slice));
 
-    let dict2_cell = c3_slice.reference(0).unwrap();
+    let dict2_cell = c3.reference(0).unwrap();
     if dict2_cell == Cell::default() {
         println!(";; current dictionary is empty");
         return Ok(())
@@ -113,7 +121,46 @@ fn disasm_solidity_command(m: &ArgMatches) -> Result<(), String> {
         let id = key_slice.get_next_u32().unwrap();
         println!();
         println!(";; function {}", id);
-        print!("{}", disasm(&mut func, true));
+        print!("{}", disasm(&mut func));
+    }
+
+    Ok(())
+}
+
+fn disasm_fun_c_command(m: &ArgMatches) -> Result<(), String> {
+    let filename = m.value_of("TVC");
+    let tvc = filename.map(|f| std::fs::read(f))
+        .transpose()
+        .map_err(|e| format!(" failed to read tvc file: {}", e))?
+        .unwrap();
+    let mut csor = Cursor::new(tvc);
+    let roots = deserialize_cells_tree(&mut csor);
+    if roots.is_err() {
+        println!(";; failed to deserialize the tvc");
+        return Ok(())
+    }
+    let code = roots.unwrap().remove(0).reference(0).unwrap();
+
+    println!(";; selector");
+    let mut sel = SliceData::from(code.clone());
+    sel.shrink_references(..0);
+    let asm = disasm(&mut sel);
+    print!("{}", asm);
+
+    let dict1_cell = code.reference(0).unwrap();
+    let dict1 = HashmapE::with_hashmap(19, Some(dict1_cell));
+    if dict1.len().is_err() {
+        println!(";; failed to recognize methods dictionary");
+        return Ok(())
+    }
+
+    for entry in dict1.into_iter() {
+        let (key, mut method) = entry.unwrap();
+        let mut key_slice = SliceData::from(key.into_cell().unwrap());
+        let id = key_slice.get_next_int(19).unwrap();
+        println!();
+        println!(";; method {:x}", id);
+        print!("{}", disasm(&mut method));
     }
 
     Ok(())
@@ -161,18 +208,18 @@ fn indent(text: String) -> String {
     indented
 }
 
-fn disasm(slice: &mut SliceData, cont: bool) -> String {
+fn disasm(slice: &mut SliceData) -> String {
     let mut disasm = String::new();
     let handlers = Handlers::new_code_page_0();
-    let mut stop = false;
-    if slice.is_empty() && cont {
-        if slice.remaining_references() == 1 {
-            *slice = SliceData::from(slice.reference(0).unwrap())
-        } else if slice.remaining_references() > 1 {
-            panic!();
+    loop {
+        if slice.is_empty() {
+            assert!(slice.remaining_references() < 2);
+            if slice.remaining_references() > 0 {
+                *slice = SliceData::from(slice.reference(0).unwrap())
+            } else {
+                break;
+            }
         }
-    }
-    while !slice.is_empty() {
         while let Ok(handler) = handlers.get_handler(&mut slice.clone()) {
             if let Some(insn) = handler(slice) {
                 disasm += &insn;
@@ -181,16 +228,8 @@ fn disasm(slice: &mut SliceData, cont: bool) -> String {
                 disasm += "> ";
                 disasm += &slice.to_hex_string();
                 disasm += "\n";
-                stop = true;
-                break;
+                return disasm;
             }
-        }
-        if stop || !cont {
-            break;
-        }
-        assert!(slice.remaining_references() < 2);
-        if slice.remaining_references() > 0 {
-            *slice = SliceData::from(slice.reference(0).unwrap());
         }
     }
     disasm
@@ -234,6 +273,20 @@ macro_rules! create_handler_2t {
             let opc = slice.get_next_int(16).unwrap();
             assert!(opc == $opc);
             Some(format!("{}{}", $mnemonic, T::suffix()).to_string())
+        }
+    };
+}
+
+macro_rules! create_handler_2r {
+    ($func_name:ident, $opc:literal, $mnemonic:literal) => {
+        fn $func_name(slice: &mut SliceData) -> Option<String> {
+            let opc = slice.get_next_int(16).unwrap();
+            assert!(opc == $opc);
+            let cell = slice.reference(0).unwrap();
+            let mut subslice = SliceData::from(cell);
+            let body = &indent(disasm(&mut subslice));
+            slice.shrink_references(1..);
+            Some(format!("{} {{\n{}}}", $mnemonic.to_string(), body).to_string())
         }
     };
 }
@@ -388,8 +441,8 @@ impl Handlers {
                 .set(0xFF, disasm_blkpush)
             )
             .set(0x60, disasm_pick)
-            .set(0x61, disasm_roll)
-            .set(0x62, disasm_rollrev)
+            .set(0x61, disasm_rollx)
+            .set(0x62, disasm_rollrevx)
             .set(0x63, disasm_blkswx)
             .set(0x64, disasm_revx)
             .set(0x65, disasm_dropx)
@@ -1172,7 +1225,7 @@ fn disasm_unknown(slice: &mut SliceData) -> Option<String> {
 }
 fn disasm_setcp(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xff);
+    assert_eq!(opc, 0xff);
     match slice.get_next_byte() {
         Ok(0) => Some("SETCP0".to_string()),
         _ => None
@@ -1192,20 +1245,20 @@ fn disasm_xchg_simple(slice: &mut SliceData) -> Option<String> {
 }
 fn disasm_xchg_std(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x10);
+    assert_eq!(opc, 0x10);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     Some(format!("XCHG s{}, s{}", i, j).to_string())
 }
 fn disasm_xchg_long(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x11);
+    assert_eq!(opc, 0x11);
     let ii = slice.get_next_int(8).unwrap();
     Some(format!("XCHG s0, s{}", ii).to_string())
 }
 fn disasm_push_simple(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(4).unwrap();
-    assert!(opc == 0x2);
+    assert_eq!(opc, 0x2);
     let i = slice.get_next_int(4).unwrap();
     if i == 0 {
         Some("DUP".to_string())
@@ -1215,7 +1268,7 @@ fn disasm_push_simple(slice: &mut SliceData) -> Option<String> {
 }
 fn disasm_pop_simple(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(4).unwrap();
-    assert!(opc == 0x3);
+    assert_eq!(opc, 0x3);
     let i = slice.get_next_int(4).unwrap();
     if i == 0 {
         Some("DROP".to_string())
@@ -1225,7 +1278,7 @@ fn disasm_pop_simple(slice: &mut SliceData) -> Option<String> {
 }
 fn disasm_xchg3(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(4).unwrap();
-    assert!(opc == 0x4);
+    assert_eq!(opc, 0x4);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     let k = slice.get_next_int(4).unwrap();
@@ -1233,35 +1286,35 @@ fn disasm_xchg3(slice: &mut SliceData) -> Option<String> {
 }
 fn disasm_xchg2(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x50);
+    assert_eq!(opc, 0x50);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     Some(format!("XCHG2 s{}, s{}", i, j).to_string())
 }
 fn disasm_xcpu(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x51);
+    assert_eq!(opc, 0x51);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     Some(format!("XCPU s{}, s{}", i, j).to_string())
 }
 fn disasm_puxc(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x52);
+    assert_eq!(opc, 0x52);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
-    Some(format!("PUXC s{}, s{}", i, j - 1).to_string())
+    Some(format!("PUXC s{}, s{}", i, j as i64 - 1).to_string())
 }
 fn disasm_push2(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x53);
+    assert_eq!(opc, 0x53);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     Some(format!("PUSH2 s{}, s{}", i, j).to_string())
 }
 fn disasm_xc2pu(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x541);
+    assert_eq!(opc, 0x541);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     let k = slice.get_next_int(4).unwrap();
@@ -1269,15 +1322,15 @@ fn disasm_xc2pu(slice: &mut SliceData) -> Option<String> {
 }
 fn disasm_xcpuxc(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x542);
+    assert_eq!(opc, 0x542);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     let k = slice.get_next_int(4).unwrap();
-    Some(format!("XCPUXC s{}, s{}, s{}", i, j, k - 1).to_string())
+    Some(format!("XCPUXC s{}, s{}, s{}", i, j, k as i64 - 1).to_string())
 }
 fn disasm_xcpu2(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x543);
+    assert_eq!(opc, 0x543);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     let k = slice.get_next_int(4).unwrap();
@@ -1285,31 +1338,31 @@ fn disasm_xcpu2(slice: &mut SliceData) -> Option<String> {
 }
 fn disasm_puxc2(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x544);
+    assert_eq!(opc, 0x544);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     let k = slice.get_next_int(4).unwrap();
-    Some(format!("PUXC2 s{}, s{}, s{}", i, j - 1, k - 1).to_string())
+    Some(format!("PUXC2 s{}, s{}, s{}", i, j as i64 - 1, k as i64 - 1).to_string())
 }
 fn disasm_puxcpu(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x545);
+    assert_eq!(opc, 0x545);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     let k = slice.get_next_int(4).unwrap();
-    Some(format!("PUXCPU s{}, s{}, s{}", i, j - 1, k - 1).to_string())
+    Some(format!("PUXCPU s{}, s{}, s{}", i, j as i64 - 1, k as i64 - 1).to_string())
 }
 fn disasm_pu2xc(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x546);
+    assert_eq!(opc, 0x546);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     let k = slice.get_next_int(4).unwrap();
-    Some(format!("PU2XC s{}, s{}, s{}", i, j - 1, k - 2).to_string())
+    Some(format!("PU2XC s{}, s{}, s{}", i, j as i64 - 1, k as i64 - 2).to_string())
 }
 fn disasm_push3(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x547);
+    assert_eq!(opc, 0x547);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     let k = slice.get_next_int(4).unwrap();
@@ -1317,20 +1370,20 @@ fn disasm_push3(slice: &mut SliceData) -> Option<String> {
 }
 fn disasm_blkswap(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x55);
+    assert_eq!(opc, 0x55);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     Some(format!("BLKSWAP {}, {}", i + 1, j + 1).to_string())
 }
 fn disasm_push(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x56);
+    assert_eq!(opc, 0x56);
     let ii = slice.get_next_int(8).unwrap();
     Some(format!("PUSH s{}", ii).to_string())
 }
 fn disasm_pop(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x57);
+    assert_eq!(opc, 0x57);
     let ii = slice.get_next_int(8).unwrap();
     Some(format!("POP s{}", ii).to_string())
 }
@@ -1342,27 +1395,27 @@ create_handler_1!(disasm_dup2,   0x5c, "DUP2");
 create_handler_1!(disasm_over2,  0x5d, "OVER2");
 fn disasm_reverse(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x5e);
+    assert_eq!(opc, 0x5e);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     Some(format!("REVERSE {}, {}", i + 2, j).to_string())
 }
 fn disasm_blkdrop(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x5f0);
+    assert_eq!(opc, 0x5f0);
     let i = slice.get_next_int(4).unwrap();
     Some(format!("BLKDROP {}", i).to_string())
 }
 fn disasm_blkpush(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x5f);
+    assert_eq!(opc, 0x5f);
     let i = slice.get_next_int(4).unwrap();
     let j = slice.get_next_int(4).unwrap();
     Some(format!("BLKPUSH {}, {}", i, j).to_string())
 }
 create_handler_1!(disasm_pick,     0x60, "PICK");
-create_handler_1!(disasm_roll,     0x61, "ROLL");
-create_handler_1!(disasm_rollrev,  0x62, "ROLLREV");
+create_handler_1!(disasm_rollx,    0x61, "ROLLX");
+create_handler_1!(disasm_rollrevx, 0x62, "ROLLREVX");
 create_handler_1!(disasm_blkswx,   0x63, "BLKSWX");
 create_handler_1!(disasm_revx,     0x64, "REVX");
 create_handler_1!(disasm_dropx,    0x65, "DROPX");
@@ -1374,7 +1427,7 @@ create_handler_1!(disasm_onlytopx, 0x6a, "ONLYTOPX");
 create_handler_1!(disasm_onlyx,    0x6b, "ONLYX");
 fn disasm_blkdrop2(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x6c);
+    assert_eq!(opc, 0x6c);
     let i = slice.get_next_int(4).unwrap();
     assert!(i > 0);
     let j = slice.get_next_int(4).unwrap();
@@ -1384,49 +1437,49 @@ create_handler_1!(disasm_null,   0x6d, "NULL");
 create_handler_1!(disasm_isnull, 0x6e, "ISNULL");
 fn disasm_tuple_create(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x6f0);
+    assert_eq!(opc, 0x6f0);
     let k = slice.get_next_int(4).unwrap();
     Some(format!("TUPLE {}", k).to_string())
 }
 fn disasm_tuple_index(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x6f1);
+    assert_eq!(opc, 0x6f1);
     let k = slice.get_next_int(4).unwrap();
     Some(format!("INDEX {}", k).to_string())
 }
 fn disasm_tuple_un(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x6f2);
+    assert_eq!(opc, 0x6f2);
     let k = slice.get_next_int(4).unwrap();
     Some(format!("UNTUPLE {}", k).to_string())
 }
 fn disasm_tuple_unpackfirst(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x6f3);
+    assert_eq!(opc, 0x6f3);
     let k = slice.get_next_int(4).unwrap();
     Some(format!("UNPACKFIRST {}", k).to_string())
 }
 fn disasm_tuple_explode(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x6f4);
+    assert_eq!(opc, 0x6f4);
     let n = slice.get_next_int(4).unwrap();
     Some(format!("EXPLODE {}", n).to_string())
 }
 fn disasm_tuple_setindex(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x6f5);
+    assert_eq!(opc, 0x6f5);
     let k = slice.get_next_int(4).unwrap();
     Some(format!("SETINDEX {}", k).to_string())
 }
 fn disasm_tuple_index_quiet(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x6f6);
+    assert_eq!(opc, 0x6f6);
     let k = slice.get_next_int(4).unwrap();
     Some(format!("INDEXQ {}", k).to_string())
 }
 fn disasm_tuple_setindex_quiet(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x6f7);
+    assert_eq!(opc, 0x6f7);
     let k = slice.get_next_int(4).unwrap();
     Some(format!("SETINDEXQ {}", k).to_string())
 }
@@ -1454,14 +1507,14 @@ create_handler_2!(disasm_nullrotrif2,             0x6fa6, "NULLROTRIF2");
 create_handler_2!(disasm_nullrotrifnot2,          0x6fa7, "NULLROTRIFNOT2");
 fn disasm_tuple_index2(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0x6fb);
+    assert_eq!(opc, 0x6fb);
     let i = slice.get_next_int(2).unwrap();
     let j = slice.get_next_int(2).unwrap();
     Some(format!("INDEX2 {}, {}", i, j).to_string())
 }
 fn disasm_tuple_index3(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(10).unwrap();
-    assert!(opc << 2 == 0x6fe);
+    assert_eq!(opc << 2, 0x6fe);
     let i = slice.get_next_int(2).unwrap();
     let j = slice.get_next_int(2).unwrap();
     let k = slice.get_next_int(2).unwrap();
@@ -1474,9 +1527,9 @@ fn disasm_pushint(slice: &mut SliceData) -> Option<String> {
     if opc <= 0x7a {
         x = opc as i16 - 0x70;
     } else if opc < 0x80 {
-        x = -(opc as i16 - 0x7f + 1);
+        x = opc as i16 - 0x80;
     } else if opc == 0x80 {
-        x = slice.get_next_int(8).unwrap() as i16;
+        x = (slice.get_next_int(8).unwrap() as i8) as i16;
     } else if opc == 0x81 {
         x = slice.get_next_int(16).unwrap() as i16;
     }
@@ -1484,50 +1537,55 @@ fn disasm_pushint(slice: &mut SliceData) -> Option<String> {
 }
 fn disasm_pushint_big(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x82);
+    assert_eq!(opc, 0x82);
     let int = disasm_bigint(slice).unwrap();
     Some(format!("PUSHINT {}", int).to_string())
 }
 fn disasm_pushpow2(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x83);
+    assert_eq!(opc, 0x83);
     let xx = slice.get_next_int(8).unwrap();
     Some(format!("PUSHPOW2 {}", xx + 1).to_string())
 }
 create_handler_2!(disasm_pushnan, 0x83ff, "PUSHNAN");
 fn disasm_pushpow2dec(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x84);
+    assert_eq!(opc, 0x84);
     let xx = slice.get_next_int(8).unwrap();
     Some(format!("PUSHPOW2DEC {}", xx + 1).to_string())
 }
 fn disasm_pushnegpow2(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x85);
+    assert_eq!(opc, 0x85);
     let xx = slice.get_next_int(8).unwrap();
     Some(format!("PUSHNEGPOW2 {}", xx + 1).to_string())
 }
 fn disasm_pushref(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x88);
-    // TODO shrink?
+    assert_eq!(opc, 0x88);
+    slice.shrink_references(1..);
+    // TODO print ref
     Some("PUSHREF".to_string())
 }
 fn disasm_pushrefslice(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x89);
-    // TODO shrink?
+    assert_eq!(opc, 0x89);
+    slice.shrink_references(1..);
+    // TODO print ref
     Some("PUSHREFSLICE".to_string())
 }
 fn disasm_pushrefcont(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x8a);
-    // TODO shrink?
-    Some("PUSHREFCONT".to_string())
+    assert_eq!(opc, 0x8a);
+    let cell = slice.reference(0).unwrap_or(Cell::default());
+    let mut subslice = SliceData::from(cell);
+    let text = indent(disasm(&mut subslice));
+    slice.shrink_references(1..);
+    Some(format!("PUSHREFCONT {{\n{}}}", text).to_string())
 }
 fn disasm_pushslice_short(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x8b);
+    assert_eq!(opc, 0x8b);
     let x = slice.get_next_int(4).unwrap() as usize;
     let mut bitstring = slice.get_next_slice(x * 8 + 4).unwrap();
     bitstring.trim_right();
@@ -1535,9 +1593,9 @@ fn disasm_pushslice_short(slice: &mut SliceData) -> Option<String> {
 }
 fn disasm_pushslice_mid(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x8c);
+    assert_eq!(opc, 0x8c);
     let r = slice.get_next_int(2).unwrap();
-    assert!(r == 0); // TODO
+    assert_eq!(r, 0); // TODO
     let xx = slice.get_next_int(5).unwrap() as usize;
     let mut bitstring = slice.get_next_slice(xx * 8 + 1).unwrap();
     bitstring.trim_right();
@@ -1545,9 +1603,9 @@ fn disasm_pushslice_mid(slice: &mut SliceData) -> Option<String> {
 }
 fn disasm_pushslice_long(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0x8d);
+    assert_eq!(opc, 0x8d);
     let r = slice.get_next_int(3).unwrap();
-    assert!(r == 0); // TODO
+    assert_eq!(r, 0); // TODO
     let xx = slice.get_next_int(7).unwrap() as usize;
     let mut bitstring = slice.get_next_slice(xx * 8 + 6).unwrap();
     bitstring.trim_right();
@@ -1555,28 +1613,27 @@ fn disasm_pushslice_long(slice: &mut SliceData) -> Option<String> {
 }
 fn disasm_pushcont_long(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(7).unwrap();
-    assert!(opc << 1 == 0x8e);
+    assert_eq!(opc << 1, 0x8e);
     let r = slice.get_next_int(2).unwrap() as usize;
-    let xx = slice.get_next_int(7).unwrap();
-    let mut d = "".to_string();
-    for i in 0..r {
-        let c = slice.reference(i as usize).unwrap();
-        let mut s = SliceData::from(c);
-        d += &indent(disasm(&mut s, true));
-    }
-    if r > 0 {
-        slice.shrink_references(r..);
-    }
-    let mut body = slice.get_next_slice(xx as usize * 8).unwrap();
-    d += &indent(disasm(&mut body, false));
+    let xx = slice.get_next_int(7).unwrap() as usize;
+    let bits = xx * 8;
+
+    let mut subslice = slice.clone();
+    subslice.shrink_data(..bits);
+    subslice.shrink_references(..r);
+    let d = indent(disasm(&mut subslice));
+
+    slice.shrink_data(bits..);
+    slice.shrink_references(r..);
+
     Some(format!("PUSHCONT {{\n{}}}", d).to_string())
 }
 fn disasm_pushcont_short(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(4).unwrap();
-    assert!(opc == 0x9);
-    let x = slice.get_next_int(4).unwrap();
-    let mut body = slice.get_next_slice(x as usize * 8).unwrap();
-    let d = indent(disasm(&mut body, false));
+    assert_eq!(opc, 0x9);
+    let x = slice.get_next_int(4).unwrap() as usize;
+    let mut body = slice.get_next_slice(x * 8).unwrap();
+    let d = indent(disasm(&mut body));
     Some(format!("PUSHCONT {{\n{}}}", d).to_string())
 }
 create_handler_1t!(disasm_add,    0xa0, "ADD");
@@ -1588,14 +1645,14 @@ create_handler_1t!(disasm_dec,    0xa5, "DEC");
 fn disasm_addconst<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xa6);
+    assert_eq!(opc, 0xa6);
     let cc = slice.get_next_int(8).unwrap() as i8;
     Some(format!("ADDCONST{} {}", T::suffix(), cc).to_string())
 }
 fn disasm_mulconst<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xa7);
+    assert_eq!(opc, 0xa7);
     let cc = slice.get_next_int(8).unwrap() as i8;
     Some(format!("MULCONST{} {}", T::suffix(), cc).to_string())
 }
@@ -1603,7 +1660,7 @@ create_handler_1t!(disasm_mul, 0xa8, "MUL");
 fn disasm_divmod<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xa9);
+    assert_eq!(opc, 0xa9);
     let opc2 = slice.get_next_int(8).unwrap();
     match opc2 {
         0x04 => Some(format!("DIV{}", T::suffix()).to_string()),
@@ -1687,14 +1744,14 @@ create_handler_1t!(disasm_not,    0xb3, "NOT");
 fn disasm_fits<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xb4);
+    assert_eq!(opc, 0xb4);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("FITS{} {}", T::suffix(), cc + 1).to_string())
 }
 fn disasm_ufits<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xb5);
+    assert_eq!(opc, 0xb5);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("UFITS{} {}", T::suffix(), cc + 1).to_string())
 }
@@ -1717,29 +1774,29 @@ create_handler_1t!(disasm_cmp,     0xbf, "CMP");
 fn disasm_eqint<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xc0);
-    let yy = slice.get_next_int(8).unwrap();
+    assert_eq!(opc, 0xc0);
+    let yy = slice.get_next_int(8).unwrap() as i8;
     Some(format!("EQINT{} {}", T::suffix(), yy).to_string())
 }
 fn disasm_lessint<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xc1);
-    let yy = slice.get_next_int(8).unwrap();
+    assert_eq!(opc, 0xc1);
+    let yy = slice.get_next_int(8).unwrap() as i8;
     Some(format!("LESSINT{} {}", T::suffix(), yy).to_string())
 }
 fn disasm_gtint<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xc2);
-    let yy = slice.get_next_int(8).unwrap();
+    assert_eq!(opc, 0xc2);
+    let yy = slice.get_next_int(8).unwrap() as i8;
     Some(format!("GTINT{} {}", T::suffix(), yy).to_string())
 }
 fn disasm_neqint<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xc3);
-    let yy = slice.get_next_int(8).unwrap();
+    assert_eq!(opc, 0xc3);
+    let yy = slice.get_next_int(8).unwrap() as i8;
     Some(format!("NEQINT{} {}", T::suffix(), yy).to_string())
 }
 create_handler_1!(disasm_isnan,  0xc4, "ISNAN");
@@ -1766,13 +1823,13 @@ create_handler_1!(disasm_newc, 0xc8, "NEWC");
 create_handler_1!(disasm_endc, 0xc9, "ENDC");
 fn disasm_sti(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xca);
+    assert_eq!(opc, 0xca);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("STI {}", cc + 1).to_string())
 }
 fn disasm_stu(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xcb);
+    assert_eq!(opc, 0xcb);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("STU {}", cc + 1).to_string())
 }
@@ -1789,38 +1846,38 @@ create_handler_2!(disasm_stixrq, 0xcf06, "STIXRQ");
 create_handler_2!(disasm_stuxrq, 0xcf07, "STUXRQ");
 fn disasm_stir(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xcf0a);
+    assert_eq!(opc, 0xcf0a);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("STIR {}", cc + 1).to_string())
 }
 fn disasm_stur(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xcf0b);
+    assert_eq!(opc, 0xcf0b);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("STUR {}", cc + 1).to_string())
 }
 
 fn disasm_stiq(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xcf0c);
+    assert_eq!(opc, 0xcf0c);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("STIQ {}", cc + 1).to_string())
 }
 fn disasm_stuq(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xcf0d);
+    assert_eq!(opc, 0xcf0d);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("STUQ {}", cc + 1).to_string())
 }
 fn disasm_stirq(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xcf0e);
+    assert_eq!(opc, 0xcf0e);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("STIRQ {}", cc + 1).to_string())
 }
 fn disasm_sturq(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xcf0f);
+    assert_eq!(opc, 0xcf0f);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("STURQ {}", cc + 1).to_string())
 }
@@ -1853,7 +1910,7 @@ create_handler_2!(disasm_bremrefs,    0xcf36, "BREMREFS");
 create_handler_2!(disasm_brembitrefs, 0xcf37, "BREMBITREFS");
 fn disasm_bchkbits_short(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xcf38);
+    assert_eq!(opc, 0xcf38);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("BCHKBITS {}", cc + 1).to_string())
 }
@@ -1862,7 +1919,7 @@ create_handler_2!(disasm_bchkrefs,      0xcf3a, "BCHKREFS");
 create_handler_2!(disasm_bchkbitrefs,   0xcf3b, "BCHKBITREFS");
 fn disasm_bchkbitsq_short(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xcf3c);
+    assert_eq!(opc, 0xcf3c);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("BCHKBITSQ {}", cc + 1).to_string())
 }
@@ -1874,24 +1931,25 @@ create_handler_2!(disasm_stones,         0xcf41, "STONES");
 create_handler_2!(disasm_stsame,         0xcf42, "STSAME");
 fn disasm_stsliceconst(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(9).unwrap();
-    assert!(opc << 3 == 0xcf8);
+    assert_eq!(opc << 3, 0xcf8);
     let x = slice.get_next_int(2).unwrap();
-    assert!(x == 0);
+    assert_eq!(x, 0);
     let y = slice.get_next_int(3).unwrap();
-    let sss = slice.get_next_slice(y as usize * 8 + 2).unwrap();
+    let mut sss = slice.get_next_slice(y as usize * 8 + 2).unwrap();
+    sss.trim_right();
     Some(format!("STSLICECONST x{}", sss.into_cell().to_hex_string(true)).to_string())
 }
 create_handler_1!(disasm_ctos, 0xd0, "CTOS");
 create_handler_1!(disasm_ends, 0xd1, "ENDS");
 fn disasm_ldi(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xd2);
+    assert_eq!(opc, 0xd2);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("LDI {}", cc + 1).to_string())
 }
 fn disasm_ldu(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xd3);
+    assert_eq!(opc, 0xd3);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("LDU {}", cc + 1).to_string())
 }
@@ -1899,7 +1957,7 @@ create_handler_1!(disasm_ldref,     0xd4, "LDREF");
 create_handler_1!(disasm_ldrefrtos, 0xd5, "LDREFRTOS");
 fn disasm_ldslice(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xd6);
+    assert_eq!(opc, 0xd6);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("LDSLICE {}", cc + 1).to_string())
 }
@@ -1913,43 +1971,43 @@ create_handler_2!(disasm_pldixq, 0xd706, "PLDIXQ");
 create_handler_2!(disasm_plduxq, 0xd707, "PLDUXQ");
 fn disasm_pldi(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xd70a);
+    assert_eq!(opc, 0xd70a);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("PLDI {}", cc + 1).to_string())
 }
 fn disasm_pldu(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xd70b);
+    assert_eq!(opc, 0xd70b);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("PLDU {}", cc + 1).to_string())
 }
 fn disasm_ldiq(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xd70c);
+    assert_eq!(opc, 0xd70c);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("LDIQ {}", cc + 1).to_string())
 }
 fn disasm_lduq(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xd70d);
+    assert_eq!(opc, 0xd70d);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("LDUQ {}", cc + 1).to_string())
 }
 fn disasm_pldiq(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xd70e);
+    assert_eq!(opc, 0xd70e);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("PLDIQ {}", cc + 1).to_string())
 }
 fn disasm_plduq(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xd70f);
+    assert_eq!(opc, 0xd70f);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("PLDUQ {}", cc + 1).to_string())
 }
 fn disasm_plduz(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(13).unwrap();
-    assert!(opc << 3 == 0xd710);
+    assert_eq!(opc << 3, 0xd710);
     let c = slice.get_next_int(3).unwrap();
     Some(format!("PLDUZ {}", 32 * (c + 1)).to_string())
 }
@@ -1959,19 +2017,19 @@ create_handler_2!(disasm_ldslicexq,  0xd71a, "LDSLICEXQ");
 create_handler_2!(disasm_pldslicexq, 0xd71b, "PLDSLICEXQ");
 fn disasm_pldslice(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xd71d);
+    assert_eq!(opc, 0xd71d);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("PLDSLICE {}", cc + 1).to_string())
 }
 fn disasm_ldsliceq(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xd71e);
+    assert_eq!(opc, 0xd71e);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("LDSLICEQ {}", cc + 1).to_string())
 }
 fn disasm_pldsliceq(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xd71f);
+    assert_eq!(opc, 0xd71f);
     let cc = slice.get_next_int(8).unwrap();
     Some(format!("PLDSLICEQ {}", cc + 1).to_string())
 }
@@ -1983,7 +2041,7 @@ create_handler_2!(disasm_sdbeginsx,    0xd726, "SDBEGINSX");
 create_handler_2!(disasm_sdbeginsxq,   0xd727, "SDBEGINSXQ");
 fn disasm_sdbegins(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(14).unwrap();
-    assert!(opc << 2 == 0xd728);
+    assert_eq!(opc << 2, 0xd728);
     let x = slice.get_next_int(7).unwrap() as usize;
     let mut bitstring = slice.get_next_slice(8 * x + 3).unwrap();
     bitstring.trim_right();
@@ -1991,7 +2049,7 @@ fn disasm_sdbegins(slice: &mut SliceData) -> Option<String> {
 }
 fn disasm_sdbeginsq(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(14).unwrap();
-    assert!(opc << 2 == 0xd72c);
+    assert_eq!(opc << 2, 0xd72c);
     let x = slice.get_next_int(7).unwrap() as usize;
     let mut bitstring = slice.get_next_slice(8 * x + 3).unwrap();
     bitstring.trim_right();
@@ -2020,7 +2078,7 @@ create_handler_2!(disasm_sbitrefs,     0xd74b, "SBITREFS");
 create_handler_2!(disasm_pldref,       0xd74c, "PLDREF");
 fn disasm_pldrefidx(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(14).unwrap();
-    assert!(opc << 2 == 0xd74c);
+    assert_eq!(opc << 2, 0xd74c);
     let n = slice.get_next_int(2).unwrap();
     Some(format!("PLDREFIDX {}", n).to_string())
 }
@@ -2057,7 +2115,7 @@ fn disasm_callxargs(slice: &mut SliceData) -> Option<String> {
         }
         0xdb => {
             let z = slice.get_next_int(4).unwrap();
-            assert!(z == 0);
+            assert_eq!(z, 0);
             let p = slice.get_next_int(4).unwrap();
             Some(format!("CALLXARGS {}, -1", p).to_string())
         }
@@ -2066,13 +2124,13 @@ fn disasm_callxargs(slice: &mut SliceData) -> Option<String> {
 }
 fn disasm_jmpxargs(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xdb1);
+    assert_eq!(opc, 0xdb1);
     let p = slice.get_next_int(4).unwrap();
     Some(format!("JMPXARGS {}", p).to_string())
 }
 fn disasm_retargs(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xdb2);
+    assert_eq!(opc, 0xdb2);
     let r = slice.get_next_int(4).unwrap();
     Some(format!("RETARGS {}", r).to_string())
 }
@@ -2083,7 +2141,7 @@ create_handler_2!(disasm_callcc,   0xdb34, "CALLCC");
 create_handler_2!(disasm_jmpxdata, 0xdb35, "JMPXDATA");
 fn disasm_callccargs(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc == 0xdb36);
+    assert_eq!(opc, 0xdb36);
     let p = slice.get_next_int(4).unwrap();
     let r = slice.get_next_int(4).unwrap();
     Some(format!("CALLCCARGS {}, {}", p, r).to_string())
@@ -2092,9 +2150,9 @@ create_handler_2!(disasm_callxva,    0xdb38, "CALLXVARARGS");
 create_handler_2!(disasm_retva,      0xdb39, "RETVARARGS");
 create_handler_2!(disasm_jmpxva,     0xdb3a, "JMPXVARARGS");
 create_handler_2!(disasm_callccva,   0xdb3b, "CALLCCVARARGS");
-create_handler_2!(disasm_callref,    0xdb3c, "CALLREF");
-create_handler_2!(disasm_jmpref,     0xdb3d, "JMPREF");
-create_handler_2!(disasm_jmprefdata, 0xdb3e, "JMPREFDATA");
+create_handler_2r!(disasm_callref,    0xdb3c, "CALLREF");
+create_handler_2r!(disasm_jmpref,     0xdb3d, "JMPREF");
+create_handler_2r!(disasm_jmprefdata, 0xdb3e, "JMPREFDATA");
 create_handler_2!(disasm_retdata,    0xdb3f, "RETDATA");
 create_handler_1!(disasm_ifret,    0xdc, "IFRET");
 create_handler_1!(disasm_ifnotret, 0xdd, "IFNOTRET");
@@ -2103,17 +2161,17 @@ create_handler_1!(disasm_ifnot,    0xdf, "IFNOT");
 create_handler_1!(disasm_ifjmp,    0xe0, "IFJMP");
 create_handler_1!(disasm_ifnotjmp, 0xe1, "IFNOTJMP");
 create_handler_1!(disasm_ifelse,   0xe2, "IFELSE");
-create_handler_2!(disasm_ifref,        0xe300, "IFREF");
-create_handler_2!(disasm_ifnotref,     0xe301, "IFNOTREF");
-create_handler_2!(disasm_ifjmpref,     0xe302, "IFJMPREF");
-create_handler_2!(disasm_ifnotjmpref,  0xe303, "IFNOTJMPREF");
+create_handler_2r!(disasm_ifref,       0xe300, "IFREF");
+create_handler_2r!(disasm_ifnotref,    0xe301, "IFNOTREF");
+create_handler_2r!(disasm_ifjmpref,    0xe302, "IFJMPREF");
+create_handler_2r!(disasm_ifnotjmpref, 0xe303, "IFNOTJMPREF");
 create_handler_2!(disasm_condsel,      0xe304, "CONDSEL");
 create_handler_2!(disasm_condselchk,   0xe305, "CONDSELCHK");
 create_handler_2!(disasm_ifretalt,     0xe308, "IFRETALT");
 create_handler_2!(disasm_ifnotretalt,  0xe309, "IFNOTRETALT");
-create_handler_2!(disasm_ifrefelse,    0xe30d, "IFREFELSE");
-create_handler_2!(disasm_ifelseref,    0xe30e, "IFELSEREF");
-create_handler_2!(disasm_ifrefelseref, 0xe30f, "IFREFELSEREF");
+create_handler_2r!(disasm_ifrefelse,      0xe30d, "IFREFELSE");
+create_handler_2r!(disasm_ifelseref,      0xe30e, "IFELSEREF");
+create_handler_2r!(disasm_ifrefelseref,   0xe30f, "IFREFELSEREF");
 create_handler_2!(disasm_repeat_break,    0xe314, "REPEATBRK");
 create_handler_2!(disasm_repeatend_break, 0xe315, "REPEATENDBRK");
 create_handler_2!(disasm_until_break,     0xe316, "UNTILBRK");
@@ -2124,25 +2182,25 @@ create_handler_2!(disasm_again_break,     0xe31a, "AGAINBRK");
 create_handler_2!(disasm_againend_break,  0xe31b, "AGAINENDBRK");
 fn disasm_ifbitjmp(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(15).unwrap();
-    assert!(opc << 1 == 0xe38);
+    assert_eq!(opc << 1, 0xe38);
     let n = slice.get_next_int(5).unwrap();
     Some(format!("IFBITJMP {}", n).to_string())
 }
 fn disasm_ifnbitjmp(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(15).unwrap();
-    assert!(opc << 1 == 0xe3a);
+    assert_eq!(opc << 1, 0xe3a);
     let n = slice.get_next_int(5).unwrap();
     Some(format!("IFNBITJMP {}", n).to_string())
 }
 fn disasm_ifbitjmpref(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(15).unwrap();
-    assert!(opc << 1 == 0xe3c);
+    assert_eq!(opc << 1, 0xe3c);
     let n = slice.get_next_int(5).unwrap();
     Some(format!("IFBITJMPREF {}", n).to_string())
 }
 fn disasm_ifnbitjmpref(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(15).unwrap();
-    assert!(opc << 1 == 0xe3e);
+    assert_eq!(opc << 1, 0xe3e);
     let n = slice.get_next_int(5).unwrap();
     Some(format!("IFNBITJMPREF {}", n).to_string())
 }
@@ -2156,14 +2214,14 @@ create_handler_1!(disasm_again,     0xea, "AGAIN");
 create_handler_1!(disasm_againend,  0xeb, "AGAINEND");
 fn disasm_setcontargs(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xec);
+    assert_eq!(opc, 0xec);
     let r = slice.get_next_int(4).unwrap();
     let n = slice.get_next_int(4).unwrap();
     Some(format!("SETCONTARGS {}, {}", r, n).to_string())
 }
 fn disasm_returnargs(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xed0);
+    assert_eq!(opc, 0xed0);
     let p = slice.get_next_int(4).unwrap();
     Some(format!("RETURNARGS {}", p).to_string())
 }
@@ -2174,55 +2232,55 @@ create_handler_2!(disasm_bless,     0xed1e, "BLESS");
 create_handler_2!(disasm_blessva,   0xed1f, "BLESSVARARGS");
 fn disasm_pushctr(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xed4);
+    assert_eq!(opc, 0xed4);
     let i = slice.get_next_int(4).unwrap();
     Some(format!("PUSHCTR c{}", i).to_string())
 }
 fn disasm_popctr(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xed5);
+    assert_eq!(opc, 0xed5);
     let i = slice.get_next_int(4).unwrap();
     Some(format!("POPCTR c{}", i).to_string())
 }
 fn disasm_setcontctr(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xed6);
+    assert_eq!(opc, 0xed6);
     let i = slice.get_next_int(4).unwrap();
     Some(format!("SETCONTCTR c{}", i).to_string())
 }
 fn disasm_setretctr(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xed7);
+    assert_eq!(opc, 0xed7);
     let i = slice.get_next_int(4).unwrap();
     Some(format!("SETRETCTR c{}", i).to_string())
 }
 fn disasm_setaltctr(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xed8);
+    assert_eq!(opc, 0xed8);
     let i = slice.get_next_int(4).unwrap();
     Some(format!("SETALTCTR c{}", i).to_string())
 }
 fn disasm_popsave(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xed9);
+    assert_eq!(opc, 0xed9);
     let i = slice.get_next_int(4).unwrap();
     Some(format!("POPSAVE c{}", i).to_string())
 }
 fn disasm_save(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xeda);
+    assert_eq!(opc, 0xeda);
     let i = slice.get_next_int(4).unwrap();
     Some(format!("SAVE c{}", i).to_string())
 }
 fn disasm_savealt(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xedb);
+    assert_eq!(opc, 0xedb);
     let i = slice.get_next_int(4).unwrap();
     Some(format!("SAVEALT c{}", i).to_string())
 }
 fn disasm_saveboth(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xedc);
+    assert_eq!(opc, 0xedc);
     let i = slice.get_next_int(4).unwrap();
     Some(format!("SAVEBOTH c{}", i).to_string())
 }
@@ -2243,86 +2301,86 @@ create_handler_2!(disasm_samealt,      0xedfa, "SAMEALT");
 create_handler_2!(disasm_samealt_save, 0xedfb, "SAMEALTSAVE");
 fn disasm_blessargs(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xee);
+    assert_eq!(opc, 0xee);
     let r = slice.get_next_int(4).unwrap();
     let n = slice.get_next_int(4).unwrap();
     Some(format!("BLESSARGS {}, {}", r, n).to_string())
 }
 fn disasm_call_short(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xf0);
+    assert_eq!(opc, 0xf0);
     let n = slice.get_next_int(8).unwrap();
     Some(format!("CALL {}", n).to_string())
 }
 fn disasm_call_long(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(10).unwrap();
-    assert!(opc << 2 == 0xf10);
+    assert_eq!(opc << 2, 0xf10);
     let n = slice.get_next_int(14).unwrap();
     Some(format!("CALL {}", n).to_string())
 }
 fn disasm_jmp(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(10).unwrap();
-    assert!(opc << 2 == 0xf14);
+    assert_eq!(opc << 2, 0xf14);
     let n = slice.get_next_int(14).unwrap();
     Some(format!("JMPDICT {}", n).to_string())
 }
 fn disasm_prepare(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(10).unwrap();
-    assert!(opc << 2 == 0xf18);
+    assert_eq!(opc << 2, 0xf18);
     let n = slice.get_next_int(14).unwrap();
     Some(format!("PREPARE {}", n).to_string())
 }
 fn disasm_throw_short(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(10).unwrap();
-    assert!(opc << 2 == 0xf20);
+    assert_eq!(opc << 2, 0xf20);
     let nn = slice.get_next_int(6).unwrap();
     Some(format!("THROW {}", nn).to_string())
 }
 fn disasm_throwif_short(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(10).unwrap();
-    assert!(opc << 2 == 0xf24);
+    assert_eq!(opc << 2, 0xf24);
     let nn = slice.get_next_int(6).unwrap();
     Some(format!("THROWIF {}", nn).to_string())
 }
 fn disasm_throwifnot_short(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(10).unwrap();
-    assert!(opc << 2 == 0xf28);
+    assert_eq!(opc << 2, 0xf28);
     let nn = slice.get_next_int(6).unwrap();
     Some(format!("THROWIFNOT {}", nn).to_string())
 }
 fn disasm_throw_long(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(13).unwrap();
-    assert!(opc << 3 == 0xf2c0);
+    assert_eq!(opc << 3, 0xf2c0);
     let nn = slice.get_next_int(11).unwrap();
     Some(format!("THROW {}", nn).to_string())
 }
 fn disasm_throwarg(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(13).unwrap();
-    assert!(opc << 3 == 0xf2c8);
+    assert_eq!(opc << 3, 0xf2c8);
     let nn = slice.get_next_int(11).unwrap();
     Some(format!("THROWARG {}", nn).to_string())
 }
 fn disasm_throwif_long(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(13).unwrap();
-    assert!(opc << 3 == 0xf2d0);
+    assert_eq!(opc << 3, 0xf2d0);
     let nn = slice.get_next_int(11).unwrap();
     Some(format!("THROWIF {}", nn).to_string())
 }
 fn disasm_throwargif(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(13).unwrap();
-    assert!(opc << 3 == 0xf2d8);
+    assert_eq!(opc << 3, 0xf2d8);
     let nn = slice.get_next_int(11).unwrap();
     Some(format!("THROWARGIF {}", nn).to_string())
 }
 fn disasm_throwifnot_long(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(13).unwrap();
-    assert!(opc << 3 == 0xf2e0);
+    assert_eq!(opc << 3, 0xf2e0);
     let nn = slice.get_next_int(11).unwrap();
     Some(format!("THROWIFNOT {}", nn).to_string())
 }
 fn disasm_throwargifnot(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(13).unwrap();
-    assert!(opc << 3 == 0xf2e8);
+    assert_eq!(opc << 3, 0xf2e8);
     let nn = slice.get_next_int(11).unwrap();
     Some(format!("THROWARGIFNOT {}", nn).to_string())
 }
@@ -2335,7 +2393,7 @@ create_handler_2!(disasm_throwarganyifnot, 0xf2f5, "THROWARGANYIFNOT");
 create_handler_2!(disasm_try,              0xf2ff, "TRY");
 fn disasm_tryargs(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(8).unwrap();
-    assert!(opc == 0xf3);
+    assert_eq!(opc, 0xf3);
     let p = slice.get_next_int(4).unwrap();
     let r = slice.get_next_int(4).unwrap();
     Some(format!("TRYARGS {}, {}", p, r).to_string())
@@ -2351,25 +2409,25 @@ create_handler_2!(disasm_stvarint32,  0xfa07, "STVARINT32");
 fn disasm_ldmsgaddr<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc & 0xfffe == 0xfa40);
+    assert_eq!(opc & 0xfffe, 0xfa40);
     Some(format!("LDMSGADDR{}", T::suffix()).to_string())
 }
 fn disasm_parsemsgaddr<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc & 0xfffe == 0xfa42);
+    assert_eq!(opc & 0xfffe, 0xfa42);
     Some(format!("PARSEMSGADDR{}", T::suffix()).to_string())
 }
 fn disasm_rewrite_std_addr<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc & 0xfffe == 0xfa44);
+    assert_eq!(opc & 0xfffe, 0xfa44);
     Some(format!("REWRITESTDADDR{}", T::suffix()).to_string())
 }
 fn disasm_rewrite_var_addr<T>(slice: &mut SliceData) -> Option<String>
 where T : OperationBehavior {
     let opc = slice.get_next_int(16).unwrap();
-    assert!(opc & 0xfffe == 0xfa46);
+    assert_eq!(opc & 0xfffe, 0xfa46);
     Some(format!("REWRITEVARADDR{}", T::suffix()).to_string())
 }
 create_handler_2!(disasm_sendrawmsg,         0xfb00, "SENDRAWMSG");
@@ -2453,7 +2511,7 @@ create_handler_2!(disasm_dictdelget,         0xf462, "DICTDELGET");
 create_handler_2!(disasm_dictdelgetref,      0xf443, "DICTDELGETREF");
 create_handler_2!(disasm_dictidelget,        0xf444, "DICTIDELGET");
 create_handler_2!(disasm_dictidelgetref,     0xf445, "DICTIDELGETREF");
-create_handler_2!(disasm_dictudelget,        0xf446, "DICTUDELGET");
+create_handler_2!(disasm_dictudelget,        0xf466, "DICTUDELGET");
 create_handler_2!(disasm_dictudelgetref,     0xf467, "DICTUDELGETREF");
 create_handler_2!(disasm_dictgetoptref,      0xf469, "DICTGETOPTREF");
 create_handler_2!(disasm_dictigetoptref,     0xf46a, "DICTIGETOPTREF");
@@ -2507,9 +2565,9 @@ create_handler_2!(disasm_dictigetexec,       0xf4a2, "DICTIGETEXEC");
 create_handler_2!(disasm_dictugetexec,       0xf4a3, "DICTUGETEXEC");
 fn disasm_dictpushconst(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(14).unwrap();
-    assert!(opc << 2 == 0xf4a4);
+    assert_eq!(opc << 2, 0xf4a4);
     let n = slice.get_next_int(10).unwrap();
-    // TODO shrink?
+    slice.shrink_references(1..);
     Some(format!("DICTPUSHCONST {}", n).to_string())
 }
 create_handler_2!(disasm_pfxdictgetq,    0xf4a8, "PFXDICTGETQ");
@@ -2518,9 +2576,9 @@ create_handler_2!(disasm_pfxdictgetjmp,  0xf4aa, "PFXDICTGETJMP");
 create_handler_2!(disasm_pfxdictgetexec, 0xf4ab, "PFXDICTGETEXEC");
 fn disasm_pfxdictswitch(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(14).unwrap();
-    assert!(opc << 2 == 0xf4ac);
+    assert_eq!(opc << 2, 0xf4ac);
     let n = slice.get_next_int(10).unwrap();
-    // TODO shrink?
+    slice.shrink_references(1..);
     Some(format!("PFXDICTSWITCH {}", n).to_string())
 }
 create_handler_2!(disasm_subdictget,    0xf4b1, "SUBDICTGET");
@@ -2545,7 +2603,7 @@ create_handler_2!(disasm_setrand,       0xf814, "SETRAND");
 create_handler_2!(disasm_addrand,       0xf815, "ADDRAND");
 fn disasm_getparam(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xf82);
+    assert_eq!(opc, 0xf82);
     let i = slice.get_next_int(4).unwrap();
     Some(format!("GETPARAM {}", i).to_string())
 }
@@ -2562,7 +2620,7 @@ create_handler_2!(disasm_config_opt_param, 0xf833, "CONFIGOPTPARAM");
 create_handler_2!(disasm_getglobvar,       0xf840, "GETGLOBVAR");
 fn disasm_getglob(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(11).unwrap();
-    assert!(opc << 1 == 0xf84);
+    assert_eq!(opc << 1, 0xf84);
     let k = slice.get_next_int(5).unwrap();
     assert!(k != 0);
     Some(format!("GETGLOB {}", k).to_string())
@@ -2570,7 +2628,7 @@ fn disasm_getglob(slice: &mut SliceData) -> Option<String> {
 create_handler_2!(disasm_setglobvar, 0xf860, "SETGLOBVAR");
 fn disasm_setglob(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(11).unwrap();
-    assert!(opc << 1 == 0xf86);
+    assert_eq!(opc << 1, 0xf86);
     let k = slice.get_next_int(5).unwrap();
     assert!(k != 0);
     Some(format!("SETGLOB {}", k).to_string())
@@ -2587,7 +2645,7 @@ create_handler_2!(disasm_sdatasize,  0xf943, "SDATASIZE");
 create_handler_2!(disasm_dump_stack, 0xfe00, "DUMPSTK");
 fn disasm_dump_stack_top(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xfe0);
+    assert_eq!(opc, 0xfe0);
     let n = slice.get_next_int(4).unwrap();
     assert!(n > 0);
     Some(format!("DUMPSTKTOP {}", n).to_string())
@@ -2602,39 +2660,86 @@ create_handler_2!(disasm_debug_off, 0xfe1e, "DEBUGOFF");
 create_handler_2!(disasm_debug_on,  0xfe1f, "DEBUGON");
 fn disasm_dump_var(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xfe2);
+    assert_eq!(opc, 0xfe2);
     let n = slice.get_next_int(4).unwrap();
     assert!(n < 15);
-    Some(format!("DUMP s{}", n).to_string())
+    Some(format!("DUMP {}", n).to_string())
 }
 fn disasm_print_var(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xfe3);
+    assert_eq!(opc, 0xfe3);
     let n = slice.get_next_int(4).unwrap();
     assert!(n < 15);
-    Some(format!("PRINT s{}", n).to_string())
+    Some(format!("PRINT {}", n).to_string())
 }
 fn disasm_dump_string(slice: &mut SliceData) -> Option<String> {
     let opc = slice.get_next_int(12).unwrap();
-    assert!(opc == 0xfef);
+    assert_eq!(opc, 0xfef);
     let n = slice.get_next_int(4).unwrap();
     let mode = slice.get_next_int(8).unwrap();
     match n {
         0 => {
-            assert!(mode == 0x00);
+            assert_eq!(mode, 0x00);
             Some("LOGFLUSH".to_string())
         }
         _ => {
             if mode == 0x00 {
                 let s = slice.get_next_slice(n as usize * 8).unwrap();
-                Some(format!("LOGSTR {}", s.to_hex_string()).to_string())
+                let ss = String::from_utf8(s.get_bytestring(0)).unwrap();
+                Some(format!("LOGSTR {}", ss).to_string())
             } else if mode == 0x01 {
                 let s = slice.get_next_slice(n as usize * 8).unwrap();
-                Some(format!("PRINTSTR {}", s.to_hex_string()).to_string())
+                let ss = String::from_utf8(s.get_bytestring(0)).unwrap();
+                Some(format!("PRINTSTR {}", ss).to_string())
             } else {
                 println!("dump_string?");
                 None
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn round_trip_test(raw0: &str, check_bin: bool) {
+        let bin0 = base64::decode(raw0).unwrap();
+        let toc0 = ton_types::deserialize_tree_of_cells(&mut std::io::Cursor::new(bin0)).unwrap();
+        let asm0 = disasm(&mut SliceData::from(toc0.clone()));
+        let toc1 = ton_labs_assembler::compile_code_to_cell(&asm0.clone()).unwrap();
+        let asm1 = disasm(&mut SliceData::from(toc1.clone()));
+        if asm0 != asm1 {
+            println!(">>>");
+            print!("{}", asm0);
+            println!("<<<");
+            print!("{}", asm1);
+        }
+        assert_eq!(asm0, asm1);
+
+        if check_bin {
+            let bin1 = ton_types::serialize_toc(&toc1).unwrap();
+            let raw1 = base64::encode(&bin1);
+            if raw0 != raw1 {
+                println!("{}", asm0);
+                print_tree_of_cells(&toc0);
+                print_tree_of_cells(&toc1);
+            }
+            assert_eq!(raw0, raw1);
+        }
+    }
+
+    #[test]
+    fn round_trip_tests() {
+        for n in 0..105 {
+            let filename = format!("tests/disasm/{:03}.b64", n);
+            let raw = std::fs::read_to_string(filename).unwrap();
+            round_trip_test(&raw, true);
+        }
+        for n in 105..130 {
+            let filename = format!("tests/disasm/{:03}.b64", n);
+            let raw = std::fs::read_to_string(filename).unwrap();
+            round_trip_test(&raw, false);
         }
     }
 }

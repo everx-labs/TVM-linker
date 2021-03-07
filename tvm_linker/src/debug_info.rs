@@ -60,7 +60,7 @@ pub fn load_debug_info(
     let dict2 = HashmapE::with_hashmap(32, Some(root_cell.reference(1).unwrap().reference(0).unwrap()));
 
     for func in debug_info_json.internals.iter() {
-        let id = &(func.id as i32);
+        let id = func.id as i32;
         let key = id.clone().write_to_new_cell().unwrap().into();
         let val = dict1.get(key).unwrap();
         if val.is_some() {

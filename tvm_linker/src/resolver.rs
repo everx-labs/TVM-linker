@@ -13,24 +13,26 @@
 use regex::Regex;
 use std::convert::TryFrom;
 use std::fmt::{LowerHex, UpperHex, Display};
+use parser::{Line, Lines};
 
 lazy_static! {
     pub static ref NAMES: Regex = Regex::new(r"\$(?P<id>:?[-_0-9a-zA-Z\.]+)(?P<offset>\+\d+)?(:(?P<len>\d*)?(?P<fmt>[xX])?)?\$").unwrap();
 }
 
-pub fn resolve_name<F, T>(text: &str, mut get: F) -> Result<String, String> 
-    where 
+pub fn resolve_name<F, T>(line: &Line, mut get: F) -> Result<Lines, String>
+    where
         F: FnMut(&str) -> Option<T>,
         T: LowerHex + UpperHex + Display + TryFrom<isize> + std::ops::AddAssign {
     let mut res_str = String::new();
     let mut end = 0;
-    let text = text.find(';').and_then(|idx| text.get(..idx)).unwrap_or(text);
-    for cap in NAMES.captures_iter(text) {
+    let semicolon_pos = line.text.find(';').unwrap_or(line.text.len());
+    let (text_old, text_rem) = line.text.split_at(semicolon_pos);
+    for cap in NAMES.captures_iter(text_old) {
         if cap.name("id").is_none() {
             return Err("invalid syntax: object name not found".to_string());
         }
         let name_match = cap.name("id").unwrap();
-        res_str += text.get(end..name_match.start() - 1).unwrap();
+        res_str += text_old.get(end..name_match.start() - 1).unwrap();
         let name = name_match.as_str();
 
         let offset = cap.name("offset").map(|m| {
@@ -65,8 +67,13 @@ pub fn resolve_name<F, T>(text: &str, mut get: F) -> Result<String, String>
         res_str += &id_str;
         end = cap.get(0).unwrap().end();
     }
-    res_str += text.get(end..).unwrap();
-    Ok(res_str)
+    res_str += text_old.get(end..).unwrap();
+    if !res_str.ends_with(' ') && !text_rem.is_empty() {
+        res_str += " ";
+    }
+    res_str += text_rem;
+    let res = Line { text: res_str, filename: line.filename.clone(), line: line.line };
+    Ok(vec![res])
 }
 
 #[cfg(test)]
@@ -88,7 +95,19 @@ mod tests {
     fn id_by_name(name: &str) -> Option<u32> {
         MAP.get(name).map(|x| x.clone())
     }
-    
+
+    pub fn resolve_name<F, T>(text: &str, get: F) -> Result<String, String>
+        where
+            F: FnMut(&str) -> Option<T>,
+            T: LowerHex + UpperHex + Display + TryFrom<isize> + std::ops::AddAssign {
+        let line = Line { text: text.to_string(), filename: "".to_string(), line: 0 };
+        let res = super::resolve_name(&line, get);
+        res.map(|lines| {
+            assert!(lines.len() == 1);
+            lines[0].text.clone()
+        })
+    }
+
     #[test]
     fn test_resolve_simple() {
         assert_eq!(resolve_name("$ctor$", id_by_name),      Ok("287454207".to_string()));
@@ -138,6 +157,6 @@ mod tests {
 
     #[test]
     fn test_resolve_with_comments() {
-        assert_eq!(resolve_name("text; ignore this $ctor$", id_by_name), Ok("text".to_string()));
+        assert_eq!(resolve_name("text; ignore this $ctor$", id_by_name), Ok("text ; ignore this $ctor$".to_string()));
     }
 }
