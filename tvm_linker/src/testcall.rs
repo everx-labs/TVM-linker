@@ -94,12 +94,15 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) {
     *body = signed_body.into();
 }
 
-fn initialize_registers(data: SliceData, myself: MsgAddressInt, now: u32, balance: (u64, CurrencyCollection)) -> SaveList {
+fn initialize_registers(data: SliceData, myself: MsgAddressInt, now: u32, balance: (u64, CurrencyCollection), config: Option<Cell>) -> SaveList {
     let mut ctrls = SaveList::new();
     let mut info = SmartContractInfo::with_myself(myself.write_to_new_cell().unwrap().into());
     *info.balance_remaining_grams_mut() = balance.0 as u128;
     *info.balance_remaining_other_mut() = balance.1.other_as_hashmap().clone();
     *info.unix_time_mut() = now;
+    if let Some(cell) = config {
+        info.set_config_params(cell);
+    }
     ctrls.put(4, &mut StackItem::Cell(data.into_cell())).unwrap();
     ctrls.put(7, &mut info.into_temp_data()).unwrap();
     ctrls
@@ -239,6 +242,7 @@ pub fn call_contract<F>(
     smc_file: &str,
     smc_balance: Option<&str>,
     msg_info: MsgInfo,
+    config_file: Option<&str>,
     key_file: Option<Option<&str>>,
     ticktock: Option<i8>,
     gas_limit: Option<i64>,
@@ -252,9 +256,15 @@ pub fn call_contract<F>(
     let addr_int = IntegerData::from_str_radix(smc_file, 16).unwrap();
     let state_init = load_from_file(&format!("{}.tvc", smc_file));
     let debug_info = load_debug_info(&state_init, debug_info_filename);
+    let config_cell = config_file.map(|filename| {
+        let state = load_from_file(filename);
+        let (_code, data) = load_code_and_data(&state);
+        // config dictionary is located in the first reference of the storage root cell
+        data.into_cell().reference(0).unwrap()
+    });
     let (exit_code, state_init) = call_contract_ex(
         addr, addr_int, state_init, debug_info, smc_balance,
-        msg_info, key_file, ticktock, gas_limit, action_decoder, debug);
+        msg_info, config_cell, key_file, ticktock, gas_limit, action_decoder, debug);
     if exit_code == 0 || exit_code == 1 {
         let smc_name = smc_file.to_owned() + ".tvc";
         save_to_file(state_init, Some(&smc_name), 0).expect("error");
@@ -308,6 +318,7 @@ pub fn call_contract_ex<F>(
     debug_info: Option<ContractDebugInfo>,
     smc_balance: Option<&str>,
     msg_info: MsgInfo,
+    config: Option<Cell>,
     key_file: Option<Option<&str>>,
     ticktock: Option<i8>,
     gas_limit: Option<i64>,
@@ -339,6 +350,7 @@ pub fn call_contract_ex<F>(
         MsgAddressInt::with_standart(None, workchain_id, addr.clone()).unwrap(),
         msg_info.now,
         (smc_value.clone(), smc_balance),
+        config,
     );
 
     let mut stack = Stack::new();
