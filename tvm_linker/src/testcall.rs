@@ -249,13 +249,14 @@ pub fn call_contract<F>(
     action_decoder: Option<F>,
     debug: bool,
     debug_info_filename: String,
+    debug_map_filename: String,
 ) -> i32
     where F: Fn(SliceData, bool)
 {
     let addr = AccountId::from_str(smc_file).unwrap();
     let addr_int = IntegerData::from_str_radix(smc_file, 16).unwrap();
     let state_init = load_from_file(&format!("{}.tvc", smc_file));
-    let debug_info = load_debug_info(&state_init, debug_info_filename);
+    let debug_info = load_debug_info(&state_init, debug_info_filename, debug_map_filename);
     let config_cell = config_file.map(|filename| {
         let state = load_from_file(filename);
         let (_code, data) = load_code_and_data(&state);
@@ -302,6 +303,17 @@ fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debu
             None => "n/a"
         };
         println!("function: {}", fname);
+
+        let cell_hash = info.cmd_code.cell().repr_hash().to_hex_string();
+        let offset = info.cmd_code.pos();
+        let position = match debug_info.map.map.get(&cell_hash) {
+            Some(offset_map) => match offset_map.get(&offset) {
+                Some(pos) => format!("{}:{}", pos.filename, pos.line),
+                None => String::from("-:0 (offset not found)")
+            },
+            None => String::from("-:0 (cell hash not found)")
+        };
+        println!("Position: {}", position);
     }
 
     println!("\n--- Stack trace ------------------------");
@@ -455,7 +467,8 @@ pub fn perform_contract_call<F>(
         None,
         if decode_c5 { Some(action_decoder) } else { None },
         debug,
-        String::from("")
+        String::from(""),
+        String::from(""),
     )
 }
 

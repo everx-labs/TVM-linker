@@ -61,7 +61,8 @@ use testcall::{call_contract, MsgInfo};
 use ton_types::{BuilderData, SliceData};
 use std::env;
 use disasm::{create_disasm_command, disasm_command};
-use parser::Line;
+use ton_labs_assembler::Line;
+use std::fs::File;
 
 fn main() -> Result<(), i32> {
     println!(
@@ -107,6 +108,7 @@ fn linker_main() -> Result<(), String> {
             (@arg WC: -w +takes_value "Workchain id used to print contract address, -1 by default.")
             (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
             (@arg DEBUG_INFO: --("debug-info") "Generates file with debug information")
+            (@arg DEBUG_MAP: --("debug-map") +takes_value "Generates debug map file")
             (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file. If not specified lib is loaded from environment variable TVM_LINKER_LIB_PATH if it exists.")
             (@arg OUT_FILE: -o +takes_value "Output file name")
             (@arg LANGUAGE: --language +takes_value "Enable language-specific features in linkage")
@@ -292,6 +294,13 @@ fn linker_main() -> Result<(), String> {
         }
 
         prog.compile_to_file_ex(wc, abi_file, ctor_params, out_file, debug, debug_info)?;
+
+        if compile_matches.is_present("DEBUG_MAP") {
+            let filename = compile_matches.value_of("DEBUG_MAP").unwrap();
+            let file = File::create(filename).unwrap();
+            serde_json::to_writer_pretty(file, &prog.dbgmap).unwrap();
+        }
+
         return Ok(());
     }
 
@@ -352,7 +361,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
                 None => None
             };
 
-            let line = Line { text: hex_str.clone(), filename: "".to_string(), line: 0 };
+            let line = Line::new(hex_str.as_str(), "", 0);
             let resolved = resolve_name(&line, |name| {
                 let id = match &parse_results {
                     Some(parse_results) => parse_results.global_by_name(name),
@@ -395,6 +404,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
     };
 
     let debug_info_filename = format!("{}{}", abi_json.map_or("debug_info.", |a| a.trim_end_matches("abi.json")), "debug.json");
+    let debug_map_filename = format!("{}{}", abi_json.map_or("debug_map.", |a| a.trim_end_matches("abi.json")), "map.json");
 
     println!("TEST STARTED");
     println!("body = {:?}", body);
@@ -423,6 +433,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
         matches.is_present("TRACE"),
         debug_info_filename,
+        debug_map_filename,
     );
 
     println!("TEST COMPLETED");

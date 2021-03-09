@@ -1,12 +1,15 @@
 use std::io::Write;
+use std::fs::File;
 use std::collections::HashMap;
 use ton_types::dictionary::HashmapE;
 use serde::{Deserialize, Serialize};
 use ton_block::{Serializable, StateInit};
-use ton_types::{UInt256};
+use ton_types::UInt256;
+use ton_labs_assembler::DbgInfo;
 
 pub struct ContractDebugInfo {
-    pub hash2function: HashMap<UInt256, String>
+    pub hash2function: HashMap<UInt256, String>,
+    pub map: DbgInfo
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -40,16 +43,22 @@ pub fn save_debug_info(
 
 pub fn load_debug_info(
     state_init: &StateInit,
-    filename: String
+    filename: String,
+    filename_map: String,
 ) -> Option<ContractDebugInfo> {
 
     // println!("---- load_debug_info ----");
+
+    let debug_map = match File::open(filename_map) {
+        Ok(file) => serde_json::from_reader(file).unwrap(),
+        Err(_) => DbgInfo::new()
+    };
 
     let mut hash2function = HashMap::new();
 
     let debug_info_str = std::fs::read_to_string(filename);
     if debug_info_str.is_err() {
-        return None;
+        return Some(ContractDebugInfo { hash2function: hash2function, map: debug_map });
     }
     let debug_info_json : DebugInfo = serde_json::from_str(&debug_info_str.unwrap()).unwrap();
 
@@ -94,6 +103,6 @@ pub fn load_debug_info(
 
     hash2function.insert(root_cell.repr_hash(), "selector".to_owned());
 
-    Some(ContractDebugInfo{hash2function })
+    Some(ContractDebugInfo { hash2function: hash2function, map: debug_map })
 }
 

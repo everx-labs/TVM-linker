@@ -22,24 +22,9 @@ use ton_types::{BuilderData, IBitstring, SliceData, Cell};
 use ton_types::dictionary::{HashmapE, HashmapType};
 use ton_vm::stack::integer::{IntegerData, serialization::{Encoding, SignedIntegerBigEndianEncoding}};
 use ton_vm::stack::serialization::Serializer;
+use ton_labs_assembler::{DbgPos, Line, Lines, lines_to_string};
 
 pub type Ptr = i64;
-pub type Lines = Vec<Line>;
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Line {
-    pub text: String,
-    pub filename: String,
-    pub line: usize,
-}
-
-pub fn lines_to_string(lines: &Lines) -> String {
-    let mut res = "".to_string();
-    for line in lines {
-        res.push_str(line.text.as_str());
-    }
-    res
-}
 
 pub struct ParseEngineResults {
     engine: ParseEngine,
@@ -576,13 +561,13 @@ impl ParseEngine {
                 let param = cap.get(1).unwrap().as_str();
                 match param {
                     "byte" | "long" | "short" | "quad" | "comm" | "bss" | "asciz" => {
-                        let line = Line { text: l.clone(), filename: filename.clone(), line: lnum };
+                        let line = Line { text: l.clone(), pos: DbgPos { filename: filename.clone(), line: lnum } };
                         obj_body.push(line)
                     },
                     _ => Err(format!("line {}: invalid param \"{}\":{}", lnum, param, l))?,
                 };
             } else {
-                let line = Line { text: l.to_string(), filename: filename.clone(), line: lnum };
+                let line = Line { text: l.to_string(), pos: DbgPos { filename: filename.clone(), line: lnum } };
                 let mut resolved = vec![line];
                 obj_body.append(&mut resolved);
             }
@@ -620,7 +605,7 @@ impl ParseEngine {
         for line in lines {
             let mut resolved =
                 self.replace_labels(&line, &obj_name)
-                    .map_err(|e| format!("line {}: cannot resolve label: {}", line.line, e))?;
+                    .map_err(|e| format!("line {}: cannot resolve label: {}", line.pos.line, e))?;
             new_lines.append(&mut resolved);
         }
         Ok(new_lines)
@@ -1153,13 +1138,13 @@ mod tests {
 
         assert_eq!(
             *body,
-            vec![Line { text: "PUSHINT 10\n".to_string(), filename: "test_macros.code".to_string(), line: 5 },
-                 Line { text: "DROP\n".to_string(),       filename: "test_macros.code".to_string(), line: 6 },
-                 Line { text: "PUSHINT 1\n".to_string(),  filename: "test_macros.code".to_string(), line: 11 },
-                 Line { text: "PUSHINT 2\n".to_string(),  filename: "test_macros.code".to_string(), line: 12 },
-                 Line { text: "ADD\n".to_string(),        filename: "test_macros.code".to_string(), line: 13 },
-                 Line { text: "PUSHINT 3\n".to_string(),  filename: "test_macros.code".to_string(), line: 8 },
-                 Line { text: "\n".to_string(),           filename: "test_macros.code".to_string(), line: 9 }]
+            vec![Line::new("PUSHINT 10\n", "test_macros.code", 5),
+                 Line::new("DROP\n",       "test_macros.code", 6),
+                 Line::new("PUSHINT 1\n",  "test_macros.code", 11),
+                 Line::new("PUSHINT 2\n",  "test_macros.code", 12),
+                 Line::new("ADD\n",        "test_macros.code", 13),
+                 Line::new("PUSHINT 3\n",  "test_macros.code", 8),
+                 Line::new("\n",           "test_macros.code", 9)]
         );
     }
 
@@ -1177,24 +1162,24 @@ mod tests {
 
         assert_eq!(
             *body,
-            vec![Line { text: "PUSHINT 10\n".to_string(), filename: "test_macros_02.code".to_string(), line: 5 },
-                 Line { text: "DROP\n".to_string(),       filename: "test_macros_02.code".to_string(), line: 6 },
-                 Line { text: "PUSHINT 1\n".to_string(),  filename: "test_macros_02.code".to_string(), line: 17 },
-                 Line { text: "\n".to_string(),           filename: "test_macros_02.code".to_string(), line: 18 },
-                 Line { text: "PUSHINT 2\n".to_string(),  filename: "test_macros_02.code".to_string(), line: 13 },
-                 Line { text: "ADD\n".to_string(),        filename: "test_macros_02.code".to_string(), line: 14 },
-                 Line { text: "\n".to_string(),           filename: "test_macros_02.code".to_string(), line: 15 },
-                 Line { text: "PUSHINT 3\n".to_string(),  filename: "test_macros_02.code".to_string(), line: 8 },
-                 Line { text: "CALL 2\n".to_string(),     filename: "test_macros_02.code".to_string(), line: 9 },
-                 Line { text: "\n".to_string(),           filename: "test_macros_02.code".to_string(), line: 10 }]
+            vec![Line::new("PUSHINT 10\n", "test_macros_02.code", 5),
+                 Line::new("DROP\n",       "test_macros_02.code", 6),
+                 Line::new("PUSHINT 1\n",  "test_macros_02.code", 17),
+                 Line::new("\n",           "test_macros_02.code", 18),
+                 Line::new("PUSHINT 2\n",  "test_macros_02.code", 13),
+                 Line::new("ADD\n",        "test_macros_02.code", 14),
+                 Line::new("\n",           "test_macros_02.code", 15),
+                 Line::new("PUSHINT 3\n",  "test_macros_02.code", 8),
+                 Line::new("CALL 2\n",     "test_macros_02.code", 9),
+                 Line::new("\n",           "test_macros_02.code", 10)]
         );
         assert_eq!(
             *internal,
-            vec![Line { text: "PUSHINT 1\n".to_string(), filename: "test_macros_02.code".to_string(), line: 17 },
-                 Line { text: "\n".to_string(),          filename: "test_macros_02.code".to_string(), line: 18 },
-                 Line { text: "PUSHINT 2\n".to_string(), filename: "test_macros_02.code".to_string(), line: 13 },
-                 Line { text: "ADD\n".to_string(),       filename: "test_macros_02.code".to_string(), line: 14 },
-                 Line { text: "\n".to_string(),          filename: "test_macros_02.code".to_string(), line: 15 }]
+            vec![Line::new("PUSHINT 1\n",  "test_macros_02.code", 17),
+                 Line::new("\n",           "test_macros_02.code", 18),
+                 Line::new("PUSHINT 2\n",  "test_macros_02.code", 13),
+                 Line::new("ADD\n",        "test_macros_02.code", 14),
+                 Line::new("\n",           "test_macros_02.code", 15)]
         );
     }
 }
