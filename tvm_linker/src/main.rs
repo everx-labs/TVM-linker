@@ -236,6 +236,16 @@ fn linker_main() -> Result<(), String> {
             }
             sources.push(path);
         }
+        let env_lib = env::var("TVM_LINKER_LIB_PATH").unwrap_or_default();
+        if sources.is_empty() && !env_lib.is_empty() {
+            println!("TVM_LINKER_LIB_PATH: {:?}", &env_lib);
+            let path = Path::new(&env_lib);
+            if !path.exists() {
+                return Err(format!("File {} doesn't exist", &env_lib));
+            }
+            sources.push(path);
+        }
+            
         let path = Path::new(input);
         if !path.exists() {
             return Err(format!("File {} doesn't exist", input));
