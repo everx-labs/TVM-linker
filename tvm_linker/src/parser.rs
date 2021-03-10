@@ -265,6 +265,7 @@ const PATTERN_COMM:     &'static str = r"^[\t\s]*\.comm[\t\s]+([a-zA-Z0-9_\.]+),
 const PATTERN_ASCIZ:    &'static str = r#"^[\t\s]*\.asciz[\t\s]+"(.+)""#;
 const PATTERN_MACRO:    &'static str = r"^[\t\s]*\.macro[\t\s]+([a-zA-Z0-9_\.:]+)";
 const PATTERN_IGNORED:  &'static str = r"^[\t\s]+\.(p2align|align|text|file|ident|section)";
+const PATTERN_LOC:      &'static str = r"^[\t\s]*\.loc[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([0-9]+)";
 
 const GLOBL:            &'static str = ".globl";
 const INTERNAL:         &'static str = ".internal";
@@ -452,6 +453,7 @@ impl ParseEngine {
         let ignored_regex = Regex::new(PATTERN_IGNORED).unwrap();
         let public_regex = Regex::new(PATTERN_PUBLIC).unwrap();
         let macro_regex = Regex::new(PATTERN_MACRO).unwrap();
+        let loc_regex = Regex::new(PATTERN_LOC).unwrap();
 
         let mut section_name: String = String::new();
         let mut obj_body: Lines = vec![];
@@ -465,6 +467,7 @@ impl ParseEngine {
         let filename = path.file_name().unwrap().to_str().unwrap().to_string();
         let file = File::open(path).map_err(|e| format!("Can't open file: {}", e))?;
         let mut reader = BufReader::new(file);
+        let mut source_pos: Option<DbgPos> = None;
 
         while reader.read_line(&mut l)
             .map_err(|_| "error while reading line")? != 0 {
@@ -472,6 +475,10 @@ impl ParseEngine {
             if !l.ends_with('\n') {
                 l += "\n";
             }
+            let pos = match source_pos.clone() {
+                None => DbgPos { filename: filename.clone(), line: lnum },
+                Some(pos) => pos
+            };
             if ignored_regex.is_match(&l) {
                 //ignore unused parameters
                 debug!("ignored: {}", l);            
@@ -561,13 +568,22 @@ impl ParseEngine {
                 let param = cap.get(1).unwrap().as_str();
                 match param {
                     "byte" | "long" | "short" | "quad" | "comm" | "bss" | "asciz" => {
-                        let line = Line { text: l.clone(), pos: DbgPos { filename: filename.clone(), line: lnum } };
+                        let line = Line { text: l.clone(), pos };
                         obj_body.push(line)
                     },
                     _ => Err(format!("line {}: invalid param \"{}\":{}", lnum, param, l))?,
                 };
+            } else if loc_regex.is_match(&l) {
+                let cap = loc_regex.captures(&l).unwrap();
+                let filename = String::from(cap.get(1).unwrap().as_str());
+                let line = cap.get(2).unwrap().as_str().parse::<usize>().unwrap();
+                if line == 0 { // special value for resetting current source pos
+                    source_pos = None;
+                } else {
+                    source_pos = Some(DbgPos { filename, line });
+                }
             } else {
-                let line = Line { text: l.to_string(), pos: DbgPos { filename: filename.clone(), line: lnum } };
+                let line = Line { text: l.clone(), pos };
                 let mut resolved = vec![line];
                 obj_body.append(&mut resolved);
             }
