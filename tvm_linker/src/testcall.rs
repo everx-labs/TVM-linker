@@ -444,11 +444,12 @@ pub fn perform_contract_call<F>(
         balance,
         MsgInfo{
             balance: msg_balance,
-            src: src,
-            now: now,
+            src,
+            now,
             bounced: false,
-            body: body
+            body
         },
+        None,
         key_file,
         ticktock,
         None,
