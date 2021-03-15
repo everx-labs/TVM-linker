@@ -292,7 +292,7 @@ impl ParseEngine {
 
     pub fn new(sources: Vec<&Path>, abi_json: Option<String>) -> Result<Self, String> {
         let mut engine = ParseEngine {
-            xrefs:      HashMap::new(), 
+            xrefs:      HashMap::new(),
             intrefs:    HashMap::new(), 
             aliases:    HashMap::new(),
             globals:    HashMap::new(), 
@@ -976,9 +976,14 @@ impl ParseEngine {
         let entry = lines_to_string(&self.entry());
         println!("Entry point:\n{}\n{}\n{}", line, entry, line);
         println!("General-purpose functions:\n{}", line);
-        
-        for (k, v) in &self.xrefs {
-            println! ("Function {:30}: id={:08X} public={}", k, v, self.globals.get(k).unwrap().public);
+
+        let mut keys = self.xrefs.keys().collect::<Vec<_>>();
+        keys.sort();
+        for k in keys {
+            println! ("Function {:30}: id={:08X} public={}",
+                      k,
+                      self.xrefs.get(k).unwrap(),
+                      self.globals.get(k).unwrap().public);
         }
         println!("private:");
         for (k, v) in &self.privates() {
