@@ -25,6 +25,7 @@ use ton_vm::stack::serialization::Serializer;
 
 pub type Ptr = i64;
 pub type Lines = Vec<Line>;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Line {
     pub text: String,
@@ -81,7 +82,7 @@ impl ParseEngineResults {
 
 pub fn ptr_to_builder(n: Ptr) -> Result<BuilderData, String> {
     let mut b = BuilderData::new();
-    b.append_i64(n).map_err(|_| format!("failed to serialize an i64 to buidler"))?;
+    b.append_i64(n).map_err(|_| format!("failed to serialize an i64 to builder"))?;
     Ok(b)
 }
 
@@ -317,17 +318,10 @@ impl ParseEngine {
         self.preinit()?;
 
         for source in &sources {
-            self.parse_code(source, true)?;
+            self.parse_code(source)?;
         }
 
-        self.next_private_globl_funcid = 0;
-        for source in &sources {
-            // TODO we read files twice! Read once and then run resolvers.
-            // We can't resolver, for example, nested macros in so way
-            self.parse_code(source, false)?;
-        }
-
-        self.replace_all_macros()?;
+        self.resolve_labels_and_replace_macros()?;
 
         if self.entry_point.is_empty() {
             return Err("Selector not found".to_string());
@@ -453,7 +447,7 @@ impl ParseEngine {
         data.addr = self.persistent_base; 
     }
 
-    fn parse_code(&mut self, path: &Path, first_pass: bool) -> Result<(), String> {
+    fn parse_code(&mut self, path: &Path) -> Result<(), String> {
         let globl_regex = Regex::new(PATTERN_GLOBL).unwrap();
         let internal_regex = Regex::new(PATTERN_INTERNAL).unwrap();
         let selector_regex = Regex::new(PATTERN_SELECTOR).unwrap();
@@ -512,7 +506,7 @@ impl ParseEngine {
             } else if type_regex.is_match(&l) {
                 // .type x, @...
                 //it's a mark for begining of a new object (func or data)
-                self.update(&section_name, &obj_name, &obj_body, first_pass)
+                self.update(&section_name, &obj_name, &obj_body)
                     .map_err(|e| format!("line {}: {}", lnum, e))?;
                 section_name = GLOBL.to_owned();
                 obj_body = vec![];
@@ -540,7 +534,7 @@ impl ParseEngine {
                 self.globals.entry(name.clone()).or_insert(Object::new(name.clone(), ""));
             } else if macro_regex.is_match(&l) {
                 // .macro x
-                self.update(&section_name, &obj_name, &obj_body, first_pass)
+                self.update(&section_name, &obj_name, &obj_body)
                     .map_err(|e| format!("line {}: {}", lnum, e))?;
                 section_name = MACROS.to_owned();
                 obj_body = vec![];
@@ -550,17 +544,13 @@ impl ParseEngine {
                 //ignore, not used
             } else if selector_regex.is_match(&l) {                
                 // .selector
-                self.update(&section_name, &obj_name, &obj_body, first_pass)?;
-                if first_pass { 
-                    section_name.clear();
-                } else {
-                    section_name = SELECTOR.to_owned();
-                }
+                self.update(&section_name, &obj_name, &obj_body)?;
+                section_name = SELECTOR.to_owned();
                 obj_name = "".to_owned();
                 obj_body = vec![];
             } else if internal_regex.is_match(&l) {
                 // .internal
-                self.update(&section_name, &obj_name, &obj_body, first_pass)
+                self.update(&section_name, &obj_name, &obj_body)
                     .map_err(|e| format!("line {}: {}", lnum, e))?;
                 section_name = INTERNAL.to_owned();
                 obj_body = vec![];
@@ -588,22 +578,18 @@ impl ParseEngine {
                 };
             } else {
                 let line = Line { text: l.to_string(), filename: filename.clone(), line: lnum };
-                let mut resolved = match first_pass { 
-                    true  => vec![line],
-                    false => self.replace_labels(&line, &obj_name)
-                        .map_err(|e| format!("line {}: cannot resolve label: {}", lnum, e))?, 
-                };
+                let mut resolved = vec![line];
                 obj_body.append(&mut resolved);
             }
             l.clear();
         }
 
-        self.update(&section_name, &obj_name, &obj_body, first_pass)
+        self.update(&section_name, &obj_name, &obj_body)
             .map_err(|e| format!("line {}: {}", lnum, e))?;
         Ok(())
     }
 
-    fn replace_all_macros(&mut self) -> Result<(), String> {
+    fn resolve_labels_and_replace_macros(&mut self) -> Result<(), String> {
         let mut iter = 0;
         loop {
             iter += 1;
@@ -624,28 +610,58 @@ impl ParseEngine {
         }
     }
 
+    fn replace_labels_in_body(&mut self, lines: Vec<Line>, obj_name: &String) -> Result<Vec<Line>, String> {
+        let mut new_lines = vec![];
+        for line in lines {
+            let mut resolved =
+                self.replace_labels(&line, &obj_name)
+                    .map_err(|e| format!("line {}: cannot resolve label: {}", line.line, e))?;
+            new_lines.append(&mut resolved);
+        }
+        Ok(new_lines)
+    }
 
     // return true, if at least one macro was replaced
     fn replace_macro(&mut self) -> Result<bool, String> {
         let mut did_some = false;
 
-        for (_name, object) in &mut self.globals {
-            if let ObjectType::Function(f) = &mut object.dtype {
-                let lines = &f.body;
-                let mut new_lines = vec![];
-                for l in lines {
-                    let mut name = String::new();
-                    resolve_name(&l, |n| { name = n.to_string(); Some(0) }).unwrap();
-                    if name != "" && self.macros.contains_key(&name) {
-                        new_lines.append(&mut self.macros.get(&name).unwrap().clone());
-                        did_some = true;
-                    } else {
-                        new_lines.push(l.clone());
-                    }
-                }
-                f.body = new_lines;
+        let mut names = vec![];
+        for name in self.globals.keys() {
+            names.push(name.clone());
+        }
+
+        for name in &names {
+            let mut new_lines = vec![];
+            let mut ok = false;
+            if let ObjectType::Function(f) = &self.globals.get(name).unwrap().dtype {
+                ok = true;
+                let lines = f.body.clone();
+                let obj_name = self.globals.get(name).unwrap().name.clone();
+                new_lines = self.replace_labels_in_body(lines, &obj_name)?;
+            }
+            if ok {
+                did_some = did_some || self.globals.get_mut(name).unwrap().dtype.func_mut().unwrap().body != new_lines;
+                self.globals.get_mut(name).unwrap().dtype.func_mut().unwrap().body = new_lines;
             }
         }
+
+
+        let mut ids = vec![];
+        for id in self.internals.keys() {
+            ids.push(*id);
+        }
+
+        for id in &ids {
+
+            let lines = self.internals.get(id).unwrap().body.clone();
+
+            let obj_name = "".to_string();
+            let new_lines = self.replace_labels_in_body(lines, &obj_name)?;
+
+            did_some = did_some || self.internals.get_mut(id).unwrap().body != new_lines;
+            self.internals.get_mut(id).unwrap().body = new_lines;
+        }
+
 
         Ok(did_some)
     }
@@ -669,7 +685,7 @@ impl ParseEngine {
             .unwrap_or(false)
     }
 
-    fn update(&mut self, section: &str, name: &str, body: &Lines, first_pass: bool) -> Result<(), String> {
+    fn update(&mut self, section: &str, name: &str, body: &Lines) -> Result<(), String> {
         match section {
             SELECTOR => {
                 if self.entry_point.is_empty() {
@@ -693,7 +709,7 @@ impl ParseEngine {
                     params.id = func_id;
                     params.body = body.clone();
                     let prev = self.xrefs.insert(name.to_string(), func_id);
-                    if first_pass && prev.is_some() {
+                    if prev.is_some() {
                         Err(format!(
                             "global function with id = {:x} and name \"{}\" already exist", 
                             func_id,
@@ -718,19 +734,16 @@ impl ParseEngine {
             },
             INTERNAL => {
                 let func_id = self.aliases.get(name).ok_or(format!("id for '{}' not found", name))?;
-                if first_pass {
-                    self.intrefs.insert(name.to_string(), *func_id);
-                    let prev = self.internals.insert(*func_id,Func::new());
-                    if prev.is_some() {
-                        Err(format!("internal function with id = {} already exist", *func_id))?;
-                    }
-                } else {
-                    self.internals.get_mut(func_id).unwrap().body = body.clone();
+                self.intrefs.insert(name.to_string(), *func_id);
+                let prev = self.internals.insert(*func_id,Func::new());
+                if prev.is_some() {
+                    Err(format!("internal function with id = {} already exist", *func_id))?;
                 }
+                self.internals.get_mut(func_id).unwrap().body = body.clone();
             },
             MACROS => {
                 let prev = self.macros.insert(name.to_string(), body.clone());
-                if first_pass && prev.is_some() {
+                if prev.is_some() {
                     Err(format!("macros with name \"{}\" already exist", name))?;
                 }
             },

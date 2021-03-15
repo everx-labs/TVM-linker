@@ -94,6 +94,6 @@ pub fn load_debug_info(
 
     hash2function.insert(root_cell.repr_hash(), "selector".to_owned());
 
-    Some(ContractDebugInfo{hash2function: hash2function})
+    Some(ContractDebugInfo{hash2function })
 }
 
