@@ -321,7 +321,7 @@ impl ParseEngine {
             self.parse_code(source)?;
         }
 
-        self.resolve_lables_and_replace_macros()?;
+        self.resolve_labels_and_replace_macros()?;
 
         if self.entry_point.is_empty() {
             return Err("Selector not found".to_string());
@@ -589,7 +589,7 @@ impl ParseEngine {
         Ok(())
     }
 
-    fn resolve_lables_and_replace_macros(&mut self) -> Result<(), String> {
+    fn resolve_labels_and_replace_macros(&mut self) -> Result<(), String> {
         let mut iter = 0;
         loop {
             iter += 1;
