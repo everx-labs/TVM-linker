@@ -111,6 +111,11 @@ enum ObjectType {
     Data(Data),
 }
 
+enum FunctionId {
+    Name(String),
+    Id(i32)
+}
+
 impl From<&str> for ObjectType {
     fn from(stype: &str) -> ObjectType {
         match stype {
@@ -292,7 +297,7 @@ impl ParseEngine {
 
     pub fn new(sources: Vec<&Path>, abi_json: Option<String>) -> Result<Self, String> {
         let mut engine = ParseEngine {
-            xrefs:      HashMap::new(), 
+            xrefs:      HashMap::new(),
             intrefs:    HashMap::new(), 
             aliases:    HashMap::new(),
             globals:    HashMap::new(), 
@@ -321,7 +326,7 @@ impl ParseEngine {
             self.parse_code(source)?;
         }
 
-        self.resolve_labels_and_replace_macros()?;
+        self.replace_all_labels()?;
 
         if self.entry_point.is_empty() {
             return Err("Selector not found".to_string());
@@ -589,14 +594,14 @@ impl ParseEngine {
         Ok(())
     }
 
-    fn resolve_labels_and_replace_macros(&mut self) -> Result<(), String> {
+    fn replace_all_labels(&mut self) -> Result<(), String> {
         let mut iter = 0;
         loop {
             iter += 1;
             if iter >= 50 {
                 return Err("There are recursive macros or level of nested macros >= 50".to_string());
             }
-            match self.replace_macro() {
+            match self.try_replace_labels() {
                 Ok(do_continue) if do_continue => {
                     continue;
                 }
@@ -610,7 +615,7 @@ impl ParseEngine {
         }
     }
 
-    fn replace_labels_in_body(&mut self, lines: Vec<Line>, obj_name: &String) -> Result<Vec<Line>, String> {
+    fn replace_labels_in_body(&mut self, lines: Vec<Line>, obj_name: FunctionId) -> Result<Vec<Line>, String> {
         let mut new_lines = vec![];
         for line in lines {
             let mut resolved =
@@ -621,47 +626,32 @@ impl ParseEngine {
         Ok(new_lines)
     }
 
-    // return true, if at least one macro was replaced
-    fn replace_macro(&mut self) -> Result<bool, String> {
+    // return true, if at least one label was replaced
+    fn try_replace_labels(&mut self) -> Result<bool, String> {
         let mut did_some = false;
 
-        let mut names = vec![];
-        for name in self.globals.keys() {
-            names.push(name.clone());
-        }
-
+        let names = self.globals.keys().map(|k| k.clone()).collect::<Vec<_>>();
         for name in &names {
-            let mut new_lines = vec![];
-            let mut ok = false;
             if let ObjectType::Function(f) = &self.globals.get(name).unwrap().dtype {
-                ok = true;
                 let lines = f.body.clone();
                 let obj_name = self.globals.get(name).unwrap().name.clone();
-                new_lines = self.replace_labels_in_body(lines, &obj_name)?;
-            }
-            if ok {
-                did_some = did_some || self.globals.get_mut(name).unwrap().dtype.func_mut().unwrap().body != new_lines;
-                self.globals.get_mut(name).unwrap().dtype.func_mut().unwrap().body = new_lines;
+                let new_lines = self.replace_labels_in_body(lines, FunctionId::Name(obj_name))?;
+
+                let body = &mut self.globals.get_mut(name).unwrap().dtype.func_mut().unwrap().body;
+                did_some = did_some || *body != new_lines;
+                *body = new_lines;
             }
         }
 
 
-        let mut ids = vec![];
-        for id in self.internals.keys() {
-            ids.push(*id);
-        }
-
+        let ids = self.internals.keys().map(|x| *x).collect::<Vec<_>>();
         for id in &ids {
-
             let lines = self.internals.get(id).unwrap().body.clone();
-
-            let obj_name = "".to_string();
-            let new_lines = self.replace_labels_in_body(lines, &obj_name)?;
-
-            did_some = did_some || self.internals.get_mut(id).unwrap().body != new_lines;
-            self.internals.get_mut(id).unwrap().body = new_lines;
+            let new_lines = self.replace_labels_in_body(lines, FunctionId::Id(*id))?;
+            let body = &mut self.internals.get_mut(id).unwrap().body;
+            did_some = did_some || *body != new_lines;
+            *body = new_lines;
         }
-
 
         Ok(did_some)
     }
@@ -871,7 +861,7 @@ impl ParseEngine {
         pers_dict.data().map(|cell| cell.clone())
     }
 
-    fn replace_labels(&mut self, line: &Line, cur_obj_name: &str) -> Result<Lines, String> {
+    fn replace_labels(&mut self, line: &Line, cur_obj_name: &FunctionId) -> Result<Lines, String> {
         resolve_name(line, |name| {
             self.intrefs.get(name).and_then(|id| Some(id.clone()))
         })
@@ -879,7 +869,7 @@ impl ParseEngine {
             let mut res = self.xrefs.get(name).map(|id| id.clone());
             if res.is_some(){
                 let id = res.unwrap();
-                self.insert_called_func(cur_obj_name, id);
+                self.insert_called_func(&cur_obj_name, id);
                 res = Some(id);
             }
             res
@@ -905,19 +895,23 @@ impl ParseEngine {
         })
     }
 
-    fn insert_called_func(&mut self, obj_name: &str, func_id: u32) {
-         self.globals.get_mut(obj_name)
-            .and_then(|obj| {
-                obj.dtype.func_mut().and_then(|f| {
-                    f.calls.push(func_id);
+    fn insert_called_func(&mut self, from_func: &FunctionId, to_func: u32) {
+        match from_func {
+            FunctionId::Name(name) => {
+                self.globals.get_mut(name)
+                    .and_then(|obj| {
+                        obj.dtype.func_mut().and_then(|f| {
+                            f.calls.push(to_func);
+                            Some(f)
+                        })
+                    });
+            }
+            FunctionId::Id(id) => {
+                self.internals.get_mut(&id).and_then(|f| {
+                    f.calls.push(to_func);
                     Some(f)
-                })
-            });
-        if let Some(cur_id) = self.intrefs.get(obj_name) {
-            self.internals.get_mut(cur_id).and_then(|f| {
-                f.calls.push(func_id);
-                Some(f)
-            });
+                });
+            }
         }
     }
 
@@ -927,7 +921,7 @@ impl ParseEngine {
             obj.1.dtype.func()
                 .and_then(|i| if obj.1.public { Some(i) } else { None })
         });
-       
+
         for func in publics_iter {
             self.enum_calling_funcs(&func, &mut ids);
         }
@@ -946,22 +940,12 @@ impl ParseEngine {
     }
 
     fn enum_calling_funcs(&self, func: &Func, ids: &mut HashSet<u32>) {
-        ids.insert(func.id);
+        ids.insert(func.id); // TODO there are public/private globs and internals
 
-        let mut privat_func_id = HashSet::<u32>::new();
         for id in &func.calls {
-            privat_func_id.insert(*id);
-        }
-        let reg = Regex::new(r"CALL\s+(?P<id>\d+)").unwrap();
-        for caps in reg.captures_iter(&lines_to_string(&func.body)) {
-            let id = caps["id"].parse::<u32>().unwrap();
-            privat_func_id.insert(id);
-        }
-
-        for id in privat_func_id {
-            if ids.insert(id) {
+            if ids.insert(*id) {
                 let subfunc = self.globals.iter().find(|(_name, obj)| {
-                    obj.dtype.func().map(|f| f.id == id).unwrap_or(false)
+                    obj.dtype.func().map(|f| f.id == *id).unwrap_or(false)
                 })
                     .map(|(_name, obj)| obj.dtype.func().unwrap());
                 if subfunc.is_some() {
@@ -976,9 +960,14 @@ impl ParseEngine {
         let entry = lines_to_string(&self.entry());
         println!("Entry point:\n{}\n{}\n{}", line, entry, line);
         println!("General-purpose functions:\n{}", line);
-        
-        for (k, v) in &self.xrefs {
-            println! ("Function {:30}: id={:08X} public={}", k, v, self.globals.get(k).unwrap().public);
+
+        let mut keys = self.xrefs.keys().collect::<Vec<_>>();
+        keys.sort();
+        for k in keys {
+            println! ("Function {:30}: id={:08X} public={}",
+                      k,
+                      self.xrefs.get(k).unwrap(),
+                      self.globals.get(k).unwrap().public);
         }
         println!("private:");
         for (k, v) in &self.privates() {
@@ -1176,8 +1165,10 @@ mod tests {
 
     #[test]
     fn test_macros_02() {
-        let sources = vec![Path::new("./tests/test_stdlib.tvm"),
-                                     Path::new("./tests/test_macros_02.code")];
+        let sources = vec![
+            Path::new("./tests/test_stdlib.tvm"),
+            Path::new("./tests/test_macros_02.code")
+        ];
         let parser = ParseEngine::new(sources, None).unwrap();
         let publics = parser.publics();
         let body = publics.get(&0x0D6E4079).unwrap();
