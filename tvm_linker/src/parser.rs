@@ -626,7 +626,7 @@ impl ParseEngine {
         Ok(new_lines)
     }
 
-    // return true, if at least one labels was replaced
+    // return true, if at least one label was replaced
     fn try_replace_labels(&mut self) -> Result<bool, String> {
         let mut did_some = false;
 
