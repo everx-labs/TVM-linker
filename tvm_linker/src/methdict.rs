@@ -41,7 +41,11 @@ where
         let val = compile_code(&code).map_err(|e| {
             (pair.0.clone(), format_compilation_error_string(e, &pair.1))
         })?;
-        if map.set(key.clone(), &val).is_err() {
+        if val.remaining_bits() <= (1023 - (32 + 10)) { // key_length + hashmap overheads
+            map.set(key.clone(), &val).map_err(|e| {
+                (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
+            })?;
+        } else {
             map.setref(key, &val.into_cell()).map_err(|e| {
                 (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
             })?;
