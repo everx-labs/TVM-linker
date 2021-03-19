@@ -2730,6 +2730,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn round_trip_tests() {
         for n in 0..105 {
             let filename = format!("tests/disasm/{:03}.b64", n);
