@@ -2734,7 +2734,7 @@ mod tests {
         for n in 0..105 {
             let filename = format!("tests/disasm/{:03}.b64", n);
             let raw = std::fs::read_to_string(filename).unwrap();
-            round_trip_test(&raw, true);
+            round_trip_test(&raw, false);
         }
         for n in 105..130 {
             let filename = format!("tests/disasm/{:03}.b64", n);
