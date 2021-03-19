@@ -128,6 +128,7 @@ fn linker_main() -> Result<(), String> {
             (@arg NOW: --now +takes_value "Supplies transaction creation unixtime")
             (@arg TICKTOCK: --ticktock +takes_value conflicts_with[BODY] "Emulates ticktock transaction in masterchain, 0 for tick and -1 for tock")
             (@arg GASLIMIT: -l --("gas-limit") +takes_value "Defines gas limit for tvm execution")
+            (@arg CONFIG: --config +takes_value "Imports config parameters from a config contract boc")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[BODY] "Supplies the name of the calling contract method")
@@ -235,6 +236,16 @@ fn linker_main() -> Result<(), String> {
             }
             sources.push(path);
         }
+        let env_lib = env::var("TVM_LINKER_LIB_PATH").unwrap_or_default();
+        if sources.is_empty() && !env_lib.is_empty() {
+            println!("TVM_LINKER_LIB_PATH: {:?}", &env_lib);
+            let path = Path::new(&env_lib);
+            if !path.exists() {
+                return Err(format!("File {} doesn't exist", &env_lib));
+            }
+            sources.push(path);
+        }
+            
         let path = Path::new(input);
         if !path.exists() {
             return Err(format!("File {} doesn't exist", input));
@@ -391,9 +402,9 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
     let msg_info = MsgInfo {
         balance: matches.value_of("INTERNAL"),
         src: matches.value_of("SRCADDR"),
-        now: now,
+        now,
         bounced: matches.is_present("BOUNCED"),
-        body: body,
+        body,
     };
 
     let gas_limit = matches.value_of("GASLIMIT")
@@ -405,6 +416,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         matches.value_of("INPUT").unwrap(),
         matches.value_of("BALANCE"),
         msg_info,
+        matches.value_of("CONFIG"),
         sign,
         ticktock,
         gas_limit,
