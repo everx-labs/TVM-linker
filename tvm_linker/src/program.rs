@@ -24,7 +24,6 @@ use ton_types::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use ton_types::{Cell, SliceData, BuilderData, IBitstring};
 use ton_types::dictionary::{HashmapE, HashmapType};
 use parser::{ptr_to_builder, ParseEngine, ParseEngineResults};
-use debug_info::{save_debug_info, DebugInfoFunction, DebugInfo};
 
 pub struct Program {
     language: Option<String>,
@@ -97,29 +96,6 @@ impl Program {
                 !(remove_ctor && self.engine.global_name(*k).unwrap_or_default() == "constructor")
             ).collect()
     }
-    
-    fn save_debug_info(&self, filename: String) {
-        let mut debug_info = DebugInfo::new();
-        for pair in self.publics_filtered(false).iter() {
-            let id = *pair.0;
-            let name = self.engine.global_name(id).unwrap();
-            debug_info.publics.push(DebugInfoFunction{id: id as i64, name });
-        }
-        for pair in self.engine.privates().iter() {
-            let id = *pair.0;
-            let name = self.engine.global_name(id).unwrap();
-            debug_info.privates.push(DebugInfoFunction{id: id as i64, name });
-        }
-        for pair in self.engine.internals().iter() {
-            let id = *pair.0;
-            let name = self.engine.internal_name(id).unwrap();
-            debug_info.internals.push(DebugInfoFunction{id: id as i64, name });
-        }
-        debug_info.publics.sort_by(|a, b| a.id.cmp(&b.id));
-        debug_info.privates.sort_by(|a, b| a.id.cmp(&b.id));
-        debug_info.internals.sort_by(|a, b| a.id.cmp(&b.id));
-        save_debug_info(debug_info, filename);
-    }
 
     pub fn public_method_dict(&mut self, remove_ctor: bool) -> std::result::Result<Option<Cell>, String> {
         let mut dict = prepare_methods(&self.engine.internals())
@@ -135,7 +111,7 @@ impl Program {
 
     #[allow(dead_code)]
     pub fn compile_to_file(&mut self, wc: i8) -> std::result::Result<String, String> {
-        self.compile_to_file_ex(wc, None, None, None, false, false)
+        self.compile_to_file_ex(wc, None, None, None, false)
     }
 
     pub fn compile_to_file_ex(
@@ -145,15 +121,10 @@ impl Program {
         ctor_params: Option<&str>,
         out_file: Option<&str>,
         trace: bool,
-        debug_info: bool,
     ) -> std::result::Result<String, String> {
         let mut state_init = self.compile_to_state()?;
         if let Some(ctor_params) = ctor_params {
             state_init = self.apply_constructor(state_init, abi_file.unwrap(), ctor_params, trace)?;
-        }
-        if debug_info {
-            let debug_info_filename = format!("{}{}", abi_file.map_or("debug_info.", |a| a.trim_end_matches("abi.json")), "debug.json");
-            self.save_debug_info(debug_info_filename);
         }
         save_to_file(state_init, out_file, wc)
     }
@@ -493,7 +464,6 @@ mod tests {
             Some(|_, _| {}),
             false,
             String::from(""),
-            String::from(""),
         );
         // must equal to out of gas exception
         assert_eq!(exit_code, 13);
@@ -534,7 +504,6 @@ mod tests {
             None,
             Some(|_, _| {}),
             true,
-            String::from(""),
             debug_map_filename,
         );
         assert_eq!(exit_code, 0);
