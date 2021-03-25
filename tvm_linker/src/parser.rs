@@ -562,6 +562,15 @@ impl ParseEngine {
                 );                
             } else if label_regex.is_match(&l) { 
                 //TODO: for goto
+            } else if loc_regex.is_match(&l) {
+                let cap = loc_regex.captures(&l).unwrap();
+                let filename = String::from(cap.get(1).unwrap().as_str());
+                let line = cap.get(2).unwrap().as_str().parse::<usize>().unwrap();
+                if line == 0 { // special value for resetting current source pos
+                    source_pos = None;
+                } else {
+                    source_pos = Some(DbgPos { filename, line });
+                }
             } else if dotted_regex.is_match(&l) {
                 // .param [value]
                 let cap = dotted_regex.captures(&l).unwrap();
@@ -573,15 +582,6 @@ impl ParseEngine {
                     },
                     _ => Err(format!("line {}: invalid param \"{}\":{}", lnum, param, l))?,
                 };
-            } else if loc_regex.is_match(&l) {
-                let cap = loc_regex.captures(&l).unwrap();
-                let filename = String::from(cap.get(1).unwrap().as_str());
-                let line = cap.get(2).unwrap().as_str().parse::<usize>().unwrap();
-                if line == 0 { // special value for resetting current source pos
-                    source_pos = None;
-                } else {
-                    source_pos = Some(DbgPos { filename, line });
-                }
             } else {
                 let line = Line { text: l.clone(), pos };
                 let mut resolved = vec![line];
