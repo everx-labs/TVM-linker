@@ -10,48 +10,66 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use ton_block::Serializable;
-use ton_labs_assembler::{compile_code, CompileError};
+use ton_labs_assembler::{compile_code_debuggable, CompileError, Lines, DbgInfo};
 use ton_types::{SliceData, dictionary::HashmapE};
-use parser::{Lines, lines_to_string};
 
 pub fn prepare_methods<T>(
     methods: &HashMap<T, Lines>,
-) -> Result<HashmapE, (T, String)>
+) -> Result<(HashmapE, DbgInfo), (T, String)>
 where
     T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash,
 {
     let bit_len = SliceData::from(T::default().write_to_new_cell().unwrap()).remaining_bits();
     let mut map = HashmapE::with_bit_len(bit_len);
-    insert_methods(&mut map, methods)?;
-    Ok(map)
+    let mut dbg = DbgInfo::new();
+    insert_methods(&mut map, &mut dbg, methods)?;
+    Ok((map, dbg))
 }
 
 pub fn insert_methods<T>(
     map: &mut HashmapE,
+    dbg: &mut DbgInfo,
     methods: &HashMap<T, Lines>,
 ) -> Result<(), (T, String)>
 where
     T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash,
 {
     for pair in methods.iter() {
-        let key : SliceData = pair.0.clone().write_to_new_cell().unwrap().into();
-        let code = lines_to_string(pair.1);
-        let val = compile_code(&code).map_err(|e| {
+        let key: SliceData = pair.0.clone().write_to_new_cell().unwrap().into();
+        let mut val = compile_code_debuggable(pair.1.clone()).map_err(|e| {
             (pair.0.clone(), format_compilation_error_string(e, &pair.1))
         })?;
-        if val.remaining_bits() <= (1023 - (32 + 10)) { // key_length + hashmap overheads
-            map.set(key.clone(), &val).map_err(|e| {
+        if val.0.remaining_bits() <= (1023 - (32 + 10)) { // key_length + hashmap overheads
+            map.set(key.clone(), &val.0).map_err(|e| {
                 (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
             })?;
         } else {
-            map.setref(key, &val.into_cell()).map_err(|e| {
+            map.setref(key.clone(), &val.0.into_cell()).map_err(|e| {
                 (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
             })?;
         }
+        let before = val.0;
+        let after = map.get(key).unwrap().unwrap();
+        adjust_debug_map(&mut val.1, before, after);
+        dbg.map.append(&mut val.1.map.clone())
     }
     Ok(())
+}
+
+fn adjust_debug_map(map: &mut DbgInfo, before: SliceData, after: SliceData) {
+    let hash_old = before.cell().repr_hash().to_hex_string();
+    let hash_new = after.cell().repr_hash().to_hex_string();
+    let old = map.map.remove(&hash_old).unwrap();
+
+    let adjustment = after.pos();
+    let mut new = BTreeMap::new();
+    for (k, v) in old {
+        new.insert(k + adjustment, v);
+    }
+
+    map.map.insert(hash_new, new);
 }
 
 fn trim_newline(s: &mut String) {
@@ -70,7 +88,7 @@ pub fn format_compilation_error_string(err: CompileError, func_code: &Lines) -> 
         CompileError::Operation(position @ _, _, _) => position.line,
     };
     let mut line = func_code[line_num - 1].text.clone();
-    let filename = func_code[line_num - 1].filename.clone();
+    let filename = func_code[line_num - 1].pos.filename.clone();
     trim_newline(&mut line);
     format!(
         "Compilation failed: \"_name_\":\n{}:{}:\n{}",

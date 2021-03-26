@@ -13,7 +13,7 @@
 use regex::Regex;
 use std::convert::TryFrom;
 use std::fmt::{LowerHex, UpperHex, Display};
-use parser::{Line, Lines};
+use ton_labs_assembler::{Line, Lines};
 
 lazy_static! {
     pub static ref NAMES: Regex = Regex::new(r"\$(?P<id>:?[-_0-9a-zA-Z\.]+)(?P<offset>\+\d+)?(:(?P<len>\d*)?(?P<fmt>[xX])?)?\$").unwrap();
@@ -72,7 +72,7 @@ pub fn resolve_name<F, T>(line: &Line, mut get: F) -> Result<Lines, String>
         res_str += " ";
     }
     res_str += text_rem;
-    let res = Line { text: res_str, filename: line.filename.clone(), line: line.line };
+    let res = Line::new(res_str.as_str(), line.pos.filename.as_str(), line.pos.line);
     Ok(vec![res])
 }
 
@@ -100,7 +100,7 @@ mod tests {
         where
             F: FnMut(&str) -> Option<T>,
             T: LowerHex + UpperHex + Display + TryFrom<isize> + std::ops::AddAssign {
-        let line = Line { text: text.to_string(), filename: "".to_string(), line: 0 };
+        let line = Line::new(text, "", 0);
         let res = super::resolve_name(&line, get);
         res.map(|lines| {
             assert!(lines.len() == 1);
@@ -114,7 +114,7 @@ mod tests {
         assert_eq!(resolve_name("00$ctor$", id_by_name),    Ok("00287454207".to_string()));
         assert_eq!(resolve_name("$ctor_1$end", id_by_name), Ok("4369end".to_string()));
         assert_eq!(resolve_name("$:int$", id_by_name),      Ok("10".to_string()));
-        assert_eq!(resolve_name("$x.y$", id_by_name),      Ok("11".to_string()));
+        assert_eq!(resolve_name("$x.y$", id_by_name),       Ok("11".to_string()));
     }
 
     #[test]
@@ -137,7 +137,7 @@ mod tests {
         assert_eq!(resolve_name("$get:02x$", id_by_name),   Ok("ff".to_string()));
         assert_eq!(resolve_name("$ctor:02x$", id_by_name),  Ok("112233ff".to_string()));
         assert_eq!(resolve_name("$:int:011X$", id_by_name), Ok("0000000000A".to_string()));
-        assert_eq!(resolve_name("$x.y:04x$", id_by_name),      Ok("000b".to_string()));
+        assert_eq!(resolve_name("$x.y:04x$", id_by_name),   Ok("000b".to_string()));
     }
 
     #[test]
@@ -147,12 +147,12 @@ mod tests {
 
     #[test]
     fn test_resolve_offset() {
-        assert_eq!(resolve_name("$ctor+16$", id_by_name), Ok("287454223".to_string()));
-        assert_eq!(resolve_name("$ctor+0$", id_by_name), Ok("287454207".to_string()));
-        assert_eq!(resolve_name("$ctor+16:X$", id_by_name), Ok("1122340F".to_string()));
+        assert_eq!(resolve_name("$ctor+16$", id_by_name),     Ok("287454223".to_string()));
+        assert_eq!(resolve_name("$ctor+0$", id_by_name),      Ok("287454207".to_string()));
+        assert_eq!(resolve_name("$ctor+16:X$", id_by_name),   Ok("1122340F".to_string()));
         assert_eq!(resolve_name("$get+256:08x$", id_by_name), Ok("000001ff".to_string()));
-        assert_eq!(resolve_name("$ctor+$", id_by_name), Ok("$ctor+$".to_string()));
-        assert_eq!(resolve_name("$x.y+1$", id_by_name),      Ok("12".to_string()));
+        assert_eq!(resolve_name("$ctor+$", id_by_name),       Ok("$ctor+$".to_string()));
+        assert_eq!(resolve_name("$x.y+1$", id_by_name),       Ok("12".to_string()));
     }
 
     #[test]
