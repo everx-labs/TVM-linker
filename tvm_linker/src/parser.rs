@@ -314,10 +314,6 @@ impl ParseEngine {
 
         self.replace_all_labels()?;
 
-        if self.entry_point.is_empty() {
-            return Err("Selector not found".to_string());
-        }
-
         self.drop_unused_objects();
         Ok(())
     }    

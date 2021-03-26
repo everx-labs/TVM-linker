@@ -84,7 +84,7 @@ impl Program {
     }
 
     pub fn internal_method_dict(&mut self) -> std::result::Result<Option<Cell>, String> {
-        let dict = prepare_methods(&self.engine.privates())
+        let dict = prepare_methods(&self.engine.privates(), true)
             .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()))?;
         self.dbgmap.map.append(&mut dict.1.map.clone());
         Ok(dict.0.data().map(|cell| cell.clone()))
@@ -98,10 +98,10 @@ impl Program {
     }
 
     pub fn public_method_dict(&mut self, remove_ctor: bool) -> std::result::Result<Option<Cell>, String> {
-        let mut dict = prepare_methods(&self.engine.internals())
+        let mut dict = prepare_methods(&self.engine.internals(), true)
             .map_err(|e| e.1.replace("_name_", &self.engine.internal_name(e.0).unwrap()) )?;
 
-        insert_methods(&mut dict.0, &mut dict.1, &self.publics_filtered(remove_ctor))
+        insert_methods(&mut dict.0, &mut dict.1, &self.publics_filtered(remove_ctor), true)
             .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()) )?;
 
         self.dbgmap.map.append(&mut dict.1.map);
@@ -190,12 +190,11 @@ impl Program {
         Ok(state)
     }
 
-    fn compile_asm(&mut self, remove_ctor: bool) -> std::result::Result<Cell, String> {
+    fn compile_asm_old(&mut self, remove_ctor: bool) -> std::result::Result<Cell, String> {
         let internal_selector_text = vec![
             Line::new("DICTPUSHCONST 32\n", "<internal-selector>", 1),
             Line::new("DICTUGETJMP\n",      "<internal-selector>", 2),
         ];
-
         let mut internal_selector = compile_code_debuggable(internal_selector_text)
             .map_err(|_| "unexpected TVM error while compiling internal selector".to_string())?;
         internal_selector.0.append_reference(self.internal_method_dict()?.unwrap_or_default().into());
@@ -218,6 +217,79 @@ impl Program {
         self.dbgmap.map.insert(hash, entry.1.clone());
 
         Ok(main_selector.0.cell().clone())
+    }
+
+    fn compile_asm(&mut self, remove_ctor: bool) -> std::result::Result<Cell, String> {
+        if !self.entry().is_empty() {
+            // TODO wipe out the old behavior
+            return self.compile_asm_old(remove_ctor);
+        }
+
+        let internal_selector_text = vec![
+            // indirect jump
+            Line::new("DICTPUSHCONST 32\n", "<internal-selector>", 1),
+            Line::new("DICTUGETJMP\n",      "<internal-selector>", 2),
+        ];
+
+        let mut internal_selector = compile_code_debuggable(internal_selector_text)
+            .map_err(|_| "unexpected TVM error while compiling internal selector".to_string())?;
+
+        let mut dict = prepare_methods(&self.engine.privates(), false)
+            .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()))?;
+
+        insert_methods(&mut dict.0, &mut dict.1, &self.engine.internals(), false)
+            .map_err(|e| e.1.replace("_name_", &self.engine.internal_name(e.0).unwrap()) )?;
+
+        insert_methods(&mut dict.0, &mut dict.1, &self.publics_filtered(remove_ctor), false)
+            .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()) )?;
+
+        let mut entry_points = vec![];
+        for id in -2..1 {
+            let key = id.write_to_new_cell().unwrap().into();
+            let value = dict.0.remove(key).unwrap();
+            entry_points.push(value.unwrap_or(SliceData::default()));
+        }
+
+        internal_selector.0.append_reference(SliceData::from(dict.0.data().unwrap_or(&Cell::default())));
+        self.dbgmap.map.append(&mut dict.1.map.clone());
+
+        // adjust hash of internal_selector cell
+        let hash = internal_selector.0.cell().repr_hash().to_hex_string();
+        assert_eq!(internal_selector.1.map.len(), 1);
+        let entry = internal_selector.1.map.iter().next().unwrap();
+        self.dbgmap.map.insert(hash, entry.1.clone());
+
+        let entry_selector_text = vec![
+            Line::new("SETCP 0\n",     "<entry-selector>", 1),
+            Line::new("PUSHREFCONT\n", "<entry-selector>", 2),
+            Line::new("POPCTR c3\n",   "<entry-selector>", 3),
+            Line::new("DUP\n",         "<entry-selector>", 4),
+            Line::new("IFNOTJMPREF\n", "<entry-selector>", 5),  //  0 - internal transaction
+            Line::new("DUP\n",         "<entry-selector>", 6),
+            Line::new("EQINT -1\n",    "<entry-selector>", 7),
+            Line::new("IFJMPREF\n",    "<entry-selector>", 8),  // -1 - external transaction
+            Line::new("DUP\n",         "<entry-selector>", 9),
+            Line::new("EQINT -2\n",    "<entry-selector>", 10),
+            Line::new("IFJMPREF\n",    "<entry-selector>", 11), // -2 - ticktock transaction
+            Line::new("THROW 11\n",    "<entry-selector>", 12),
+        ];
+
+        let mut entry_selector = compile_code_debuggable(entry_selector_text.clone())
+            .map_err(|e| format_compilation_error_string(e, &entry_selector_text).replace("_name_", "selector"))?;
+
+        entry_selector.0.append_reference(internal_selector.0);
+        entry_points.reverse();
+        for entry in entry_points {
+            entry_selector.0.append_reference(entry);
+        }
+
+        // adjust hash of entry_selector cell
+        let hash = entry_selector.0.cell().repr_hash().to_hex_string();
+        assert_eq!(entry_selector.1.map.len(), 1);
+        let entry = entry_selector.1.map.iter().next().unwrap();
+        self.dbgmap.map.insert(hash, entry.1.clone());
+
+        Ok(entry_selector.0.cell().clone())
     }
 
     pub fn debug_print(&self) {
