@@ -49,10 +49,10 @@ where
             map.setref(key.clone(), &val.0.into_cell()).map_err(|e| {
                 (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
             })?;
-            let before = val.0;
-            let after = map.get(key).unwrap().unwrap();
-            adjust_debug_map(&mut val.1, before, after);
         }
+        let before = val.0;
+        let after = map.get(key).unwrap().unwrap();
+        adjust_debug_map(&mut val.1, before, after);
         dbg.map.append(&mut val.1.map.clone())
     }
     Ok(())
