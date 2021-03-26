@@ -84,7 +84,7 @@ impl Program {
     }
 
     pub fn internal_method_dict(&mut self) -> std::result::Result<Option<Cell>, String> {
-        let dict = prepare_methods(&self.engine.privates())
+        let dict = prepare_methods(&self.engine.privates(), true)
             .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()))?;
         self.dbgmap.map.append(&mut dict.1.map.clone());
         Ok(dict.0.data().map(|cell| cell.clone()))
@@ -98,10 +98,10 @@ impl Program {
     }
 
     pub fn public_method_dict(&mut self, remove_ctor: bool) -> std::result::Result<Option<Cell>, String> {
-        let mut dict = prepare_methods(&self.engine.internals())
+        let mut dict = prepare_methods(&self.engine.internals(), true)
             .map_err(|e| e.1.replace("_name_", &self.engine.internal_name(e.0).unwrap()) )?;
 
-        insert_methods(&mut dict.0, &mut dict.1, &self.publics_filtered(remove_ctor))
+        insert_methods(&mut dict.0, &mut dict.1, &self.publics_filtered(remove_ctor), true)
             .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()) )?;
 
         self.dbgmap.map.append(&mut dict.1.map);
@@ -234,13 +234,13 @@ impl Program {
         let mut internal_selector = compile_code_debuggable(internal_selector_text)
             .map_err(|_| "unexpected TVM error while compiling internal selector".to_string())?;
 
-        let mut dict = prepare_methods(&self.engine.privates())
+        let mut dict = prepare_methods(&self.engine.privates(), false)
             .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()))?;
 
-        insert_methods(&mut dict.0, &mut dict.1, &self.engine.internals())
+        insert_methods(&mut dict.0, &mut dict.1, &self.engine.internals(), false)
             .map_err(|e| e.1.replace("_name_", &self.engine.internal_name(e.0).unwrap()) )?;
 
-        insert_methods(&mut dict.0, &mut dict.1, &self.publics_filtered(remove_ctor))
+        insert_methods(&mut dict.0, &mut dict.1, &self.publics_filtered(remove_ctor), false)
             .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()) )?;
 
         let mut entry_points = vec![];

@@ -17,6 +17,7 @@ use ton_types::{SliceData, dictionary::HashmapE};
 
 pub fn prepare_methods<T>(
     methods: &HashMap<T, Lines>,
+    adjust_entry_points: bool,
 ) -> Result<(HashmapE, DbgInfo), (T, String)>
 where
     T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash,
@@ -24,7 +25,7 @@ where
     let bit_len = SliceData::from(T::default().write_to_new_cell().unwrap()).remaining_bits();
     let mut map = HashmapE::with_bit_len(bit_len);
     let mut dbg = DbgInfo::new();
-    insert_methods(&mut map, &mut dbg, methods)?;
+    insert_methods(&mut map, &mut dbg, methods, adjust_entry_points)?;
     Ok((map, dbg))
 }
 
@@ -32,6 +33,7 @@ pub fn insert_methods<T>(
     map: &mut HashmapE,
     dbg: &mut DbgInfo,
     methods: &HashMap<T, Lines>,
+    adjust_entry_points: bool,
 ) -> Result<(), (T, String)>
 where
     T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash,
@@ -50,9 +52,12 @@ where
                 (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
             })?;
         }
-        let before = val.0;
-        let after = map.get(key).unwrap().unwrap();
-        adjust_debug_map(&mut val.1, before, after);
+        let id = key.clone().get_next_i32().unwrap();
+        if adjust_entry_points || id < -2 || id > 0 {
+            let before = val.0;
+            let after = map.get(key).unwrap().unwrap();
+            adjust_debug_map(&mut val.1, before, after);
+        }
         dbg.map.append(&mut val.1.map.clone())
     }
     Ok(())
