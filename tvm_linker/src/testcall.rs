@@ -18,6 +18,7 @@ use crate::printer::msg_printer;
 use program::{load_from_file, save_to_file, get_now};
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use serde_json::Value;
+use std::fs::File;
 use std::str::FromStr;
 use std::sync::Arc;
 use ton_vm::executor::{Engine, EngineTraceInfo, EngineTraceInfoType, gas::gas_state::Gas};
@@ -30,7 +31,7 @@ use ton_block::{
     InternalMessageHeader, Message, MsgAddressExt, MsgAddressInt, OutAction,
     OutActions, Serializable, StateInit, UnixTime32
 };
-use debug_info::{load_debug_info, ContractDebugInfo};
+use ton_labs_assembler::DbgInfo;
 
 const DEFAULT_ACCOUNT_BALANCE: &str = "100000000000";
 
@@ -238,6 +239,15 @@ pub struct MsgInfo<'a> {
     pub body: Option<SliceData>,
 }
 
+pub fn load_debug_info(
+    filename: String,
+) -> Option<DbgInfo> {
+    match File::open(filename) {
+        Ok(file) => Some(serde_json::from_reader(file).unwrap()),
+        Err(_) => None
+    }
+}
+
 pub fn call_contract<F>(
     smc_file: &str,
     smc_balance: Option<&str>,
@@ -248,14 +258,14 @@ pub fn call_contract<F>(
     gas_limit: Option<i64>,
     action_decoder: Option<F>,
     debug: bool,
-    debug_info_filename: String,
+    debug_map_filename: String,
 ) -> i32
     where F: Fn(SliceData, bool)
 {
     let addr = AccountId::from_str(smc_file).unwrap();
     let addr_int = IntegerData::from_str_radix(smc_file, 16).unwrap();
     let state_init = load_from_file(&format!("{}.tvc", smc_file));
-    let debug_info = load_debug_info(&state_init, debug_info_filename);
+    let debug_info = load_debug_info(debug_map_filename);
     let config_cell = config_file.map(|filename| {
         let state = load_from_file(filename);
         let (_code, data) = load_code_and_data(&state);
@@ -273,7 +283,7 @@ pub fn call_contract<F>(
     exit_code
 }
 
-fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debug_info: &Option<ContractDebugInfo>) {
+fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debug_info: &Option<DbgInfo>) {
 
     if info.info_type == EngineTraceInfoType::Dump {
         println!("{}", info.cmd_str);
@@ -296,12 +306,16 @@ fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debu
     );
 
     if let Some(debug_info) = debug_info {
-        // TODO: move
-        let fname = match debug_info.hash2function.get(&info.cmd_code.cell().repr_hash()) {
-            Some(fname) => fname,
-            None => "n/a"
+        let cell_hash = info.cmd_code.cell().repr_hash().to_hex_string();
+        let offset = info.cmd_code.pos();
+        let position = match debug_info.map.get(&cell_hash) {
+            Some(offset_map) => match offset_map.get(&offset) {
+                Some(pos) => format!("{}:{}", pos.filename, pos.line),
+                None => String::from("-:0 (offset not found)")
+            },
+            None => String::from("-:0 (cell hash not found)")
         };
-        println!("function: {}", fname);
+        println!("Position: {}", position);
     }
 
     println!("\n--- Stack trace ------------------------");
@@ -315,7 +329,7 @@ pub fn call_contract_ex<F>(
     addr: AccountId,
     addr_int: IntegerData,
     state_init: StateInit,
-    debug_info: Option<ContractDebugInfo>,
+    debug_info: Option<DbgInfo>,
     smc_balance: Option<&str>,
     msg_info: MsgInfo,
     config: Option<Cell>,
@@ -455,7 +469,7 @@ pub fn perform_contract_call<F>(
         None,
         if decode_c5 { Some(action_decoder) } else { None },
         debug,
-        String::from("")
+        String::from(""),
     )
 }
 

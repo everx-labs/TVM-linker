@@ -19,24 +19,18 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 use methdict::*;
 use ton_block::*;
-use parser::{Lines, lines_to_string};
-use ton_labs_assembler::{compile_code};
+use ton_labs_assembler::{Line, Lines, compile_code_debuggable, DbgInfo};
 use ton_types::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use ton_types::{Cell, SliceData, BuilderData, IBitstring};
 use ton_types::dictionary::{HashmapE, HashmapType};
 use parser::{ptr_to_builder, ParseEngine, ParseEngineResults};
-use debug_info::{save_debug_info, DebugInfoFunction, DebugInfo};
 
 pub struct Program {
     language: Option<String>,
     engine: ParseEngineResults,
     keypair: Option<Keypair>,
+    pub dbgmap: DbgInfo,
 }
-
-const SELECTOR_INTERNAL: &str = "
-    DICTPUSHCONST 32
-	DICTUGETJMP
-";
 
 impl Program {
     pub fn new(parser: ParseEngine) -> Self {
@@ -44,6 +38,7 @@ impl Program {
             language: None,
             engine: ParseEngineResults::new(parser),
             keypair: None,
+            dbgmap: DbgInfo::new(),
         }
     }
 
@@ -88,79 +83,54 @@ impl Program {
         self.engine.entry()
     }
 
-    pub fn internal_method_dict(&self) -> std::result::Result<Option<Cell>, String> {
-        let dict = prepare_methods(&self.engine.privates())
-            .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()) )?;
-        Ok(dict.data().map(|cell| cell.clone()))
+    pub fn internal_method_dict(&mut self) -> std::result::Result<Option<Cell>, String> {
+        let dict = prepare_methods(&self.engine.privates(), true)
+            .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()))?;
+        self.dbgmap.map.append(&mut dict.1.map.clone());
+        Ok(dict.0.data().map(|cell| cell.clone()))
     }
-    
+
     fn publics_filtered(&self, remove_ctor: bool) -> HashMap<u32, Lines> {
         self.engine.publics().into_iter()
             .filter(|(k, _)| 
                 !(remove_ctor && self.engine.global_name(*k).unwrap_or_default() == "constructor")
             ).collect()
     }
-    
-    fn save_debug_info(&self, filename: String) {
-        let mut debug_info = DebugInfo::new();
-        for pair in self.publics_filtered(false).iter() {
-            let id = *pair.0;
-            let name = self.engine.global_name(id).unwrap();
-            debug_info.publics.push(DebugInfoFunction{id: id as i64, name });
-        }
-        for pair in self.engine.privates().iter() {
-            let id = *pair.0;
-            let name = self.engine.global_name(id).unwrap();
-            debug_info.privates.push(DebugInfoFunction{id: id as i64, name });
-        }
-        for pair in self.engine.internals().iter() {
-            let id = *pair.0;
-            let name = self.engine.internal_name(id).unwrap();
-            debug_info.internals.push(DebugInfoFunction{id: id as i64, name });
-        }
-        debug_info.publics.sort_by(|a, b| a.id.cmp(&b.id));
-        debug_info.privates.sort_by(|a, b| a.id.cmp(&b.id));
-        debug_info.internals.sort_by(|a, b| a.id.cmp(&b.id));
-        save_debug_info(debug_info, filename);
-    }
 
-    pub fn public_method_dict(&self, remove_ctor: bool) -> std::result::Result<Option<Cell>, String> {
-        let mut dict = prepare_methods(&self.engine.internals())
+    pub fn public_method_dict(&mut self, remove_ctor: bool) -> std::result::Result<Option<Cell>, String> {
+        let mut dict = prepare_methods(&self.engine.internals(), true)
             .map_err(|e| e.1.replace("_name_", &self.engine.internal_name(e.0).unwrap()) )?;
 
-        insert_methods(&mut dict, &self.publics_filtered(remove_ctor))
+        insert_methods(&mut dict.0, &mut dict.1, &self.publics_filtered(remove_ctor), true)
             .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()) )?;
 
-        Ok(dict.data().map(|cell| cell.clone()))
+        self.dbgmap.map.append(&mut dict.1.map);
+
+        Ok(dict.0.data().map(|cell| cell.clone()))
     }
 
     #[allow(dead_code)]
-    pub fn compile_to_file(&self, wc: i8) -> std::result::Result<String, String> {
-        self.compile_to_file_ex(wc, None, None, None, false, false)
+    pub fn compile_to_file(&mut self, wc: i8) -> std::result::Result<String, String> {
+        self.compile_to_file_ex(wc, None, None, None, false)
     }
 
     pub fn compile_to_file_ex(
-        &self,
+        &mut self,
         wc: i8,
         abi_file: Option<&str>,
         ctor_params: Option<&str>,
         out_file: Option<&str>,
         trace: bool,
-        debug_info: bool,
     ) -> std::result::Result<String, String> {
         let mut state_init = self.compile_to_state()?;
         if let Some(ctor_params) = ctor_params {
             state_init = self.apply_constructor(state_init, abi_file.unwrap(), ctor_params, trace)?;
         }
-        if debug_info {
-            let debug_info_filename = format!("{}{}", abi_file.map_or("debug_info.", |a| a.trim_end_matches("abi.json")), "debug.json");
-            self.save_debug_info(debug_info_filename);
-        }
         save_to_file(state_init, out_file, wc)
     }
 
     fn apply_constructor(
-        &self,
+        &mut self,
         state_init: StateInit,
         abi_file: &str,
         ctor_params : &str,
@@ -213,25 +183,113 @@ impl Program {
         }
     }
 
-    fn compile_to_state(&self) -> std::result::Result<StateInit, String> {
+    fn compile_to_state(&mut self) -> std::result::Result<StateInit, String> {
         let mut state = StateInit::default();
         state.set_code(self.compile_asm(false)?);
         state.set_data(self.data()?);
         Ok(state)
     }
 
-    fn compile_asm(&self, remove_ctor: bool) -> std::result::Result<Cell, String> {
-        let mut internal_selector = compile_code(SELECTOR_INTERNAL)
+    fn compile_asm_old(&mut self, remove_ctor: bool) -> std::result::Result<Cell, String> {
+        let internal_selector_text = vec![
+            Line::new("DICTPUSHCONST 32\n", "<internal-selector>", 1),
+            Line::new("DICTUGETJMP\n",      "<internal-selector>", 2),
+        ];
+        let mut internal_selector = compile_code_debuggable(internal_selector_text)
             .map_err(|_| "unexpected TVM error while compiling internal selector".to_string())?;
-        internal_selector.append_reference(self.internal_method_dict()?.unwrap_or_default().into());
+        internal_selector.0.append_reference(self.internal_method_dict()?.unwrap_or_default().into());
 
-        let entry = lines_to_string(&self.entry());
-        let mut main_selector = compile_code(entry.as_str())
+        // adjust hash of internal_selector cell
+        let hash = internal_selector.0.cell().repr_hash().to_hex_string();
+        assert!(internal_selector.1.map.len() == 1);
+        let entry = internal_selector.1.map.iter().next().unwrap();
+        self.dbgmap.map.insert(hash, entry.1.clone());
+
+        let mut main_selector = compile_code_debuggable(self.entry())
             .map_err(|e| format_compilation_error_string(e, &self.entry()).replace("_name_", "selector"))?;
-        main_selector.append_reference(self.public_method_dict(remove_ctor)?.unwrap_or_default().into());
-        main_selector.append_reference(internal_selector);
+        main_selector.0.append_reference(self.public_method_dict(remove_ctor)?.unwrap_or_default().into());
+        main_selector.0.append_reference(internal_selector.0);
 
-        Ok(main_selector.cell().clone())
+        // adjust hash of main_selector cell
+        let hash = main_selector.0.cell().repr_hash().to_hex_string();
+        assert!(main_selector.1.map.len() == 1);
+        let entry = main_selector.1.map.iter().next().unwrap();
+        self.dbgmap.map.insert(hash, entry.1.clone());
+
+        Ok(main_selector.0.cell().clone())
+    }
+
+    fn compile_asm(&mut self, remove_ctor: bool) -> std::result::Result<Cell, String> {
+        if !self.entry().is_empty() {
+            // TODO wipe out the old behavior
+            return self.compile_asm_old(remove_ctor);
+        }
+
+        let internal_selector_text = vec![
+            // indirect jump
+            Line::new("DICTPUSHCONST 32\n", "<internal-selector>", 1),
+            Line::new("DICTUGETJMP\n",      "<internal-selector>", 2),
+        ];
+
+        let mut internal_selector = compile_code_debuggable(internal_selector_text)
+            .map_err(|_| "unexpected TVM error while compiling internal selector".to_string())?;
+
+        let mut dict = prepare_methods(&self.engine.privates(), false)
+            .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()))?;
+
+        insert_methods(&mut dict.0, &mut dict.1, &self.engine.internals(), false)
+            .map_err(|e| e.1.replace("_name_", &self.engine.internal_name(e.0).unwrap()) )?;
+
+        insert_methods(&mut dict.0, &mut dict.1, &self.publics_filtered(remove_ctor), false)
+            .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()) )?;
+
+        let mut entry_points = vec![];
+        for id in -2..1 {
+            let key = id.write_to_new_cell().unwrap().into();
+            let value = dict.0.remove(key).unwrap();
+            entry_points.push(value.unwrap_or(SliceData::default()));
+        }
+
+        internal_selector.0.append_reference(SliceData::from(dict.0.data().unwrap_or(&Cell::default())));
+        self.dbgmap.map.append(&mut dict.1.map.clone());
+
+        // adjust hash of internal_selector cell
+        let hash = internal_selector.0.cell().repr_hash().to_hex_string();
+        assert_eq!(internal_selector.1.map.len(), 1);
+        let entry = internal_selector.1.map.iter().next().unwrap();
+        self.dbgmap.map.insert(hash, entry.1.clone());
+
+        let entry_selector_text = vec![
+            Line::new("SETCP 0\n",     "<entry-selector>", 1),
+            Line::new("PUSHREFCONT\n", "<entry-selector>", 2),
+            Line::new("POPCTR c3\n",   "<entry-selector>", 3),
+            Line::new("DUP\n",         "<entry-selector>", 4),
+            Line::new("IFNOTJMPREF\n", "<entry-selector>", 5),  //  0 - internal transaction
+            Line::new("DUP\n",         "<entry-selector>", 6),
+            Line::new("EQINT -1\n",    "<entry-selector>", 7),
+            Line::new("IFJMPREF\n",    "<entry-selector>", 8),  // -1 - external transaction
+            Line::new("DUP\n",         "<entry-selector>", 9),
+            Line::new("EQINT -2\n",    "<entry-selector>", 10),
+            Line::new("IFJMPREF\n",    "<entry-selector>", 11), // -2 - ticktock transaction
+            Line::new("THROW 11\n",    "<entry-selector>", 12),
+        ];
+
+        let mut entry_selector = compile_code_debuggable(entry_selector_text.clone())
+            .map_err(|e| format_compilation_error_string(e, &entry_selector_text).replace("_name_", "selector"))?;
+
+        entry_selector.0.append_reference(internal_selector.0);
+        entry_points.reverse();
+        for entry in entry_points {
+            entry_selector.0.append_reference(entry);
+        }
+
+        // adjust hash of entry_selector cell
+        let hash = entry_selector.0.cell().repr_hash().to_hex_string();
+        assert_eq!(entry_selector.1.map.len(), 1);
+        let entry = entry_selector.1.map.iter().next().unwrap();
+        self.dbgmap.map.insert(hash, entry.1.clone());
+
+        Ok(entry_selector.0.cell().clone())
     }
 
     pub fn debug_print(&self) {
@@ -311,6 +369,7 @@ fn dump_cell(cell: &Cell, pfx: &str) {
 #[cfg(test)]
 mod tests {
     use abi;
+    use std::fs::File;
     use std::path::Path;
     use super::*;
     use testcall::{perform_contract_call, call_contract, MsgInfo};
@@ -322,7 +381,7 @@ mod tests {
                                      Path::new("./tests/comm_test2.s")];
         let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
-        let prog = Program::new(parser.unwrap());
+        let mut prog = Program::new(parser.unwrap());
         let body = {
             let mut b = BuilderData::new();
             b.append_u32(abi::gen_abi_id(None, "main")).unwrap();
@@ -341,7 +400,7 @@ mod tests {
                                      Path::new("./tests/asci_test1.s")];
         let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
-        let prog = Program::new(parser.unwrap());
+        let mut prog = Program::new(parser.unwrap());
         let body = {
             let mut b = BuilderData::new();
             b.append_u32(abi::gen_abi_id(None, "main")).unwrap();
@@ -360,7 +419,7 @@ mod tests {
                                      Path::new("./tests/sign-test.s")];
         let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
-        let prog = Program::new(parser.unwrap());
+        let mut prog = Program::new(parser.unwrap());
         let body = {
             let buf = hex::decode("000D6E4079").unwrap();
             let buf_bits = buf.len() * 8;
@@ -385,7 +444,7 @@ mod tests {
                                      Path::new("./tests/ticktock.code")];
         let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
-        let prog = Program::new(parser.unwrap());
+        let mut prog = Program::new(parser.unwrap());
         let contract_file = prog.compile_to_file(-1).unwrap();
         let name = contract_file.split('.').next().unwrap();
 
@@ -399,7 +458,7 @@ mod tests {
                                      Path::new("./tests/test_recursive.code")];
         let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
-        let prog = Program::new(parser.unwrap());
+        let mut prog = Program::new(parser.unwrap());
         let contract_file = prog.compile_to_file(-1).unwrap();
         let name = contract_file.split('.').next().unwrap();
         let body = {
@@ -422,7 +481,7 @@ mod tests {
 
         let parser = ParseEngine::new(sources, Some(abi_str));
         assert_eq!(parser.is_ok(), true);
-        let prog = Program::new(parser.unwrap());
+        let mut prog = Program::new(parser.unwrap());
 
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
@@ -460,7 +519,7 @@ mod tests {
 
         let parser = ParseEngine::new(sources, Some(abi));
         assert_eq!(parser.is_ok(), true);
-        let prog = Program::new(parser.unwrap());
+        let mut prog = Program::new(parser.unwrap());
 
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
@@ -482,9 +541,49 @@ mod tests {
             Some(3000), // gas limit
             Some(|_, _| {}),
             false,
-            String::from("")
+            String::from(""),
         );
         // must equal to out of gas exception
         assert_eq!(exit_code, 13);
+    }
+
+    #[test]
+    fn test_debug_map() {
+        let sources = vec![Path::new("tests/test_stdlib_sol.tvm"),
+                                     Path::new("tests/Wallet.code")];
+        let abi = abi::load_abi_json_string("tests/Wallet.abi.json").unwrap();
+
+        let parser = ParseEngine::new(sources, Some(abi));
+        assert_eq!(parser.is_ok(), true);
+        let mut prog = Program::new(parser.unwrap());
+
+        let contract_file = prog.compile_to_file(0).unwrap();
+        let debug_map_filename = String::from("tests/Wallet.map.json");
+        let debug_map_file = File::create(&debug_map_filename).unwrap();
+        serde_json::to_writer_pretty(debug_map_file, &prog.dbgmap).unwrap();
+
+        let name = contract_file.split('.').next().unwrap();
+        let body = abi::build_abi_body("tests/Wallet.abi.json", "constructor", "{}", None, None, false)
+            .unwrap();
+
+        let exit_code = call_contract(
+            &name,
+            Some("10000000000"), //account balance 10T
+            MsgInfo {
+                balance: Some("1000000000"), // msg balance = 1T
+                src: None,
+                now: 1,
+                bounced: false,
+                body: Some(body.into())
+            },
+            None,
+            None,
+            None,
+            None,
+            Some(|_, _| {}),
+            true,
+            debug_map_filename,
+        );
+        assert_eq!(exit_code, 0);
     }
 }

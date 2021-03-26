@@ -22,24 +22,9 @@ use ton_types::{BuilderData, IBitstring, SliceData, Cell};
 use ton_types::dictionary::{HashmapE, HashmapType};
 use ton_vm::stack::integer::{IntegerData, serialization::{Encoding, SignedIntegerBigEndianEncoding}};
 use ton_vm::stack::serialization::Serializer;
+use ton_labs_assembler::{DbgPos, Line, Lines, lines_to_string};
 
 pub type Ptr = i64;
-pub type Lines = Vec<Line>;
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Line {
-    pub text: String,
-    pub filename: String,
-    pub line: usize,
-}
-
-pub fn lines_to_string(lines: &Lines) -> String {
-    let mut res = "".to_string();
-    for line in lines {
-        res.push_str(line.text.as_str());
-    }
-    res
-}
 
 pub struct ParseEngineResults {
     engine: ParseEngine,
@@ -280,6 +265,7 @@ const PATTERN_COMM:     &'static str = r"^[\t\s]*\.comm[\t\s]+([a-zA-Z0-9_\.]+),
 const PATTERN_ASCIZ:    &'static str = r#"^[\t\s]*\.asciz[\t\s]+"(.+)""#;
 const PATTERN_MACRO:    &'static str = r"^[\t\s]*\.macro[\t\s]+([a-zA-Z0-9_\.:]+)";
 const PATTERN_IGNORED:  &'static str = r"^[\t\s]+\.(p2align|align|text|file|ident|section)";
+const PATTERN_LOC:      &'static str = r"^[\t\s]*\.loc[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([0-9]+)";
 
 const GLOBL:            &'static str = ".globl";
 const INTERNAL:         &'static str = ".internal";
@@ -327,10 +313,6 @@ impl ParseEngine {
         }
 
         self.replace_all_labels()?;
-
-        if self.entry_point.is_empty() {
-            return Err("Selector not found".to_string());
-        }
 
         self.drop_unused_objects();
         Ok(())
@@ -467,6 +449,7 @@ impl ParseEngine {
         let ignored_regex = Regex::new(PATTERN_IGNORED).unwrap();
         let public_regex = Regex::new(PATTERN_PUBLIC).unwrap();
         let macro_regex = Regex::new(PATTERN_MACRO).unwrap();
+        let loc_regex = Regex::new(PATTERN_LOC).unwrap();
 
         let mut section_name: String = String::new();
         let mut obj_body: Lines = vec![];
@@ -480,6 +463,7 @@ impl ParseEngine {
         let filename = path.file_name().unwrap().to_str().unwrap().to_string();
         let file = File::open(path).map_err(|e| format!("Can't open file: {}", e))?;
         let mut reader = BufReader::new(file);
+        let mut source_pos: Option<DbgPos> = None;
 
         while reader.read_line(&mut l)
             .map_err(|_| "error while reading line")? != 0 {
@@ -487,6 +471,10 @@ impl ParseEngine {
             if !l.ends_with('\n') {
                 l += "\n";
             }
+            let pos = match source_pos.clone() {
+                None => DbgPos { filename: filename.clone(), line: lnum },
+                Some(pos) => pos
+            };
             if ignored_regex.is_match(&l) {
                 //ignore unused parameters
                 debug!("ignored: {}", l);            
@@ -570,19 +558,28 @@ impl ParseEngine {
                 );                
             } else if label_regex.is_match(&l) { 
                 //TODO: for goto
+            } else if loc_regex.is_match(&l) {
+                let cap = loc_regex.captures(&l).unwrap();
+                let filename = String::from(cap.get(1).unwrap().as_str());
+                let line = cap.get(2).unwrap().as_str().parse::<usize>().unwrap();
+                if line == 0 { // special value for resetting current source pos
+                    source_pos = None;
+                } else {
+                    source_pos = Some(DbgPos { filename, line });
+                }
             } else if dotted_regex.is_match(&l) {
                 // .param [value]
                 let cap = dotted_regex.captures(&l).unwrap();
                 let param = cap.get(1).unwrap().as_str();
                 match param {
                     "byte" | "long" | "short" | "quad" | "comm" | "bss" | "asciz" => {
-                        let line = Line { text: l.clone(), filename: filename.clone(), line: lnum };
+                        let line = Line { text: l.clone(), pos };
                         obj_body.push(line)
                     },
                     _ => Err(format!("line {}: invalid param \"{}\":{}", lnum, param, l))?,
                 };
             } else {
-                let line = Line { text: l.to_string(), filename: filename.clone(), line: lnum };
+                let line = Line { text: l.clone(), pos };
                 let mut resolved = vec![line];
                 obj_body.append(&mut resolved);
             }
@@ -620,7 +617,7 @@ impl ParseEngine {
         for line in lines {
             let mut resolved =
                 self.replace_labels(&line, &obj_name)
-                    .map_err(|e| format!("line {}: cannot resolve label: {}", line.line, e))?;
+                    .map_err(|e| format!("line {}: cannot resolve label: {}", line.pos.line, e))?;
             new_lines.append(&mut resolved);
         }
         Ok(new_lines)
@@ -1153,13 +1150,13 @@ mod tests {
 
         assert_eq!(
             *body,
-            vec![Line { text: "PUSHINT 10\n".to_string(), filename: "test_macros.code".to_string(), line: 5 },
-                 Line { text: "DROP\n".to_string(),       filename: "test_macros.code".to_string(), line: 6 },
-                 Line { text: "PUSHINT 1\n".to_string(),  filename: "test_macros.code".to_string(), line: 11 },
-                 Line { text: "PUSHINT 2\n".to_string(),  filename: "test_macros.code".to_string(), line: 12 },
-                 Line { text: "ADD\n".to_string(),        filename: "test_macros.code".to_string(), line: 13 },
-                 Line { text: "PUSHINT 3\n".to_string(),  filename: "test_macros.code".to_string(), line: 8 },
-                 Line { text: "\n".to_string(),           filename: "test_macros.code".to_string(), line: 9 }]
+            vec![Line::new("PUSHINT 10\n", "test_macros.code", 5),
+                 Line::new("DROP\n",       "test_macros.code", 6),
+                 Line::new("PUSHINT 1\n",  "test_macros.code", 11),
+                 Line::new("PUSHINT 2\n",  "test_macros.code", 12),
+                 Line::new("ADD\n",        "test_macros.code", 13),
+                 Line::new("PUSHINT 3\n",  "test_macros.code", 8),
+                 Line::new("\n",           "test_macros.code", 9)]
         );
     }
 
@@ -1177,24 +1174,24 @@ mod tests {
 
         assert_eq!(
             *body,
-            vec![Line { text: "PUSHINT 10\n".to_string(), filename: "test_macros_02.code".to_string(), line: 5 },
-                 Line { text: "DROP\n".to_string(),       filename: "test_macros_02.code".to_string(), line: 6 },
-                 Line { text: "PUSHINT 1\n".to_string(),  filename: "test_macros_02.code".to_string(), line: 17 },
-                 Line { text: "\n".to_string(),           filename: "test_macros_02.code".to_string(), line: 18 },
-                 Line { text: "PUSHINT 2\n".to_string(),  filename: "test_macros_02.code".to_string(), line: 13 },
-                 Line { text: "ADD\n".to_string(),        filename: "test_macros_02.code".to_string(), line: 14 },
-                 Line { text: "\n".to_string(),           filename: "test_macros_02.code".to_string(), line: 15 },
-                 Line { text: "PUSHINT 3\n".to_string(),  filename: "test_macros_02.code".to_string(), line: 8 },
-                 Line { text: "CALL 2\n".to_string(),     filename: "test_macros_02.code".to_string(), line: 9 },
-                 Line { text: "\n".to_string(),           filename: "test_macros_02.code".to_string(), line: 10 }]
+            vec![Line::new("PUSHINT 10\n", "test_macros_02.code", 5),
+                 Line::new("DROP\n",       "test_macros_02.code", 6),
+                 Line::new("PUSHINT 1\n",  "test_macros_02.code", 17),
+                 Line::new("\n",           "test_macros_02.code", 18),
+                 Line::new("PUSHINT 2\n",  "test_macros_02.code", 13),
+                 Line::new("ADD\n",        "test_macros_02.code", 14),
+                 Line::new("\n",           "test_macros_02.code", 15),
+                 Line::new("PUSHINT 3\n",  "test_macros_02.code", 8),
+                 Line::new("CALL 2\n",     "test_macros_02.code", 9),
+                 Line::new("\n",           "test_macros_02.code", 10)]
         );
         assert_eq!(
             *internal,
-            vec![Line { text: "PUSHINT 1\n".to_string(), filename: "test_macros_02.code".to_string(), line: 17 },
-                 Line { text: "\n".to_string(),          filename: "test_macros_02.code".to_string(), line: 18 },
-                 Line { text: "PUSHINT 2\n".to_string(), filename: "test_macros_02.code".to_string(), line: 13 },
-                 Line { text: "ADD\n".to_string(),       filename: "test_macros_02.code".to_string(), line: 14 },
-                 Line { text: "\n".to_string(),          filename: "test_macros_02.code".to_string(), line: 15 }]
+            vec![Line::new("PUSHINT 1\n",  "test_macros_02.code", 17),
+                 Line::new("\n",           "test_macros_02.code", 18),
+                 Line::new("PUSHINT 2\n",  "test_macros_02.code", 13),
+                 Line::new("ADD\n",        "test_macros_02.code", 14),
+                 Line::new("\n",           "test_macros_02.code", 15)]
         );
     }
 }
