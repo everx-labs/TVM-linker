@@ -269,8 +269,14 @@ fn calc_userfriendly_address(wc: i8, addr: &[u8], bounce: bool, testnet: bool) -
 
 pub fn load_from_file(contract_file: &str) -> StateInit {
     let mut csor = Cursor::new(std::fs::read(contract_file).unwrap());
-    let cell = deserialize_cells_tree(&mut csor).unwrap().remove(0);
-    StateInit::construct_from(&mut cell.into()).unwrap()
+    let mut cell = deserialize_cells_tree(&mut csor).unwrap().remove(0);
+    // try appending a dummy library cell if there is no such cell in the tvc file
+    if cell.references_count() == 2 {
+        let mut adjusted_cell = BuilderData::from(cell);
+        adjusted_cell.append_reference(BuilderData::default());
+        cell = adjusted_cell.into();
+    }
+    StateInit::construct_from_cell(cell).expect("StateInit construction failed")
 }
 
 pub fn get_now() -> u32 {
