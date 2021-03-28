@@ -56,7 +56,7 @@ use program::{Program, get_now};
 use real_ton::{decode_boc, compile_message};
 use resolver::resolve_name;
 use std::path::Path;
-use testcall::{call_contract, MsgInfo};
+use testcall::{call_contract, MsgInfo, TraceLevel};
 use ton_types::{BuilderData, SliceData};
 use std::env;
 use disasm::{create_disasm_command, disasm_command};
@@ -120,6 +120,7 @@ fn linker_main() -> Result<(), String> {
             (@arg BODY: --body +takes_value "Body for external inbound message (a bitstring like x09c_ or a hex string)")
             (@arg SIGN: --sign +takes_value "Signs body with private key from defined file")
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
+            (@arg TRACE_MIN: --("trace-minimal") "Prints minimal trace")
             (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
             (@arg INTERNAL: --internal +takes_value "Emulates inbound internal message with value instead of external message")
             (@arg BOUNCED: --bounced requires[INTERNAL] "Emulates bounced message, can be used only with --internal option.")
@@ -427,7 +428,14 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         .map(|v| i64::from_str_radix(v, 10))
         .transpose()
         .map_err(|e| format!("cannot parse gas limit value: {}", e))?;
-    
+
+    let mut trace_level = TraceLevel::None;
+    if matches.is_present("TRACE") {
+        trace_level = TraceLevel::Full;
+    } else if matches.is_present("TRACE_MIN") {
+        trace_level = TraceLevel::Minimal;
+    }
+
     call_contract(
         matches.value_of("INPUT").unwrap(),
         matches.value_of("BALANCE"),
@@ -437,7 +445,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         ticktock,
         gas_limit,
         if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
-        matches.is_present("TRACE"),
+        trace_level,
         debug_map_filename,
     );
 
