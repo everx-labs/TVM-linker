@@ -117,7 +117,7 @@ fn linker_main() -> Result<(), String> {
             (version: "0.1")
             (author: "TONLabs")
             (@arg SOURCE: -s --source +takes_value "Contract source file")
-            (@arg BODY: --body +takes_value "Body for external inbound message (hex string)")
+            (@arg BODY: --body +takes_value "Body for external inbound message (a bitstring like x09c_ or a hex string)")
             (@arg SIGN: --sign +takes_value "Signs body with private key from defined file")
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
             (@arg DECODEC6: --("decode-c6") "Prints last command name, stack and registers after each executed TVM command")
@@ -339,6 +339,19 @@ fn run_init_subcmd(matches: &ArgMatches) -> Result<(), String> {
     set_initial_data(tvc, None, vars, abi)
 }
 
+fn decode_hex_string(hex_str: String) -> Result<(Vec<u8>, usize), String> {
+    if hex_str.to_ascii_lowercase().starts_with('x') {
+        let buf = SliceData::from_string(&hex_str[1..])
+            .map_err(|_| format!("body {} is invalid literal slice", hex_str))?;
+        Ok((buf.get_bytestring(0), buf.remaining_bits()))
+    } else {
+        let buf = hex::decode(&hex_str)
+            .map_err(|_| format!("body {} is invalid hex string", hex_str))?;
+        let buf_bits = buf.len() * 8;
+        Ok((buf, buf_bits))
+    }
+}
+
 fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
     let (body, sign) = match matches.value_of("BODY") {
         Some(hex_str) => {
@@ -368,9 +381,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
             .map_err(|e| format!("failed to resolve body {}: {}", hex_str, e))?;
             hex_str = resolved[0].text.clone();
 
-            let buf = hex::decode(&hex_str)
-                .map_err(|_| format!("body {} is invalid hex string", hex_str))?;
-            let buf_bits = buf.len() * 8;
+            let (buf, buf_bits) = decode_hex_string(hex_str).unwrap();
             let body: SliceData = BuilderData::with_raw(buf, buf_bits)
                 .map_err(|e| format!("failed to pack body in cell: {}", e))?
                 .into();
