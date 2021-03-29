@@ -31,12 +31,17 @@ pub fn create_disasm_command<'a, 'b>() -> App<'a, 'b> {
                     .required(true)
                     .help("Path to tvc file")))
         .subcommand(SubCommand::with_name("solidity")
-            .about("disassembles the given tvc")
+            .about("disassembles the given tvc produced by Solidity compiler")
+            .arg(Arg::with_name("TVC")
+                    .required(true)
+                    .help("Path to tvc file")))
+        .subcommand(SubCommand::with_name("solidity-v1")
+            .about("disassembles the given tvc produced by Solidity compiler, obsolete version")
             .arg(Arg::with_name("TVC")
                     .required(true)
                     .help("Path to tvc file")))
         .subcommand(SubCommand::with_name("fun-c")
-            .about("dumps tree of cells for the given tvc")
+            .about("disassembles the given tvc produced by FunC compiler")
             .arg(Arg::with_name("TVC")
                     .required(true)
                     .help("Path to tvc file")))
@@ -47,6 +52,8 @@ pub fn disasm_command(m: &ArgMatches) -> Result<(), String> {
         return disasm_dump_command(m);
     } else if let Some(m) = m.subcommand_matches("solidity") {
         return disasm_solidity_command(m);
+    } else if let Some(m) = m.subcommand_matches("solidity-v1") {
+        return disasm_solidity_v1_command(m);
     } else if let Some(m) = m.subcommand_matches("fun-c") {
         return disasm_fun_c_command(m);
     }
@@ -66,7 +73,7 @@ fn disasm_dump_command(m: &ArgMatches) -> Result<(), String> {
     Ok(())
 }
 
-fn disasm_solidity_command(m: &ArgMatches) -> Result<(), String> {
+fn disasm_solidity_v1_command(m: &ArgMatches) -> Result<(), String> {
     let filename = m.value_of("TVC");
     let tvc = filename.map(|f| std::fs::read(f))
         .transpose()
@@ -122,6 +129,59 @@ fn disasm_solidity_command(m: &ArgMatches) -> Result<(), String> {
         println!();
         println!(";; function {}", id);
         print!("{}", disasm(&mut func));
+    }
+
+    Ok(())
+}
+
+fn disasm_solidity_command(m: &ArgMatches) -> Result<(), String> {
+    let filename = m.value_of("TVC");
+    let tvc = filename.map(|f| std::fs::read(f))
+        .transpose()
+        .map_err(|e| format!(" failed to read tvc file: {}", e))?
+        .unwrap();
+    let mut csor = Cursor::new(tvc);
+    let roots = deserialize_cells_tree(&mut csor);
+    if roots.is_err() {
+        println!(";; failed to deserialize the tvc");
+        return Ok(())
+    }
+    let root = roots.unwrap().remove(0).reference(0).unwrap();
+
+    println!(";; entry point");
+    let mut entry = SliceData::from(root.clone());
+    entry.shrink_references(..0);
+    for _ in 0..4 {
+        entry.append_reference(SliceData::default());
+    }
+    println!("{}", disasm(&mut entry));
+
+    println!(";; function selector");
+    let mut sel = SliceData::from(root.reference(0).unwrap());
+    sel.shrink_references(..0);
+    println!("{}", disasm(&mut sel));
+
+    println!(";; internal transaction entry point");
+    println!("{}", disasm(&mut SliceData::from(root.reference(1).unwrap())));
+    println!(";; external transaction entry point");
+    println!("{}", disasm(&mut SliceData::from(root.reference(2).unwrap())));
+    println!(";; ticktock transaction entry point");
+    println!("{}", disasm(&mut SliceData::from(root.reference(3).unwrap())));
+
+    let dict_cell = root.reference(0).unwrap().reference(0).unwrap();
+    let dict = HashmapE::with_hashmap(32, Some(dict_cell));
+    if dict.len().is_err() {
+        println!(";; failed to recognize functions dictionary");
+        return Ok(())
+    }
+
+    for entry in dict.into_iter() {
+        let (key, mut method) = entry.unwrap();
+        let mut key_slice = SliceData::from(key.into_cell().unwrap());
+        let id = key_slice.get_next_int(19).unwrap();
+        println!();
+        println!(";; method {:x}", id);
+        print!("{}", disasm(&mut method));
     }
 
     Ok(())
