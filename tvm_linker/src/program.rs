@@ -111,7 +111,7 @@ impl Program {
 
     #[allow(dead_code)]
     pub fn compile_to_file(&mut self, wc: i8) -> std::result::Result<String, String> {
-        self.compile_to_file_ex(wc, None, None, None, false)
+        self.compile_to_file_ex(wc, None, None, None, false, None)
     }
 
     pub fn compile_to_file_ex(
@@ -121,10 +121,16 @@ impl Program {
         ctor_params: Option<&str>,
         out_file: Option<&str>,
         trace: bool,
+        data_filename: Option<&str>,
     ) -> std::result::Result<String, String> {
         let mut state_init = self.compile_to_state()?;
         if let Some(ctor_params) = ctor_params {
             state_init = self.apply_constructor(state_init, abi_file.unwrap(), ctor_params, trace)?;
+        }
+        if let Some(data_filename) = data_filename {
+            let mut data_cursor = Cursor::new(std::fs::read(data_filename).unwrap());
+            let data_cell = deserialize_cells_tree(&mut data_cursor).unwrap().remove(0);
+            state_init.set_data(data_cell);
         }
         save_to_file(state_init, out_file, wc)
     }
