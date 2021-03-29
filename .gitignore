@@ -2,3 +2,5 @@ target
 *.lock
 .vscode
 .idea/
+
+tvm_linker/tests/Wallet.map.json
