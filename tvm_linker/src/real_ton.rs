@@ -21,7 +21,7 @@ extern crate hex;
 use ton_block::*;
 use ton_types::types::{AccountId};
 use ton_types::cells_serialization::{BocSerialiseMode, BagOfCells, deserialize_cells_tree_ex };
-use ton_types::SliceData;
+use ton_types::{SliceData, BuilderData};
 
 pub fn decode_boc(file_name: &str, is_tvc: bool) {
     let mut orig_bytes = Vec::new();
@@ -31,8 +31,13 @@ pub fn decode_boc(file_name: &str, is_tvc: bool) {
 
     let mut cur = Cursor::new(orig_bytes.clone());
     let (root_cells, _mode, _x, _y) = deserialize_cells_tree_ex(&mut cur).expect("Error deserialising BOC");
-    let root_cells_vec : Vec<SliceData> = root_cells.iter().map(|c| SliceData::from(c)).collect();
-    let mut root_slice = SliceData::from(root_cells_vec[0].clone());
+    let mut root = root_cells[0].clone();
+    if root.references_count() == 2 {
+        let mut adjusted_cell = BuilderData::from(root);
+        adjusted_cell.append_reference(BuilderData::default());
+        root = adjusted_cell.into();
+    }
+    let mut root_slice = SliceData::from(root);
     
     println!("Encoded: {}\n", hex::encode(orig_bytes));
     if is_tvc {

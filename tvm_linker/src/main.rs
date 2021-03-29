@@ -107,6 +107,7 @@ fn linker_main() -> Result<(), String> {
             (@arg WC: -w +takes_value "Workchain id used to print contract address, -1 by default.")
             (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
             (@arg DEBUG_MAP: --("debug-map") +takes_value "Generates debug map file")
+            (@arg DATA: --("data") +takes_value "Overwrites data with a cell from a file")
             (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file. If not specified lib is loaded from environment variable TVM_LINKER_LIB_PATH if it exists.")
             (@arg OUT_FILE: -o +takes_value "Output file name")
             (@arg LANGUAGE: --language +takes_value "Enable language-specific features in linkage")
@@ -290,7 +291,9 @@ fn linker_main() -> Result<(), String> {
             return Err(msg.to_string());
         }
 
-        prog.compile_to_file_ex(wc, abi_file, ctor_params, out_file, debug)?;
+        let data_filename = compile_matches.value_of("DATA");
+
+        prog.compile_to_file_ex(wc, abi_file, ctor_params, out_file, debug, data_filename)?;
 
         if compile_matches.is_present("DEBUG_MAP") {
             let filename = compile_matches.value_of("DEBUG_MAP").unwrap();
