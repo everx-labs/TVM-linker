@@ -291,7 +291,7 @@ pub fn call_contract<F>(
 }
 
 fn trace_callback_minimal(_engine: &Engine, info: &EngineTraceInfo) {
-    println!("{}: {}", info.step, info.cmd_str);
+    println!("{} {} {} {}", info.step, info.gas_used, info.gas_cmd, info.cmd_str);
 }
 
 fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debug_info: &Option<DbgInfo>) {
