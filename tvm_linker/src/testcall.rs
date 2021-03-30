@@ -248,6 +248,13 @@ pub fn load_debug_info(
     }
 }
 
+#[derive(PartialEq)]
+pub enum TraceLevel {
+    Full,
+    Minimal,
+    None
+}
+
 pub fn call_contract<F>(
     smc_file: &str,
     smc_balance: Option<&str>,
@@ -257,7 +264,7 @@ pub fn call_contract<F>(
     ticktock: Option<i8>,
     gas_limit: Option<i64>,
     action_decoder: Option<F>,
-    debug: bool,
+    trace_level: TraceLevel,
     debug_map_filename: String,
 ) -> i32
     where F: Fn(SliceData, bool)
@@ -274,13 +281,17 @@ pub fn call_contract<F>(
     });
     let (exit_code, state_init) = call_contract_ex(
         addr, addr_int, state_init, debug_info, smc_balance,
-        msg_info, config_cell, key_file, ticktock, gas_limit, action_decoder, debug);
+        msg_info, config_cell, key_file, ticktock, gas_limit, action_decoder, trace_level);
     if exit_code == 0 || exit_code == 1 {
         let smc_name = smc_file.to_owned() + ".tvc";
         save_to_file(state_init, Some(&smc_name), 0).expect("error");
         println!("Contract persistent data updated");
     }
     exit_code
+}
+
+fn trace_callback_minimal(_engine: &Engine, info: &EngineTraceInfo) {
+    println!("{} {} {} {}", info.step, info.gas_used, info.gas_cmd, info.cmd_str);
 }
 
 fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debug_info: &Option<DbgInfo>) {
@@ -337,7 +348,7 @@ pub fn call_contract_ex<F>(
     ticktock: Option<i8>,
     gas_limit: Option<i64>,
     action_decoder: Option<F>,
-    debug: bool,
+    trace_level: TraceLevel,
 ) -> (i32, StateInit)
     where F: Fn(SliceData, bool)
 {
@@ -351,7 +362,7 @@ pub fn call_contract_ex<F>(
     let msg = create_inbound_msg(func_selector, &msg_info, addr.clone());
 
     if !log_enabled!(Error) {
-        init_logger(debug);
+        init_logger(trace_level == TraceLevel::Full);
     }
 
     let mut state_init = state_init;
@@ -404,8 +415,10 @@ pub fn call_contract_ex<F>(
 
     let mut engine = Engine::new().setup_with_libraries(code, Some(registers), Some(stack), Some(gas), vec![]);
     engine.set_trace(0);
-    if debug {
-        engine.set_trace_callback(move |engine, info| { trace_callback(engine, info, true, &debug_info); })
+    match trace_level {
+        TraceLevel::Full => engine.set_trace_callback(move |engine, info| { trace_callback(engine, info, true, &debug_info); }),
+        TraceLevel::Minimal => engine.set_trace_callback(move |engine, info| { trace_callback_minimal(engine, info); }),
+        TraceLevel::None => {}
     }
     let exit_code = match engine.execute() {
         Err(exc) => match tvm_exception(exc) {
@@ -442,7 +455,7 @@ pub fn perform_contract_call<F>(
     contract_file: &str,
     body: Option<SliceData>,
     key_file: Option<Option<&str>>,
-    debug: bool,
+    trace_level: TraceLevel,
     decode_c5: bool,
     msg_balance: Option<&str>,
     ticktock: Option<i8>,
@@ -468,7 +481,7 @@ pub fn perform_contract_call<F>(
         ticktock,
         None,
         if decode_c5 { Some(action_decoder) } else { None },
-        debug,
+        trace_level,
         String::from(""),
     )
 }

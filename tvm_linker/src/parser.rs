@@ -249,23 +249,23 @@ pub struct ParseEngine {
     abi: Option<Contract>,
 }
 
-const PATTERN_GLOBL:    &'static str = r"^[\t\s]*\.globl[\t\s]+(:?[a-zA-Z0-9_\.]+)";
-const PATTERN_DATA:     &'static str = r"^[\t\s]*\.data";
-const PATTERN_INTERNAL: &'static str = r"^[\t\s]*\.internal[\t\s]+(:[a-zA-Z0-9_]+)";
-const PATTERN_SELECTOR: &'static str = r"^[\t\s]*\.selector";
-const PATTERN_ALIAS:    &'static str = r"^[\t\s]*\.internal-alias (:[a-zA-Z0-9_]+),[\t\s]+(-?\d+)";
-const PATTERN_GLBLBASE: &'static str = r"^[\t\s]*\.global-base[\t\s]+([0-9]+)";
-const PATTERN_PERSBASE: &'static str = r"^[\t\s]*\.persistent-base[\t\s]+([0-9]+)";
-const PATTERN_LABEL:    &'static str = r"^:?[\.a-zA-Z0-9_]+:";
-const PATTERN_PARAM:    &'static str = r#"^[\t\s]+\.([a-zA-Z0-9_]+),?[\t\s]*([a-zA-Z0-9-_\s"]+)"#;
-const PATTERN_TYPE:     &'static str = r"^[\t\s]*\.type[\t\s]+(:?[a-zA-Z0-9_\.]+),[\t\s]*@([a-zA-Z]+)";
-const PATTERN_PUBLIC:   &'static str = r"^[\t\s]*\.public[\t\s]+([a-zA-Z0-9_\.]+)";
-const PATTERN_SIZE:     &'static str = r"^[\t\s]*\.size[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([\.a-zA-Z0-9_]+)";
-const PATTERN_COMM:     &'static str = r"^[\t\s]*\.comm[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([0-9]+),[\t\s]*([0-9]+)";
-const PATTERN_ASCIZ:    &'static str = r#"^[\t\s]*\.asciz[\t\s]+"(.+)""#;
-const PATTERN_MACRO:    &'static str = r"^[\t\s]*\.macro[\t\s]+([a-zA-Z0-9_\.:]+)";
-const PATTERN_IGNORED:  &'static str = r"^[\t\s]+\.(p2align|align|text|file|ident|section)";
-const PATTERN_LOC:      &'static str = r"^[\t\s]*\.loc[\t\s]+([a-zA-Z0-9_\.]+),[\t\s]*([0-9]+)";
+const PATTERN_GLOBL:    &'static str = r"^\s*\.globl\s+(:?[\w\.]+)";
+const PATTERN_DATA:     &'static str = r"^\s*\.data";
+const PATTERN_INTERNAL: &'static str = r"^\s*\.internal\s+(:\w+)";
+const PATTERN_SELECTOR: &'static str = r"^\s*\.selector";
+const PATTERN_ALIAS:    &'static str = r"^\s*\.internal-alias (:\w+),\s+(-?\d+)";
+const PATTERN_GLBLBASE: &'static str = r"^\s*\.global-base\s+(\d+)";
+const PATTERN_PERSBASE: &'static str = r"^\s*\.persistent-base\s+(\d+)";
+const PATTERN_LABEL:    &'static str = r"^:?[\.\w]+:";
+const PATTERN_PARAM:    &'static str = r#"^\s+\.(\w+),?\s*([a-zA-Z0-9-_\s"]+)"#;
+const PATTERN_TYPE:     &'static str = r"^\s*\.type\s+(:?[\w\.]+),\s*@([a-zA-Z]+)";
+const PATTERN_PUBLIC:   &'static str = r"^\s*\.public\s+([\w\.]+)";
+const PATTERN_SIZE:     &'static str = r"^\s*\.size\s+([\w\.]+),\s*([\.\w]+)";
+const PATTERN_COMM:     &'static str = r"^\s*\.comm\s+([\w\.]+),\s*(\d+),\s*(\d+)";
+const PATTERN_ASCIZ:    &'static str = r#"^\s*\.asciz\s+"(.+)""#;
+const PATTERN_MACRO:    &'static str = r"^\s*\.macro\s+([\w\.:]+)";
+const PATTERN_IGNORED:  &'static str = r"^\s+\.(p2align|align|text|file|ident|section)";
+const PATTERN_LOC:      &'static str = r"^\s*\.loc\s+(.+),\s+(\d+)\n$";
 
 const GLOBL:            &'static str = ".globl";
 const INTERNAL:         &'static str = ".internal";

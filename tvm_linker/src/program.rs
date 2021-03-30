@@ -24,6 +24,7 @@ use ton_types::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use ton_types::{Cell, SliceData, BuilderData, IBitstring};
 use ton_types::dictionary::{HashmapE, HashmapType};
 use parser::{ptr_to_builder, ParseEngine, ParseEngineResults};
+use testcall::TraceLevel;
 
 pub struct Program {
     language: Option<String>,
@@ -176,7 +177,7 @@ impl Program {
             None, // ticktock,
             None, // gas_limit,
             Some(action_decoder),
-            trace
+            if trace { TraceLevel::Full } else { TraceLevel::None }
         );
 
         if exit_code == 0 || exit_code == 1 {
@@ -396,7 +397,7 @@ mod tests {
         };
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
-        assert_eq!(perform_contract_call(name, body, Some(None), false, false, None, None, None, None, 0, |_b,_i| {}), 0);
+        assert_eq!(perform_contract_call(name, body, Some(None), TraceLevel::None, false, None, None, None, None, 0, |_b,_i| {}), 0);
     }
 
     #[ignore] // due to offline constructor
@@ -414,7 +415,7 @@ mod tests {
         };
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
-        assert_eq!(perform_contract_call(name, body, Some(None), false, false, None, None, None, None, 0, |_b,_i| {}), 0);
+        assert_eq!(perform_contract_call(name, body, Some(None), TraceLevel::None, false, None, None, None, None, 0, |_b,_i| {}), 0);
     }
 
     #[test]
@@ -434,7 +435,7 @@ mod tests {
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
 
-        assert_eq!(perform_contract_call(name, body, Some(Some("key1")), false, false, None, None, None, None, 0, |_b,_i| {}), 0);
+        assert_eq!(perform_contract_call(name, body, Some(Some("key1")), TraceLevel::None, false, None, None, None, None, 0, |_b,_i| {}), 0);
     }
 
     #[test]
@@ -454,7 +455,7 @@ mod tests {
         let contract_file = prog.compile_to_file(-1).unwrap();
         let name = contract_file.split('.').next().unwrap();
 
-        assert_eq!(perform_contract_call(name, None, None, false, false, None, Some(-1), None, None, 0, |_b,_i| {}), 0);
+        assert_eq!(perform_contract_call(name, None, None, TraceLevel::None, false, None, Some(-1), None, None, 0, |_b,_i| {}), 0);
     }
 
     #[ignore] // due to offline constructor
@@ -473,7 +474,7 @@ mod tests {
             Some(b.into())
         };
 
-        assert_eq!(perform_contract_call(name, body, Some(Some("key1")), false, false, None, None, None, None, 0, |_b,_i| {}), 0);
+        assert_eq!(perform_contract_call(name, body, Some(Some("key1")), TraceLevel::None, false, None, None, None, None, 0, |_b,_i| {}), 0);
     }
 
     #[ignore] // due to offline constructor
@@ -498,7 +499,7 @@ mod tests {
             Some(b.into())
         };
 
-        assert_eq!(perform_contract_call(name, body1, None, false, false, None, None, None, None, 0, |_b,_i| {}), 0);
+        assert_eq!(perform_contract_call(name, body1, None, TraceLevel::None, false, None, None, None, None, 0, |_b,_i| {}), 0);
 
         let body2 = {
             let mut b = BuilderData::new();
@@ -506,7 +507,7 @@ mod tests {
             b.append_reference(BuilderData::new());
             Some(b.into())
         };
-        assert!(perform_contract_call(name, body2, None, false, false, None, None, None, None, 0, |_b,_i| {}) != 0);
+        assert!(perform_contract_call(name, body2, None, TraceLevel::None, false, None, None, None, None, 0, |_b,_i| {}) != 0);
 
         let body3 = {
             let mut b = BuilderData::new();
@@ -514,7 +515,7 @@ mod tests {
             b.append_reference(BuilderData::new());
             Some(b.into())
         };
-        assert_eq!(perform_contract_call(name, body3, None, false, false, None, None, None, None, 0, |_b,_i| {}), 0);
+        assert_eq!(perform_contract_call(name, body3, None, TraceLevel::None, false, None, None, None, None, 0, |_b,_i| {}), 0);
     }
 
     #[test]
@@ -546,7 +547,7 @@ mod tests {
             None,
             Some(3000), // gas limit
             Some(|_, _| {}),
-            false,
+            TraceLevel::None,
             String::from(""),
         );
         // must equal to out of gas exception
@@ -587,7 +588,7 @@ mod tests {
             None,
             None,
             Some(|_, _| {}),
-            true,
+            TraceLevel::Full,
             debug_map_filename,
         );
         assert_eq!(exit_code, 0);
