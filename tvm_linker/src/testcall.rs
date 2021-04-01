@@ -290,8 +290,29 @@ pub fn call_contract<F>(
     exit_code
 }
 
-fn trace_callback_minimal(_engine: &Engine, info: &EngineTraceInfo) {
-    println!("{} {} {} {}", info.step, info.gas_used, info.gas_cmd, info.cmd_str);
+fn get_position(info: &EngineTraceInfo, debug_info: &Option<DbgInfo>) -> Option<String> {
+    if let Some(debug_info) = debug_info {
+        let cell_hash = info.cmd_code.cell().repr_hash().to_hex_string();
+        let offset = info.cmd_code.pos();
+        let position = match debug_info.map.get(&cell_hash) {
+            Some(offset_map) => match offset_map.get(&offset) {
+                Some(pos) => format!("{}:{}", pos.filename, pos.line),
+                None => String::from("-:0 (offset not found)")
+            },
+            None => String::from("-:0 (cell hash not found)")
+        };
+        return Some(position)
+    }
+    None
+}
+
+fn trace_callback_minimal(_engine: &Engine, info: &EngineTraceInfo, debug_info: &Option<DbgInfo>) {
+    print!("{} {} {} {}", info.step, info.gas_used, info.gas_cmd, info.cmd_str);
+    let position =  get_position(info, debug_info);
+    if position.is_some() {
+        print!(" {}", position.unwrap());
+    }
+    println!();
 }
 
 fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debug_info: &Option<DbgInfo>) {
@@ -316,17 +337,9 @@ fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debu
         info.gas_cmd
     );
 
-    if let Some(debug_info) = debug_info {
-        let cell_hash = info.cmd_code.cell().repr_hash().to_hex_string();
-        let offset = info.cmd_code.pos();
-        let position = match debug_info.map.get(&cell_hash) {
-            Some(offset_map) => match offset_map.get(&offset) {
-                Some(pos) => format!("{}:{}", pos.filename, pos.line),
-                None => String::from("-:0 (offset not found)")
-            },
-            None => String::from("-:0 (cell hash not found)")
-        };
-        println!("Position: {}", position);
+    let position = get_position(info, debug_info);
+    if position.is_some() {
+        println!("Position: {}", position.unwrap());
     }
 
     println!("\n--- Stack trace ------------------------");
@@ -417,7 +430,7 @@ pub fn call_contract_ex<F>(
     engine.set_trace(0);
     match trace_level {
         TraceLevel::Full => engine.set_trace_callback(move |engine, info| { trace_callback(engine, info, true, &debug_info); }),
-        TraceLevel::Minimal => engine.set_trace_callback(move |engine, info| { trace_callback_minimal(engine, info); }),
+        TraceLevel::Minimal => engine.set_trace_callback(move |engine, info| { trace_callback_minimal(engine, info, &debug_info); }),
         TraceLevel::None => {}
     }
     let exit_code = match engine.execute() {
