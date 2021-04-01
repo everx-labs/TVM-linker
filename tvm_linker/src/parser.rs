@@ -572,16 +572,13 @@ impl ParseEngine {
                 let cap = dotted_regex.captures(&l).unwrap();
                 let param = cap.get(1).unwrap().as_str();
                 match param {
-                    "byte" | "long" | "short" | "quad" | "comm" | "bss" | "asciz" => {
-                        let line = Line { text: l.clone(), pos };
-                        obj_body.push(line)
+                    "blob" | "cell" | "byte" | "long" | "short" | "quad" | "comm" | "bss" | "asciz" => {
+                        obj_body.push(Line { text: l.clone(), pos })
                     },
                     _ => Err(format!("line {}: invalid param \"{}\":{}", lnum, param, l))?,
                 };
             } else {
-                let line = Line { text: l.clone(), pos };
-                let mut resolved = vec![line];
-                obj_body.append(&mut resolved);
+                obj_body.push(Line { text: l.clone(), pos });
             }
             l.clear();
         }
