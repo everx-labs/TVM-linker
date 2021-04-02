@@ -2,7 +2,6 @@
 
     .globl constructor
     .type constructor, @function
-constructor:
 
 
     .internal :main_ticktock
@@ -18,8 +17,6 @@ constructor:
 
     .globl fallback
     .type fallback,@function
-fallback:
 
     .globl onBounce
     .type onBounce,@function
-onBounce:
