@@ -12,7 +12,7 @@
  */
 use std::collections::{BTreeMap, HashMap};
 use ton_block::Serializable;
-use ton_labs_assembler::{compile_code_debuggable, CompileError, Lines, DbgInfo};
+use ton_labs_assembler::{compile_code_debuggable, Lines, DbgInfo};
 use ton_types::{SliceData, dictionary::HashmapE};
 
 pub fn prepare_methods<T>(
@@ -41,7 +41,7 @@ where
     for pair in methods.iter() {
         let key: SliceData = pair.0.clone().write_to_new_cell().unwrap().into();
         let mut val = compile_code_debuggable(pair.1.clone()).map_err(|e| {
-            (pair.0.clone(), format_compilation_error_string(e, &pair.1))
+            (pair.0.clone(), e.to_string())
         })?;
         if val.0.remaining_bits() <= (1023 - (32 + 10)) { // key_length + hashmap overheads
             map.set(key.clone(), &val.0).map_err(|e| {
@@ -75,30 +75,4 @@ fn adjust_debug_map(map: &mut DbgInfo, before: SliceData, after: SliceData) {
     }
 
     map.map.insert(hash_new, new);
-}
-
-fn trim_newline(s: &mut String) {
-    if s.ends_with('\n') {
-        s.pop();
-        if s.ends_with('\r') {
-            s.pop();
-        }
-    }
-}
-
-pub fn format_compilation_error_string(err: CompileError, func_code: &Lines) -> String {
-    let line_num = match err {
-        CompileError::Syntax(position @ _, _) => position.line,
-        CompileError::UnknownOperation(position @ _, _) => position.line,
-        CompileError::Operation(position @ _, _, _) => position.line,
-    };
-    let mut line = func_code[line_num - 1].text.clone();
-    let filename = func_code[line_num - 1].pos.filename.clone();
-    trim_newline(&mut line);
-    format!(
-        "Compilation failed: \"_name_\":\n{}:{}:\n{}",
-        filename,
-        err,
-        line,
-    )
 }
