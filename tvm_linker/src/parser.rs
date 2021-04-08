@@ -597,6 +597,10 @@ impl ParseEngine {
             l.clear();
         }
 
+        if section_name.is_empty() {
+            return Err("input file has no assembler definitions".to_string());
+        }
+
         self.update(&section_name, &obj_name, &obj_body)
             .map_err(|e| format!("line {}: {}", lnum, e))?;
         Ok(())
