@@ -59,19 +59,11 @@ use std::path::Path;
 use testcall::{call_contract, MsgInfo, TraceLevel};
 use ton_types::{BuilderData, SliceData};
 use std::env;
-use disasm::{create_disasm_command, disasm_command};
+use disasm::disasm_command;
 use ton_labs_assembler::Line;
 use std::fs::File;
 
 fn main() -> Result<(), i32> {
-    println!(
-        "TVM linker {}\nCOMMIT_ID: {}\nBUILD_DATE: {}\nCOMMIT_DATE: {}\nGIT_BRANCH: {}",
-        env!("CARGO_PKG_VERSION"),
-        env!("BUILD_GIT_COMMIT"),
-        env!("BUILD_TIME") ,
-        env!("BUILD_GIT_DATE"),
-        env!("BUILD_GIT_BRANCH")
-    );
     linker_main().map_err(|err_str| {
         println!("Error: {}", err_str);
         1
@@ -79,26 +71,29 @@ fn main() -> Result<(), i32> {
 }
 
 fn linker_main() -> Result<(), String> {
-    let build_info = match option_env!("BUILD_INFO") {
-        Some(s) => s,
-        None => "",
-    };
-    let matches = clap_app! (tvm_linker =>
-        (version: &*format!("0.1 ({})", build_info))
-        (author: "TONLabs")
-        (about: "Linker for TVM assembly")
+    let build_info = format!(
+        "v{}\nBUILD_GIT_COMMIT: {}\nBUILD_GIT_DATE:   {}\nBUILD_TIME:       {}",
+        env!("CARGO_PKG_VERSION"),
+        env!("BUILD_GIT_COMMIT"),
+        env!("BUILD_GIT_DATE"),
+        env!("BUILD_TIME") ,
+    );
+    let matches = clap_app!(tvm_linker =>
+        (version: build_info.as_str())
+        (author: "TON Labs")
+        (about: "Tool for assembling, disassembling and executing TVM code")
         (@subcommand decode =>
-            (about: "Decode real TON message")
-            (version: "0.1")
-            (author: "TONLabs")
+            (about: "take apart a message boc or a tvc file")
+            (version: build_info.as_str())
+            (author: "TON Labs")
             (@arg INPUT: +required +takes_value "BOC file")
             (@arg TVC: --tvc "BOC file is tvc file")
         )
         (@subcommand compile =>
             (@setting AllowNegativeNumbers)
             (about: "compile contract")
-            (version: "0.1")
-            (author: "TONLabs")
+            (version: build_info.as_str())
+            (author: "TON Labs")
             (@arg INPUT: +required +takes_value "TVM assembler source file")
             (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids. If not specified abi is loaded from file path obtained from <INPUT> path if it exists.")
             (@arg CTOR_PARAMS: -p --("ctor-params") +takes_value "Supplies arguments for the constructor")
@@ -115,8 +110,8 @@ fn linker_main() -> Result<(), String> {
         (@subcommand test =>
             (@setting AllowLeadingHyphen)
             (about: "execute contract in test environment")
-            (version: "0.1")
-            (author: "TONLabs")
+            (version: build_info.as_str())
+            (author: "TON Labs")
             (@arg SOURCE: -s --source +takes_value "Contract source file")
             (@arg BODY: --body +takes_value "Body for external inbound message (a bitstring like x09c_ or a hex string)")
             (@arg SIGN: --sign +takes_value "Signs body with private key from defined file")
@@ -140,8 +135,8 @@ fn linker_main() -> Result<(), String> {
         (@subcommand message =>
             (@setting AllowNegativeNumbers)
             (about: "generate external inbound message for the blockchain")
-            (version: "0.1")
-            (author: "TONLabs")
+            (version: build_info.as_str())
+            (author: "TON Labs")
             (@arg INIT: -i --init "Generates constructor message with code and data of the contract")
             (@arg DATA: -d --data +takes_value "Supplies body for the message in hex format (empty data by default)")
             (@arg WORKCHAIN: -w --workchain +takes_value "Supplies workchain id for the contract address")
@@ -154,11 +149,36 @@ fn linker_main() -> Result<(), String> {
         )
         (@subcommand init =>
             (about: "initialize smart contract public variables")
+            (version: build_info.as_str())
             (@arg INPUT: +required +takes_value "Path to compiled smart contract file")
             (@arg DATA: +required +takes_value "Set of public variables with values in json format")
             (@arg ABI: +required +takes_value "Path to smart contract ABI file")
         )
-        (subcommand: create_disasm_command())
+        (@subcommand disasm =>
+            (about: "disassemble a tvc or dumps its tree of cells")
+            (version: build_info.as_str())
+            (author: "TON Labs")
+            (@subcommand dump =>
+                (about: "dumps tree of cells for the given tvc")
+                (version: build_info.as_str())
+                (@arg TVC: +required +takes_value "Path to tvc file")
+            )
+            (@subcommand solidity =>
+                (about: "disassembles the given tvc produced by Solidity compiler")
+                (version: build_info.as_str())
+                (@arg TVC: +required +takes_value "Path to tvc file")
+            )
+            (@subcommand solidity_v1 =>
+                (about: "disassembles the given tvc produced by Solidity compiler, obsolete version")
+                (version: build_info.as_str())
+                (@arg TVC: +required +takes_value "Path to tvc file")
+            )
+            (@subcommand fun_c =>
+                (about: "disassembles the given tvc produced by FunC compiler")
+                (version: build_info.as_str())
+                (@arg TVC: +required +takes_value "Path to tvc file")
+            )
+        )
         (@setting SubcommandRequired)
     ).get_matches();
 

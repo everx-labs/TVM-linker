@@ -63,6 +63,9 @@ impl ParseEngineResults {
     pub fn debug_print(&self) {
         self.engine.debug_print()
     }
+    pub fn version(&self) -> Option<String> {
+        self.engine.version()
+    }
 }
 
 pub fn ptr_to_builder(n: Ptr) -> Result<BuilderData, String> {
@@ -247,6 +250,8 @@ pub struct ParseEngine {
     persistent_ptr: Ptr,
     /// Contract ABI info, used for correct function id calculation
     abi: Option<Contract>,
+    /// Contract version
+    version: Option<String>,
 }
 
 const PATTERN_GLOBL:    &'static str = r"^\s*\.globl\s+(:?[\w\.]+)";
@@ -266,6 +271,7 @@ const PATTERN_ASCIZ:    &'static str = r#"^\s*\.asciz\s+"(.+)""#;
 const PATTERN_MACRO:    &'static str = r"^\s*\.macro\s+([\w\.:]+)";
 const PATTERN_IGNORED:  &'static str = r"^\s+\.(p2align|align|text|file|ident|section)";
 const PATTERN_LOC:      &'static str = r"^\s*\.loc\s+(.+),\s+(\d+)\n$";
+const PATTERN_VERSION:  &'static str = r"^\s*\.version\s+(.+)";
 
 const GLOBL:            &'static str = ".globl";
 const INTERNAL:         &'static str = ".internal";
@@ -291,11 +297,12 @@ impl ParseEngine {
             internals:  HashMap::new(),
             macros:     HashMap::new(),
             entry_point: vec![],
-            globl_base: 0,
-            globl_ptr: 0,
+            globl_base:      0,
+            globl_ptr:       0,
             persistent_base: 0,
-            persistent_ptr: 0,
-            abi: None,
+            persistent_ptr:  0,
+            abi:             None,
+            version:         None,
         };
         engine.parse(sources, abi_json)?;
         Ok(engine)
@@ -434,6 +441,10 @@ impl ParseEngine {
         data.addr = self.persistent_base; 
     }
 
+    fn version(&self) -> Option<String> {
+        self.version.clone()
+    }
+
     fn parse_code(&mut self, path: &Path) -> Result<(), String> {
         let globl_regex = Regex::new(PATTERN_GLOBL).unwrap();
         let internal_regex = Regex::new(PATTERN_INTERNAL).unwrap();
@@ -450,6 +461,7 @@ impl ParseEngine {
         let public_regex = Regex::new(PATTERN_PUBLIC).unwrap();
         let macro_regex = Regex::new(PATTERN_MACRO).unwrap();
         let loc_regex = Regex::new(PATTERN_LOC).unwrap();
+        let version_regex = Regex::new(PATTERN_VERSION).unwrap();
 
         let mut section_name: String = String::new();
         let mut obj_body: Lines = vec![];
@@ -478,6 +490,9 @@ impl ParseEngine {
             if ignored_regex.is_match(&l) {
                 //ignore unused parameters
                 debug!("ignored: {}", l);            
+            } else if version_regex.is_match(&l) {
+                let cap = version_regex.captures(&l).unwrap();
+                self.version = Some(cap.get(1).unwrap().as_str().to_owned());
             } else if base_glbl_regex.is_match(&l) {
                 // .global-base
                 let cap = base_glbl_regex.captures(&l).unwrap();

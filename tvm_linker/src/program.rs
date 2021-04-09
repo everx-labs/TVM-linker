@@ -260,6 +260,15 @@ impl Program {
         internal_selector.0.append_reference(SliceData::from(dict.0.data().unwrap_or(&Cell::default())));
         self.dbgmap.map.append(&mut dict.1.map.clone());
 
+        let version = self.engine.version();
+        match version {
+            Some(version) => {
+                let version = version.as_bytes();
+                internal_selector.0.append_reference(SliceData::from_raw(version.to_vec(), version.len() * 8));
+            },
+            None => {}
+        }
+
         // adjust hash of internal_selector cell
         let hash = internal_selector.0.cell().repr_hash().to_hex_string();
         assert_eq!(internal_selector.1.map.len(), 1);

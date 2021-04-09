@@ -11,41 +11,13 @@
  * limitations under the License.
  */
 
-use clap::{App, ArgMatches, SubCommand, Arg, AppSettings};
+use clap::ArgMatches;
 use ton_types::cells_serialization::deserialize_cells_tree;
 use ton_types::{Cell, SliceData, HashmapE, HashmapType};
 use ton_types::Result as Result_;
 use std::io::Cursor;
 use std::ops::{Not, Range};
 use num_traits::Zero;
-
-pub fn create_disasm_command<'a, 'b>() -> App<'a, 'b> {
-    SubCommand::with_name("disasm")
-        .about("disassembles a tvc or dumps its tree of cells")
-        .setting(AppSettings::AllowLeadingHyphen)
-        .setting(AppSettings::TrailingVarArg)
-        .setting(AppSettings::DontCollapseArgsInUsage)
-        .subcommand(SubCommand::with_name("dump")
-            .about("dumps tree of cells for the given tvc")
-            .arg(Arg::with_name("TVC")
-                    .required(true)
-                    .help("Path to tvc file")))
-        .subcommand(SubCommand::with_name("solidity")
-            .about("disassembles the given tvc produced by Solidity compiler")
-            .arg(Arg::with_name("TVC")
-                    .required(true)
-                    .help("Path to tvc file")))
-        .subcommand(SubCommand::with_name("solidity-v1")
-            .about("disassembles the given tvc produced by Solidity compiler, obsolete version")
-            .arg(Arg::with_name("TVC")
-                    .required(true)
-                    .help("Path to tvc file")))
-        .subcommand(SubCommand::with_name("fun-c")
-            .about("disassembles the given tvc produced by FunC compiler")
-            .arg(Arg::with_name("TVC")
-                    .required(true)
-                    .help("Path to tvc file")))
-}
 
 pub fn disasm_command(m: &ArgMatches) -> Result<(), String> {
     if let Some(m) = m.subcommand_matches("dump") {
