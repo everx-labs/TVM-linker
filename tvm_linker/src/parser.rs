@@ -570,9 +570,9 @@ impl ParseEngine {
                     cap.get(1).unwrap().as_str().to_owned(), 
                     i32::from_str_radix(cap.get(2).unwrap().as_str(), 10)
                         .map_err(|_| format!("line: '{}': failed to parse id", lnum))?, 
-                );                
-            } else if label_regex.is_match(&l) { 
-                //TODO: for goto
+                );
+            } else if label_regex.is_match(&l) {
+                // ignore labels
             } else if loc_regex.is_match(&l) {
                 let cap = loc_regex.captures(&l).unwrap();
                 let filename = String::from(cap.get(1).unwrap().as_str());
@@ -1162,13 +1162,13 @@ mod tests {
 
         assert_eq!(
             *body,
-            vec![Line::new("PUSHINT 10\n", "test_macros.code", 5),
-                 Line::new("DROP\n",       "test_macros.code", 6),
-                 Line::new("PUSHINT 1\n",  "test_macros.code", 11),
-                 Line::new("PUSHINT 2\n",  "test_macros.code", 12),
-                 Line::new("ADD\n",        "test_macros.code", 13),
-                 Line::new("PUSHINT 3\n",  "test_macros.code", 8),
-                 Line::new("\n",           "test_macros.code", 9)]
+            vec![Line::new("PUSHINT 10\n", "test_macros.code", 4),
+                 Line::new("DROP\n",       "test_macros.code", 5),
+                 Line::new("PUSHINT 1\n",  "test_macros.code", 10),
+                 Line::new("PUSHINT 2\n",  "test_macros.code", 11),
+                 Line::new("ADD\n",        "test_macros.code", 12),
+                 Line::new("PUSHINT 3\n",  "test_macros.code", 7),
+                 Line::new("\n",           "test_macros.code", 8)]
         );
     }
 
@@ -1186,24 +1186,24 @@ mod tests {
 
         assert_eq!(
             *body,
-            vec![Line::new("PUSHINT 10\n", "test_macros_02.code", 5),
-                 Line::new("DROP\n",       "test_macros_02.code", 6),
-                 Line::new("PUSHINT 1\n",  "test_macros_02.code", 17),
-                 Line::new("\n",           "test_macros_02.code", 18),
-                 Line::new("PUSHINT 2\n",  "test_macros_02.code", 13),
-                 Line::new("ADD\n",        "test_macros_02.code", 14),
-                 Line::new("\n",           "test_macros_02.code", 15),
-                 Line::new("PUSHINT 3\n",  "test_macros_02.code", 8),
-                 Line::new("CALL 2\n",     "test_macros_02.code", 9),
-                 Line::new("\n",           "test_macros_02.code", 10)]
+            vec![Line::new("PUSHINT 10\n", "test_macros_02.code", 4),
+                 Line::new("DROP\n",       "test_macros_02.code", 5),
+                 Line::new("PUSHINT 1\n",  "test_macros_02.code", 16),
+                 Line::new("\n",           "test_macros_02.code", 17),
+                 Line::new("PUSHINT 2\n",  "test_macros_02.code", 12),
+                 Line::new("ADD\n",        "test_macros_02.code", 13),
+                 Line::new("\n",           "test_macros_02.code", 14),
+                 Line::new("PUSHINT 3\n",  "test_macros_02.code", 7),
+                 Line::new("CALL 2\n",     "test_macros_02.code", 8),
+                 Line::new("\n",           "test_macros_02.code", 9)]
         );
         assert_eq!(
             *internal,
-            vec![Line::new("PUSHINT 1\n",  "test_macros_02.code", 17),
-                 Line::new("\n",           "test_macros_02.code", 18),
-                 Line::new("PUSHINT 2\n",  "test_macros_02.code", 13),
-                 Line::new("ADD\n",        "test_macros_02.code", 14),
-                 Line::new("\n",           "test_macros_02.code", 15)]
+            vec![Line::new("PUSHINT 1\n",  "test_macros_02.code", 16),
+                 Line::new("\n",           "test_macros_02.code", 17),
+                 Line::new("PUSHINT 2\n",  "test_macros_02.code", 12),
+                 Line::new("ADD\n",        "test_macros_02.code", 13),
+                 Line::new("\n",           "test_macros_02.code", 14)]
         );
     }
 }

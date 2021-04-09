@@ -1,7 +1,6 @@
     .globl  main
     .public main
     .type main, @function
-main:
 PUSHINT 10
 DROP
 CALL $sum$
