@@ -14,13 +14,39 @@ use ton_block::*;
 use ton_types::cells_serialization::serialize_tree_of_cells;
 use ton_types::{BuilderData, Cell};
 
+fn get_version(root: Option<&Cell>) -> String {
+    match root {
+        Some(cell1) => {
+            match cell1.reference(0) {
+                Ok(cell2) => {
+                    match cell2.reference(1) {
+                        Ok(cell3) => {
+                            let data = cell3.data();
+                            let bytes = &data[..data.len() - 1];
+                            println!("{:?}", bytes);
+                            match String::from_utf8(bytes.to_vec()) {
+                                Ok(string) => if string.is_empty() { "<empty>".to_string() } else { string },
+                                Err(e) => format!("decoding failed: {}", e)
+                            }
+                        }
+                        Err(_) => "not found".to_string()
+                    }
+                }
+                Err(_) => "not found".to_string()
+            }
+        }
+        None => "not found".to_string()
+    }
+}
+
 pub fn state_init_printer(state: &StateInit) -> String {
-    format!("StateInit\n split_depth: {}\n special: {}\n data: {}\n code: {}\n code_hash: {}\n lib:  {}\n",
+    format!("StateInit\n split_depth: {}\n special: {}\n data: {}\n code: {}\n code_hash: {}\n version: {}\n lib:  {}\n",
         state.split_depth.as_ref().map(|x| format!("{:?}", (x.0 as u8))).unwrap_or("None".to_string()),
         state.special.as_ref().map(|x| format!("{:?}", x)).unwrap_or("None".to_string()),
         tree_of_cells_into_base64(state.data.as_ref()),
         tree_of_cells_into_base64(state.code.as_ref()),
         state.code.clone().unwrap().repr_hash().to_hex_string(),
+        get_version(state.code.as_ref()),
         tree_of_cells_into_base64(state.library.root()),
     )
 }
