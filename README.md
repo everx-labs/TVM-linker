@@ -134,6 +134,14 @@ Example:
 	tvm_linker init contract.tvc '{"var1": 10}' contract.abi.json
 
 
+### 6) Disassembler
+
+There are a number of tools under the `disasm` umbrella:
+
+`dump` outputs a pseudo-graphical representation of a tree of cells.
+`solidity` and `fun_c` subcommands both disassemble a tvc produced by Solidity and FunC compilers respectively.
+`graphviz` produces an output in dot format for generation of graphical DAG representation of a tvc.
+
 ### More Help
 Use `tvm_linker --help` for detailed description about all options, flags and subcommands.
 
