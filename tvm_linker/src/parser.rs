@@ -56,7 +56,7 @@ impl ParseEngineResults {
     }
     pub fn global_by_name(&self, name: &str) -> Option<(u32, Lines)> {
         self.engine.global_by_name(name)
-    }    
+    }
     pub fn persistent_data(&self) -> (i64, Option<Cell>) {
         (self.engine.persistent_base, self.engine.data())
     }
@@ -164,7 +164,6 @@ enum DataValue {
 
 impl std::fmt::Display for DataValue {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        
         match self {
             DataValue::Number(ref integer) => {
                 write!(f, "(int {})", integer.0)
@@ -202,7 +201,7 @@ struct Object {
     pub name: String,
     pub size: usize,
     pub index: usize,
-    pub public: bool,    
+    pub public: bool,
     pub dtype: ObjectType,
 }
 
@@ -290,9 +289,9 @@ impl ParseEngine {
     pub fn new(sources: Vec<&Path>, abi_json: Option<String>) -> Result<Self, String> {
         let mut engine = ParseEngine {
             xrefs:      HashMap::new(),
-            intrefs:    HashMap::new(), 
+            intrefs:    HashMap::new(),
             aliases:    HashMap::new(),
-            globals:    HashMap::new(), 
+            globals:    HashMap::new(),
             next_private_globl_funcid: 0,
             internals:  HashMap::new(),
             macros:     HashMap::new(),
@@ -323,7 +322,7 @@ impl ParseEngine {
 
         self.drop_unused_objects();
         Ok(())
-    }    
+    }
 
     fn data(&self) -> Option<Cell> {
         self.build_data()
@@ -381,7 +380,7 @@ impl ParseEngine {
         self.globals.iter().find(|item| {
             if let Some(func) = item.1.dtype.func() {
                 func.id == id
-            } else { 
+            } else {
                 false
             }
         })
@@ -393,10 +392,10 @@ impl ParseEngine {
             v.dtype.func().and_then(|func| Some((func.id.clone(), func.body.clone()) ))
         })
     }
-   
+
     fn preinit(&mut self) -> Result <(), String> {
         self.globals.insert(
-            PUBKEY_NAME.to_string(), 
+            PUBKEY_NAME.to_string(),
             Object::new(PUBKEY_NAME.to_string(), DATA_TYPENAME)
         );
         self.globals.get_mut(PUBKEY_NAME)
@@ -410,7 +409,7 @@ impl ParseEngine {
             });
 
         self.globals.insert(
-            SCI_NAME.to_string(), 
+            SCI_NAME.to_string(),
             Object::new(SCI_NAME.to_string(), DATA_TYPENAME)
         );
         self.globals.get_mut(SCI_NAME)
@@ -431,14 +430,14 @@ impl ParseEngine {
             .dtype
             .data_mut()
             .unwrap();
-        data.addr = self.globl_base; 
+        data.addr = self.globl_base;
 
         let data = self.globals.get_mut(PUBKEY_NAME)
             .unwrap()
             .dtype
             .data_mut()
             .unwrap();
-        data.addr = self.persistent_base; 
+        data.addr = self.persistent_base;
     }
 
     fn version(&self) -> Option<String> {
@@ -468,7 +467,7 @@ impl ParseEngine {
         let mut obj_name: String = "".to_owned();
         let mut lnum = 0;
         let mut l = String::new();
-              
+
         self.globl_ptr = self.globl_base + OFFSET_GLOBL_DATA;
         self.persistent_ptr = self.persistent_base + OFFSET_PERS_DATA;
 
@@ -484,7 +483,7 @@ impl ParseEngine {
                 l += "\n";
             }
             let pos = match source_pos.clone() {
-                None => DbgPos { filename: filename.clone(), line: lnum },
+                None => DbgPos { filename: filename.clone(), line: lnum, line_code: lnum },
                 Some(pos) => pos
             };
             if ignored_regex.is_match(&l) {
@@ -535,7 +534,7 @@ impl ParseEngine {
                 let cap = public_regex.captures(&l).unwrap();
                 let name = cap.get(1).unwrap().as_str();
                 self.globals.get_mut(name).and_then(|obj| {obj.public = true; Some(obj)});
-            } else if globl_regex.is_match(&l) { 
+            } else if globl_regex.is_match(&l) {
                 // .globl x
                 let cap = globl_regex.captures(&l).unwrap();
                 let name = cap.get(1).unwrap().as_str().to_owned();
@@ -550,7 +549,7 @@ impl ParseEngine {
             } else if data_regex.is_match(&l) {
                 // .data
                 //ignore, not used
-            } else if selector_regex.is_match(&l) {                
+            } else if selector_regex.is_match(&l) {
                 // .selector
                 self.update(&section_name, &obj_name, &obj_body)?;
                 section_name = SELECTOR.to_owned();
@@ -567,9 +566,9 @@ impl ParseEngine {
                 // .internal-alias
                 let cap = alias_regex.captures(&l).unwrap();
                 self.aliases.insert(
-                    cap.get(1).unwrap().as_str().to_owned(), 
+                    cap.get(1).unwrap().as_str().to_owned(),
                     i32::from_str_radix(cap.get(2).unwrap().as_str(), 10)
-                        .map_err(|_| format!("line: '{}': failed to parse id", lnum))?, 
+                        .map_err(|_| format!("line: '{}': failed to parse id", lnum))?,
                 );
             } else if label_regex.is_match(&l) {
                 // ignore labels
@@ -580,7 +579,7 @@ impl ParseEngine {
                 if line == 0 { // special value for resetting current source pos
                     source_pos = None;
                 } else {
-                    source_pos = Some(DbgPos { filename, line });
+                    source_pos = Some(DbgPos { filename, line, line_code: lnum });
                 }
             } else if dotted_regex.is_match(&l) {
                 // .param [value]
@@ -596,6 +595,10 @@ impl ParseEngine {
                 obj_body.push(Line { text: l.clone(), pos });
             }
             l.clear();
+        }
+
+        if section_name.is_empty() {
+            return Err("input file has no assembler definitions".to_string());
         }
 
         self.update(&section_name, &obj_name, &obj_body)
@@ -652,7 +655,6 @@ impl ParseEngine {
             }
         }
 
-
         let ids = self.internals.keys().map(|x| *x).collect::<Vec<_>>();
         for id in &ids {
             let lines = self.internals.get(id).unwrap().body.clone();
@@ -678,8 +680,8 @@ impl ParseEngine {
     fn is_public(&self, globl_name: &str) -> bool {
         self.abi.as_ref()
             .map(|abi| {
-                abi.functions().get(globl_name).is_some() 
-                || abi.events().get(globl_name).is_some() 
+                abi.functions().get(globl_name).is_some()
+                || abi.events().get(globl_name).is_some()
             })
             .unwrap_or(false)
     }
@@ -710,7 +712,7 @@ impl ParseEngine {
                     let prev = self.xrefs.insert(name.to_string(), func_id);
                     if prev.is_some() {
                         Err(format!(
-                            "global function with id = {:x} and name \"{}\" already exist", 
+                            "global function with id = {:x} and name \"{}\" already exist",
                             func_id,
                             name,
                         ))?;
@@ -725,7 +727,7 @@ impl ParseEngine {
                         data.persistent = true;
                         data.addr = self.persistent_ptr;
                         self.persistent_ptr += offset;
-                    } else { 
+                    } else {
                         data.addr = self.globl_ptr;
                         self.globl_ptr += offset;
                     }
@@ -767,7 +769,7 @@ impl ParseEngine {
             if let Some(cap) = COMM_RE.captures(param.text.as_str()) {
                 // .comm <symbol>, <size>, <align>
                 let size_bytes = usize::from_str_radix(
-                    cap.get(2).unwrap().as_str(), 
+                    cap.get(2).unwrap().as_str(),
                     10,
                 ).map_err(|_| "invalid \".comm\": invalid size".to_string())?;
                 let align = usize::from_str_radix(
@@ -828,8 +830,8 @@ impl ParseEngine {
         let filter = |persistent: bool| {
             self.globals.iter().filter_map(move |item| {
                 item.1.dtype.data().and_then(|data| {
-                    if data.persistent == persistent { 
-                        Some((&data.addr, &data.values)) 
+                    if data.persistent == persistent {
+                        Some((&data.addr, &data.values))
                     } else {
                         None
                     }
@@ -850,20 +852,20 @@ impl ParseEngine {
             }
             dict
         };
-        
+
         let globl_dict = build_dict(&globl_data_vec);
         let mut pers_dict = build_dict(&pers_data_vec);
         let mut globl_cell = BuilderData::new();
-        if let Some(cell) = globl_dict.data() {                
+        if let Some(cell) = globl_dict.data() {
             globl_cell.append_bit_one()
                 .unwrap()
                 .checked_append_reference(cell.clone())
                 .unwrap();
-        } else {                                        
-            globl_cell.append_bit_zero().unwrap(); 
+        } else {
+            globl_cell.append_bit_zero().unwrap();
         }
         pers_dict.set(
-            ptr_to_builder(self.persistent_base + OFFSET_GLOBL_DATA).unwrap().into(), 
+            ptr_to_builder(self.persistent_base + OFFSET_GLOBL_DATA).unwrap().into(),
             &globl_cell.into()
         ).unwrap();
 
@@ -941,7 +943,7 @@ impl ParseEngine {
         self.globals.retain(|_k, v| {
             v.dtype.func()
                 .map(|f| ids.contains(&f.id))
-                .unwrap_or(true)            
+                .unwrap_or(true)
         });
         self.xrefs.retain(|_k, v| {
             ids.contains(&v)
@@ -987,7 +989,7 @@ impl ParseEngine {
         for (k, v) in self.publics() {
             let code = lines_to_string(&v);
             println! ("Function {:08X}\n{}\n{}\n{}", k, line, code, line);
-        }        
+        }
         println!("{}\nInternal functions:\n{}", line, line);
         for (k, v) in &self.intrefs {
             println! ("Function {:30}: id={:08X}", k, v);
@@ -1013,7 +1015,7 @@ mod tests {
         let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let parser = parser.unwrap();
-        
+
         let mut data_dict = BuilderData::new();
         data_dict.append_bit_one().unwrap().checked_append_reference(parser.data().unwrap()).unwrap();
 
@@ -1026,11 +1028,11 @@ mod tests {
             DUP
             PUSH s2
             PUSHINT 64
-            DICTIGET        
+            DICTIGET
             THROWIFNOT 100
             SEMPTY
             THROWIFNOT 100
-     
+
         ;get base+8 value from the dict - it's a global data dictionary
             ADDCONST {offset}
             DUP
@@ -1039,7 +1041,7 @@ mod tests {
             DICTIGET
             THROWIFNOT 100
             PLDDICT
-            
+
         ;read 4 integers starting with address 8 from global dict
             DUP
             PUSHINT 8
@@ -1068,7 +1070,7 @@ mod tests {
             PUSHINT 257 LDIX
             ENDS
             SWAP
-            
+
             PUSHINT 20
             OVER
             PUSHINT 64
@@ -1077,7 +1079,7 @@ mod tests {
             PUSHINT 257 LDIX
             ENDS
             NIP
-            
+
         ;read integer with address persistent_base+16 from persistent dict
             PUSH s4
             ADDCONST {offset}
@@ -1090,7 +1092,7 @@ mod tests {
 
             BLKSWAP 2, 5
             BLKDROP 2
-        ", 
+        ",
         base = 1000000,
         offset = OFFSET_GLOBL_DATA,
         )).expect("Couldn't compile code");
@@ -1116,7 +1118,7 @@ mod tests {
                                      Path::new("./tests/local_global_var.code")];
         let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
-    }   
+    }
 
     #[test]
     fn test_parser_var_with_comm() {

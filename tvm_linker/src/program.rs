@@ -213,7 +213,7 @@ impl Program {
         self.dbgmap.map.insert(hash, entry.1.clone());
 
         let mut main_selector = compile_code_debuggable(self.entry())
-            .map_err(|e| format_compilation_error_string(e, &self.entry()).replace("_name_", "selector"))?;
+            .map_err(|e| e.to_string())?;
         main_selector.0.append_reference(self.public_method_dict(remove_ctor)?.unwrap_or_default().into());
         main_selector.0.append_reference(internal_selector.0);
 
@@ -291,7 +291,7 @@ impl Program {
         ];
 
         let mut entry_selector = compile_code_debuggable(entry_selector_text.clone())
-            .map_err(|e| format_compilation_error_string(e, &entry_selector_text).replace("_name_", "selector"))?;
+            .map_err(|e| e.to_string())?;
 
         entry_selector.0.append_reference(internal_selector.0);
         entry_points.reverse();
