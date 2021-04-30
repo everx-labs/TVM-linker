@@ -305,7 +305,51 @@ impl Program {
         let entry = entry_selector.1.map.iter().next().unwrap();
         self.dbgmap.map.insert(hash, entry.1.clone());
 
-        Ok(entry_selector.0.cell().clone())
+        if !self.engine.save_my_code() {
+            return Ok(entry_selector.0.cell().clone())
+        }
+
+        let save_my_code_text = vec![
+            Line::new("PUSHREF {\n",                      "<save-my-code>", 1),
+            Line::new("  DUP\n",                          "<save-my-code>", 1),
+            Line::new("  XCHG s0, s2\n",                  "<save-my-code>", 1),
+            Line::new("  NEWC\n",                         "<save-my-code>", 1),
+            Line::new("  STSLICECONST x8820d068a57f\n",   "<save-my-code>", 1),
+            Line::new("  STSLICECONST xed1fdb35\n",       "<save-my-code>", 1),
+            Line::new("  STREF\n",                        "<save-my-code>", 1),
+            Line::new("  STSLICE\n",                      "<save-my-code>", 1),
+            Line::new("  PUSH c7\n",                      "<save-my-code>", 1),
+            Line::new("  FIRST\n",                        "<save-my-code>", 1),
+            Line::new("  UNTUPLE 10\n",                   "<save-my-code>", 1),
+            Line::new("  DROP\n",                         "<save-my-code>", 1),
+            Line::new("  PUSH s9\n",                      "<save-my-code>", 1),
+            Line::new("  NULL\n",                         "<save-my-code>", 1),
+            Line::new("  TUPLE 11\n",                     "<save-my-code>", 1),
+            Line::new("  SINGLE\n",                       "<save-my-code>", 1),
+            Line::new("  POP c7\n",                       "<save-my-code>", 1),
+            Line::new("  DROP\n",                         "<save-my-code>", 1),
+            Line::new("  DEPTH\n",                        "<save-my-code>", 1),
+            Line::new("  DEC\n",                          "<save-my-code>", 1),
+            Line::new("  PUSHINT -1\n",                   "<save-my-code>", 1),
+            Line::new("  BLESSVARARGS\n",                 "<save-my-code>", 1),
+            Line::new("  JMPX\n",                         "<save-my-code>", 1),
+            Line::new("}\n",                              "<save-my-code>", 1),
+            Line::new("DUP\n",                            "<save-my-code>", 1),
+            Line::new("CTOS\n",                           "<save-my-code>", 1),
+            Line::new("DEPTH\n",                          "<save-my-code>", 1),
+            Line::new("DEC\n",                            "<save-my-code>", 1),
+            Line::new("PUSHINT -1\n",                     "<save-my-code>", 1),
+            Line::new("BLESSVARARGS\n",                   "<save-my-code>", 1),
+            Line::new("JMPXDATA\n",                       "<save-my-code>", 1),
+            Line::new("JMPREF\n",                         "<save-my-code>", 1),
+        ];
+        let mut save_my_code = compile_code_debuggable(save_my_code_text.clone())
+            .map_err(|e| e.to_string())?;
+        save_my_code.0.append_reference(entry_selector.0);
+
+        // TODO adjust debug map
+
+        Ok(save_my_code.0.cell().clone())
     }
 
     pub fn debug_print(&self) {

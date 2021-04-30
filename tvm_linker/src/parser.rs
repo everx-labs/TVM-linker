@@ -66,6 +66,9 @@ impl ParseEngineResults {
     pub fn version(&self) -> Option<String> {
         self.engine.version()
     }
+    pub fn save_my_code(&self) -> bool {
+        self.engine.save_my_code()
+    }
 }
 
 pub fn ptr_to_builder(n: Ptr) -> Result<BuilderData, String> {
@@ -251,6 +254,8 @@ pub struct ParseEngine {
     abi: Option<Contract>,
     /// Contract version
     version: Option<String>,
+    /// Selector variant
+    save_my_code: bool,
 }
 
 const PATTERN_GLOBL:    &'static str = r"^\s*\.globl\s+(:?[\w\.]+)";
@@ -271,6 +276,7 @@ const PATTERN_MACRO:    &'static str = r"^\s*\.macro\s+([\w\.:]+)";
 const PATTERN_IGNORED:  &'static str = r"^\s+\.(p2align|align|text|file|ident|section)";
 const PATTERN_LOC:      &'static str = r"^\s*\.loc\s+(.+),\s+(\d+)\n$";
 const PATTERN_VERSION:  &'static str = r"^\s*\.version\s+(.+)";
+const PATTERN_PRAGMA:   &'static str = r"^\s*\.pragma\s+(.+)";
 
 const GLOBL:            &'static str = ".globl";
 const INTERNAL:         &'static str = ".internal";
@@ -302,6 +308,7 @@ impl ParseEngine {
             persistent_ptr:  0,
             abi:             None,
             version:         None,
+            save_my_code:    false,
         };
         engine.parse(sources, abi_json)?;
         Ok(engine)
@@ -444,6 +451,10 @@ impl ParseEngine {
         self.version.clone()
     }
 
+    fn save_my_code(&self) -> bool {
+        self.save_my_code
+    }
+
     fn parse_code(&mut self, path: &Path) -> Result<(), String> {
         let globl_regex = Regex::new(PATTERN_GLOBL).unwrap();
         let internal_regex = Regex::new(PATTERN_INTERNAL).unwrap();
@@ -461,6 +472,7 @@ impl ParseEngine {
         let macro_regex = Regex::new(PATTERN_MACRO).unwrap();
         let loc_regex = Regex::new(PATTERN_LOC).unwrap();
         let version_regex = Regex::new(PATTERN_VERSION).unwrap();
+        let pragma_regex = Regex::new(PATTERN_PRAGMA).unwrap();
 
         let mut section_name: String = String::new();
         let mut obj_body: Lines = vec![];
@@ -492,6 +504,14 @@ impl ParseEngine {
             } else if version_regex.is_match(&l) {
                 let cap = version_regex.captures(&l).unwrap();
                 self.version = Some(cap.get(1).unwrap().as_str().to_owned());
+            } else if pragma_regex.is_match(&l) {
+                let cap = pragma_regex.captures(&l).unwrap();
+                match cap.get(1) {
+                    Some(m) => if m.as_str() == "selector-save-my-code" {
+                        self.save_my_code = true
+                    },
+                    None => {}
+                }
             } else if base_glbl_regex.is_match(&l) {
                 // .global-base
                 let cap = base_glbl_regex.captures(&l).unwrap();
