@@ -310,13 +310,12 @@ impl Program {
         }
 
         let save_my_code_text = vec![
-            Line::new("PUSHREFSLICE {\n",                      "<save-my-code>", 1),
+            Line::new("PUSHREFCONT {\n",                      "<save-my-code>", 1),
             Line::new("  DUP\n",                    "<save-my-code>", 1),
             Line::new("  SETGLOB 1\n",                    "<save-my-code>", 1),
             Line::new("  BLESS\n",                 "<save-my-code>", 1),
             Line::new("  JMPX\n",                         "<save-my-code>", 1),
             Line::new("}\n",                              "<save-my-code>", 1),
-            Line::new("BLESS\n",                   "<save-my-code>", 1),
             Line::new("JMPXDATA\n",                       "<save-my-code>", 1),
         ];
         let mut save_my_code = compile_code_debuggable(save_my_code_text.clone())
