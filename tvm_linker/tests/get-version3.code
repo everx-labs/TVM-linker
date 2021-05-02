@@ -1,0 +1,3 @@
+.internal-alias :main_internal, -1
+.internal       :main_internal
+PRINTSTR hello
