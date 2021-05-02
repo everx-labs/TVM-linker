@@ -15,6 +15,7 @@ use ton_types::cells_serialization::serialize_tree_of_cells;
 use ton_types::{BuilderData, Cell};
 
 fn get_version(root: Option<&Cell>) -> String {
+    // TODO fix if we use selector of the last version
     match root {
         Some(cell1) => {
             match cell1.reference(0) {
@@ -23,7 +24,6 @@ fn get_version(root: Option<&Cell>) -> String {
                         Ok(cell3) => {
                             let data = cell3.data();
                             let bytes = &data[..data.len() - 1];
-                            println!("{:?}", bytes);
                             match String::from_utf8(bytes.to_vec()) {
                                 Ok(string) => if string.is_empty() { "<empty>".to_string() } else { string },
                                 Err(e) => format!("decoding failed: {}", e)
