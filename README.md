@@ -120,6 +120,8 @@ Example:
 	tvm_linker address test --body 00$main:X$ -s source
 	tvm_linker address test --body 00$main:x$ -s source
 
+The `--body-from-boc` option is analogous to `--body` but extracts the message body from the specified message boc file.
+
 ### 5) Initialize static variables in compiled contract
 
 	tvm_linker init <tvc_file> <data_json> <abi_file>

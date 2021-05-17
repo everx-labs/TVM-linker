@@ -55,13 +55,16 @@ use parser::{ParseEngine, ParseEngineResults};
 use program::{Program, get_now};
 use real_ton::{decode_boc, compile_message};
 use resolver::resolve_name;
-use std::path::Path;
+use ton_block::{Deserializable, Message};
+use std::{path::Path};
 use testcall::{call_contract, MsgInfo, TraceLevel};
 use ton_types::{BuilderData, SliceData};
 use std::env;
 use disasm::disasm_command;
 use ton_labs_assembler::Line;
 use std::fs::File;
+
+use crate::real_ton::load_stateinit;
 
 fn main() -> Result<(), i32> {
     linker_main().map_err(|err_str| {
@@ -114,6 +117,7 @@ fn linker_main() -> Result<(), String> {
             (author: "TON Labs")
             (@arg SOURCE: -s --source +takes_value "Contract source file")
             (@arg BODY: --body +takes_value "Body for external inbound message (a bitstring like x09c_ or a hex string)")
+            (@arg BODY_FROM_BOC: --("body-from-boc") +takes_value "Body from message boc file")
             (@arg SIGN: --sign +takes_value "Signs body with private key from defined file")
             (@arg TRACE: --trace "Prints last command name, stack and registers after each executed TVM command")
             (@arg TRACE_MIN: --("trace-minimal") "Prints minimal trace")
@@ -439,13 +443,22 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
     println!("TEST STARTED");
     println!("body = {:?}", body);
 
-    let msg_info = MsgInfo {
+    let mut msg_info = MsgInfo {
         balance: matches.value_of("INTERNAL"),
         src: matches.value_of("SRCADDR"),
         now,
         bounced: matches.is_present("BOUNCED"),
         body,
     };
+
+    match matches.value_of("BODY_FROM_BOC") {
+        Some(filename) => {
+            let (mut root_slice, _) = load_stateinit(filename);
+            let msg = Message::construct_from(&mut root_slice).expect("cannot read message from slice");
+            msg_info.body = msg.body();
+        }
+        None => {}
+    }
 
     let gas_limit = matches.value_of("GASLIMIT")
         .map(|v| i64::from_str_radix(v, 10))
