@@ -31,7 +31,7 @@ should be supplied for every file). If `--lib` option is not specified linker lo
 if it is set that path is used to load a library.
 
 If there is an ABI file, it is better to use `--abi-json` option to supply a contract ABI file. Function ID's are generated according to function signatures in the ABI.
-If neither `-a` nor `--abi-json` option is specified, linker checks whether file `source`(without extension) + `.abi.json` exists. If file exists linker loads ABI from it.
+If neither `-a` nor `--abi-json` option is specified, linker checks whether file `source`(without extension) + `.abi.json` exists. If file exists, linker loads ABI from it.
 
 Linker generates an `address.tvc` file, where `address` is a hash from initial data and code of the contract.
 
@@ -66,7 +66,7 @@ First, generate a contract as described in 1). Then use `message` subcommand to 
 
 To create a `constructor message` with contract's code and data, use `--init` option.
 
-Aditionally, you can add a raw body to the message. Use the `--data` option:
+Additionally, you can add a raw body to the message. Use the `--data` option:
 
 	tvm_linker message <contract-address> --data XXXX...
 
@@ -93,7 +93,7 @@ If `--sign` specified, the body will be signed with the private key from `key-fi
 
 Use `--trace` flag to trace VM execution: stack, registers and gas will be printed after each executed VM command.
 
-Use `--decode-c6` to see output actions in user friendly format.
+Use `--decode-c6` to see output actions in user-friendly format.
 
 Use `--balance <value>` to define account balance in nanograms. It will be available  at the bottom of initial stake and in SmartContractInfo tuple from c7 register .
 
@@ -111,7 +111,7 @@ An ABI body can be generated if `abi-params`, `abi-json` and `abi-method` will b
 
 If `--body` is used, contract's public function ids can be encoded by their names using `$...$` syntax:`$name:[0len][type]$`, 
 where `name` is a name of public function, `len` - length in chars of the id (if `len` is bigger than `name`'s length in chars than 
-zeros will be added at the left side to fit required length), `type` can be `x` or `X` - hexadecimal integer  in lowercase or uppercase. You have to set `-s source` option when you use $...$ syntax.
+zeros will be added on the left side to fit required length), `type` can be `x` or `X` - hexadecimal integer  in lowercase or uppercase. You have to set `-s source` option when you use $...$ syntax.
 
 Example:
 
@@ -120,15 +120,16 @@ Example:
 	tvm_linker address test --body 00$main:X$ -s source
 	tvm_linker address test --body 00$main:x$ -s source
 
-### 5) Initialize public variables in compiled contract
+### 5) Initialize static variables in compiled contract
 
 	tvm_linker init <tvc_file> <data_json> <abi_file>
 
-Updates contract data with values defined in `data_json` argument.
+Updates contract's static state variables (see section `data` in `*.abi.json` file) with values
+defined in `data_json` argument.
 
 Example:
 
-	tvm_linker init contract.tvc '{"var1":10}' contract.abi.json
+	tvm_linker init contract.tvc '{"var1": 10}' contract.abi.json
 
 
 ### More Help
