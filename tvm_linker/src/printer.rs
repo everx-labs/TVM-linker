@@ -11,31 +11,28 @@
  * limitations under the License.
  */
 use ton_block::*;
-use ton_types::cells_serialization::serialize_tree_of_cells;
+use ton_types::{cells_serialization::serialize_tree_of_cells};
 use ton_types::{BuilderData, Cell};
 
-fn get_version(root: Option<&Cell>) -> String {
-    // TODO fix if we use selector of the last version
-    match root {
-        Some(cell1) => {
-            match cell1.reference(0) {
-                Ok(cell2) => {
-                    match cell2.reference(1) {
-                        Ok(cell3) => {
-                            let data = cell3.data();
-                            let bytes = &data[..data.len() - 1];
-                            match String::from_utf8(bytes.to_vec()) {
-                                Ok(string) => if string.is_empty() { "<empty>".to_string() } else { string },
-                                Err(e) => format!("decoding failed: {}", e)
-                            }
-                        }
-                        Err(_) => "not found".to_string()
-                    }
-                }
-                Err(_) => "not found".to_string()
-            }
+fn get_version(root: &Cell) -> Result<String, String> {
+    let cell1 = root.reference(0).map_err(|e| format!("not found ({})", e))?;
+    let cell2 = cell1.reference(1).map_err(|e| format!("not found ({})", e))?;
+    let data = cell2.data();
+    let bytes = &data[..data.len() - 1];
+    match String::from_utf8(bytes.to_vec()) {
+        Ok(string) => if string.is_empty() { Ok("<empty>".to_string()) } else { Ok(string) },
+        Err(e) => Err(format!("decoding failed ({})", e))
+    }
+}
+
+pub fn get_version_mycode_aware(root: Option<&Cell>) -> Result<String, String> {
+    let root = root.ok_or("not found (empty root)".to_string())?;
+    match get_version(root) {
+        Ok(res) => Ok(res),
+        Err(_) => {
+            let root = root.reference(1).map_err(|e| e.to_string())?;
+            get_version(&root)
         }
-        None => "not found".to_string()
     }
 }
 
@@ -46,7 +43,7 @@ pub fn state_init_printer(state: &StateInit) -> String {
         tree_of_cells_into_base64(state.data.as_ref()),
         tree_of_cells_into_base64(state.code.as_ref()),
         state.code.clone().unwrap().repr_hash().to_hex_string(),
-        get_version(state.code.as_ref()),
+        get_version_mycode_aware(state.code.as_ref()).map_or_else(|v| v, |e| e),
         tree_of_cells_into_base64(state.library.root()),
     )
 }

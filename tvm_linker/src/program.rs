@@ -276,18 +276,17 @@ impl Program {
         self.dbgmap.map.insert(hash, entry.1.clone());
 
         let entry_selector_text = vec![
-            Line::new("SETCP 0\n",     "<entry-selector>", 1),
-            Line::new("PUSHREFCONT\n", "<entry-selector>", 2),
-            Line::new("POPCTR c3\n",   "<entry-selector>", 3),
-            Line::new("DUP\n",         "<entry-selector>", 4),
-            Line::new("IFNOTJMPREF\n", "<entry-selector>", 5),  //  0 - internal transaction
-            Line::new("DUP\n",         "<entry-selector>", 6),
-            Line::new("EQINT -1\n",    "<entry-selector>", 7),
-            Line::new("IFJMPREF\n",    "<entry-selector>", 8),  // -1 - external transaction
-            Line::new("DUP\n",         "<entry-selector>", 9),
-            Line::new("EQINT -2\n",    "<entry-selector>", 10),
-            Line::new("IFJMPREF\n",    "<entry-selector>", 11), // -2 - ticktock transaction
-            Line::new("THROW 11\n",    "<entry-selector>", 12),
+            Line::new("PUSHREFCONT\n", "<entry-selector>", 1),
+            Line::new("POPCTR c3\n",   "<entry-selector>", 2),
+            Line::new("DUP\n",         "<entry-selector>", 3),
+            Line::new("IFNOTJMPREF\n", "<entry-selector>", 4),  //  0 - internal transaction
+            Line::new("DUP\n",         "<entry-selector>", 5),
+            Line::new("EQINT -1\n",    "<entry-selector>", 6),
+            Line::new("IFJMPREF\n",    "<entry-selector>", 7),  // -1 - external transaction
+            Line::new("DUP\n",         "<entry-selector>", 8),
+            Line::new("EQINT -2\n",    "<entry-selector>", 9),
+            Line::new("IFJMPREF\n",    "<entry-selector>", 10), // -2 - ticktock transaction
+            Line::new("THROW 11\n",    "<entry-selector>", 11),
         ];
 
         let mut entry_selector = compile_code_debuggable(entry_selector_text.clone())
@@ -310,19 +309,27 @@ impl Program {
         }
 
         let save_my_code_text = vec![
-            Line::new("PUSHREFCONT {\n",                      "<save-my-code>", 1),
-            Line::new("  DUP\n",                    "<save-my-code>", 1),
-            Line::new("  SETGLOB 1\n",                    "<save-my-code>", 1),
-            Line::new("  BLESS\n",                 "<save-my-code>", 1),
-            Line::new("  JMPX\n",                         "<save-my-code>", 1),
-            Line::new("}\n",                              "<save-my-code>", 1),
-            Line::new("JMPXDATA\n",                       "<save-my-code>", 1),
+            Line::new("PUSHREFCONT {\n", "<save-my-code>", 1),
+            Line::new("  DUP\n",         "<save-my-code>", 2),
+            Line::new("  SETGLOB 1\n",   "<save-my-code>", 3),
+            Line::new("  BLESS\n",       "<save-my-code>", 4),
+            Line::new("  JMPX\n",        "<save-my-code>", 5),
+            Line::new("}\n",             "<save-my-code>", 6),
+            Line::new("JMPXDATA\n",      "<save-my-code>", 7),
         ];
         let mut save_my_code = compile_code_debuggable(save_my_code_text.clone())
             .map_err(|e| e.to_string())?;
+        assert_eq!(save_my_code.1.map.len(), 2);
+        let old_hash = save_my_code.0.cell().repr_hash().to_hex_string();
+        let entry = save_my_code.1.map.get(&old_hash).unwrap();
         save_my_code.0.append_reference(entry_selector.0);
 
-        // TODO adjust debug map
+        let hash = save_my_code.0.cell().repr_hash().to_hex_string();
+        self.dbgmap.map.insert(hash, entry.clone());
+
+        let inner_hash = save_my_code.0.reference(0).unwrap().repr_hash().to_hex_string();
+        let entry = save_my_code.1.map.get(&inner_hash).unwrap();
+        self.dbgmap.map.insert(inner_hash, entry.clone());
 
         Ok(save_my_code.0.cell().clone())
     }
@@ -406,6 +413,8 @@ mod tests {
     use abi;
     use std::fs::File;
     use std::path::Path;
+    use crate::{printer::get_version_mycode_aware, real_ton::load_stateinit};
+
     use super::*;
     use testcall::{perform_contract_call, call_contract, MsgInfo};
 
@@ -620,5 +629,28 @@ mod tests {
             debug_map_filename,
         );
         assert_eq!(exit_code, 0);
+    }
+
+    fn get_version(filename: &str) -> String {
+        let parser = ParseEngine::new(vec![Path::new(filename)], None);
+        assert_eq!(parser.is_ok(), true);
+        let mut prog = Program::new(parser.unwrap());
+        let file_name = prog.compile_to_file(-1).unwrap();
+        let (mut root_slice, _) = load_stateinit(file_name.as_str());
+        let state = StateInit::construct_from(&mut root_slice).expect("cannot read state_init from slice");
+        get_version_mycode_aware(state.code.as_ref()).map_or_else(|v| v, |e| e)
+    }
+
+    #[test]
+    fn test_get_version() {
+        assert_eq!(
+            "0.43.0+commit.e8c3d877.mod.Linux.g++".to_string(),
+            get_version("tests/get-version1.code"));
+        assert_eq!(
+            "0.43.0+commit.e8c3d877.mod.Linux.g++".to_string(),
+            get_version("tests/get-version2.code"));
+        assert_eq!(
+            "not found (cell underflow)".to_string(),
+            get_version("tests/get-version3.code"));
     }
 }

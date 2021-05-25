@@ -23,22 +23,25 @@ use ton_types::types::{AccountId};
 use ton_types::cells_serialization::{BocSerialiseMode, BagOfCells, deserialize_cells_tree_ex };
 use ton_types::{SliceData, BuilderData};
 
-pub fn decode_boc(file_name: &str, is_tvc: bool) {
+pub fn load_stateinit(file_name: &str) -> (SliceData, Vec<u8>) {
     let mut orig_bytes = Vec::new();
-
     let mut f = File::open(file_name).expect("Unable to open file");
     f.read_to_end(&mut orig_bytes).expect("Unable to read file");
 
     let mut cur = Cursor::new(orig_bytes.clone());
     let (root_cells, _mode, _x, _y) = deserialize_cells_tree_ex(&mut cur).expect("Error deserialising BOC");
     let mut root = root_cells[0].clone();
-    if root.references_count() == 2 {
+    if root.references_count() == 2 { // append empty library cell
         let mut adjusted_cell = BuilderData::from(root);
         adjusted_cell.append_reference(BuilderData::default());
         root = adjusted_cell.into();
     }
-    let mut root_slice = SliceData::from(root);
-    
+    (SliceData::from(root), orig_bytes)
+}
+
+pub fn decode_boc(filename: &str, is_tvc: bool) {
+    let (mut root_slice, orig_bytes) = load_stateinit(filename);
+
     println!("Encoded: {}\n", hex::encode(orig_bytes));
     if is_tvc {
         let state = StateInit::construct_from(&mut root_slice).expect("cannot read state_init from slice");
@@ -47,7 +50,6 @@ pub fn decode_boc(file_name: &str, is_tvc: bool) {
         let msg = Message::construct_from(&mut root_slice).expect("cannot read message from slice");
         println!("Decoded:\n{}", msg_printer(&msg));
     }
-
 }
 
 pub fn compile_message(
