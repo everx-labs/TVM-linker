@@ -167,6 +167,12 @@ fn linker_main() -> Result<(), String> {
                 (version: build_info.as_str())
                 (@arg TVC: +required +takes_value "Path to tvc file")
             )
+            (@subcommand graphviz =>
+                (about: "generates graphviz dot for the given tvc")
+                (version: build_info.as_str())
+                (@arg METHOD: --method +takes_value "Selects a particular method by ID or int|ext|ticktock")
+                (@arg TVC: +required +takes_value "Path to tvc file")
+            )
             (@subcommand solidity =>
                 (about: "disassembles the given tvc produced by Solidity compiler")
                 (version: build_info.as_str())

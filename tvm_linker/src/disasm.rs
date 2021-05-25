@@ -11,9 +11,12 @@
  * limitations under the License.
  */
 
+use std::collections::HashSet;
+use std::str::FromStr;
+use ton_block::Serializable;
 use clap::ArgMatches;
 use ton_types::cells_serialization::deserialize_cells_tree;
-use ton_types::{Cell, SliceData, HashmapE, HashmapType};
+use ton_types::{Cell, SliceData, HashmapE, HashmapType, UInt256};
 use ton_types::Result as Result_;
 use std::io::Cursor;
 use std::ops::{Not, Range};
@@ -22,6 +25,8 @@ use num_traits::Zero;
 pub fn disasm_command(m: &ArgMatches) -> Result<(), String> {
     if let Some(m) = m.subcommand_matches("dump") {
         return disasm_dump_command(m);
+    } else if let Some(m) = m.subcommand_matches("graphviz") {
+        return disasm_graphviz_command(m);
     } else if let Some(m) = m.subcommand_matches("solidity") {
         return disasm_solidity_command(m);
     } else if let Some(m) = m.subcommand_matches("solidity-v1") {
@@ -30,6 +35,88 @@ pub fn disasm_command(m: &ArgMatches) -> Result<(), String> {
         return disasm_fun_c_command(m);
     }
     Err("unknown command".to_owned())
+}
+
+fn disasm_graphviz_command(m: &ArgMatches) -> Result<(), String> {
+    let filename = m.value_of("TVC");
+    let tvc = filename.map(|f| std::fs::read(f))
+        .transpose()
+        .map_err(|e| format!(" failed to read tvc file: {}", e))?
+        .unwrap();
+    let mut csor = Cursor::new(tvc);
+    let mut roots = deserialize_cells_tree(&mut csor).unwrap();
+    let root = roots.remove(0).reference(0).unwrap();
+    match m.value_of("METHOD") {
+        Some(string) => {
+            if string == "int" {
+                graphviz(&root.reference(1).unwrap())
+            } else if string == "ext" {
+                graphviz(&root.reference(2).unwrap())
+            } else if string == "ticktock" {
+                graphviz(&root.reference(3).unwrap())
+            } else {
+                let method_id = u32::from_str(string).map_err(|e| -> String { e.to_string() })?;
+                let dict_cell = root.reference(0).unwrap().reference(0).unwrap();
+                let dict = HashmapE::with_hashmap(32, Some(dict_cell));
+                if dict.len().is_err() {
+                    return Err("empty internal methods dictionary".to_string())
+                }
+                let key = method_id.write_to_new_cell().unwrap().into();
+                let data = dict.get(key).map_err(|e| -> String { e.to_string() })?
+                    .ok_or(format!("internal method {} not found", method_id))?;
+                let cell = data.into_cell();
+                graphviz(&cell)
+            }
+        },
+        None => graphviz(&root)
+    }
+    Ok(())
+}
+
+fn data_pretty_printed(cell: &Cell) -> String {
+    let mut string = String::new();
+    let mut hex = cell.to_hex_string(true);
+    if hex.len() > 0 {
+        while hex.len() > 32 {
+            let tail = hex.split_off(32);
+            string += format!("<tr><td align=\"left\">{}</td></tr>", hex).as_str();
+            hex = tail;
+        }
+        string += format!("<tr><td align=\"left\">{}</td></tr>", hex).as_str();
+    } else {
+        string += "<tr><td align=\"left\">8_</td></tr>";
+    }
+    string
+}
+
+fn tree_walk_graphviz(cell: &Cell, visited: &mut HashSet<UInt256>) {
+    visited.insert(cell.repr_hash());
+    let cell_hash = cell.repr_hash().to_hex_string();
+    let cell_id = &cell_hash.as_str()[..8];
+    println!("  \"{}\" [label=<<table border=\"0\"><tr><td align=\"left\"><b>{}</b></td></tr>{}</table>>];",
+        cell_id, cell_id, data_pretty_printed(cell));
+    if cell.references_count() > 0 {
+        for i in 0..cell.references_count() {
+            let child = cell.reference(i).unwrap();
+            let child_hash = child.repr_hash().to_hex_string();
+            let child_id = &child_hash.as_str()[..8];
+            println!("  \"{}\" -> \"{}\" [ taillabel=\"{}\"];", cell_id, child_id, i.to_string());
+        }
+    }
+    for i in 0..cell.references_count() {
+        let child = cell.reference(i).unwrap();
+        if !visited.contains(&child.repr_hash()) {
+            tree_walk_graphviz(&child, visited);
+        }
+    }
+}
+
+fn graphviz(cell: &Cell) {
+    println!("digraph code {{");
+    println!("  node [shape=box, fontname=\"DejaVu Sans Mono\"]");
+    let mut visited = HashSet::new();
+    tree_walk_graphviz(&cell, &mut visited);
+    println!("}}");
 }
 
 fn disasm_dump_command(m: &ArgMatches) -> Result<(), String> {
@@ -150,7 +237,7 @@ fn disasm_solidity_command(m: &ArgMatches) -> Result<(), String> {
     for entry in dict.into_iter() {
         let (key, mut method) = entry.unwrap();
         let mut key_slice = SliceData::from(key.into_cell().unwrap());
-        let id = key_slice.get_next_int(19).unwrap();
+        let id = key_slice.get_next_int(32).unwrap();
         println!();
         println!(";; method {:x}", id);
         print!("{}", disasm(&mut method));
@@ -213,7 +300,7 @@ fn print_tree_of_cells(toc: &Cell) {
             }
             println!("{}{}{}", prefix, if first { indent } else { indent_next }, hex);
         } else {
-            println!("{}{}{}", prefix, indent, "1_");
+            println!("{}{}{}", prefix, indent, "8_");
         }
 
         let prefix_child = if last { "  " } else { "│ " };
