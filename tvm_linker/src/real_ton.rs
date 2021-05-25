@@ -19,8 +19,8 @@ use std::io::prelude::*;
 use std::fs::File;
 extern crate hex;
 use ton_block::*;
-use ton_types::types::{AccountId};
-use ton_types::cells_serialization::{BocSerialiseMode, BagOfCells, deserialize_cells_tree_ex };
+use ton_types::types::AccountId;
+use ton_types::cells_serialization::{BocSerialiseMode, BagOfCells, deserialize_cells_tree_ex};
 use ton_types::{SliceData, BuilderData};
 
 pub fn load_stateinit(file_name: &str) -> (SliceData, Vec<u8>) {
