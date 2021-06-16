@@ -29,9 +29,9 @@ pub fn disasm_command(m: &ArgMatches) -> Result<(), String> {
         return disasm_graphviz_command(m);
     } else if let Some(m) = m.subcommand_matches("solidity") {
         return disasm_solidity_command(m);
-    } else if let Some(m) = m.subcommand_matches("solidity-v1") {
+    } else if let Some(m) = m.subcommand_matches("solidity_v1") {
         return disasm_solidity_v1_command(m);
-    } else if let Some(m) = m.subcommand_matches("fun-c") {
+    } else if let Some(m) = m.subcommand_matches("fun_c") {
         return disasm_fun_c_command(m);
     }
     Err("unknown command".to_owned())
