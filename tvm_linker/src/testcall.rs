@@ -370,8 +370,6 @@ pub fn call_contract_ex<F>(
         None => if ticktock.is_some() { -2 } else { -1 },
     };
 
-    let (value, _) = decode_balance(msg_info.balance).unwrap();
-
     let msg = create_inbound_msg(func_selector, &msg_info, addr.clone());
 
     if !log_enabled!(Error) {
@@ -404,12 +402,18 @@ pub fn call_contract_ex<F>(
             key_file.map(|key| sign_body(&mut body, key));
         }
 
+        let msg_value = if func_selector == 0 {
+            decode_balance(msg_info.balance).unwrap().0 // for internal message
+        } else {
+            0 // for external message
+        };
+
         stack
-            .push(int!(smc_value))
-            .push(int!(value))              //msg balance
-            .push(msg_cell)                 //msg
-            .push(StackItem::Slice(body))   //msg.body
-            .push(int!(func_selector));     //selector
+            .push(int!(smc_value))        // contract balance
+            .push(int!(msg_value))        // msg value
+            .push(msg_cell)               // whole msg
+            .push(StackItem::Slice(body)) // msg body
+            .push(int!(func_selector));   //selector
     } else {
         stack
             .push(int!(smc_value))
