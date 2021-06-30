@@ -491,9 +491,12 @@ impl ParseEngine {
         while reader.read_line(&mut l)
             .map_err(|_| "error while reading line")? != 0 {
             lnum += 1;
+
+            l = l.replace("\r", "");
             if !l.ends_with('\n') {
                 l += "\n";
             }
+
             let pos = match source_pos.clone() {
                 None => DbgPos { filename: filename.clone(), line: lnum, line_code: lnum },
                 Some(pos) => pos
