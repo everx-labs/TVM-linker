@@ -159,7 +159,7 @@ impl Program {
             false   // is_internal
         )?.into();
 
-        let (exit_code, mut state_init) = call_contract_ex(
+        let (exit_code, mut state_init, is_vm_success) = call_contract_ex(
             AccountId::from(UInt256::default()),
             IntegerData::zero(),
             state_init,
@@ -180,7 +180,7 @@ impl Program {
             if trace { TraceLevel::Full } else { TraceLevel::None }
         );
 
-        if exit_code == 0 || exit_code == 1 {
+        if is_vm_success {
             // TODO: check that no action is fired.
             // Rebuild code with removed constructor
             state_init.set_code(self.compile_asm(true)?);
