@@ -68,15 +68,15 @@ impl Program {
                 data_dict = HashmapE::with_hashmap(64, persistent_data)
             }
         }
-        let key = ptr_to_builder(persistent_base)?.into();
+        let key:SliceData = ptr_to_builder(persistent_base)?.into_cell().map_err(|e| format!("failed to pack body in cell: {}", e))?.into();
         BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8)
-            .and_then(|data| data_dict.set(key, &data.into()))
+            .and_then(|data| data_dict.set(key, &data.into_cell()?.into()))
             .map_err(|e| format!("failed to pack pubkey to data dictionary: {}", e))?;
         let mut builder = BuilderData::new();
         builder
             .append_bit_one().unwrap()
             .checked_append_reference(data_dict.data().unwrap().clone()).unwrap();
-        Ok(builder.into())
+        Ok(builder.into_cell().map_err(|e| format!("failed to pack body in cell: {}", e))?)
     }
 
     #[allow(dead_code)]
@@ -157,7 +157,7 @@ impl Program {
             None,   // header,
             None,   // key_file,
             false   // is_internal
-        )?.into();
+        )?.into_cell().map_err(|e| format!("failed to pack body in cell: {}", e))?.into();
 
         let (exit_code, mut state_init, is_vm_success) = call_contract_ex(
             AccountId::from(UInt256::default()),
@@ -252,7 +252,9 @@ impl Program {
 
         let mut entry_points = vec![];
         for id in -2..1 {
-            let key = id.write_to_new_cell().unwrap().into();
+            let key = id.serialize()
+                .map_err(|e| format!("failed to pack body in cell: {}", e))?
+                .into();
             let value = dict.0.remove(key).unwrap();
             entry_points.push(value.unwrap_or(SliceData::default()));
         }
@@ -342,7 +344,8 @@ impl Program {
 pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8) -> std::result::Result<String, String> {
     let root_cell = state.write_to_new_cell()
         .map_err(|e| format!("Serialization failed: {}", e))?
-        .into();
+        .into_cell()
+        .map_err(|e| format!("failed to pack body in cell: {}", e))?;
     let mut buffer = vec![];
     BagOfCells::with_root(&root_cell).write_to(&mut buffer, false)
         .map_err(|e| format!("BOC failed: {}", e))?;
@@ -388,7 +391,7 @@ pub fn load_from_file(contract_file: &str) -> StateInit {
     if cell.references_count() == 2 {
         let mut adjusted_cell = BuilderData::from(cell);
         adjusted_cell.append_reference(BuilderData::default());
-        cell = adjusted_cell.into();
+        cell = adjusted_cell.into_cell().expect("Cell construction failed");
     }
     StateInit::construct_from_cell(cell).expect("StateInit construction failed")
 }
@@ -430,7 +433,7 @@ mod tests {
             let mut b = BuilderData::new();
             b.append_u32(abi::gen_abi_id(None, "main")).unwrap();
             b.append_reference(BuilderData::new());
-            Some(b.into())
+            Some(b.into_cell().unwrap().into())
         };
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
@@ -448,7 +451,7 @@ mod tests {
         let body = {
             let mut b = BuilderData::new();
             b.append_u32(abi::gen_abi_id(None, "main")).unwrap();
-            Some(b.into())
+            Some(b.into_cell().unwrap().into())
         };
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
@@ -467,7 +470,7 @@ mod tests {
         let body = {
             let buf = hex::decode("000D6E4079").unwrap();
             let buf_bits = buf.len() * 8;
-            Some(BuilderData::with_raw(buf, buf_bits).unwrap().into())
+            Some(BuilderData::with_raw(buf, buf_bits).unwrap().into_cell().unwrap().into())
         };
         let contract_file = prog.compile_to_file(0).unwrap();
         let name = contract_file.split('.').next().unwrap();
@@ -508,7 +511,7 @@ mod tests {
         let body = {
             let mut b = BuilderData::new();
             b.append_u32(abi::gen_abi_id(None, "main")).unwrap();
-            Some(b.into())
+            Some(b.into_cell().unwrap().into())
         };
 
         assert_eq!(perform_contract_call(name, body, Some(Some("key1")), TraceLevel::None, false, None, None, None, None, 0, |_b,_i| {}), 0);
@@ -533,7 +536,7 @@ mod tests {
             let mut b = BuilderData::new();
             b.append_u32(abi::gen_abi_id(None, "sum")).unwrap();
             b.append_reference(BuilderData::new());
-            Some(b.into())
+            Some(b.into_cell().unwrap().into())
         };
 
         assert_eq!(perform_contract_call(name, body1, None, TraceLevel::None, false, None, None, None, None, 0, |_b,_i| {}), 0);
@@ -542,7 +545,7 @@ mod tests {
             let mut b = BuilderData::new();
             b.append_u32(abi::gen_abi_id(None, "sum_p")).unwrap();
             b.append_reference(BuilderData::new());
-            Some(b.into())
+            Some(b.into_cell().unwrap().into())
         };
         assert!(perform_contract_call(name, body2, None, TraceLevel::None, false, None, None, None, None, 0, |_b,_i| {}) != 0);
 
@@ -550,7 +553,7 @@ mod tests {
             let mut b = BuilderData::new();
             b.append_u32(abi::gen_abi_id(Some(abi), "sum2")).unwrap();
             b.append_reference(BuilderData::new());
-            Some(b.into())
+            Some(b.into_cell().unwrap().into())
         };
         assert_eq!(perform_contract_call(name, body3, None, TraceLevel::None, false, None, None, None, None, 0, |_b,_i| {}), 0);
     }
@@ -577,7 +580,7 @@ mod tests {
                 src: None,
                 now: 1,
                 bounced: false,
-                body: Some(body.into())
+                body: Some(body.into_cell().unwrap().into())
             },
             None,
             None,
@@ -618,7 +621,7 @@ mod tests {
                 src: None,
                 now: 1,
                 bounced: false,
-                body: Some(body.into())
+                body: Some(body.into_cell().unwrap().into())
             },
             None,
             None,

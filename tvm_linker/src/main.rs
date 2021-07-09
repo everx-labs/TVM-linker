@@ -229,6 +229,8 @@ fn linker_main() -> Result<(), String> {
                 let len = buf.len() * 8;
                 let body: SliceData = BuilderData::with_raw(buf, len)
                     .map_err(|e| format!("failed to pack body in cell: {}", e))?
+                    .into_cell()
+                    .map_err(|e| format!("failed to pack body in cell: {}", e))?
                     .into();
                 Some(body)
             },
@@ -418,6 +420,8 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
             let (buf, buf_bits) = decode_hex_string(hex_str).unwrap();
             let body: SliceData = BuilderData::with_raw(buf, buf_bits)
                 .map_err(|e| format!("failed to pack body in cell: {}", e))?
+                .into_cell()
+                .map_err(|e| format!("failed to pack body in cell: {}", e))?
                 .into();
             (Some(body), Some(matches.value_of("SIGN")))
         },
@@ -514,7 +518,9 @@ fn build_body(matches: &ArgMatches) -> Result<Option<SliceData>, String> {
             header,
             key_file,
             is_internal
-        )?.into();
+        )?.into_cell()
+        .map_err(|e| format!("failed to pack body in cell: {}", e))?
+        .into();
         Ok(Some(body))
     } else if mask == 0 {
         Ok(None)
