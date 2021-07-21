@@ -2,7 +2,7 @@
 build = "build/build.rs"
 name = "tvm_linker"
 description = "TVM Linker"
-version = "0.11.85"
+version = "0.11.86"
 authors = ["TON DEV SOLUTIONS LTD <support@tonlabs.io>"]
 readme = "README.md"
 license-file = "LICENSE.md"
