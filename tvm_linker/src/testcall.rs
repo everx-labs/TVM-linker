@@ -257,6 +257,7 @@ pub enum TraceLevel {
 
 pub fn call_contract<F>(
     smc_file: &str,
+    address: &str,
     smc_balance: Option<&str>,
     msg_info: MsgInfo,
     config_file: Option<&str>,
@@ -266,15 +267,15 @@ pub fn call_contract<F>(
     action_decoder: Option<F>,
     trace_level: TraceLevel,
     debug_map_filename: String,
-) -> i32
+) -> Result<i32, String>
     where F: Fn(SliceData, bool)
 {
-    let addr = AccountId::from_str(smc_file).unwrap();
-    let addr_int = IntegerData::from_str_radix(smc_file, 16).unwrap();
-    let state_init = load_from_file(&format!("{}.tvc", smc_file));
+    let addr = AccountId::from_str(address).unwrap();
+    let addr_int = IntegerData::from_str_radix(address, 16).unwrap();
+    let state_init = load_from_file(smc_file)?;
     let debug_info = load_debug_info(debug_map_filename);
     let config_cell = config_file.map(|filename| {
-        let state = load_from_file(filename);
+        let state = load_from_file(filename).unwrap_or_default();
         let (_code, data) = load_code_and_data(&state);
         // config dictionary is located in the first reference of the storage root cell
         data.into_cell().reference(0).unwrap()
@@ -283,11 +284,10 @@ pub fn call_contract<F>(
         addr, addr_int, state_init, debug_info, smc_balance,
         msg_info, config_cell, key_file, ticktock, gas_limit, action_decoder, trace_level);
     if is_vm_success {
-        let smc_name = smc_file.to_owned() + ".tvc";
-        save_to_file(state_init, Some(&smc_name), 0).expect("error");
+        save_to_file(state_init, Some(&smc_file), 0).expect("error");
         println!("Contract persistent data updated");
     }
-    exit_code
+    Ok(exit_code)
 }
 
 fn get_position(info: &EngineTraceInfo, debug_info: &Option<DbgInfo>) -> Option<String> {
@@ -486,7 +486,9 @@ pub fn perform_contract_call<F>(
 ) -> i32
     where F: Fn(SliceData, bool)
 {
+    let file = format!("{}.tvc", contract_file);
     call_contract(
+        &file,
         contract_file,
         balance,
         MsgInfo{
@@ -503,7 +505,7 @@ pub fn perform_contract_call<F>(
         if decode_c5 { Some(action_decoder) } else { None },
         trace_level,
         String::from(""),
-    )
+    ).unwrap_or(-1)
 }
 
 #[cfg(test)]

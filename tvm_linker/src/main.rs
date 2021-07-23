@@ -131,6 +131,7 @@ fn linker_main() -> Result<(), String> {
             (@arg GASLIMIT: -l --("gas-limit") +takes_value "Defines gas limit for tvm execution")
             (@arg CONFIG: --config +takes_value "Imports config parameters from a config contract boc")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
+            (@arg ADDRESS: --address +takes_value "Contract address, placed on the stack. If not specified address can be obtained from the INPUT argument.")
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[BODY] "Supplies the name of the calling contract method")
             (@arg ABI_PARAMS: -p --("abi-params") +takes_value conflicts_with[BODY] "Supplies ABI arguments for the contract method")
@@ -478,8 +479,23 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         trace_level = TraceLevel::Minimal;
     }
 
+    let input = matches.value_of("INPUT").unwrap();
+    let addr_from_input = if hex::decode(input).is_ok() {
+        input.to_owned()
+    } else {
+        std::iter::repeat("0").take(64).collect::<String>()
+    };
+    let address = matches.value_of("ADDRESS")
+        .unwrap_or(&addr_from_input);
+
+    let input = if input.contains(".tvc") {
+        input.to_owned()
+    } else {
+        format!("{}.tvc", input)
+    };
     call_contract(
-        matches.value_of("INPUT").unwrap(),
+        &input,
+        address,
         matches.value_of("BALANCE"),
         msg_info,
         matches.value_of("CONFIG"),
@@ -489,7 +505,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
         trace_level,
         debug_map_filename,
-    );
+    )?;
 
     println!("TEST COMPLETED");
     return Ok(());
