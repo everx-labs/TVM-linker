@@ -22,7 +22,7 @@ pub fn prepare_methods<T>(
 where
     T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash,
 {
-    let bit_len = SliceData::from(T::default().write_to_new_cell().unwrap()).remaining_bits();
+    let bit_len = SliceData::from(T::default().serialize().unwrap()).remaining_bits();
     let mut map = HashmapE::with_bit_len(bit_len);
     let mut dbg = DbgInfo::new();
     insert_methods(&mut map, &mut dbg, methods, adjust_entry_points)?;
@@ -39,7 +39,7 @@ where
     T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash,
 {
     for pair in methods.iter() {
-        let key: SliceData = pair.0.clone().write_to_new_cell().unwrap().into();
+        let key: SliceData = pair.0.clone().serialize().unwrap().into();
         let mut val = compile_code_debuggable(pair.1.clone()).map_err(|e| {
             (pair.0.clone(), e.to_string())
         })?;
@@ -48,7 +48,7 @@ where
                 (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
             })?;
         } else {
-            map.setref(key.clone(), &val.0.into_cell()).map_err(|e| {
+            map.setref(key.clone(), &val.0.clone().into_cell()).map_err(|e| {
                 (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
             })?;
         }
@@ -58,15 +58,15 @@ where
             let after = map.get(key).unwrap().unwrap();
             adjust_debug_map(&mut val.1, before, after);
         }
-        dbg.map.append(&mut val.1.map.clone())
+        dbg.append(&mut val.1)
     }
     Ok(())
 }
 
 fn adjust_debug_map(map: &mut DbgInfo, before: SliceData, after: SliceData) {
-    let hash_old = before.cell().repr_hash().to_hex_string();
-    let hash_new = after.cell().repr_hash().to_hex_string();
-    let old = map.map.remove(&hash_old).unwrap();
+    let hash_old = before.cell().repr_hash();
+    let hash_new = after.cell().repr_hash();
+    let old = map.remove(&hash_old).unwrap();
 
     let adjustment = after.pos();
     let mut new = BTreeMap::new();
@@ -74,5 +74,5 @@ fn adjust_debug_map(map: &mut DbgInfo, before: SliceData, after: SliceData) {
         new.insert(k + adjustment, v);
     }
 
-    map.map.insert(hash_new, new);
+    map.insert(hash_new, new);
 }

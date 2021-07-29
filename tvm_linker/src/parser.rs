@@ -869,7 +869,7 @@ impl ParseEngine {
             for item in data_vec {
                 let mut ptr = item.0.clone();
                 for subitem in item.1 {
-                    dict.set(ptr_to_builder(ptr).unwrap().into(), &subitem.write().into()).unwrap();
+                    dict.set(ptr_to_builder(ptr).unwrap().into_cell().unwrap().into(), &subitem.write().into_cell().unwrap().into()).unwrap();
                     ptr += subitem.size();
                 }
             }
@@ -888,8 +888,8 @@ impl ParseEngine {
             globl_cell.append_bit_zero().unwrap();
         }
         pers_dict.set(
-            ptr_to_builder(self.persistent_base + OFFSET_GLOBL_DATA).unwrap().into(),
-            &globl_cell.into()
+            ptr_to_builder(self.persistent_base + OFFSET_GLOBL_DATA).unwrap().into_cell().unwrap().into(),
+            &globl_cell.into_cell().unwrap().into()
         ).unwrap();
 
         pers_dict.data().map(|cell| cell.clone())
@@ -1121,7 +1121,7 @@ mod tests {
         )).expect("Couldn't compile code");
 
         let mut stack = Stack::new();
-        stack.push(StackItem::Slice(data_dict.into()));
+        stack.push(StackItem::Slice(data_dict.into_cell().unwrap().into()));
 
         let mut engine = Engine::new().setup_with_libraries(code, None, Some(stack), None, vec![]);
         engine.set_trace(Engine::TRACE_ALL);

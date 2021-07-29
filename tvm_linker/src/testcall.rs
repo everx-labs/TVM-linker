@@ -43,7 +43,7 @@ fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Cell {
     func_id.write_to(&mut builder).unwrap();
     a.write_to(&mut builder).unwrap();
     b.write_to(&mut builder).unwrap();
-    builder.into()
+    builder.into_cell().unwrap()
 }
 
 fn create_external_inbound_msg(src_addr: MsgAddressExt, dst_addr: MsgAddressInt, body: Option<SliceData>) -> Message {
@@ -92,12 +92,12 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) {
         sign_builder.append_raw(&pub_key, pub_key.len() * 8).unwrap();
     }
     signed_body.prepend_reference(sign_builder);
-    *body = signed_body.into();
+    *body = signed_body.into_cell().unwrap().into();
 }
 
 fn initialize_registers(data: SliceData, myself: MsgAddressInt, now: u32, balance: (u64, CurrencyCollection), config: Option<Cell>) -> SaveList {
     let mut ctrls = SaveList::new();
-    let mut info = SmartContractInfo::with_myself(myself.write_to_new_cell().unwrap().into());
+    let mut info = SmartContractInfo::with_myself(myself.serialize().unwrap().into());
     *info.balance_remaining_grams_mut() = balance.0 as u128;
     *info.balance_remaining_other_mut() = balance.1.other_as_hashmap().clone();
     *info.unix_time_mut() = now;
@@ -145,7 +145,7 @@ fn create_inbound_msg(
                 Some(s) => MsgAddressExt::from_str(s).unwrap(),
                 None => {
                     MsgAddressExt::with_extern(
-                        BuilderData::with_raw(vec![0x55; 8], 64).unwrap().into()
+                        BuilderData::with_raw(vec![0x55; 8], 64).unwrap().into_cell().unwrap().into()
                     ).unwrap()
                 },
             };
@@ -193,11 +193,11 @@ fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: 
 fn load_code_and_data(state_init: &StateInit) -> (SliceData, SliceData) {
     let code: SliceData = state_init.code
             .clone()
-            .unwrap_or(BuilderData::new().into())
+            .unwrap_or(Cell::default())
             .into();
     let data = state_init.data
             .clone()
-            .unwrap_or(BuilderData::new().into())
+            .unwrap_or(Cell::default())
             .into();
     (code, data)
 }
@@ -292,9 +292,9 @@ pub fn call_contract<F>(
 
 fn get_position(info: &EngineTraceInfo, debug_info: &Option<DbgInfo>) -> Option<String> {
     if let Some(debug_info) = debug_info {
-        let cell_hash = info.cmd_code.cell().repr_hash().to_hex_string();
+        let cell_hash = info.cmd_code.cell().repr_hash();
         let offset = info.cmd_code.pos();
-        let position = match debug_info.map.get(&cell_hash) {
+        let position = match debug_info.get(&cell_hash) {
             Some(offset_map) => match offset_map.get(&offset) {
                 Some(pos) => format!("{}:{}", pos.filename, pos.line),
                 None => String::from("-:0 (offset not found)")
@@ -391,11 +391,11 @@ pub fn call_contract_ex<F>(
 
     let mut stack = Stack::new();
     if func_selector > -2 {
-        let msg_cell = StackItem::Cell(msg.unwrap().write_to_new_cell().unwrap().into());
+        let msg_cell = StackItem::Cell(msg.unwrap().serialize().unwrap());
 
         let mut body: SliceData = match msg_info.body {
             Some(b) => b.into(),
-            None => BuilderData::new().into(),
+            None => Cell::default().into(),
         };
 
         if func_selector == -1 {
@@ -516,7 +516,7 @@ mod tests {
     fn test_msg_print() {
         let msg = create_external_inbound_msg(
             MsgAddressExt::with_extern(
-                BuilderData::with_raw(vec![0x55; 8], 64).unwrap().into()
+                BuilderData::with_raw(vec![0x55; 8], 64).unwrap().into_cell().unwrap().into()
             ).unwrap(),
             MsgAddressInt::with_standart(None, 0, [0x11; 32].into()).unwrap(),
             Some(create_inbound_body(10, 20, 0x11223344).into()),
