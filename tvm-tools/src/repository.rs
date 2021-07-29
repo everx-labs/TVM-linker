@@ -149,9 +149,9 @@ where
         let options = zip::write::FileOptions::default();
         let mut code_buffer = Vec::new();
         let mut data_buffer = Vec::new();
-        serialize_tree_of_cells(&contract.code.into_cell(), &mut code_buffer)
+        serialize_tree_of_cells(&contract.code.clone().into_cell(), &mut code_buffer)
             .unwrap_or_else(|err| panic!("Code error: {}", err));
-        serialize_tree_of_cells(&contract.persistent_data.into_cell(), &mut data_buffer)
+        serialize_tree_of_cells(&contract.persistent_data.clone().into_cell(), &mut data_buffer)
             .unwrap_or_else(|err| panic!("Data error: {}", err));
         destination.start_file("code.cells", options)?;
         destination.write_all(code_buffer.as_slice())?;

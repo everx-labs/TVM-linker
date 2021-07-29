@@ -45,7 +45,7 @@ fn load_cells(path: &Path) -> SliceData {
     let mut buffer: Vec<u8> = vec![];
     File::open(path).expect(&format!("File not found: {}", path.display()))
         .read_to_end(&mut buffer)
-        .unwrap_or_else(|e| panic!(format!("File: {}. I/O error {}", path.display(), e)));
+        .unwrap_or_else(|e| panic!("File: {}. I/O error {}", path.display(), e));
     deserialize_tree_of_cells(&mut std::io::Cursor::new(buffer))
         .unwrap_or_else(|err| panic!("BOC load error: {}", err)).into()
 }

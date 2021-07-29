@@ -85,9 +85,9 @@ impl Program {
     }
 
     pub fn internal_method_dict(&mut self) -> std::result::Result<Option<Cell>, String> {
-        let dict = prepare_methods(&self.engine.privates(), true)
+        let mut dict = prepare_methods(&self.engine.privates(), true)
             .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()))?;
-        self.dbgmap.map.append(&mut dict.1.map.clone());
+        self.dbgmap.append(&mut dict.1);
         Ok(dict.0.data().map(|cell| cell.clone()))
     }
 
@@ -105,7 +105,7 @@ impl Program {
         insert_methods(&mut dict.0, &mut dict.1, &self.publics_filtered(remove_ctor), true)
             .map_err(|e| e.1.replace("_name_", &self.engine.global_name(e.0).unwrap()) )?;
 
-        self.dbgmap.map.append(&mut dict.1.map);
+        self.dbgmap.append(&mut dict.1);
 
         Ok(dict.0.data().map(|cell| cell.clone()))
     }
@@ -207,10 +207,10 @@ impl Program {
         internal_selector.0.append_reference(self.internal_method_dict()?.unwrap_or_default().into());
 
         // adjust hash of internal_selector cell
-        let hash = internal_selector.0.cell().repr_hash().to_hex_string();
-        assert!(internal_selector.1.map.len() == 1);
-        let entry = internal_selector.1.map.iter().next().unwrap();
-        self.dbgmap.map.insert(hash, entry.1.clone());
+        let hash = internal_selector.0.cell().repr_hash();
+        assert_eq!(internal_selector.1.len(), 1);
+        let entry = internal_selector.1.first_entry().unwrap();
+        self.dbgmap.insert(hash, entry.clone());
 
         let mut main_selector = compile_code_debuggable(self.entry())
             .map_err(|e| e.to_string())?;
@@ -218,10 +218,10 @@ impl Program {
         main_selector.0.append_reference(internal_selector.0);
 
         // adjust hash of main_selector cell
-        let hash = main_selector.0.cell().repr_hash().to_hex_string();
-        assert!(main_selector.1.map.len() == 1);
-        let entry = main_selector.1.map.iter().next().unwrap();
-        self.dbgmap.map.insert(hash, entry.1.clone());
+        let hash = main_selector.0.cell().repr_hash();
+        assert_eq!(main_selector.1.len(), 1);
+        let entry = main_selector.1.first_entry().unwrap();
+        self.dbgmap.insert(hash, entry.clone());
 
         Ok(main_selector.0.cell().clone())
     }
@@ -258,7 +258,7 @@ impl Program {
         }
 
         internal_selector.0.append_reference(SliceData::from(dict.0.data().unwrap_or(&Cell::default())));
-        self.dbgmap.map.append(&mut dict.1.map.clone());
+        self.dbgmap.append(&mut dict.1);
 
         let version = self.engine.version();
         match version {
@@ -270,10 +270,10 @@ impl Program {
         }
 
         // adjust hash of internal_selector cell
-        let hash = internal_selector.0.cell().repr_hash().to_hex_string();
-        assert_eq!(internal_selector.1.map.len(), 1);
-        let entry = internal_selector.1.map.iter().next().unwrap();
-        self.dbgmap.map.insert(hash, entry.1.clone());
+        let hash = internal_selector.0.cell().repr_hash();
+        assert_eq!(internal_selector.1.len(), 1);
+        let entry = internal_selector.1.first_entry().unwrap();
+        self.dbgmap.insert(hash, entry.clone());
 
         let entry_selector_text = vec![
             Line::new("PUSHREFCONT\n", "<entry-selector>", 1),
@@ -299,10 +299,10 @@ impl Program {
         }
 
         // adjust hash of entry_selector cell
-        let hash = entry_selector.0.cell().repr_hash().to_hex_string();
-        assert_eq!(entry_selector.1.map.len(), 1);
-        let entry = entry_selector.1.map.iter().next().unwrap();
-        self.dbgmap.map.insert(hash, entry.1.clone());
+        let hash = entry_selector.0.cell().repr_hash();
+        assert_eq!(entry_selector.1.len(), 1);
+        let entry = entry_selector.1.first_entry().unwrap();
+        self.dbgmap.insert(hash, entry.clone());
 
         if !self.engine.save_my_code() {
             return Ok(entry_selector.0.cell().clone())
@@ -319,17 +319,17 @@ impl Program {
         ];
         let mut save_my_code = compile_code_debuggable(save_my_code_text.clone())
             .map_err(|e| e.to_string())?;
-        assert_eq!(save_my_code.1.map.len(), 2);
-        let old_hash = save_my_code.0.cell().repr_hash().to_hex_string();
-        let entry = save_my_code.1.map.get(&old_hash).unwrap();
+        assert_eq!(save_my_code.1.len(), 2);
+        let old_hash = save_my_code.0.cell().repr_hash();
+        let entry = save_my_code.1.get(&old_hash).unwrap();
         save_my_code.0.append_reference(entry_selector.0);
 
-        let hash = save_my_code.0.cell().repr_hash().to_hex_string();
-        self.dbgmap.map.insert(hash, entry.clone());
+        let hash = save_my_code.0.cell().repr_hash();
+        self.dbgmap.insert(hash, entry.clone());
 
-        let inner_hash = save_my_code.0.reference(0).unwrap().repr_hash().to_hex_string();
-        let entry = save_my_code.1.map.get(&inner_hash).unwrap();
-        self.dbgmap.map.insert(inner_hash, entry.clone());
+        let inner_hash = save_my_code.0.reference(0).unwrap().repr_hash();
+        let entry = save_my_code.1.get(&inner_hash).unwrap();
+        self.dbgmap.insert(inner_hash, entry.clone());
 
         Ok(save_my_code.0.cell().clone())
     }
