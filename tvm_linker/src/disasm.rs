@@ -61,7 +61,7 @@ fn disasm_graphviz_command(m: &ArgMatches) -> Result<(), String> {
                 if dict.len().is_err() {
                     return Err("empty internal methods dictionary".to_string())
                 }
-                let key = method_id.write_to_new_cell().unwrap().into();
+                let key = method_id.serialize().unwrap().into();
                 let data = dict.get(key).map_err(|e| -> String { e.to_string() })?
                     .ok_or(format!("internal method {} not found", method_id))?;
                 let cell = data.into_cell();
