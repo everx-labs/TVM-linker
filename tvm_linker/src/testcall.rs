@@ -292,9 +292,9 @@ pub fn call_contract<F>(
 
 fn get_position(info: &EngineTraceInfo, debug_info: &Option<DbgInfo>) -> Option<String> {
     if let Some(debug_info) = debug_info {
-        let cell_hash = info.cmd_code.cell().repr_hash().to_hex_string();
+        let cell_hash = info.cmd_code.cell().repr_hash();
         let offset = info.cmd_code.pos();
-        let position = match debug_info.map.get(&cell_hash) {
+        let position = match debug_info.get(&cell_hash) {
             Some(offset_map) => match offset_map.get(&offset) {
                 Some(pos) => format!("{}:{}", pos.filename, pos.line),
                 None => String::from("-:0 (offset not found)")
