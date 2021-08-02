@@ -133,7 +133,12 @@ impl Program {
             let data_cell = deserialize_cells_tree(&mut data_cursor).unwrap().remove(0);
             state_init.set_data(data_cell);
         }
-        save_to_file(state_init, out_file, wc)
+        let ret = save_to_file(state_init.clone(), out_file, wc);
+        if out_file.is_some() && ret.is_ok() {
+            println!("Contract successfully compiled. Saved to file {}.", out_file.unwrap());
+            println!("Contract address: {:x}", state_init.hash().unwrap());
+        }
+        return ret;
     }
 
     fn apply_constructor(
@@ -363,7 +368,7 @@ pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8) -> std::result
     file.write_all(&buffer).map_err(|e| format!("Write to file failed: {}", e))?;
 
     if print_filename {
-        println! ("Saved contract to file {}", &file_name);
+        println!("Saved contract to file {}", &file_name);
         println!("testnet:");
         println!("Non-bounceable address (for init): {}", &calc_userfriendly_address(wc, address.as_slice(), false, true));
         println!("Bounceable address (for later access): {}", &calc_userfriendly_address(wc, address.as_slice(), true, true));
@@ -384,16 +389,21 @@ fn calc_userfriendly_address(wc: i8, addr: &[u8], bounce: bool, testnet: bool) -
     encode(&bytes)
 }
 
-pub fn load_from_file(contract_file: &str) -> StateInit {
-    let mut csor = Cursor::new(std::fs::read(contract_file).unwrap());
-    let mut cell = deserialize_cells_tree(&mut csor).unwrap().remove(0);
+pub fn load_from_file(contract_file: &str) -> Result<StateInit, String> {
+    let mut csor = Cursor::new(
+        std::fs::read(contract_file)
+            .map_err(|e| format!("failed to read file {}: {}", contract_file, e))?
+    );
+    let mut cell = deserialize_cells_tree(&mut csor)
+        .map_err(|e| format!("failed to deserialize cell tree: {}", e))?
+        .remove(0);
     // try appending a dummy library cell if there is no such cell in the tvc file
     if cell.references_count() == 2 {
         let mut adjusted_cell = BuilderData::from(cell);
         adjusted_cell.append_reference(BuilderData::default());
         cell = adjusted_cell.into_cell().expect("Cell construction failed");
     }
-    StateInit::construct_from_cell(cell).expect("StateInit construction failed")
+    Ok(StateInit::construct_from_cell(cell).expect("StateInit construction failed"))
 }
 
 pub fn get_now() -> u32 {
@@ -573,6 +583,7 @@ mod tests {
         let body = abi::build_abi_body("./tests/Wallet.abi.json", "constructor", "{}", None, None, false)
             .unwrap();
         let exit_code = call_contract(
+            &contract_file,
             &name,
             Some("10000000000"), //account balance 10T
             MsgInfo {
@@ -591,7 +602,8 @@ mod tests {
             String::from(""),
         );
         // must equal to out of gas exception
-        assert_eq!(exit_code, 13);
+        assert!(exit_code.is_ok());
+        assert_eq!(exit_code.unwrap(), 13);
     }
 
     #[test]
@@ -614,6 +626,7 @@ mod tests {
             .unwrap();
 
         let exit_code = call_contract(
+            &contract_file,
             &name,
             Some("10000000000"), //account balance 10T
             MsgInfo {
@@ -631,7 +644,8 @@ mod tests {
             TraceLevel::Full,
             debug_map_filename,
         );
-        assert_eq!(exit_code, 0);
+        assert!(exit_code.is_ok());
+        assert_eq!(exit_code.unwrap(), 0);
     }
 
     fn get_version(filename: &str) -> String {

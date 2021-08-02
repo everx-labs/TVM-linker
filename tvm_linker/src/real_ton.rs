@@ -70,7 +70,7 @@ pub fn compile_message(
         AccountId::from_str(address_str).map_err(|_| "input string is not a valid address".to_string())?
     ).unwrap();
 
-    let state = if pack_code { Some(load_from_file(&format!("{}.tvc", address_str))) } else { None };
+    let state = if pack_code { Some(load_from_file(&format!("{}.tvc", address_str))?) } else { None };
     
     let mut msg_hdr = ExternalInboundMessageHeader::default();
     msg_hdr.dst = dest_address;
