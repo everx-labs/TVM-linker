@@ -131,7 +131,7 @@ fn linker_main() -> Result<(), String> {
             (@arg GASLIMIT: -l --("gas-limit") +takes_value "Defines gas limit for tvm execution")
             (@arg CONFIG: --config +takes_value "Imports config parameters from a config contract boc")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
-            (@arg ADDRESS: --address +takes_value "Contract address, placed on the stack. If not specified address can be obtained from the INPUT argument.")
+            (@arg ADDRESS: --address +takes_value "Contract address, which can be obtained from the contract with `address(this)`. If not specified address can be obtained from the INPUT argument or set to zero.")
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[BODY] "Supplies the name of the calling contract method")
             (@arg ABI_PARAMS: -p --("abi-params") +takes_value conflicts_with[BODY] "Supplies ABI arguments for the contract method")
