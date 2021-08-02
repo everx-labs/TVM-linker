@@ -456,11 +456,11 @@ pub fn call_contract_ex<F>(
     println!("{}", engine.dump_stack("Post-execution stack state", false));
     println!("{}", engine.dump_ctrls(false));
 
-    if let Some(decoder) = action_decoder {
-        decode_actions(engine.get_actions(), &mut state_init, decoder);
-    }
+    if is_vm_success {
+        if let Some(decoder) = action_decoder {
+            decode_actions(engine.get_actions(), &mut state_init, decoder);
+        }
 
-    if exit_code == 0 || exit_code == 1 {
         state_init.data = match engine.get_committed_state().get_root() {
             StackItem::Cell(root_cell) => Some(root_cell),
             _ => panic!("cannot get root data: c4 register is not a cell."),
