@@ -484,12 +484,12 @@ impl ParseEngine {
         self.persistent_ptr = self.persistent_base + OFFSET_PERS_DATA;
 
         let filename = path.file_name().unwrap().to_str().unwrap().to_string();
-        let file = File::open(path).map_err(|e| format!("Can't open file: {}", e))?;
+        let file = File::open(path).map_err(|e| format!("Can't open file {}: {}", filename, e))?;
         let mut reader = BufReader::new(file);
         let mut source_pos: Option<DbgPos> = None;
 
         while reader.read_line(&mut l)
-            .map_err(|_| "error while reading line")? != 0 {
+            .map_err(|_| format!("error while reading line (file: {})", filename))? != 0 {
             lnum += 1;
 
             l = l.replace("\r", "");

@@ -88,7 +88,7 @@ pub fn compile_message(
 
     let output_file_name = address_str.get(0..8).unwrap().to_string() + suffix;
     let mut f = File::create(&output_file_name).map_err(|_| "Unable to create msg file".to_string())?;
-    f.write_all(&bytes).map_err(|_| "Unable to write_data to msg file".to_string())?;
+    f.write_all(&bytes).map_err(|_| format!("Unable to write_data to msg file {}", output_file_name))?;
 
     println!("boc file created: {}", output_file_name);
     Ok(())

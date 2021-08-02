@@ -36,7 +36,7 @@ pub fn build_abi_body(
 
 pub fn load_abi_json_string(abi_file: &str) -> Result<String, String> {
     let abi_json = std::fs::read_to_string(abi_file)
-        .map_err(|e| format!("unable to read ABI file: {}", e))?;
+        .map_err(|e| format!("unable to read ABI file {}: {}", abi_file, e))?;
     Ok(abi_json)
 }
 
