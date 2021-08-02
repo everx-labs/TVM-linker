@@ -27,7 +27,7 @@ impl KeypairManager {
     }
 
     pub fn from_secret_file(file: &str) -> Self {
-        let mut file = File::open(file.to_string()).expect("error: cannot open key file");
+        let mut file = File::open(file.to_string()).expect(&format!("error: cannot open key file {}",file));
         let mut keys_buf = vec![];
         file.read_to_end(&mut keys_buf).unwrap();
         let pair = Keypair::from_bytes(&keys_buf).expect("error: invalid key");
@@ -36,7 +36,7 @@ impl KeypairManager {
 
     #[allow(dead_code)]
     pub fn from_public_file(file: &str) -> Self {
-        let mut file = File::open(file.to_string()).expect("error: cannot open public key file");
+        let mut file = File::open(file.to_string()).expect(&format!("error: cannot open public key file {}", file));
         let mut key_buf = vec![];
         file.read_to_end(&mut key_buf).unwrap();
         let pubkey = PublicKey::from_bytes(&key_buf).expect("error: invalid public key");
@@ -50,13 +50,13 @@ impl KeypairManager {
 
     pub fn store_secret(&self, file: &str) {
         let bytes = self.pair.to_bytes();
-        let mut file = File::create(file.to_string()).expect("error: cannot create key file");
+        let mut file = File::create(file.to_string()).expect(&format!("error: cannot create key file {}", file));
         file.write_all(&bytes).unwrap();
     }
 
     pub fn store_public(&self, file: &str) {
         let bytes = self.pair.public.to_bytes();
-        let mut file = File::create(file.to_string()).expect("error: cannot create key file");
+        let mut file = File::create(file.to_string()).expect(&format!("error: cannot create key file {}", file));
         file.write_all(&bytes).unwrap();
     }
 

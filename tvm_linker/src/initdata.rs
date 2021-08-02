@@ -6,7 +6,7 @@ use abi::load_abi_json_string;
 
 pub fn set_initial_data(tvc: &str, pubkey: Option<[u8; 32]>, data: &str, abi: &str) -> Result<(), String> {
     let mut state_init = OpenOptions::new().read(true).open(tvc)
-        .map_err(|e| format!("unable to open contract file: {}", e))?;
+        .map_err(|e| format!("unable to open contract file {}: {}", tvc, e))?;
     let abi = load_abi_json_string(abi)?;
 
     let mut contract_image = if let Some(key_bytes) = pubkey {
