@@ -203,7 +203,6 @@ impl DataValue {
 struct Object {
     pub name: String,
     pub size: usize,
-    pub index: usize,
     pub public: bool,
     pub dtype: ObjectType,
 }
@@ -213,7 +212,6 @@ impl Object {
         Object {
             name,
             size: 0,
-            index: 0,
             public: false,
             dtype: ObjectType::from(stype),
         }
