@@ -134,7 +134,7 @@ fn linker_main() -> Result<(), String> {
             (@arg ADDRESS: --address +takes_value "Contract address, which can be obtained from the contract with `address(this)`. If not specified address can be obtained from the INPUT argument or set to zero.")
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[BODY] "Supplies the name of the calling contract method")
-            (@arg ABI_PARAMS: -p --("abi-params") +takes_value conflicts_with[BODY] "Supplies ABI arguments for the contract method")
+            (@arg ABI_PARAMS: -p --("abi-params") +takes_value conflicts_with[BODY] "Supplies ABI arguments for the contract method (can be passed via filename). Can be not specified for empty parameters.")
             (@arg ABI_HEADER: -h --("abi-header") +takes_value conflicts_with[BODY] conflicts_with[INTERNAL] "Supplies ABI header")
         )
         (@subcommand message =>
@@ -519,18 +519,26 @@ fn build_body(matches: &ArgMatches) -> Result<Option<SliceData>, String> {
     let mut mask = 0u8;
     let abi_file = matches.value_of("ABI_JSON").map(|m| {mask |= 1; m });
     let method_name = matches.value_of("ABI_METHOD").map(|m| {mask |= 2; m });
-    let params = matches.value_of("ABI_PARAMS").map(|m| {mask |= 4; m });
+    let params = matches.value_of("ABI_PARAMS");
     let header = matches.value_of("ABI_HEADER");
-    if mask == 0x7 {
+    if mask == 0x3 {
         let key_file = matches.value_of("SIGN").map(|path| {
             let pair = KeypairManager::from_secret_file(path);
             pair.drain()
         });
+        let params = params.map_or(Ok("{}".to_owned()), |params|
+            if params.find('{').is_none() {
+                std::fs::read_to_string(params)
+                    .map_err(|e| format!("failed to load params from file: {}", e))
+            } else {
+                Ok(params.to_owned())
+            }
+        )?;
         let is_internal = matches.is_present("INTERNAL");
         let body: SliceData = build_abi_body(
             abi_file.unwrap(),
             method_name.unwrap(),
-            params.unwrap(),
+            &params,
             header,
             key_file,
             is_internal
@@ -541,6 +549,6 @@ fn build_body(matches: &ArgMatches) -> Result<Option<SliceData>, String> {
     } else if mask == 0 {
         Ok(None)
     } else {
-        Err("All ABI parameters must be supplied: ABI_JSON, ABI_METHOD, ABI_PARAMS".to_string())
+        Err("All ABI parameters must be supplied: ABI_JSON, ABI_METHOD".to_string())
     }
 }
