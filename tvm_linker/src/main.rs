@@ -60,7 +60,7 @@ use std::{path::Path};
 use testcall::{call_contract, MsgInfo, TraceLevel};
 use ton_types::{BuilderData, SliceData};
 use std::env;
-use disasm::disasm_command;
+use disasm::disasm::disasm_command;
 use ton_labs_assembler::Line;
 use std::fs::File;
 
@@ -174,18 +174,8 @@ fn linker_main() -> Result<(), String> {
                 (@arg METHOD: --method +takes_value "Selects a particular method by ID or int|ext|ticktock")
                 (@arg TVC: +required +takes_value "Path to tvc file")
             )
-            (@subcommand solidity =>
-                (about: "disassembles the given tvc produced by Solidity compiler")
-                (version: build_info.as_str())
-                (@arg TVC: +required +takes_value "Path to tvc file")
-            )
-            (@subcommand solidity_v1 =>
-                (about: "disassembles the given tvc produced by Solidity compiler, obsolete version")
-                (version: build_info.as_str())
-                (@arg TVC: +required +takes_value "Path to tvc file")
-            )
-            (@subcommand fun_c =>
-                (about: "disassembles the given tvc produced by FunC compiler")
+            (@subcommand text =>
+                (about: "disassembles tvc's code into assembler text")
                 (version: build_info.as_str())
                 (@arg TVC: +required +takes_value "Path to tvc file")
             )
