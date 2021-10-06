@@ -148,8 +148,6 @@ impl Program {
         ctor_params : &str,
         trace: bool
     ) -> std::result::Result<StateInit, String> {
-        use ton_types::{AccountId, UInt256};
-        use ton_vm::stack::integer::IntegerData;
         use testcall::{call_contract_ex, MsgInfo};
         use abi;
 
@@ -165,8 +163,7 @@ impl Program {
         )?.into_cell().map_err(|e| format!("failed to pack body in cell: {}", e))?.into();
 
         let (exit_code, mut state_init, is_vm_success) = call_contract_ex(
-            AccountId::from(UInt256::default()),
-            IntegerData::zero(),
+            ton_block::MsgAddressInt::default(),
             state_init,
             None, // debug_info
             None, // balance,

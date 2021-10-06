@@ -270,8 +270,19 @@ pub fn call_contract<F>(
 ) -> Result<i32, String>
     where F: Fn(SliceData, bool)
 {
-    let addr = AccountId::from_str(address).unwrap();
-    let addr_int = IntegerData::from_str_radix(address, 16).unwrap();
+    let wc = match msg_info.balance {
+        Some(_) => 0,
+        None => if ticktock.is_some() { -1 } else { 0 },
+    };
+
+    let addr = if address.find(':').is_none() {
+        format!("{}:{}", wc, address)
+    } else {
+        address.to_owned()
+    };
+    let addr = ton_block::MsgAddressInt::from_str(&addr)
+        .map_err(|e| format!("failed to load address: {}", e))?;
+
     let state_init = load_from_file(smc_file)?;
     let debug_info = load_debug_info(debug_map_filename);
     let config_cell = config_file.map(|filename| {
@@ -281,7 +292,7 @@ pub fn call_contract<F>(
         data.into_cell().reference(0).unwrap()
     });
     let (exit_code, state_init, is_vm_success) = call_contract_ex(
-        addr, addr_int, state_init, debug_info, smc_balance,
+        addr, state_init, debug_info, smc_balance,
         msg_info, config_cell, key_file, ticktock, gas_limit, action_decoder, trace_level);
     if is_vm_success {
         save_to_file(state_init, Some(&smc_file), 0).expect("error");
@@ -350,8 +361,7 @@ fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debu
 }
 
 pub fn call_contract_ex<F>(
-    addr: AccountId,
-    addr_int: IntegerData,
+    addr: MsgAddressInt,
     state_init: StateInit,
     debug_info: Option<DbgInfo>,
     smc_balance: Option<&str>,
@@ -370,7 +380,7 @@ pub fn call_contract_ex<F>(
         None => if ticktock.is_some() { -2 } else { -1 },
     };
 
-    let msg = create_inbound_msg(func_selector, &msg_info, addr.clone());
+    let msg = create_inbound_msg(func_selector, &msg_info, addr.address().clone());
 
     if !log_enabled!(Error) {
         init_logger(trace_level == TraceLevel::Full);
@@ -379,11 +389,10 @@ pub fn call_contract_ex<F>(
     let mut state_init = state_init;
     let (code, data) = load_code_and_data(&state_init);
 
-    let workchain_id = if func_selector > -2 { 0 } else { -1 };
     let (smc_value, smc_balance) = decode_balance(smc_balance).unwrap();
     let registers = initialize_registers(
         data,
-        MsgAddressInt::with_standart(None, workchain_id, addr.clone()).unwrap(),
+        addr.clone(),
         msg_info.now,
         (smc_value.clone(), smc_balance),
         config,
@@ -415,6 +424,8 @@ pub fn call_contract_ex<F>(
             .push(StackItem::Slice(body)) // msg body
             .push(int!(func_selector));   //selector
     } else {
+        let addr_val = addr.address().to_hex_string();
+        let addr_int = IntegerData::from_str_radix(&addr_val, 16).unwrap();
         stack
             .push(int!(smc_value))
             .push(StackItem::Integer(Arc::new(addr_int))) //contract address
