@@ -44,8 +44,8 @@ pub fn state_init_printer(state: &StateInit) -> String {
         tree_of_cells_into_base64(state.code.as_ref()),
         state.code.clone().unwrap().repr_hash().to_hex_string(),
         state.data.clone().unwrap().repr_hash().to_hex_string(),
-        state.code.clone().unwrap().depth(0),
-        state.data.clone().unwrap().depth(0),
+        state.code.clone().unwrap().repr_depth(),
+        state.data.clone().unwrap().repr_depth(),
         get_version_mycode_aware(state.code.as_ref()).map_or_else(|v| v, |e| e),
         tree_of_cells_into_base64(state.library.root()),
     )
