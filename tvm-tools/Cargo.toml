@@ -4,9 +4,9 @@ name = "tvm_tools"
 version = "0.1.0"
 
 [dependencies]
-ton_labs_assembler = { git = "https://github.com/tonlabs/ton-labs-assembler.git" }
-ton_types = { git = "https://github.com/tonlabs/ton-labs-types.git" }
-ton_vm = { git = "https://github.com/tonlabs/ton-labs-vm.git" }
+ton_labs_assembler = { git = "https://github.com/tonlabs/ton-labs-assembler.git", tag = '1.2.24' }
+ton_types = { git = "https://github.com/tonlabs/ton-labs-types.git", tag = '1.10.10' }
+ton_vm = { git = "https://github.com/tonlabs/ton-labs-vm.git", tag = '1.8.19' }
 
 clap = "2.32"
 hex = "0.3.2"
