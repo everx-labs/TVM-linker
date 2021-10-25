@@ -30,12 +30,12 @@ num = "^0.2"
 num-traits = "^0.2.8"
 failure = "0.1.0"
 
-ton_abi = { git = "https://github.com/tonlabs/ton-labs-abi.git" }
-ton_block = { git = "https://github.com/tonlabs/ton-labs-block.git" }
-ton_labs_assembler = { git = "https://github.com/tonlabs/ton-labs-assembler.git" }
-ton_sdk = { git = "https://github.com/tonlabs/ton-sdk.git", default-features = false }
-ton_types = { git = "https://github.com/tonlabs/ton-labs-types.git" }
-ton_vm = { git = "https://github.com/tonlabs/ton-labs-vm.git", default-features = false }
+ton_abi = { git = "https://github.com/tonlabs/ton-labs-abi.git", tag = '2.1.1' }
+ton_block = { git = "https://github.com/tonlabs/ton-labs-block.git", tag = '1.7.27' }
+ton_labs_assembler = { git = "https://github.com/tonlabs/ton-labs-assembler.git", tag = '1.2.24' }
+ton_sdk = { git = "https://github.com/tonlabs/ton-sdk.git", default-features = false, tag = '1.24.0' }
+ton_types = { git = "https://github.com/tonlabs/ton-labs-types.git", tag = '1.10.10' }
+ton_vm = { git = "https://github.com/tonlabs/ton-labs-vm.git", default-features = false, tag = '1.8.19' }
 
 [dev-dependencies]
 assert_cmd = "0.11"
