@@ -1,12 +1,12 @@
 [package]
 build = "build.rs"
 name = "tvm_tools"
-version = "0.1.0"
+version = "0.13.83"
 
 [dependencies]
-ton_labs_assembler = { git = "https://github.com/tonlabs/ton-labs-assembler.git", tag = '1.2.24' }
-ton_types = { git = "https://github.com/tonlabs/ton-labs-types.git", tag = '1.10.10' }
-ton_vm = { git = "https://github.com/tonlabs/ton-labs-vm.git", tag = '1.8.19' }
+ton_labs_assembler = { git = "https://github.com/tonlabs/ton-labs-assembler.git", tag = '1.2.25' }
+ton_types = { git = "https://github.com/tonlabs/ton-labs-types.git", tag = '1.10.11' }
+ton_vm = { git = "https://github.com/tonlabs/ton-labs-vm.git", tag = '1.8.20' }
 
 clap = "2.32"
 hex = "0.3.2"
