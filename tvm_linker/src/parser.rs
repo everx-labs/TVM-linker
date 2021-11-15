@@ -893,14 +893,15 @@ impl ParseEngine {
         pers_dict.data().map(|cell| cell.clone())
     }
 
-    fn cell_encode(&self, cell: &Cell) -> Lines {
+    fn cell_encode(&self, cell: &Cell, toplevel: bool) -> Lines {
         let slice = SliceData::from(cell);
         let mut lines = vec!();
-        lines.push(Line::new(".cell {", "", 0));
+        let opening = if toplevel { "{" } else { ".cell {" };
+        lines.push(Line::new(opening, "", 0));
         lines.push(Line::new(format!(".blob x{}", slice.to_hex_string()).as_str(), "", 0));
         for i in slice.get_references() {
             let child = cell.reference(i).unwrap();
-            let mut child_lines = self.cell_encode(&child);
+            let mut child_lines = self.cell_encode(&child, false);
             lines.append(&mut child_lines);
         }
         lines.push(Line::new("}", "", 0));
@@ -927,7 +928,7 @@ impl ParseEngine {
         };
 
         let cell = engine.stack().get(0).as_cell().map_err(|_| name)?;
-        Ok(self.cell_encode(cell))
+        Ok(self.cell_encode(cell, true))
     }
 
     fn replace_labels(&mut self, line: &Line, cur_obj_name: &FunctionId) -> Result<Lines, String> {
@@ -1288,7 +1289,7 @@ mod tests {
             vec![
                 Line::new("\n",               "test_compute.code", 3),
                 Line::new("PUSHREF\n",        "test_compute.code", 4),
-                Line::new(".cell {",          "", 0),
+                Line::new("{",                "", 0),
                 Line::new(".blob x0000006f",  "", 0),
                 Line::new("}",                "", 0),
                 Line::new("CTOS\n",           "test_compute.code", 6),
