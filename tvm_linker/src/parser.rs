@@ -896,15 +896,15 @@ impl ParseEngine {
     fn cell_encode(&self, cell: &Cell, toplevel: bool) -> Lines {
         let slice = SliceData::from(cell);
         let mut lines = vec!();
-        let opening = if toplevel { "{" } else { ".cell {" };
+        let opening = if toplevel { "{\n" } else { ".cell {\n" };
         lines.push(Line::new(opening, "", 0));
-        lines.push(Line::new(format!(".blob x{}", slice.to_hex_string()).as_str(), "", 0));
+        lines.push(Line::new(format!(".blob x{}\n", slice.to_hex_string()).as_str(), "", 0));
         for i in slice.get_references() {
             let child = cell.reference(i).unwrap();
             let mut child_lines = self.cell_encode(&child, false);
             lines.append(&mut child_lines);
         }
-        lines.push(Line::new("}", "", 0));
+        lines.push(Line::new("}\n", "", 0));
         lines
     }
 
@@ -932,9 +932,11 @@ impl ParseEngine {
     }
 
     fn replace_labels(&mut self, line: &Line, cur_obj_name: &FunctionId) -> Result<Lines, String> {
-        let compute_regex = Regex::new(r"^\s*\.compute\s+\$([\w\.:]+)\$").unwrap();
-        if compute_regex.is_match(&line.text) {
-            let name = compute_regex.captures(&line.text).unwrap().get(1).unwrap().as_str();
+        lazy_static! {
+            static ref COMPUTE_REGEX: Regex = Regex::new(r"^\s*\.compute\s+\$([\w\.:]+)\$").unwrap();
+        }
+        if COMPUTE_REGEX.is_match(&line.text) {
+            let name = COMPUTE_REGEX.captures(&line.text).unwrap().get(1).unwrap().as_str();
             let lines = self.macros.get(name).ok_or(name)?;
             return self.cell_compute(name, lines)
         }
@@ -1289,9 +1291,9 @@ mod tests {
             vec![
                 Line::new("\n",               "test_compute.code", 3),
                 Line::new("PUSHREF\n",        "test_compute.code", 4),
-                Line::new("{",                "", 0),
-                Line::new(".blob x0000006f",  "", 0),
-                Line::new("}",                "", 0),
+                Line::new("{\n",                "", 0),
+                Line::new(".blob x0000006f\n",  "", 0),
+                Line::new("}\n",                "", 0),
                 Line::new("CTOS\n",           "test_compute.code", 6),
                 Line::new("PLDU 32\n",        "test_compute.code", 7),
                 Line::new("PUSHINT 111\n",    "test_compute.code", 8),
