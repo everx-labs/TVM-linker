@@ -607,7 +607,7 @@ impl ParseEngine {
                 let cap = dotted_regex.captures(&l).unwrap();
                 let param = cap.get(1).unwrap().as_str();
                 match param {
-                    "blob" | "cell" | "byte" | "long" | "short" | "quad" | "comm" | "bss" | "asciz" => {
+                    "blob" | "cell" | "byte" | "long" | "short" | "quad" | "comm" | "bss" | "asciz" | "compute" => {
                         obj_body.push(Line { text: l.clone(), pos })
                     },
                     _ => Err(format!("line {}: invalid param \"{}\":{}", lnum, param, l))?,
