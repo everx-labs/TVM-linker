@@ -501,7 +501,7 @@ impl ParseEngine {
             };
             if ignored_regex.is_match(&l) {
                 //ignore unused parameters
-                debug!("ignored: {}", l);            
+                debug!("ignored: {}", l);
             } else if version_regex.is_match(&l) {
                 let cap = version_regex.captures(&l).unwrap();
                 self.version = Some(cap.get(1).unwrap().as_str().to_owned());
@@ -607,7 +607,7 @@ impl ParseEngine {
                 let cap = dotted_regex.captures(&l).unwrap();
                 let param = cap.get(1).unwrap().as_str();
                 match param {
-                    "blob" | "cell" | "byte" | "long" | "short" | "quad" | "comm" | "bss" | "asciz" => {
+                    "blob" | "cell" | "byte" | "long" | "short" | "quad" | "comm" | "bss" | "asciz" | "compute" => {
                         obj_body.push(Line { text: l.clone(), pos })
                     },
                     _ => Err(format!("line {}: invalid param \"{}\":{}", lnum, param, l))?,
@@ -893,7 +893,53 @@ impl ParseEngine {
         pers_dict.data().map(|cell| cell.clone())
     }
 
+    fn cell_encode(&self, cell: &Cell, toplevel: bool) -> Lines {
+        let slice = SliceData::from(cell);
+        let mut lines = vec!();
+        let opening = if toplevel { "{\n" } else { ".cell {\n" };
+        lines.push(Line::new(opening, "", 0));
+        lines.push(Line::new(format!(".blob x{}\n", slice.to_hex_string()).as_str(), "", 0));
+        for i in slice.get_references() {
+            let child = cell.reference(i).unwrap();
+            let mut child_lines = self.cell_encode(&child, false);
+            lines.append(&mut child_lines);
+        }
+        lines.push(Line::new("}\n", "", 0));
+        lines
+    }
+
+    fn cell_compute(&self, name: &str, lines: &Lines) -> Result<Lines, String> {
+        let (code, _) = ton_labs_assembler::compile_code_debuggable(lines.clone())
+            .map_err(|ce| ce.to_string())?;
+
+        let mut engine = ton_vm::executor::Engine::new().setup_with_libraries(
+            code, None, None, None, vec![]);
+        match engine.execute() {
+            Err(e) => {
+                println!("failed to compute cell: {}", e);
+                return Err(name.to_string())
+            }
+            Ok(code) => {
+                if code != 0 {
+                    println!("failed to compute cell, exit code {}", code);
+                    return Err(name.to_string())
+                }
+            }
+        };
+
+        let cell = engine.stack().get(0).as_cell().map_err(|_| name)?;
+        Ok(self.cell_encode(cell, true))
+    }
+
     fn replace_labels(&mut self, line: &Line, cur_obj_name: &FunctionId) -> Result<Lines, String> {
+        lazy_static! {
+            static ref COMPUTE_REGEX: Regex = Regex::new(r"^\s*\.compute\s+\$([\w\.:]+)\$").unwrap();
+        }
+        if COMPUTE_REGEX.is_match(&line.text) {
+            let name = COMPUTE_REGEX.captures(&line.text).unwrap().get(1).unwrap().as_str();
+            let lines = self.macros.get(name).ok_or(name)?;
+            return self.cell_compute(name, lines)
+        }
         resolve_name(line, |name| {
             self.intrefs.get(name).and_then(|id| Some(id.clone()))
         })
@@ -1227,6 +1273,34 @@ mod tests {
                  Line::new("PUSHINT 2\n",  "test_macros_02.code", 12),
                  Line::new("ADD\n",        "test_macros_02.code", 13),
                  Line::new("\n",           "test_macros_02.code", 14)]
+        );
+    }
+
+    #[test]
+    fn test_compute() {
+        let sources = vec![Path::new("./tests/test_stdlib.tvm"),
+                                     Path::new("./tests/test_compute.code")];
+        let parser = ParseEngine::new(sources, None);
+        assert_eq!(parser.is_ok(), true);
+
+        let internals = parser.unwrap().internals();
+        let internal = internals.get(&-2).unwrap();
+
+        assert_eq!(
+            *internal,
+            vec![
+                Line::new("\n",               "test_compute.code", 3),
+                Line::new("PUSHREF\n",        "test_compute.code", 4),
+                Line::new("{\n",                "", 0),
+                Line::new(".blob x0000006f\n",  "", 0),
+                Line::new("}\n",                "", 0),
+                Line::new("CTOS\n",           "test_compute.code", 6),
+                Line::new("PLDU 32\n",        "test_compute.code", 7),
+                Line::new("PUSHINT 111\n",    "test_compute.code", 8),
+                Line::new("EQUAL\n",          "test_compute.code", 9),
+                Line::new("THROWIFNOT 222\n", "test_compute.code", 10),
+                Line::new("\n",               "test_compute.code", 11),
+            ]
         );
     }
 }
