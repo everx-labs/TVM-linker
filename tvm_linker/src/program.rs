@@ -228,7 +228,7 @@ impl Program {
         Ok(main_selector.0.cell().clone())
     }
 
-    fn compile_asm(&mut self, remove_ctor: bool) -> std::result::Result<Cell, String> {
+    pub fn compile_asm(&mut self, remove_ctor: bool) -> std::result::Result<Cell, String> {
         if !self.entry().is_empty() {
             // TODO wipe out the old behavior
             return self.compile_asm_old(remove_ctor);
