@@ -659,8 +659,7 @@ impl ParseEngine {
         for line in lines {
             if COMPUTE_REGEX.is_match(&line.text) {
                 let name = COMPUTE_REGEX.captures(&line.text).unwrap().get(1).unwrap().as_str();
-                let lines = self.macros.get(name).ok_or(name)?.clone();
-                let mut resolved = self.compute_cell(name, &lines)?;
+                let mut resolved = self.compute_cell(name)?;
                 new_lines.append(&mut resolved);
                 continue
             }
@@ -921,17 +920,18 @@ impl ParseEngine {
         lines
     }
 
-    fn compute_cell(&mut self, name: &str, lines: &Lines) -> Result<Lines, String> {
+    fn compute_cell(&mut self, name: &str) -> Result<Lines, String> {
         if let Some(computed) = self.computed.get(name) {
             return Ok(computed.clone())
         }
+
+        let lines = self.macros.get(name).ok_or(format!("macro {} was not found", name))?.clone();
 
         let mut collected = vec!();
         for line in lines {
             if COMPUTE_REGEX.is_match(&line.text) {
                 let name_inner = COMPUTE_REGEX.captures(&line.text).unwrap().get(1).unwrap().as_str();
-                let lines_inner = self.macros.get(name).ok_or(name)?.clone();
-                collected.append(&mut self.compute_cell(name_inner, &lines_inner)?);
+                collected.append(&mut self.compute_cell(name_inner)?);
             } else {
                 collected.push(line.clone());
             }
