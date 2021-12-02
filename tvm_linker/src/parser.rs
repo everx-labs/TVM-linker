@@ -254,6 +254,7 @@ pub struct ParseEngine {
     version: Option<String>,
     /// Selector variant
     save_my_code: bool,
+    computed: HashMap<String, Lines>,
 }
 
 const PATTERN_GLOBL:    &'static str = r"^\s*\.globl\s+(:?[\w\.]+)";
@@ -275,6 +276,10 @@ const PATTERN_IGNORED:  &'static str = r"^\s+\.(p2align|align|text|file|ident|se
 const PATTERN_LOC:      &'static str = r"^\s*\.loc\s+(.+),\s+(\d+)\n$";
 const PATTERN_VERSION:  &'static str = r"^\s*\.version\s+(.+)";
 const PATTERN_PRAGMA:   &'static str = r"^\s*\.pragma\s+(.+)";
+
+lazy_static! {
+    static ref COMPUTE_REGEX: Regex = Regex::new(r"^\s*\.compute\s+\$([\w\.:]+)\$").unwrap();
+}
 
 const GLOBL:            &'static str = ".globl";
 const INTERNAL:         &'static str = ".internal";
@@ -307,6 +312,7 @@ impl ParseEngine {
             abi:             None,
             version:         None,
             save_my_code:    false,
+            computed:        HashMap::new(),
         };
         engine.parse(sources, abi_json)?;
         Ok(engine)
@@ -651,6 +657,12 @@ impl ParseEngine {
     fn replace_labels_in_body(&mut self, lines: Vec<Line>, obj_name: FunctionId) -> Result<Vec<Line>, String> {
         let mut new_lines = vec![];
         for line in lines {
+            if COMPUTE_REGEX.is_match(&line.text) {
+                let name = COMPUTE_REGEX.captures(&line.text).unwrap().get(1).unwrap().as_str();
+                let mut resolved = self.compute_cell(name)?;
+                new_lines.append(&mut resolved);
+                continue
+            }
             let mut resolved =
                 self.replace_labels(&line, &obj_name)
                     .map_err(|e| format!("line {}: cannot resolve label: {}", line.pos.line, e))?;
@@ -893,7 +905,7 @@ impl ParseEngine {
         pers_dict.data().map(|cell| cell.clone())
     }
 
-    fn cell_encode(&self, cell: &Cell, toplevel: bool) -> Lines {
+    fn encode_computed_cell(&self, cell: &Cell, toplevel: bool) -> Lines {
         let slice = SliceData::from(cell);
         let mut lines = vec!();
         let opening = if toplevel { "{\n" } else { ".cell {\n" };
@@ -901,15 +913,31 @@ impl ParseEngine {
         lines.push(Line::new(format!(".blob x{}\n", slice.to_hex_string()).as_str(), "", 0));
         for i in slice.get_references() {
             let child = cell.reference(i).unwrap();
-            let mut child_lines = self.cell_encode(&child, false);
+            let mut child_lines = self.encode_computed_cell(&child, false);
             lines.append(&mut child_lines);
         }
         lines.push(Line::new("}\n", "", 0));
         lines
     }
 
-    fn cell_compute(&self, name: &str, lines: &Lines) -> Result<Lines, String> {
-        let (code, _) = ton_labs_assembler::compile_code_debuggable(lines.clone())
+    fn compute_cell(&mut self, name: &str) -> Result<Lines, String> {
+        if let Some(computed) = self.computed.get(name) {
+            return Ok(computed.clone())
+        }
+
+        let lines = self.macros.get(name).ok_or(format!("macro {} was not found", name))?.clone();
+
+        let mut collected = vec!();
+        for line in lines {
+            if COMPUTE_REGEX.is_match(&line.text) {
+                let name_inner = COMPUTE_REGEX.captures(&line.text).unwrap().get(1).unwrap().as_str();
+                collected.append(&mut self.compute_cell(name_inner)?);
+            } else {
+                collected.push(line.clone());
+            }
+        }
+
+        let (code, _) = ton_labs_assembler::compile_code_debuggable(collected)
             .map_err(|ce| ce.to_string())?;
 
         let mut engine = ton_vm::executor::Engine::new().setup_with_libraries(
@@ -928,18 +956,12 @@ impl ParseEngine {
         };
 
         let cell = engine.stack().get(0).as_cell().map_err(|_| name)?;
-        Ok(self.cell_encode(cell, true))
+        let res = self.encode_computed_cell(cell, true);
+        self.computed.insert(String::from(name), res.clone());
+        Ok(res)
     }
 
     fn replace_labels(&mut self, line: &Line, cur_obj_name: &FunctionId) -> Result<Lines, String> {
-        lazy_static! {
-            static ref COMPUTE_REGEX: Regex = Regex::new(r"^\s*\.compute\s+\$([\w\.:]+)\$").unwrap();
-        }
-        if COMPUTE_REGEX.is_match(&line.text) {
-            let name = COMPUTE_REGEX.captures(&line.text).unwrap().get(1).unwrap().as_str();
-            let lines = self.macros.get(name).ok_or(name)?;
-            return self.cell_compute(name, lines)
-        }
         resolve_name(line, |name| {
             self.intrefs.get(name).and_then(|id| Some(id.clone()))
         })
@@ -1300,6 +1322,30 @@ mod tests {
                 Line::new("EQUAL\n",          "test_compute.code", 9),
                 Line::new("THROWIFNOT 222\n", "test_compute.code", 10),
                 Line::new("\n",               "test_compute.code", 11),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_compute_nested() {
+        let sources = vec![Path::new("./tests/test_stdlib.tvm"),
+                                     Path::new("./tests/test_compute_nested.code")];
+        let parser = ParseEngine::new(sources, None);
+        assert_eq!(parser.is_ok(), true);
+
+        let internals = parser.unwrap().internals();
+        let internal = internals.get(&-2).unwrap();
+
+        assert_eq!(
+            *internal,
+            vec![
+                Line::new("\n",               "test_compute_nested.code", 3),
+                Line::new("PUSHREF\n",        "test_compute_nested.code", 4),
+                Line::new("{\n",                "", 0),
+                Line::new(".blob x0000006f00000000000000de\n", "", 0),
+                Line::new("}\n",                "", 0),
+                Line::new("DROP\n",           "test_compute_nested.code", 6),
+                Line::new("\n",               "test_compute_nested.code", 7),
             ]
         );
     }
