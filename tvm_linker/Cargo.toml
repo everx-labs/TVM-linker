@@ -9,7 +9,7 @@ license-file = 'LICENSE.md'
 name = 'tvm_linker'
 readme = 'README.md'
 repository = 'https://github.com/tonlabs/TVM-linker'
-version = '0.13.107'
+version = '0.13.108'
 
 [dependencies]
 base64 = '0.10.0'
