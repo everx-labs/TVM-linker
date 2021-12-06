@@ -55,7 +55,7 @@ use parser::{ParseEngine, ParseEngineResults};
 use program::{Program, get_now};
 use real_ton::{decode_boc, compile_message};
 use resolver::resolve_name;
-use ton_block::{Deserializable, Message};
+use ton_block::{Deserializable, Message, StateInit, Serializable, Account};
 use std::{path::Path};
 use testcall::{call_contract, MsgInfo, TraceLevel};
 use ton_types::{BuilderData, SliceData};
@@ -92,13 +92,26 @@ fn linker_main() -> Result<(), String> {
             (@arg INPUT: +required +takes_value "BOC file")
             (@arg TVC: --tvc "BOC file is tvc file")
         )
+        (@subcommand replace_code =>
+            (@setting AllowNegativeNumbers)
+            (about: "Compile assembler code file and replace contract code with a new one.")
+            (version: build_info.as_str())
+            (author: "TON Labs")
+            (@arg INPUT: +required +takes_value "TVM assembler source file")
+            (@arg CONTRACT_PATH: +required +takes_value "Path to the file with the BOC of contract account state whose code should be replaced.")
+            (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids. If not specified abi can be loaded from file path obtained from <INPUT> path if it exists.")
+            (@arg DEBUG_MAP: --("debug-map") +takes_value "Generates debug map file")
+            (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file. If not specified lib is loaded from environment variable TVM_LINKER_LIB_PATH if it exists.")
+            (@arg OUT_FILE: -o +takes_value "Output file name. If not specified the input file is rewritten.")
+            (@arg TVC: --tvc "Changes command behaviour to work with stateInit TVC instead of account BOC.")
+        )
         (@subcommand compile =>
             (@setting AllowNegativeNumbers)
             (about: "compile contract")
             (version: build_info.as_str())
             (author: "TON Labs")
             (@arg INPUT: +required +takes_value "TVM assembler source file")
-            (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids. If not specified abi is loaded from file path obtained from <INPUT> path if it exists.")
+            (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids. If not specified abi can be loaded from file path obtained from <INPUT> path if it exists.")
             (@arg CTOR_PARAMS: -p --("ctor-params") +takes_value "Supplies arguments for the constructor")
             (@arg GENKEY: --genkey +takes_value conflicts_with[SETKEY] "Generates new keypair for the contract and saves it to the file")
             (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
@@ -331,7 +344,87 @@ fn linker_main() -> Result<(), String> {
         return disasm_command(m);
     }
 
+    if let Some(matches) = matches.subcommand_matches("replace_code") {
+        return  replace_command(matches);
+    }
+
     unreachable!()
+}
+
+fn replace_command(matches: &ArgMatches) -> Result<(), String> {
+    let input = matches.value_of("INPUT").unwrap();
+    let abi_from_input = format!("{}{}", input.trim_end_matches("code"), "abi.json");
+    let abi_file = matches.value_of("ABI").or_else(|| {
+        println!("ABI_PATH (obtained from INPUT): {}", abi_from_input);
+        Some(abi_from_input.as_ref())
+    });
+    let abi_json = match abi_file {
+        Some(abi_file_name) => Some(load_abi_json_string(abi_file_name)?),
+        None => None
+    };
+    let out_file = matches.value_of("OUT_FILE");
+
+    let mut sources = Vec::new();
+    for lib in matches.values_of("LIB").unwrap_or_default() {
+        let path = Path::new(lib);
+        if !path.exists() {
+            return Err(format!("File {} doesn't exist", lib));
+        }
+        sources.push(path);
+    }
+    let env_lib = env::var("TVM_LINKER_LIB_PATH").unwrap_or_default();
+    if sources.is_empty() && !env_lib.is_empty() {
+        println!("TVM_LINKER_LIB_PATH: {:?}", &env_lib);
+        let path = Path::new(&env_lib);
+        if !path.exists() {
+            return Err(format!("File {} doesn't exist", &env_lib));
+        }
+        sources.push(path);
+    }
+
+    let path = Path::new(input);
+    if !path.exists() {
+        return Err(format!("File {} doesn't exist", input));
+    }
+    sources.push(path);
+
+    let mut prog = Program::new(
+        ParseEngine::new(sources, abi_json)?
+    );
+
+    let code = prog.compile_asm(false)?;
+
+    let input_path = matches.value_of("CONTRACT_PATH").unwrap();
+    let out_file = out_file.unwrap_or(input_path);
+    if matches.is_present("TVC") {
+        let mut state_init = StateInit::construct_from_file(input_path)
+            .map_err(|e| format!("Failed to load stateInit from the file {}: {}", input_path, e))?;
+        state_init.set_code(code);
+        state_init.write_to_file(out_file)
+            .map_err(|e| format!("Failed to save stateInit: {}", e))?;
+    } else {
+        let mut account = Account::construct_from_file(input_path)
+            .map_err(|e| format!("Failed to load account from the file {}: {}", input_path, e))?;
+        match account.state_init() {
+            Some(_) => {
+                account.set_code(code);
+            }
+            None => {
+                return Err("Account doesn't contain stateInit.".to_string())
+            }
+        }
+        account.write_to_file(out_file)
+            .map_err(|e| format!("Failed to save account: {}", e))?;
+    }
+    println!("Result saved to file: {}", out_file);
+    if matches.is_present("DEBUG_MAP") {
+        let filename = matches.value_of("DEBUG_MAP").unwrap();
+        let file = File::create(filename).unwrap();
+        serde_json::to_writer_pretty(file, &prog.dbgmap).unwrap();
+    }
+
+    return Ok(());
+
 }
 
 fn parse_now(now: Option<&str>) -> Result<u32, String> {
