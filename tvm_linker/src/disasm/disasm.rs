@@ -122,9 +122,17 @@ fn disasm_dump_command(m: &ArgMatches) -> core::result::Result<(), String> {
         .map_err(|e| format!(" failed to read tvc file: {}", e))?
         .unwrap();
     let mut csor = Cursor::new(tvc);
-    let mut roots = deserialize_cells_tree(&mut csor).unwrap();
-    let code = roots.remove(0).reference(0).unwrap();
-    print_tree_of_cells(&code);
+    let roots = deserialize_cells_tree(&mut csor).map_err(|e| e.to_string())?;
+    if roots.len() == 0 {
+        println!("empty");
+    } else {
+        println!("{} {} in total", roots.len(), if roots.len() < 2 { "root" } else { "roots" });
+        for i in 0..roots.len() {
+            let root = roots.get(i).unwrap();
+            println!("root {}:", i);
+            print_tree_of_cells(root);
+        }
+    }
     Ok(())
 }
 
