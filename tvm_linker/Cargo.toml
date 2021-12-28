@@ -32,9 +32,9 @@ serde = { features = [ 'derive' ], version = '1.0.100' }
 ton_abi = { git = 'https://github.com/tonlabs/ton-labs-abi.git', tag = '2.1.7' }
 ton_block = { git = 'https://github.com/tonlabs/ton-labs-block.git', tag = '1.7.36' }
 ton_labs_assembler = { git = 'https://github.com/tonlabs/ton-labs-assembler.git', tag = '1.2.30' }
-ton_sdk = { default-features = false, git = 'https://github.com/tonlabs/ton-sdk.git', tag = '1.27.2' }
+ton_sdk = { default-features = false, git = 'https://github.com/tonlabs/ton-sdk.git', tag = '1.28.0' }
 ton_types = { git = 'https://github.com/tonlabs/ton-labs-types.git', tag = '1.10.12' }
-ton_vm = { default-features = false, git = 'https://github.com/tonlabs/ton-labs-vm.git', tag = '1.8.27' }
+ton_vm = { default-features = false, git = 'https://github.com/tonlabs/ton-labs-vm.git', tag = '1.8.28' }
 
 [dev-dependencies]
 assert_cmd = '0.11'
