@@ -10,5 +10,5 @@ log = '0.4.6'
 zip = '0.5.3'
 ton_labs_assembler = { git = 'https://github.com/tonlabs/ton-labs-assembler.git', tag = '1.2.30' }
 ton_types = { git = 'https://github.com/tonlabs/ton-labs-types.git', tag = '1.10.12' }
-ton_vm = { git = 'https://github.com/tonlabs/ton-labs-vm.git', tag = '1.8.27' }
+ton_vm = { git = 'https://github.com/tonlabs/ton-labs-vm.git', tag = '1.8.28' }
 
