@@ -23,33 +23,38 @@ use ton_types::types::AccountId;
 use ton_types::cells_serialization::{BocSerialiseMode, BagOfCells, deserialize_cells_tree_ex};
 use ton_types::{SliceData, BuilderData};
 
-pub fn load_stateinit(file_name: &str) -> (SliceData, Vec<u8>) {
+pub fn load_stateinit(file_name: &str) -> Result<(SliceData, Vec<u8>), String> {
     let mut orig_bytes = Vec::new();
-    let mut f = File::open(file_name).expect("Unable to open file");
-    f.read_to_end(&mut orig_bytes).expect("Unable to read file");
+    let mut f = File::open(file_name)
+        .map_err(|e| format!("Failed to open file {}: {}", file_name, e))?;
+    f.read_to_end(&mut orig_bytes)
+        .map_err(|e| format!("Failed to read file data: {}", e))?;
 
     let mut cur = Cursor::new(orig_bytes.clone());
-    let (root_cells, _mode, _x, _y) = deserialize_cells_tree_ex(&mut cur).expect("Error deserialising BOC");
+    let (root_cells, _mode, _x, _y) = deserialize_cells_tree_ex(&mut cur)
+        .map_err(|e| format!("Failed to deserialize BOC: {}", e))?;
     let mut root = root_cells[0].clone();
     if root.references_count() == 2 { // append empty library cell
         let mut adjusted_cell = BuilderData::from(root);
         adjusted_cell.append_reference(BuilderData::default());
-        root = adjusted_cell.into_cell().expect("Error serialize cell");
+        root = adjusted_cell.into_cell()
+            .map_err(|e| format!("Failed to serialize cell: {}", e))?;
     }
-    (SliceData::from(root), orig_bytes)
+    Ok((SliceData::from(root), orig_bytes))
 }
 
-pub fn decode_boc(filename: &str, is_tvc: bool) {
-    let (mut root_slice, orig_bytes) = load_stateinit(filename);
+pub fn decode_boc(filename: &str, is_tvc: bool) -> Result<(), String> {
+    let (mut root_slice, orig_bytes) = load_stateinit(filename)?;
 
     println!("Encoded: {}\n", hex::encode(orig_bytes));
     if is_tvc {
-        let state = StateInit::construct_from(&mut root_slice).expect("cannot read state_init from slice");
+        let state = StateInit::construct_from(&mut root_slice).map_err(|e| format!("Failed to read state_init from the slice: {}", e))?;
         println!("Decoded:\n{}", state_init_printer(&state));
     } else {
-        let msg = Message::construct_from(&mut root_slice).expect("cannot read message from slice");
+        let msg = Message::construct_from(&mut root_slice).map_err(|e| format!("Failed to read message from the slice: {}", e))?;
         println!("Decoded:\n{}", msg_printer(&msg));
     }
+    Ok(())
 }
 
 pub fn compile_message(

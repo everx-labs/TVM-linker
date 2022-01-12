@@ -208,11 +208,10 @@ fn linker_main() -> Result<(), String> {
 
     //SUBCOMMAND DECODE
     if let Some(decode_matches) = matches.subcommand_matches("decode") {
-        decode_boc(
+        return decode_boc(
             decode_matches.value_of("INPUT").unwrap(),
             decode_matches.is_present("TVC"),
         );
-        return Ok(());
     }
 
     //SUBCOMMAND MESSAGE
@@ -297,13 +296,14 @@ fn linker_main() -> Result<(), String> {
         match compile_matches.value_of("GENKEY") {
             Some(file) => {
                 let pair = KeypairManager::new();
-                pair.store_public(&(file.to_string() + ".pub"));
-                pair.store_secret(file);
+                pair.store_public(&(file.to_string() + ".pub"))?;
+                pair.store_secret(file)?;
                 prog.set_keypair(pair.drain());
             },
             None => match compile_matches.value_of("SETKEY") {
                 Some(file) => {
-                    let pair = KeypairManager::from_secret_file(file);
+                    let pair = KeypairManager::from_secret_file(file)
+                        .ok_or("Failed to read keypair.")?;
                     prog.set_keypair(pair.drain());
                 },
                 None => (),
@@ -547,8 +547,9 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
 
     match matches.value_of("BODY_FROM_BOC") {
         Some(filename) => {
-            let (mut root_slice, _) = load_stateinit(filename);
-            let msg = Message::construct_from(&mut root_slice).expect("cannot read message from slice");
+            let (mut root_slice, _) = load_stateinit(filename)?;
+            let msg = Message::construct_from(&mut root_slice)
+                .map_err(|e| format!("Failed to read message from slice: {}", e))?;
             msg_info.body = msg.body();
         }
         None => {}
@@ -605,10 +606,14 @@ fn build_body(matches: &ArgMatches) -> Result<Option<SliceData>, String> {
     let params = matches.value_of("ABI_PARAMS");
     let header = matches.value_of("ABI_HEADER");
     if mask == 0x3 {
-        let key_file = matches.value_of("SIGN").map(|path| {
-            let pair = KeypairManager::from_secret_file(path);
-            pair.drain()
-        });
+        let key_file = match matches.value_of("SIGN") {
+            Some(path) => {
+                let pair = KeypairManager::from_secret_file(path)
+                    .ok_or("Failed to read keypair.")?;
+                Some(pair.drain())
+            },
+            _ => None
+        };
         let params = params.map_or(Ok("{}".to_owned()), |params|
             if params.find('{').is_none() {
                 std::fs::read_to_string(params)

@@ -12,7 +12,7 @@
  */
 
 use std::collections::HashMap;
-use ton_types::{Cell, Result, Bitmask, SliceData, fail};
+use ton_types::{Cell, Result, /*Bitmask,*/ SliceData, fail};
 
 pub type Code = Vec<Instruction>;
 
@@ -66,10 +66,10 @@ pub enum InstructionParameter {
     Code(Code),
 }
 
-#[derive(Clone, Debug)]
-pub struct DivMode {
-    flags: Bitmask,
-}
+// #[derive(Clone, Debug)]
+// pub struct DivMode {
+//     flags: Bitmask,
+// }
 
 pub(super) trait OperationBehavior {
     fn insn(insn: Instruction) -> Instruction;

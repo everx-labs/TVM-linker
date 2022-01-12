@@ -81,11 +81,12 @@ fn create_internal_msg(
     msg
 }
 
-fn sign_body(body: &mut SliceData, key_file: Option<&str>) {
+fn sign_body(body: &mut SliceData, key_file: Option<&str>) -> Result<(), String>{
     let mut signed_body = BuilderData::from_slice(body);
     let mut sign_builder = BuilderData::new();
     if let Some(f) = key_file {
-        let pair = KeypairManager::from_secret_file(f).drain();
+        let pair = KeypairManager::from_secret_file(f)
+            .ok_or("Failed to read keypair.")?.drain();
         let pub_key = pair.public.to_bytes();
         let signature = pair.sign(body.cell().repr_hash().as_slice()).to_bytes();
         sign_builder.append_raw(&signature, signature.len() * 8).unwrap();
@@ -93,6 +94,7 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) {
     }
     signed_body.prepend_reference(sign_builder);
     *body = signed_body.into_cell().unwrap().into();
+    Ok(())
 }
 
 fn initialize_registers(data: SliceData, myself: MsgAddressInt, now: u32, balance: (u64, CurrencyCollection), config: Option<Cell>) -> SaveList {
@@ -159,12 +161,12 @@ fn create_inbound_msg(
     }
 }
 
-fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: F)
+fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: F) -> Result<(), String>
     where F: Fn(SliceData, bool) -> ()
 {
     if let StackItem::Cell(cell) = actions {
         let actions: OutActions = OutActions::construct_from(&mut cell.into())
-            .expect("Failed to decode output actions");
+            .map_err(|e| format!("Failed to decode output actions: {}", e))?;
         println!("Output actions:\n----------------");
         for act in actions {
             match act {
@@ -188,6 +190,7 @@ fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: 
             };
         }
     }
+    Ok(())
 }
 
 fn load_code_and_data(state_init: &StateInit) -> (SliceData, SliceData) {
@@ -293,9 +296,10 @@ pub fn call_contract<F>(
     });
     let (exit_code, state_init, is_vm_success) = call_contract_ex(
         addr, state_init, debug_info, smc_balance,
-        msg_info, config_cell, key_file, ticktock, gas_limit, action_decoder, trace_level);
+        msg_info, config_cell, key_file, ticktock, gas_limit, action_decoder, trace_level)?;
     if is_vm_success {
-        save_to_file(state_init, Some(&smc_file), 0).expect("error");
+        save_to_file(state_init, Some(&smc_file), 0)
+            .map_err(|e| format!("Failed to save file: {}", e))?;
         println!("Contract persistent data updated");
     }
     Ok(exit_code)
@@ -372,7 +376,7 @@ pub fn call_contract_ex<F>(
     gas_limit: Option<i64>,
     action_decoder: Option<F>,
     trace_level: TraceLevel,
-) -> (i32, StateInit, bool)
+) -> Result<(i32, StateInit, bool), String>
     where F: Fn(SliceData, bool)
 {
     let func_selector = match msg_info.balance {
@@ -408,7 +412,9 @@ pub fn call_contract_ex<F>(
         };
 
         if func_selector == -1 {
-            key_file.map(|key| sign_body(&mut body, key));
+            if key_file.is_some() {
+                sign_body(&mut body, key_file.unwrap())?;
+            }
         }
 
         let msg_value = if func_selector == 0 {
@@ -469,7 +475,7 @@ pub fn call_contract_ex<F>(
 
     if is_vm_success {
         if let Some(decoder) = action_decoder {
-            decode_actions(engine.get_actions(), &mut state_init, decoder);
+            decode_actions(engine.get_actions(), &mut state_init, decoder)?;
         }
 
         state_init.data = match engine.get_committed_state().get_root() {
@@ -478,7 +484,7 @@ pub fn call_contract_ex<F>(
         };
     }
 
-    (exit_code, state_init, is_vm_success)
+    Ok((exit_code, state_init, is_vm_success))
 }
 
 #[cfg(test)]
