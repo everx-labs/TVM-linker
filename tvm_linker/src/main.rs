@@ -333,8 +333,10 @@ fn linker_main() -> Result<(), String> {
 
         if compile_matches.is_present("DEBUG_MAP") {
             let filename = compile_matches.value_of("DEBUG_MAP").unwrap();
-            let file = File::create(filename).unwrap();
-            serde_json::to_writer_pretty(file, &prog.dbgmap).unwrap();
+            let file = File::create(filename)
+                .map_err(|e| format!("Failed to create file {}: {}", filename, e))?;
+            serde_json::to_writer_pretty(file, &prog.dbgmap)
+                .map_err(|e| format!("Failed to write data to file: {}", e))?;
         }
 
         return Ok(());
@@ -419,8 +421,10 @@ fn replace_command(matches: &ArgMatches) -> Result<(), String> {
     println!("Result saved to file: {}", out_file);
     if matches.is_present("DEBUG_MAP") {
         let filename = matches.value_of("DEBUG_MAP").unwrap();
-        let file = File::create(filename).unwrap();
-        serde_json::to_writer_pretty(file, &prog.dbgmap).unwrap();
+        let file = File::create(filename)
+            .map_err(|e| format!("Failed to create file {}: {}", filename, e))?;
+        serde_json::to_writer_pretty(file, &prog.dbgmap)
+            .map_err(|e| format!("Failed to write data to file: {}", e))?;
     }
 
     return Ok(());
@@ -501,7 +505,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
             .map_err(|e| format!("failed to resolve body {}: {}", hex_str, e))?;
             hex_str = resolved[0].text.clone();
 
-            let (buf, buf_bits) = decode_hex_string(hex_str).unwrap();
+            let (buf, buf_bits) = decode_hex_string(hex_str)?;
             let body: SliceData = BuilderData::with_raw(buf, buf_bits)
                 .map_err(|e| format!("failed to pack body in cell: {}", e))?
                 .into_cell()

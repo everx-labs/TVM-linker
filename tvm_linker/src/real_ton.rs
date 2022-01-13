@@ -52,7 +52,7 @@ pub fn decode_boc(filename: &str, is_tvc: bool) -> Result<(), String> {
         println!("Decoded:\n{}", state_init_printer(&state));
     } else {
         let msg = Message::construct_from(&mut root_slice).map_err(|e| format!("Failed to read message from the slice: {}", e))?;
-        println!("Decoded:\n{}", msg_printer(&msg));
+        println!("Decoded:\n{}", msg_printer(&msg)?);
     }
     Ok(())
 }
@@ -73,7 +73,7 @@ pub fn compile_message(
         None, 
         wc, 
         AccountId::from_str(address_str).map_err(|_| "input string is not a valid address".to_string())?
-    ).unwrap();
+    ).map_err(|e| format!("Failed to create address with specified parameters: {}", e))?;
 
     let state = if pack_code { Some(load_from_file(&format!("{}.tvc", address_str))?) } else { None };
     
@@ -87,11 +87,12 @@ pub fn compile_message(
     let boc = BagOfCells::with_root(&root_cell);
     let mut bytes = Vec::new();
     let mode = BocSerialiseMode::Generic { index: false, crc: true, cache_bits: false, flags: 0 };
-    boc.write_to_ex(&mut bytes, mode, None, Some(4)).unwrap();
+    boc.write_to_ex(&mut bytes, mode, None, Some(4))
+        .map_err(|e| format!("Failed to write data: {}", e))?;
 
     println!("Encoded msg: {}", hex::encode(&bytes));
 
-    let output_file_name = address_str.get(0..8).unwrap().to_string() + suffix;
+    let output_file_name = address_str.get(0..8).unwrap_or("00000000").to_string() + suffix;
     let mut f = File::create(&output_file_name).map_err(|_| "Unable to create msg file".to_string())?;
     f.write_all(&bytes).map_err(|_| format!("Unable to write_data to msg file {}", output_file_name))?;
 

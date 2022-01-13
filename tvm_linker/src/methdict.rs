@@ -39,7 +39,8 @@ where
     T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash,
 {
     for pair in methods.iter() {
-        let key: SliceData = pair.0.clone().serialize().unwrap().into();
+        let key: SliceData = pair.0.clone().serialize()
+            .map_err(|e| (pair.0.clone(), format!("Failed to serialize data: {}", e)))?.into();
         let mut val = compile_code_debuggable(pair.1.clone()).map_err(|e| {
             (pair.0.clone(), e.to_string())
         })?;
@@ -52,21 +53,26 @@ where
                 (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
             })?;
         }
-        let id = key.clone().get_next_i32().unwrap();
+        let id = key.clone().get_next_i32()
+            .map_err(|e| (pair.0.clone(), format!("Failed to decode data: {}", e)))?;
         if adjust_entry_points || id < -2 || id > 0 {
             let before = val.0;
-            let after = map.get(key).unwrap().unwrap();
-            adjust_debug_map(&mut val.1, before, after);
+            let after = map.get(key)
+                .map_err(|e| (pair.0.clone(), format!("Failed to find key: {}", e)))?
+                .ok_or((pair.0.clone(), "Data is empty".to_string()))?;
+            adjust_debug_map(&mut val.1, before, after)
+                .map_err(|e| (pair.0.clone(), e))?;
         }
         dbg.append(&mut val.1)
     }
     Ok(())
 }
 
-fn adjust_debug_map(map: &mut DbgInfo, before: SliceData, after: SliceData) {
+fn adjust_debug_map(map: &mut DbgInfo, before: SliceData, after: SliceData) -> Result<(), String> {
     let hash_old = before.cell().repr_hash();
     let hash_new = after.cell().repr_hash();
-    let old = map.remove(&hash_old).unwrap();
+    let old = map.remove(&hash_old)
+        .ok_or("Failed to remove old value.".to_string())?;
 
     let adjustment = after.pos();
     let mut new = BTreeMap::new();
@@ -75,4 +81,5 @@ fn adjust_debug_map(map: &mut DbgInfo, before: SliceData, after: SliceData) {
     }
 
     map.insert(hash_new, new);
+    Ok(())
 }
