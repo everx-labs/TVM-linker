@@ -250,7 +250,6 @@ fn decode_balance(value: Option<&str>) -> Result<(u64, CurrencyCollection), Stri
                 Some(())
             })
         }).ok_or(err_msg.to_owned())?;
-
         Ok((main, currencies))
     }
 }
@@ -267,7 +266,12 @@ pub fn load_debug_info(
     filename: String,
 ) -> Option<DbgInfo> {
     match File::open(filename) {
-        Ok(file) => Some(serde_json::from_reader(file).unwrap()),
+        Ok(file) => {
+            match serde_json::from_reader(file) {
+                Ok(data) => Some(data),
+                Err(_) => None
+            }
+        },
         Err(_) => None
     }
 }
@@ -415,7 +419,7 @@ pub fn call_contract_ex<F>(
     let mut state_init = state_init;
     let (code, data) = load_code_and_data(&state_init);
 
-    let (smc_value, smc_balance) = decode_balance(smc_balance).unwrap();
+    let (smc_value, smc_balance) = decode_balance(smc_balance)?;
     let registers = initialize_registers(
         data,
         addr.clone(),
@@ -426,7 +430,9 @@ pub fn call_contract_ex<F>(
 
     let mut stack = Stack::new();
     if func_selector > -2 {
-        let msg_cell = StackItem::Cell(msg.unwrap().serialize().unwrap());
+        let msg_cell = StackItem::Cell(msg.ok_or("Failed to create message".to_string())?
+            .serialize()
+            .map_err(|e| format!("Failed to serialize message: {}", e))?);
 
         let mut body: SliceData = match msg_info.body {
             Some(b) => b.into(),
@@ -440,7 +446,7 @@ pub fn call_contract_ex<F>(
         }
 
         let msg_value = if func_selector == 0 {
-            decode_balance(msg_info.balance).unwrap().0 // for internal message
+            decode_balance(msg_info.balance)?.0 // for internal message
         } else {
             0 // for external message
         };
@@ -453,7 +459,8 @@ pub fn call_contract_ex<F>(
             .push(int!(func_selector));   //selector
     } else {
         let addr_val = addr.address().to_hex_string();
-        let addr_int = IntegerData::from_str_radix(&addr_val, 16).unwrap();
+        let addr_int = IntegerData::from_str_radix(&addr_val, 16)
+            .map_err(|e| format!("Failed to convert address: {}", e))?;
         stack
             .push(int!(smc_value))
             .push(StackItem::Integer(Arc::new(addr_int))) //contract address
