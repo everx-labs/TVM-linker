@@ -208,11 +208,10 @@ fn linker_main() -> Result<(), String> {
 
     //SUBCOMMAND DECODE
     if let Some(decode_matches) = matches.subcommand_matches("decode") {
-        decode_boc(
+        return decode_boc(
             decode_matches.value_of("INPUT").unwrap(),
             decode_matches.is_present("TVC"),
         );
-        return Ok(());
     }
 
     //SUBCOMMAND MESSAGE
@@ -297,13 +296,14 @@ fn linker_main() -> Result<(), String> {
         match compile_matches.value_of("GENKEY") {
             Some(file) => {
                 let pair = KeypairManager::new();
-                pair.store_public(&(file.to_string() + ".pub"));
-                pair.store_secret(file);
+                pair.store_public(&(file.to_string() + ".pub"))?;
+                pair.store_secret(file)?;
                 prog.set_keypair(pair.drain());
             },
             None => match compile_matches.value_of("SETKEY") {
                 Some(file) => {
-                    let pair = KeypairManager::from_secret_file(file);
+                    let pair = KeypairManager::from_secret_file(file)
+                        .ok_or("Failed to read keypair.")?;
                     prog.set_keypair(pair.drain());
                 },
                 None => (),
@@ -333,8 +333,10 @@ fn linker_main() -> Result<(), String> {
 
         if compile_matches.is_present("DEBUG_MAP") {
             let filename = compile_matches.value_of("DEBUG_MAP").unwrap();
-            let file = File::create(filename).unwrap();
-            serde_json::to_writer_pretty(file, &prog.dbgmap).unwrap();
+            let file = File::create(filename)
+                .map_err(|e| format!("Failed to create file {}: {}", filename, e))?;
+            serde_json::to_writer_pretty(file, &prog.dbgmap)
+                .map_err(|e| format!("Failed to write data to file: {}", e))?;
         }
 
         return Ok(());
@@ -419,8 +421,10 @@ fn replace_command(matches: &ArgMatches) -> Result<(), String> {
     println!("Result saved to file: {}", out_file);
     if matches.is_present("DEBUG_MAP") {
         let filename = matches.value_of("DEBUG_MAP").unwrap();
-        let file = File::create(filename).unwrap();
-        serde_json::to_writer_pretty(file, &prog.dbgmap).unwrap();
+        let file = File::create(filename)
+            .map_err(|e| format!("Failed to create file {}: {}", filename, e))?;
+        serde_json::to_writer_pretty(file, &prog.dbgmap)
+            .map_err(|e| format!("Failed to write data to file: {}", e))?;
     }
 
     return Ok(());
@@ -501,7 +505,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
             .map_err(|e| format!("failed to resolve body {}: {}", hex_str, e))?;
             hex_str = resolved[0].text.clone();
 
-            let (buf, buf_bits) = decode_hex_string(hex_str).unwrap();
+            let (buf, buf_bits) = decode_hex_string(hex_str)?;
             let body: SliceData = BuilderData::with_raw(buf, buf_bits)
                 .map_err(|e| format!("failed to pack body in cell: {}", e))?
                 .into_cell()
@@ -547,8 +551,9 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
 
     match matches.value_of("BODY_FROM_BOC") {
         Some(filename) => {
-            let (mut root_slice, _) = load_stateinit(filename);
-            let msg = Message::construct_from(&mut root_slice).expect("cannot read message from slice");
+            let (mut root_slice, _) = load_stateinit(filename)?;
+            let msg = Message::construct_from(&mut root_slice)
+                .map_err(|e| format!("Failed to read message from slice: {}", e))?;
             msg_info.body = msg.body();
         }
         None => {}
@@ -605,10 +610,14 @@ fn build_body(matches: &ArgMatches) -> Result<Option<SliceData>, String> {
     let params = matches.value_of("ABI_PARAMS");
     let header = matches.value_of("ABI_HEADER");
     if mask == 0x3 {
-        let key_file = matches.value_of("SIGN").map(|path| {
-            let pair = KeypairManager::from_secret_file(path);
-            pair.drain()
-        });
+        let key_file = match matches.value_of("SIGN") {
+            Some(path) => {
+                let pair = KeypairManager::from_secret_file(path)
+                    .ok_or("Failed to read keypair.")?;
+                Some(pair.drain())
+            },
+            _ => None
+        };
         let params = params.map_or(Ok("{}".to_owned()), |params|
             if params.find('{').is_none() {
                 std::fs::read_to_string(params)

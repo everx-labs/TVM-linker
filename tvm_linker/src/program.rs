@@ -180,7 +180,7 @@ impl Program {
             None, // gas_limit,
             Some(action_decoder),
             if trace { TraceLevel::Full } else { TraceLevel::None }
-        );
+        )?;
 
         if is_vm_success {
             // TODO: check that no action is fired.
@@ -398,9 +398,11 @@ pub fn load_from_file(contract_file: &str) -> Result<StateInit, String> {
     if cell.references_count() == 2 {
         let mut adjusted_cell = BuilderData::from(cell);
         adjusted_cell.append_reference(BuilderData::default());
-        cell = adjusted_cell.into_cell().expect("Cell construction failed");
+        cell = adjusted_cell.into_cell()
+            .map_err(|e| format!("Failed to construct cell: {}", e))?;
     }
-    Ok(StateInit::construct_from_cell(cell).expect("StateInit construction failed"))
+    Ok(StateInit::construct_from_cell(cell)
+           .map_err(|e| format!("Failed to construct StateInit: {}", e))?)
 }
 
 pub fn get_now() -> u32 {
@@ -645,26 +647,27 @@ mod tests {
         assert_eq!(exit_code.unwrap(), 0);
     }
 
-    fn get_version(filename: &str) -> String {
+    fn get_version(filename: &str) -> Result<String, String> {
         let parser = ParseEngine::new(vec![Path::new(filename)], None);
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
         let file_name = prog.compile_to_file(-1).unwrap();
-        let (mut root_slice, _) = load_stateinit(file_name.as_str());
-        let state = StateInit::construct_from(&mut root_slice).expect("cannot read state_init from slice");
-        get_version_mycode_aware(state.code.as_ref()).map_or_else(|v| v, |e| e)
+        let (mut root_slice, _) = load_stateinit(file_name.as_str())?;
+        let state = StateInit::construct_from(&mut root_slice)
+            .map_err(|e| format!("Failed to read stateInit from slice: {}", e))?;
+        Ok(get_version_mycode_aware(state.code.as_ref()).map_or_else(|v| v, |e| e))
     }
 
     #[test]
     fn test_get_version() {
         assert_eq!(
             "0.43.0+commit.e8c3d877.mod.Linux.g++".to_string(),
-            get_version("tests/get-version1.code"));
+            get_version("tests/get-version1.code").unwrap_or("".to_string()));
         assert_eq!(
             "0.43.0+commit.e8c3d877.mod.Linux.g++".to_string(),
-            get_version("tests/get-version2.code"));
+            get_version("tests/get-version2.code").unwrap_or("".to_string()));
         assert_eq!(
             "not found (cell underflow)".to_string(),
-            get_version("tests/get-version3.code"));
+            get_version("tests/get-version3.code").unwrap_or("".to_string()));
     }
 }

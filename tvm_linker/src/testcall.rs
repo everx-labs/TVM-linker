@@ -36,14 +36,19 @@ use ton_labs_assembler::DbgInfo;
 const DEFAULT_ACCOUNT_BALANCE: &str = "100000000000";
 
 #[allow(dead_code)]
-fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Cell {
+fn create_inbound_body(a: i32, b: i32, func_id: i32) -> Result<Cell, String> {
     let mut builder = BuilderData::new();
     let version: u8 = 0;
-    version.write_to(&mut builder).unwrap();
-    func_id.write_to(&mut builder).unwrap();
-    a.write_to(&mut builder).unwrap();
-    b.write_to(&mut builder).unwrap();
-    builder.into_cell().unwrap()
+    version.write_to(&mut builder)
+        .map_err(|e| format!("Failed to write data: {}", e))?;
+    func_id.write_to(&mut builder)
+        .map_err(|e| format!("Failed to write data: {}", e))?;
+    a.write_to(&mut builder)
+        .map_err(|e| format!("Failed to write data: {}", e))?;
+    b.write_to(&mut builder)
+        .map_err(|e| format!("Failed to write data: {}", e))?;
+    Ok(builder.into_cell()
+        .map_err(|e| format!("Failed to convert builder to cell: {}", e))?)
 }
 
 fn create_external_inbound_msg(src_addr: MsgAddressExt, dst_addr: MsgAddressInt, body: Option<SliceData>) -> Message {
@@ -81,39 +86,48 @@ fn create_internal_msg(
     msg
 }
 
-fn sign_body(body: &mut SliceData, key_file: Option<&str>) {
+fn sign_body(body: &mut SliceData, key_file: Option<&str>) -> Result<(), String>{
     let mut signed_body = BuilderData::from_slice(body);
     let mut sign_builder = BuilderData::new();
     if let Some(f) = key_file {
-        let pair = KeypairManager::from_secret_file(f).drain();
+        let pair = KeypairManager::from_secret_file(f)
+            .ok_or("Failed to read keypair.")?.drain();
         let pub_key = pair.public.to_bytes();
         let signature = pair.sign(body.cell().repr_hash().as_slice()).to_bytes();
-        sign_builder.append_raw(&signature, signature.len() * 8).unwrap();
-        sign_builder.append_raw(&pub_key, pub_key.len() * 8).unwrap();
+        sign_builder.append_raw(&signature, signature.len() * 8)
+            .map_err(|e| format!("Failed to write data: {}", e))?;
+        sign_builder.append_raw(&pub_key, pub_key.len() * 8)
+            .map_err(|e| format!("Failed to write data: {}", e))?;
     }
     signed_body.prepend_reference(sign_builder);
-    *body = signed_body.into_cell().unwrap().into();
+    *body = signed_body.into_cell()
+        .map_err(|e| format!("Failed to convert builder to cell: {}", e))?.into();
+    Ok(())
 }
 
-fn initialize_registers(data: SliceData, myself: MsgAddressInt, now: u32, balance: (u64, CurrencyCollection), config: Option<Cell>) -> SaveList {
+fn initialize_registers(data: SliceData, myself: MsgAddressInt, now: u32, balance: (u64, CurrencyCollection), config: Option<Cell>) -> Result<SaveList, String> {
     let mut ctrls = SaveList::new();
-    let mut info = SmartContractInfo::with_myself(myself.serialize().unwrap().into());
+    let mut info = SmartContractInfo::with_myself(myself.serialize()
+              .map_err(|e| format!("Failed to serialize address: {}", e))?.into());
     *info.balance_remaining_grams_mut() = balance.0 as u128;
     *info.balance_remaining_other_mut() = balance.1.other_as_hashmap().clone();
     *info.unix_time_mut() = now;
     if let Some(cell) = config {
         info.set_config_params(cell);
     }
-    ctrls.put(4, &mut StackItem::Cell(data.into_cell())).unwrap();
-    ctrls.put(7, &mut info.into_temp_data()).unwrap();
-    ctrls
+    ctrls.put(4, &mut StackItem::Cell(data.into_cell()))
+        .map_err(|e| format!("Failed to convert data: {}", e))?;
+    ctrls.put(7, &mut info.into_temp_data())
+        .map_err(|e| format!("Failed to convert data: {}", e))?;
+    Ok(ctrls)
 }
 
-fn init_logger(debug: bool) {
+fn init_logger(debug: bool) -> Result<(), String>{
     SimpleLogger::init(
         if debug {LevelFilter::Trace } else { LevelFilter::Info },
         Config { time: None, level: None, target: None, location: None, time_format: None },
-    ).unwrap();
+    ).map_err(|e| format!("Failed to init logger: {}", e))?;
+    Ok(())
     // TODO: it crashes sometimes here...
 }
 
@@ -122,17 +136,21 @@ fn create_inbound_msg(
     selector: i32,
     msg_info: &MsgInfo,
     dst: AccountId,
-) -> Option<Message> {
-    let (_, value) = decode_balance(msg_info.balance).unwrap();
-    match selector {
+) -> Result<Option<Message>, String> {
+    let (_, value) = decode_balance(msg_info.balance)
+        .map_err(|e| format!("Failed to decode balance: {}", e))?;
+    Ok(match selector {
         0 => {
             let src = match msg_info.src {
-                Some(s) => MsgAddressInt::from_str(s).unwrap(),
-                None => MsgAddressInt::with_standart(None, 0, [0u8; 32].into()).unwrap(),
+                Some(s) => MsgAddressInt::from_str(s)
+                    .map_err(|e| format!("Failed to convert address: {}", e))?,
+                None => MsgAddressInt::with_standart(None, 0, [0u8; 32].into())
+                    .map_err(|e| format!("Failed to convert address: {}", e))?,
             };
             Some(create_internal_msg(
                 src,
-                MsgAddressInt::with_standart(None, 0, dst).unwrap(),
+                MsgAddressInt::with_standart(None, 0, dst)
+                    .map_err(|e| format!("Failed to convert address: {}", e))?,
                 value,
                 1,
                 get_now(),
@@ -142,34 +160,38 @@ fn create_inbound_msg(
         },
         -1 => {
             let src = match msg_info.src {
-                Some(s) => MsgAddressExt::from_str(s).unwrap(),
+                Some(s) => MsgAddressExt::from_str(s)
+                    .map_err(|e| format!("Failed to convert address: {}", e))?,
                 None => {
                     MsgAddressExt::with_extern(
-                        BuilderData::with_raw(vec![0x55; 8], 64).unwrap().into_cell().unwrap().into()
-                    ).unwrap()
+                        BuilderData::with_raw(vec![0x55; 8], 64)
+                            .map_err(|e| format!("Failed to create builder: {}", e))?.into_cell()
+                            .map_err(|e| format!("Failed to convert builder to cell: {}", e))?.into()
+                    ).map_err(|e| format!("Failed to create address: {}", e))?
                 },
             };
             Some(create_external_inbound_msg(
                 src,
-                MsgAddressInt::with_standart(None, 0, dst.clone()).unwrap(),
+                MsgAddressInt::with_standart(None, 0, dst.clone())
+                    .map_err(|e| format!("Failed to convert address: {}", e))?,
                 msg_info.body.clone(),
             ))
         },
         _ => None,
-    }
+    })
 }
 
-fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: F)
+fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: F) -> Result<(), String>
     where F: Fn(SliceData, bool) -> ()
 {
     if let StackItem::Cell(cell) = actions {
         let actions: OutActions = OutActions::construct_from(&mut cell.into())
-            .expect("Failed to decode output actions");
+            .map_err(|e| format!("Failed to decode output actions: {}", e))?;
         println!("Output actions:\n----------------");
         for act in actions {
             match act {
                 OutAction::SendMsg{mode: _, out_msg } => {
-                    println!("Action(SendMsg):\n{}", msg_printer(&out_msg));
+                    println!("Action(SendMsg):\n{}", msg_printer(&out_msg)?);
                     if let Some(b) = out_msg.body() {
                         action_decoder(b, out_msg.is_internal());
                     }
@@ -188,6 +210,7 @@ fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: 
             };
         }
     }
+    Ok(())
 }
 
 fn load_code_and_data(state_init: &StateInit) -> (SliceData, SliceData) {
@@ -221,12 +244,12 @@ fn decode_balance(value: Option<&str>) -> Result<(u64, CurrencyCollection), Stri
                 for (i, val) in extra {
                     let key = u32::from_str_radix(i, 10).ok()?;
                     let amount = val.as_u64()?;
-                    currencies.set_other(key, amount as u128).unwrap();
+                    currencies.set_other(key, amount as u128)
+                        .map_err(|e| println!("Failed to update currencies: {}", e)).unwrap_or_default();
                 }
                 Some(())
             })
         }).ok_or(err_msg.to_owned())?;
-
         Ok((main, currencies))
     }
 }
@@ -243,7 +266,12 @@ pub fn load_debug_info(
     filename: String,
 ) -> Option<DbgInfo> {
     match File::open(filename) {
-        Ok(file) => Some(serde_json::from_reader(file).unwrap()),
+        Ok(file) => {
+            match serde_json::from_reader(file) {
+                Ok(data) => Some(data),
+                Err(_) => None
+            }
+        },
         Err(_) => None
     }
 }
@@ -289,13 +317,15 @@ pub fn call_contract<F>(
         let state = load_from_file(filename).unwrap_or_default();
         let (_code, data) = load_code_and_data(&state);
         // config dictionary is located in the first reference of the storage root cell
-        data.into_cell().reference(0).unwrap()
-    });
+        data.into_cell().reference(0)
+            .map_err(|e| format!("Failed to obtain dicitonary: {}", e))
+    }).transpose()?;
     let (exit_code, state_init, is_vm_success) = call_contract_ex(
         addr, state_init, debug_info, smc_balance,
-        msg_info, config_cell, key_file, ticktock, gas_limit, action_decoder, trace_level);
+        msg_info, config_cell, key_file, ticktock, gas_limit, action_decoder, trace_level)?;
     if is_vm_success {
-        save_to_file(state_init, Some(&smc_file), 0).expect("error");
+        save_to_file(state_init, Some(&smc_file), 0)
+            .map_err(|e| format!("Failed to save file: {}", e))?;
         println!("Contract persistent data updated");
     }
     Ok(exit_code)
@@ -372,7 +402,7 @@ pub fn call_contract_ex<F>(
     gas_limit: Option<i64>,
     action_decoder: Option<F>,
     trace_level: TraceLevel,
-) -> (i32, StateInit, bool)
+) -> Result<(i32, StateInit, bool), String>
     where F: Fn(SliceData, bool)
 {
     let func_selector = match msg_info.balance {
@@ -380,27 +410,29 @@ pub fn call_contract_ex<F>(
         None => if ticktock.is_some() { -2 } else { -1 },
     };
 
-    let msg = create_inbound_msg(func_selector, &msg_info, addr.address().clone());
+    let msg = create_inbound_msg(func_selector, &msg_info, addr.address().clone())?;
 
     if !log_enabled!(Error) {
-        init_logger(trace_level == TraceLevel::Full);
+        init_logger(trace_level == TraceLevel::Full)?;
     }
 
     let mut state_init = state_init;
     let (code, data) = load_code_and_data(&state_init);
 
-    let (smc_value, smc_balance) = decode_balance(smc_balance).unwrap();
+    let (smc_value, smc_balance) = decode_balance(smc_balance)?;
     let registers = initialize_registers(
         data,
         addr.clone(),
         msg_info.now,
         (smc_value.clone(), smc_balance),
         config,
-    );
+    )?;
 
     let mut stack = Stack::new();
     if func_selector > -2 {
-        let msg_cell = StackItem::Cell(msg.unwrap().serialize().unwrap());
+        let msg_cell = StackItem::Cell(msg.ok_or("Failed to create message".to_string())?
+            .serialize()
+            .map_err(|e| format!("Failed to serialize message: {}", e))?);
 
         let mut body: SliceData = match msg_info.body {
             Some(b) => b.into(),
@@ -408,11 +440,13 @@ pub fn call_contract_ex<F>(
         };
 
         if func_selector == -1 {
-            key_file.map(|key| sign_body(&mut body, key));
+            if key_file.is_some() {
+                sign_body(&mut body, key_file.unwrap())?;
+            }
         }
 
         let msg_value = if func_selector == 0 {
-            decode_balance(msg_info.balance).unwrap().0 // for internal message
+            decode_balance(msg_info.balance)?.0 // for internal message
         } else {
             0 // for external message
         };
@@ -425,7 +459,8 @@ pub fn call_contract_ex<F>(
             .push(int!(func_selector));   //selector
     } else {
         let addr_val = addr.address().to_hex_string();
-        let addr_int = IntegerData::from_str_radix(&addr_val, 16).unwrap();
+        let addr_int = IntegerData::from_str_radix(&addr_val, 16)
+            .map_err(|e| format!("Failed to convert address: {}", e))?;
         stack
             .push(int!(smc_value))
             .push(StackItem::Integer(Arc::new(addr_int))) //contract address
@@ -469,7 +504,7 @@ pub fn call_contract_ex<F>(
 
     if is_vm_success {
         if let Some(decoder) = action_decoder {
-            decode_actions(engine.get_actions(), &mut state_init, decoder);
+            decode_actions(engine.get_actions(), &mut state_init, decoder)?;
         }
 
         state_init.data = match engine.get_committed_state().get_root() {
@@ -478,7 +513,7 @@ pub fn call_contract_ex<F>(
         };
     }
 
-    (exit_code, state_init, is_vm_success)
+    Ok((exit_code, state_init, is_vm_success))
 }
 
 #[cfg(test)]
@@ -530,7 +565,7 @@ mod tests {
                 BuilderData::with_raw(vec![0x55; 8], 64).unwrap().into_cell().unwrap().into()
             ).unwrap(),
             MsgAddressInt::with_standart(None, 0, [0x11; 32].into()).unwrap(),
-            Some(create_inbound_body(10, 20, 0x11223344).into()),
+            Some(create_inbound_body(10, 20, 0x11223344).unwrap().into()),
         );
 
         let _msg2 = create_internal_msg(
@@ -543,8 +578,8 @@ mod tests {
             false,
         );
 
-        println!("SendMsg action:\n{}", msg_printer(&msg));
-        println!("SendMsg action:\n{}", msg_printer(&msg));
+        println!("SendMsg action:\n{}", msg_printer(&msg).unwrap_or("Undefined".to_string()));
+        println!("SendMsg action:\n{}", msg_printer(&msg).unwrap_or("Undefined".to_string()));
     }
 
     #[test]

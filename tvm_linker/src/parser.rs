@@ -178,18 +178,21 @@ impl std::fmt::Display for DataValue {
 }
 
 impl DataValue {
-    pub fn write(&self) -> BuilderData {
+    pub fn write(&self) -> Result<BuilderData, String> {
         let mut b = BuilderData::new();
-        match self {
+        Ok(match self {
             DataValue::Number(ref integer) => {
                 let encoding = SignedIntegerBigEndianEncoding::new(257);
-                let bitstring = encoding.try_serialize(&integer.0).unwrap();
-                b.append_builder(&bitstring).unwrap();
+                let bitstring = encoding.try_serialize(&integer.0)
+                    .map_err(|e| format!("Failed to serialize data: {}", e))?;
+                b.append_builder(&bitstring)
+                    .map_err(|e| format!("Failed to store data: {}", e))?;
                 b
             },
-            DataValue::Slice(ref slice) => { b.checked_append_references_and_data(slice).unwrap(); b },
+            DataValue::Slice(ref slice) => { b.checked_append_references_and_data(slice)
+                .map_err(|e| format!("Failed to store data: {}", e))?; b },
             DataValue::Empty => b,
-        }
+        })
     }
     pub fn size(&self) -> Ptr {
         match self {
@@ -879,7 +882,7 @@ impl ParseEngine {
             for item in data_vec {
                 let mut ptr = item.0.clone();
                 for subitem in item.1 {
-                    dict.set(ptr_to_builder(ptr).unwrap().into_cell().unwrap().into(), &subitem.write().into_cell().unwrap().into()).unwrap();
+                    dict.set(ptr_to_builder(ptr).unwrap().into_cell().unwrap().into(), &subitem.write().unwrap_or(BuilderData::default()).into_cell().unwrap().into()).unwrap();
                     ptr += subitem.size();
                 }
             }

@@ -42,10 +42,10 @@ pub fn state_init_printer(state: &StateInit) -> String {
         state.special.as_ref().map(|x| format!("{:?}", x)).unwrap_or("None".to_string()),
         tree_of_cells_into_base64(state.data.as_ref()),
         tree_of_cells_into_base64(state.code.as_ref()),
-        state.code.clone().unwrap().repr_hash().to_hex_string(),
-        state.data.clone().unwrap().repr_hash().to_hex_string(),
-        state.code.clone().unwrap().repr_depth(),
-        state.data.clone().unwrap().repr_depth(),
+        state.code.as_ref().map(|code| code.repr_hash().to_hex_string()).unwrap_or("None".to_string()),
+        state.data.as_ref().map(|code| code.repr_hash().to_hex_string()).unwrap_or("None".to_string()),
+        state.code.as_ref().map(|code| code.repr_depth().to_string()).unwrap_or("None".to_string()),
+        state.data.as_ref().map(|code| code.repr_depth().to_string()).unwrap_or("None".to_string()),
         get_version_mycode_aware(state.code.as_ref()).map_or_else(|v| v, |e| e),
         tree_of_cells_into_base64(state.library.root()),
     )
@@ -55,19 +55,24 @@ fn tree_of_cells_into_base64(root_cell: Option<&Cell>) -> String {
     match root_cell {
         Some(cell) => {
             let mut bytes = Vec::new();
-            serialize_tree_of_cells(cell, &mut bytes).unwrap();
-            base64::encode(&bytes)
+            match serialize_tree_of_cells(cell, &mut bytes) {
+                Ok(()) => base64::encode(&bytes),
+                Err(_) => "None".to_string()
+            }
         }
         None => "None".to_string()
     }
 }
 
-pub fn msg_printer(msg: &Message) -> String {
+pub fn msg_printer(msg: &Message) -> Result<String, String> {
     let mut b = BuilderData::new();
-    msg.write_to(&mut b).unwrap();
+    msg.write_to(&mut b)
+        .map_err(|e| format!("Failed to serialize message: {}", e))?;
     let mut bytes = Vec::new();
-    serialize_tree_of_cells(&b.into_cell().unwrap(), &mut bytes).unwrap();
-    format!("message header\n{}init  : {}\nbody  : {}\nbody_hex: {}\nbody_base64: {}\nboc_base64: {}\n",
+    serialize_tree_of_cells(&b.into_cell()
+        .map_err(|e| format!("Failed to convert builder to cell: {}", e))?, &mut bytes)
+        .map_err(|e| format!("Failed to serialize data: {}", e))?;
+    Ok(format!("message header\n{}init  : {}\nbody  : {}\nbody_hex: {}\nbody_base64: {}\nboc_base64: {}\n",
         print_msg_header(&msg.header()),
         msg.state_init().as_ref().map(|x| {
             format!("{}", state_init_printer(x))
@@ -85,7 +90,7 @@ pub fn msg_printer(msg: &Message) -> String {
                 .as_ref(),
         ),
         base64::encode(&bytes),
-    )
+    ))
 }
 
 fn print_msg_header(header: &CommonMsgInfo) -> String {
