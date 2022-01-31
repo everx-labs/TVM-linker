@@ -258,6 +258,8 @@ pub struct ParseEngine {
     /// Selector variant
     save_my_code: bool,
     computed: HashMap<String, Lines>,
+    /// Verbose flag
+    verbose: bool,
 }
 
 const PATTERN_GLOBL:    &'static str = r"^\s*\.globl\s+(:?[\w\.]+)";
@@ -298,7 +300,7 @@ const SCI_NAME:         &'static str = "tvm_contract_info";
 
 impl ParseEngine {
 
-    pub fn new(sources: Vec<&Path>, abi_json: Option<String>) -> Result<Self, String> {
+    pub fn new(sources: Vec<&Path>, abi_json: Option<String>, verbose: bool) -> Result<Self, String> {
         let mut engine = ParseEngine {
             xrefs:      HashMap::new(),
             intrefs:    HashMap::new(),
@@ -316,19 +318,28 @@ impl ParseEngine {
             version:         None,
             save_my_code:    false,
             computed:        HashMap::new(),
+            verbose,
         };
         engine.parse(sources, abi_json)?;
         Ok(engine)
     }
 
+    fn trace(&self, line: &str) {
+        if self.verbose {
+            println!("VERBOSE: {}", line)
+        }
+    }
+
     fn parse(&mut self, sources: Vec<&Path>, abi_json: Option<String>) -> Result<(), String> {
         if let Some(s) = abi_json {
             self.abi = Some(load_abi_contract(&s)?);
+            self.trace("ABI was successfully loaded.");
         }
 
         self.preinit()?;
 
         for source in &sources {
+            self.trace(&format!("Parse code file {:?}", source));
             self.parse_code(source)?;
         }
 
@@ -637,9 +648,11 @@ impl ParseEngine {
     }
 
     fn replace_all_labels(&mut self) -> Result<(), String> {
+        self.trace("Replacing labels...");
         let mut iter = 0;
         loop {
             iter += 1;
+            self.trace(&format!("Replacement iteration #{}", iter));
             if iter >= 50 {
                 return Err("There are recursive macros or level of nested macros >= 50".to_string());
             }
@@ -664,6 +677,7 @@ impl ParseEngine {
                 let name = COMPUTE_REGEX.captures(&line.text).unwrap().get(1).unwrap().as_str();
                 let mut resolved = self.compute_cell(name)?;
                 new_lines.append(&mut resolved);
+                self.trace("Compute expression was replaced.");
                 continue
             }
             let mut resolved =
@@ -688,6 +702,9 @@ impl ParseEngine {
                 let body = &mut self.globals.get_mut(name).unwrap().dtype.func_mut().unwrap().body;
                 did_some = did_some || *body != new_lines;
                 *body = new_lines;
+                if did_some {
+                    self.trace(&format!("Replaced in {}", name));
+                }
             }
         }
 
@@ -698,6 +715,9 @@ impl ParseEngine {
             let body = &mut self.internals.get_mut(id).unwrap().body;
             did_some = did_some || *body != new_lines;
             *body = new_lines;
+            if did_some {
+                self.trace(&format!("Replaced in function with id {}", id));
+            }
         }
 
         Ok(did_some)
@@ -723,6 +743,7 @@ impl ParseEngine {
     }
 
     fn update(&mut self, section: &str, name: &str, body: &Lines) -> Result<(), String> {
+        self.trace(&format!("{} added to section {}", name, section));
         match section {
             SELECTOR => {
                 if self.entry_point.is_empty() {
@@ -966,7 +987,10 @@ impl ParseEngine {
 
     fn replace_labels(&mut self, line: &Line, cur_obj_name: &FunctionId) -> Result<Lines, String> {
         resolve_name(line, |name| {
-            self.intrefs.get(name).and_then(|id| Some(id.clone()))
+            self.intrefs.get(name).and_then(|id| {
+                self.trace(&format!("Replaced internal function reference {}", name));
+                Some(id.clone())
+            })
         })
         .or_else(|_| resolve_name(line, |name| {
             let mut res = self.xrefs.get(name).map(|id| id.clone());
@@ -975,14 +999,19 @@ impl ParseEngine {
                 self.insert_called_func(&cur_obj_name, id);
                 res = Some(id);
             }
+            self.trace(&format!("Replaced global function reference {}", name));
             res
         }))
         .or_else(|_| resolve_name(line, |name| {
             self.globals.get(name).and_then(|obj| {
-                obj.dtype.data().and_then(|data| Some(data.addr.clone()))
+                obj.dtype.data().and_then(|data| {
+                    self.trace(&format!("Replaced global object {}", name));
+                    Some(data.addr.clone())
+                })
             })
         }))
         .or_else(|_| resolve_name(line, |name| {
+            self.trace(&format!("Replaced global object {}", name));
             match name {
                 "global-base" => Some(self.globl_base.clone()),
                 "persistent-base" => Some(self.persistent_base.clone()),
@@ -994,7 +1023,10 @@ impl ParseEngine {
             resolve_name(line, |n| { name = n.to_string(); Some(0)}).unwrap();
             self.macros.get(&name)
                 .ok_or(e)
-                .map(|body| body.clone())
+                .map(|body| {
+                    self.trace(&format!("Replace macro {}", name));
+                    body.clone()
+                })
         })
     }
 
@@ -1104,7 +1136,7 @@ mod tests {
     #[test]
     fn test_parser_testlib() {
         let sources = vec![Path::new("./tests/test.tvm")];
-        let parser = ParseEngine::new(sources, None);
+        let parser = ParseEngine::new(sources, None, false);
         assert_eq!(parser.is_ok(), true);
         let parser = parser.unwrap();
 
@@ -1208,7 +1240,7 @@ mod tests {
     fn test_parser_var_without_globl() {
         let sources = vec![Path::new("./tests/test_stdlib.tvm"),
                                      Path::new("./tests/local_global_var.code")];
-        let parser = ParseEngine::new(sources, None);
+        let parser = ParseEngine::new(sources, None, false);
         assert_eq!(parser.is_ok(), true);
     }
 
@@ -1216,7 +1248,7 @@ mod tests {
     fn test_parser_var_with_comm() {
         let sources = vec![Path::new("./tests/test_stdlib.tvm"),
                                      Path::new("./tests/comm_test1.s")];
-        let parser = ParseEngine::new(sources, None);
+        let parser = ParseEngine::new(sources, None, false);
         assert_eq!(parser.is_ok(), true);
     }
 
@@ -1224,7 +1256,7 @@ mod tests {
     fn test_parser_bss() {
         let sources = vec![Path::new("./tests/test_stdlib.tvm"),
                                      Path::new("./tests/bss_test1.s")];
-        let parser = ParseEngine::new(sources, None);
+        let parser = ParseEngine::new(sources, None, false);
         assert_eq!(parser.is_ok(), true);
     }
 
@@ -1233,7 +1265,7 @@ mod tests {
         let sources = vec![Path::new("./tests/testlib1.tvm"),
                                      Path::new("./tests/testlib2.tvm"),
                                      Path::new("./tests/hello.code")];
-        let parser = ParseEngine::new(sources, None);
+        let parser = ParseEngine::new(sources, None, false);
         assert_eq!(parser.is_ok(), true);
     }
 
@@ -1241,7 +1273,7 @@ mod tests {
     fn test_external_linking() {
         let sources = vec![Path::new("./tests/test_extlink_lib.tvm"),
                                      Path::new("./tests/test_extlink_source.s")];
-        let parser = ParseEngine::new(sources, None);
+        let parser = ParseEngine::new(sources, None, false);
         assert_eq!(parser.is_ok(), true);
     }
 
@@ -1249,7 +1281,7 @@ mod tests {
     fn test_macros() {
         let sources = vec![Path::new("./tests/test_stdlib.tvm"),
                                      Path::new("./tests/test_macros.code")];
-        let parser = ParseEngine::new(sources, None);
+        let parser = ParseEngine::new(sources, None, false);
         assert_eq!(parser.is_ok(), true);
         let publics = parser.unwrap().publics();
         let body = publics.get(&0x0D6E4079).unwrap();
@@ -1272,7 +1304,7 @@ mod tests {
             Path::new("./tests/test_stdlib.tvm"),
             Path::new("./tests/test_macros_02.code")
         ];
-        let parser = ParseEngine::new(sources, None).unwrap();
+        let parser = ParseEngine::new(sources, None, false).unwrap();
         let publics = parser.publics();
         let body = publics.get(&0x0D6E4079).unwrap();
         let globals = parser.globals(false);
@@ -1305,7 +1337,7 @@ mod tests {
     fn test_compute() {
         let sources = vec![Path::new("./tests/test_stdlib.tvm"),
                                      Path::new("./tests/test_compute.code")];
-        let parser = ParseEngine::new(sources, None);
+        let parser = ParseEngine::new(sources, None, false);
         assert_eq!(parser.is_ok(), true);
 
         let internals = parser.unwrap().internals();
@@ -1333,7 +1365,7 @@ mod tests {
     fn test_compute_nested() {
         let sources = vec![Path::new("./tests/test_stdlib.tvm"),
                                      Path::new("./tests/test_compute_nested.code")];
-        let parser = ParseEngine::new(sources, None);
+        let parser = ParseEngine::new(sources, None, false);
         assert_eq!(parser.is_ok(), true);
 
         let internals = parser.unwrap().internals();
