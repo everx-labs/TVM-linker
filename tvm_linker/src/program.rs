@@ -93,7 +93,7 @@ impl Program {
 
     fn publics_filtered(&self, remove_ctor: bool) -> HashMap<u32, Lines> {
         self.engine.publics().into_iter()
-            .filter(|(k, _)| 
+            .filter(|(k, _)|
                 !(remove_ctor && self.engine.global_name(*k).unwrap_or_default() == "constructor")
             ).collect()
     }
@@ -669,5 +669,41 @@ mod tests {
         assert_eq!(
             "not found (cell underflow)".to_string(),
             get_version("tests/get-version3.code").unwrap_or("".to_string()));
+    }
+
+    #[test]
+    fn test_mycode() {
+        let sources = vec![Path::new("tests/test_stdlib_sol.tvm"), Path::new("tests/mycode.code")];
+        let abi = abi::load_abi_json_string("tests/mycode.abi.json").unwrap();
+
+        let parser = ParseEngine::new(sources, Some(abi), false);
+        assert_eq!(parser.is_ok(), true);
+        let mut prog = Program::new(parser.unwrap());
+
+        let contract_file = prog.compile_to_file(0).unwrap();
+        let name = contract_file.split('.').next().unwrap();
+        let body = abi::build_abi_body("tests/mycode.abi.json", "constructor", "{}", None, None, false)
+            .unwrap();
+        let exit_code = call_contract(
+            &contract_file,
+            &name,
+            Some("10000000000"), //account balance 10T
+            MsgInfo {
+                balance: Some("1000000000"), // msg balance = 1T
+                src: None,
+                now: 1,
+                bounced: false,
+                body: Some(body.into_cell().unwrap().into())
+            },
+            None,
+            None,
+            None,
+            None,
+            Some(|_, _| {}),
+            TraceLevel::None,
+            String::new(),
+        );
+        assert!(exit_code.is_ok());
+        assert_eq!(exit_code.unwrap(), 0);
     }
 }

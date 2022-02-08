@@ -105,7 +105,7 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) -> Result<(), String>
     Ok(())
 }
 
-fn initialize_registers(data: SliceData, myself: MsgAddressInt, now: u32, balance: (u64, CurrencyCollection), config: Option<Cell>) -> Result<SaveList, String> {
+fn initialize_registers(data: SliceData, code: Cell, myself: MsgAddressInt, now: u32, balance: (u64, CurrencyCollection), config: Option<Cell>) -> Result<SaveList, String> {
     let mut ctrls = SaveList::new();
     let mut info = SmartContractInfo::with_myself(myself.serialize()
               .map_err(|e| format!("Failed to serialize address: {}", e))?.into());
@@ -115,6 +115,8 @@ fn initialize_registers(data: SliceData, myself: MsgAddressInt, now: u32, balanc
     if let Some(cell) = config {
         info.set_config_params(cell);
     }
+    // TODO info.set_init_code_hash()
+    info.set_mycode(code);
     ctrls.put(4, &mut StackItem::Cell(data.into_cell()))
         .map_err(|e| format!("Failed to convert data: {}", e))?;
     ctrls.put(7, &mut info.into_temp_data())
@@ -422,6 +424,7 @@ pub fn call_contract_ex<F>(
     let (smc_value, smc_balance) = decode_balance(smc_balance)?;
     let registers = initialize_registers(
         data,
+        code.clone().into_cell(),
         addr.clone(),
         msg_info.now,
         (smc_value.clone(), smc_balance),
