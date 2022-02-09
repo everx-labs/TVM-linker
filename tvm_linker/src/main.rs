@@ -600,6 +600,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
         trace_level,
         debug_map_filename,
+        None
     )?;
 
     println!("TEST COMPLETED");

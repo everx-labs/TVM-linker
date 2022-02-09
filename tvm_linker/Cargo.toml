@@ -21,8 +21,8 @@ failure = '0.1.0'
 hex = '0.3.2'
 lazy_static = '1.1.0'
 log = '0.4.6'
-num = '^0.2'
-num-traits = '^0.2.8'
+num = '0.4'
+num-traits = '0.2'
 rand = '0.7.3'
 regex = '1'
 serde_json = '1.0.41'
@@ -39,3 +39,4 @@ ton_vm = { default-features = false, git = 'https://github.com/tonlabs/ton-labs-
 [dev-dependencies]
 assert_cmd = '0.11'
 predicates = '1'
+

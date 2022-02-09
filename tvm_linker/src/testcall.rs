@@ -297,6 +297,7 @@ pub fn call_contract<F>(
     action_decoder: Option<F>,
     trace_level: TraceLevel,
     debug_map_filename: String,
+    capabilities: Option<u64>
 ) -> Result<i32, String>
     where F: Fn(SliceData, bool)
 {
@@ -324,7 +325,9 @@ pub fn call_contract<F>(
     }).transpose()?;
     let (exit_code, state_init, is_vm_success) = call_contract_ex(
         addr, state_init, debug_info, smc_balance,
-        msg_info, config_cell, key_file, ticktock, gas_limit, action_decoder, trace_level)?;
+        msg_info, config_cell, key_file, ticktock, gas_limit, action_decoder, trace_level,
+        capabilities
+    )?;
     if is_vm_success {
         save_to_file(state_init, Some(&smc_file), 0)
             .map_err(|e| format!("Failed to save file: {}", e))?;
@@ -404,6 +407,7 @@ pub fn call_contract_ex<F>(
     gas_limit: Option<i64>,
     action_decoder: Option<F>,
     trace_level: TraceLevel,
+    capabilities: Option<u64>
 ) -> Result<(i32, StateInit, bool), String>
     where F: Fn(SliceData, bool)
 {
@@ -479,7 +483,11 @@ pub fn call_contract_ex<F>(
         Gas::test()
     };
 
-    let mut engine = Engine::new().setup_with_libraries(code, Some(registers), Some(stack), Some(gas), vec![]);
+    let mut engine = Engine::with_capabilities(
+        capabilities.unwrap_or(0)
+    ).setup_with_libraries(
+        code, Some(registers), Some(stack), Some(gas), vec![]
+    );
     engine.set_trace(0);
     match trace_level {
         TraceLevel::Full => engine.set_trace_callback(move |engine, info| { trace_callback(engine, info, true, &debug_info); }),
@@ -554,6 +562,7 @@ pub fn perform_contract_call<F>(
         if decode_c5 { Some(action_decoder) } else { None },
         trace_level,
         String::from(""),
+        None
     ).unwrap_or(-1)
 }
 
