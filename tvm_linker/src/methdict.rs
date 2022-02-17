@@ -39,10 +39,6 @@ where
     T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash,
 {
     for pair in methods.iter() {
-        // for x in pair.1 {
-        //     println!("{}:{}:{} {}", x.pos.filename, x.pos.line_code, x.pos.line, x.text);
-        // }
-
         let key: SliceData = pair.0.clone().serialize()
             .map_err(|e| (pair.0.clone(), format!("Failed to serialize data: {}", e)))?.into();
         let mut val = compile_code_debuggable(pair.1.clone()).map_err(|e| {
