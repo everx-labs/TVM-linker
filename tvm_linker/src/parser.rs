@@ -13,11 +13,15 @@
 use abi::{gen_abi_id, load_abi_contract};
 use abi_json::Contract;
 use regex::Regex;
+use resolver::resolve_name;
 use std::collections::{HashSet, HashMap};
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 use std::path::Path;
 use ton_types::{BuilderData, IBitstring, SliceData, Cell};
+use ton_types::dictionary::{HashmapE, HashmapType};
+use ton_vm::stack::integer::{IntegerData, serialization::{Encoding, SignedIntegerBigEndianEncoding}};
+use ton_vm::stack::serialization::Serializer;
 use ton_labs_assembler::{DbgPos, Line, Lines, lines_to_string};
 
 pub type Ptr = i64;
@@ -53,6 +57,9 @@ impl ParseEngineResults {
     pub fn global_by_name(&self, name: &str) -> Option<(u32, Lines)> {
         self.engine.global_by_name(name)
     }
+    pub fn persistent_data(&self) -> (i64, Option<Cell>) {
+        (self.engine.persistent_base, self.engine.data())
+    }
     pub fn debug_print(&self) {
         self.engine.debug_print()
     }
@@ -84,30 +91,134 @@ impl InternalFunc {
     }
 }
 
+struct Data {
+    pub addr: Ptr,
+    pub values: Vec<DataValue>,
+    pub persistent: bool,
+}
+
+enum GloblFuncOrDataType {
+    None, // TODO delete
+    Function(InternalFunc),
+    Data(Data),
+}
+
 enum FunctionId {
     Name(String),
     Id(i32)
 }
 
-struct GloblFunc {
-    pub name: String,
-    pub public: bool,
-    pub dtype: InternalFunc,
-}
-
-impl GloblFunc {
-    pub fn new(name: String) -> Self {
-        GloblFunc {
-            name,
-            public: false,
-            dtype: InternalFunc::new(),
+impl From<&str> for GloblFuncOrDataType {
+    fn from(stype: &str) -> GloblFuncOrDataType {
+        match stype {
+            "function" => GloblFuncOrDataType::Function(InternalFunc { id: 0, body: vec![], called_ids: vec![] }),
+            "object" => GloblFuncOrDataType::Data(Data { addr: 0, values: vec![], persistent: false }),
+            _ => GloblFuncOrDataType::None,
         }
     }
 }
 
-impl Default for GloblFunc {
+impl GloblFuncOrDataType {
+    pub fn is_func(&self) -> bool {
+        match self {
+            GloblFuncOrDataType::Function(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn func_mut(&mut self) -> Option<&mut InternalFunc> {
+        match self {
+            GloblFuncOrDataType::Function(params) => Some(params),
+            _ => None,
+        }
+    }
+
+    pub fn func(&self) -> Option<&InternalFunc> {
+        match self {
+            GloblFuncOrDataType::Function(params) => Some(params),
+            _ => None,
+        }
+    }
+
+    pub fn data_mut(&mut self) -> Option<&mut Data> {
+        match self {
+            GloblFuncOrDataType::Data(params) => Some(params),
+            _ => None,
+        }
+    }
+
+    pub fn data(&self) -> Option<&Data> {
+        match self {
+            GloblFuncOrDataType::Data(params) => Some(params),
+            _ => None,
+        }
+    }
+}
+
+const WORD_SIZE: Ptr = 1;
+const OFFSET_GLOBL_DATA: Ptr = 8;
+const OFFSET_PERS_DATA: Ptr = 16;
+
+enum DataValue {
+    Empty,
+    Number((IntegerData, usize)),
+}
+
+impl std::fmt::Display for DataValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            DataValue::Number(ref integer) => {
+                write!(f, "(int {})", integer.0)
+            },
+            DataValue::Empty => { write!(f, "(empty)") },
+        }
+    }
+}
+
+impl DataValue {
+    pub fn write(&self) -> Result<BuilderData, String> {
+        let mut b = BuilderData::new();
+        Ok(match self {
+            DataValue::Number(ref integer) => {
+                let encoding = SignedIntegerBigEndianEncoding::new(257);
+                let bitstring = encoding.try_serialize(&integer.0)
+                    .map_err(|e| format!("Failed to serialize data: {}", e))?;
+                b.append_builder(&bitstring)
+                    .map_err(|e| format!("Failed to store data: {}", e))?;
+                b
+            },
+            DataValue::Empty => b,
+        })
+    }
+    pub fn size(&self) -> Ptr {
+        match self {
+            DataValue::Number(ref integer) => integer.1 as Ptr * WORD_SIZE,
+            DataValue::Empty => WORD_SIZE,
+        }
+    }
+}
+
+struct GloblFuncOrData {
+    pub name: String,
+    pub size: usize,
+    pub public: bool,
+    pub dtype: GloblFuncOrDataType,
+}
+
+impl GloblFuncOrData {
+    pub fn new(name: String, stype: &str) -> Self {
+        GloblFuncOrData {
+            name,
+            size: 0,
+            public: false,
+            dtype: GloblFuncOrDataType::from(stype),
+        }
+    }
+}
+
+impl Default for GloblFuncOrData {
     fn default() -> Self {
-        GloblFunc::new(String::new())
+        GloblFuncOrData::new(String::new(), "")
     }
 }
 
@@ -130,7 +241,7 @@ pub struct ParseEngine {
     /// name -> id
     globl_name_to_id: HashMap<String, u32>,
     /// name -> object
-    globl_name_to_func: HashMap<String, GloblFunc>,
+    globl_name_to_object: HashMap<String, GloblFuncOrData>,
     /// ID for next private global function
     next_private_globl_funcid: u32,
 
@@ -145,6 +256,13 @@ pub struct ParseEngine {
     /// Contract version
     version: Option<String>,
 
+    /// starting key for objects in global memory dictionary
+    globl_base: Ptr,
+    /// key for next object in global memory dictionary
+    globl_ptr: Ptr,
+    persistent_base: Ptr,
+    persistent_ptr: Ptr,
+
     /// Contract ABI info, used for correct function id calculation
     abi: Option<Contract>,
     // for lazy calculation .compute expressions
@@ -152,14 +270,21 @@ pub struct ParseEngine {
 }
 
 const PATTERN_GLOBL:    &'static str = r"^\s*\.globl\s+(:?[\w\.]+)";
+const PATTERN_DATA:     &'static str = r"^\s*\.data";
 const PATTERN_INTERNAL: &'static str = r"^\s*\.internal\s+(:\w+)";
 const PATTERN_SELECTOR: &'static str = r"^\s*\.selector";
 const PATTERN_ALIAS:    &'static str = r"^\s*\.internal-alias (:\w+),\s+(-?\d+)";
+const PATTERN_GLBLBASE: &'static str = r"^\s*\.global-base\s+(\d+)";
+const PATTERN_PERSBASE: &'static str = r"^\s*\.persistent-base\s+(\d+)";
 const PATTERN_LABEL:    &'static str = r"^:?[\.\w]+:";
+const PATTERN_PARAM:    &'static str = r#"^\s+\.(\w+),?\s*([a-zA-Z0-9-_\s"]+)"#;
 const PATTERN_TYPE:     &'static str = r"^\s*\.type\s+(:?[\w\.]+),\s*@([a-zA-Z]+)";
 const PATTERN_PUBLIC:   &'static str = r"^\s*\.public\s+([\w\.]+)";
+const PATTERN_SIZE:     &'static str = r"^\s*\.size\s+([\w\.]+),\s*([\.\w]+)";
+const PATTERN_COMM:     &'static str = r"^\s*\.comm\s+([\w\.]+),\s*(\d+),\s*(\d+)";
+const PATTERN_ASCIZ:    &'static str = r#"^\s*\.asciz\s+"(.+)""#;
 const PATTERN_MACRO:    &'static str = r"^\s*\.macro\s+([\w\.:]+)";
-const PATTERN_IGNORED:  &'static str = r"^\s+\.(size|persistent-base|global-base|data|p2align|align|text|file|ident|section)";
+const PATTERN_IGNORED:  &'static str = r"^\s+\.(p2align|align|text|file|ident|section)";
 const PATTERN_LOC:      &'static str = r"^\s*\.loc\s+(.+),\s+(\d+)\n$";
 const PATTERN_VERSION:  &'static str = r"^\s*\.version\s+(.+)";
 const PATTERN_PRAGMA:   &'static str = r"^\s*\.pragma\s+(.+)";
@@ -168,7 +293,6 @@ lazy_static! {
     // TODO move all here
     static ref COMPUTE_REGEX: Regex = Regex::new(r"^\s*\.compute\s+\$([\w\.:]+)\$").unwrap();
     static ref CALL_REGEX: Regex = Regex::new(r"^\s*CALL\s+\$([\w\.:]+)\$").unwrap();
-    static ref NAMES: Regex = Regex::new(r"(?P<head>.*)\$(?P<mid>.*)\$(?P<tail>.*)").unwrap();
 }
 
 const GLOBL:            &'static str = ".globl";
@@ -176,24 +300,34 @@ const INTERNAL:         &'static str = ".internal";
 const MACROS:           &'static str = ".macro";
 const SELECTOR:         &'static str = ".selector";
 
+const DATA_TYPENAME:    &'static str = "object";
+
+const PERSISTENT_DATA_SUFFIX: &'static str = "_persistent";
+
+const PUBKEY_NAME:      &'static str = "tvm_public_key";
+const SCI_NAME:         &'static str = "tvm_contract_info";
 
 impl ParseEngine {
 
     pub fn new(sources: Vec<&Path>, abi_json: Option<String>) -> Result<Self, String> {
         let mut engine = ParseEngine {
-            globl_name_to_id: HashMap::new(),
-            internal_name_to_id: HashMap::new(),
-            internal_alias_name_to_id_: HashMap::new(),
-            globl_name_to_func: HashMap::new(),
+            globl_name_to_id:      HashMap::new(),
+            internal_name_to_id:    HashMap::new(),
+            internal_alias_name_to_id_:    HashMap::new(),
+            globl_name_to_object:    HashMap::new(),
             next_private_globl_funcid: 0,
-            internal_id_to_code: HashMap::new(),
-            macro_name_to_lines: HashMap::new(),
+            internal_id_to_code:  HashMap::new(),
+            macro_name_to_lines:     HashMap::new(),
             is_computed_macros: HashMap::new(),
             entry_point: vec![],
-            abi: None,
-            version: None,
-            save_my_code: false,
-            computed: HashMap::new(),
+            globl_base:      0,
+            globl_ptr:       0,
+            persistent_base: 0,
+            persistent_ptr:  0,
+            abi:             None,
+            version:         None,
+            save_my_code:    false,
+            computed:        HashMap::new(),
         };
         engine.parse(sources, abi_json)?;
         Ok(engine)
@@ -204,6 +338,8 @@ impl ParseEngine {
             self.abi = Some(load_abi_contract(&s)?);
         }
 
+        self.preinit()?;
+
         for source in &sources {
             self.parse_code(source)?;
         }
@@ -213,6 +349,10 @@ impl ParseEngine {
 
         self.drop_unused_objects();
         Ok(())
+    }
+
+    fn data(&self) -> Option<Cell> {
+        self.build_data()
     }
 
     fn entry(&self) -> Lines {
@@ -241,25 +381,85 @@ impl ParseEngine {
 
     fn globals(&self, public: bool) -> HashMap<u32, Lines> {
         let mut funcs = HashMap::new();
-        for i in &self.globl_name_to_func {
-            if i.1.public == public {
-                funcs.insert(i.1.dtype.id, i.1.dtype.body.clone());
-            }
+        let iter = self.globl_name_to_object.iter().filter_map(|item| {
+            item.1.dtype.func().and_then(|i| {
+                if public == item.1.public {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
+        });
+        for i in iter {
+            funcs.insert(i.id, i.body.clone());
         }
         funcs
     }
 
     fn global_name(&self, id: u32) -> Option<String> {
-        self.globl_name_to_func.iter().find(|item| {
-            item.1.dtype.id == id
+        self.globl_name_to_object.iter().find(|item| {
+            if let Some(func) = item.1.dtype.func() {
+                func.id == id
+            } else {
+                false
+            }
         })
         .map(|i| i.0.clone())
     }
 
     fn global_by_name(&self, name: &str) -> Option<(u32, Lines)> {
-        self.globl_name_to_func.get(name).and_then(|v| {
-            Some((v.dtype.id.clone(), v.dtype.body.clone()))
+        self.globl_name_to_object.get(name).and_then(|v| {
+            v.dtype.func().and_then(|func| Some((func.id.clone(), func.body.clone()) ))
         })
+    }
+
+    fn preinit(&mut self) -> Result <(), String> {
+        // TODO delete
+        self.globl_name_to_object.insert(
+            PUBKEY_NAME.to_string(),
+            GloblFuncOrData::new(PUBKEY_NAME.to_string(), DATA_TYPENAME)
+        );
+        self.globl_name_to_object.get_mut(PUBKEY_NAME)
+            .unwrap()
+            .dtype
+            .data_mut()
+            .and_then(|data| {
+                data.persistent = true;
+                data.values.push(DataValue::Empty);
+                Some(data)
+            });
+
+        // TODO delete
+        self.globl_name_to_object.insert(
+            SCI_NAME.to_string(),
+            GloblFuncOrData::new(SCI_NAME.to_string(), DATA_TYPENAME)
+        );
+        self.globl_name_to_object.get_mut(SCI_NAME)
+            .unwrap()
+            .dtype
+            .data_mut()
+            .and_then(|data| {
+                data.persistent = false;
+                data.values.push(DataValue::Empty);
+                Some(data)
+            });
+        Ok(())
+    }
+
+    fn update_predefined(&mut self) {
+        let data = self.globl_name_to_object.get_mut(SCI_NAME)
+            .unwrap()
+            .dtype
+            .data_mut()
+            .unwrap();
+        data.addr = self.globl_base;
+
+        let data = self.globl_name_to_object.get_mut(PUBKEY_NAME)
+            .unwrap()
+            .dtype
+            .data_mut()
+            .unwrap();
+        data.addr = self.persistent_base;
     }
 
     fn version(&self) -> Option<String> {
@@ -274,9 +474,14 @@ impl ParseEngine {
         let globl_regex = Regex::new(PATTERN_GLOBL).unwrap();
         let internal_regex = Regex::new(PATTERN_INTERNAL).unwrap();
         let selector_regex = Regex::new(PATTERN_SELECTOR).unwrap();
+        let data_regex = Regex::new(PATTERN_DATA).unwrap();
         let label_regex = Regex::new(PATTERN_LABEL).unwrap();
+        let dotted_regex = Regex::new(PATTERN_PARAM).unwrap();
         let alias_regex = Regex::new(PATTERN_ALIAS).unwrap();
         let type_regex = Regex::new(PATTERN_TYPE).unwrap();
+        let size_regex = Regex::new(PATTERN_SIZE).unwrap();
+        let base_glbl_regex = Regex::new(PATTERN_GLBLBASE).unwrap();
+        let base_pers_regex = Regex::new(PATTERN_PERSBASE).unwrap();
         let ignored_regex = Regex::new(PATTERN_IGNORED).unwrap();
         let public_regex = Regex::new(PATTERN_PUBLIC).unwrap();
         let macro_regex = Regex::new(PATTERN_MACRO).unwrap();
@@ -289,6 +494,9 @@ impl ParseEngine {
         let mut obj_name: String = "".to_owned();
         let mut lnum = 0;
         let mut l = String::new();
+
+        self.globl_ptr = self.globl_base + OFFSET_GLOBL_DATA;
+        self.persistent_ptr = self.persistent_base + OFFSET_PERS_DATA;
 
         let filename = path.file_name().unwrap().to_str().unwrap().to_string();
         let file = File::open(path).map_err(|e| format!("Can't open file {}: {}", filename, e))?;
@@ -308,58 +516,93 @@ impl ParseEngine {
                 None => DbgPos { filename: filename.clone(), line: lnum, line_code: lnum },
                 Some(pos) => pos
             };
-
             if ignored_regex.is_match(&l) {
                 //ignore unused parameters
-            } else if let Some(cap) = version_regex.captures(&l) {
+                debug!("ignored: {}", l);
+            } else if version_regex.is_match(&l) {
+                let cap = version_regex.captures(&l).unwrap();
                 self.version = Some(cap.get(1).unwrap().as_str().to_owned());
-            } else if let Some(cap) = pragma_regex.captures(&l) {
+            } else if pragma_regex.is_match(&l) {
+                let cap = pragma_regex.captures(&l).unwrap();
                 match cap.get(1) {
                     Some(m) => if m.as_str() == "selector-save-my-code" {
                         self.save_my_code = true
                     },
                     None => {}
                 }
-            } else if let Some(cap) = type_regex.captures(&l) {
+            } else if base_glbl_regex.is_match(&l) {
+                // .global-base
+                let cap = base_glbl_regex.captures(&l).unwrap();
+                let base = cap.get(1).map(|m| m.as_str())
+                    .ok_or(format!("line {}: invalid syntax for global base", lnum))?;
+                self.globl_base = Ptr::from_str_radix(base, 10)
+                    .map_err(|_| format!("line {}: invalid global base address", lnum))?;
+                self.globl_ptr = self.globl_base + OFFSET_GLOBL_DATA;
+                self.update_predefined();
+            } else if base_pers_regex.is_match(&l) {
+                // .persistent-base
+                let cap = base_pers_regex.captures(&l).unwrap();
+                let base = cap.get(1).map(|m| m.as_str())
+                    .ok_or(format!("line {}: invalid syntax for persistent base", lnum))?;
+                self.persistent_base = Ptr::from_str_radix(base, 10)
+                    .map_err(|_| format!("line {}: invalid persistent base address", lnum))?;
+                self.persistent_ptr = self.persistent_base + OFFSET_PERS_DATA;
+                self.update_predefined();
+            } else if type_regex.is_match(&l) {
                 // .type x, @...
-                //it's a mark of beginning of a new function
+                //it's a mark for begining of a new object (func or data)
                 self.update(&section_name, &obj_name, &obj_body)
                     .map_err(|e| format!("line {}: {}", lnum, e))?;
                 section_name = GLOBL.to_owned();
                 obj_body = vec![];
+                let cap = type_regex.captures(&l).unwrap();
                 obj_name = cap.get(1).unwrap().as_str().to_owned();
-                let obj = self.globl_name_to_func.entry(obj_name.clone()).or_insert(GloblFunc::new(obj_name.clone()));
-                obj.dtype = InternalFunc::new();
-            } else if let Some(cap) = public_regex.captures(&l) {
-                // .public x
-                let name = cap.get(1).unwrap().as_str();
-                self.globl_name_to_func.get_mut(name).and_then(|obj| {obj.public = true; Some(obj)});
-            } else if let Some(cap) = globl_regex.captures(&l) {
-                // .globl x
+                let type_name = cap.get(2).ok_or(format!("line {}: .type option is invalid", lnum))?.as_str();
+                let obj = self.globl_name_to_object.entry(obj_name.clone()).or_insert(GloblFuncOrData::new(obj_name.clone(), &type_name));
+                obj.dtype = GloblFuncOrDataType::from(type_name);
+            } else if size_regex.is_match(&l) {
+                // .size x, val
+                let cap = size_regex.captures(&l).unwrap();
                 let name = cap.get(1).unwrap().as_str().to_owned();
-                self.globl_name_to_func.entry(name.clone()).or_insert(GloblFunc::new(name.clone()));
-            } else if let Some(cap) = macro_regex.captures(&l) {
+                let size_str = cap.get(2).ok_or(format!("line {}: .size option is invalid", lnum))?.as_str();
+                let item_ref = self.globl_name_to_object.entry(name.clone()).or_insert(GloblFuncOrData::new(name, ""));
+                item_ref.size = usize::from_str_radix(size_str, 10).unwrap_or(0);
+            } else if public_regex.is_match(&l) {
+                // .public x
+                let cap = public_regex.captures(&l).unwrap();
+                let name = cap.get(1).unwrap().as_str();
+                self.globl_name_to_object.get_mut(name).and_then(|obj| {obj.public = true; Some(obj)});
+            } else if globl_regex.is_match(&l) {
+                // .globl x
+                let cap = globl_regex.captures(&l).unwrap();
+                let name = cap.get(1).unwrap().as_str().to_owned();
+                self.globl_name_to_object.entry(name.clone()).or_insert(GloblFuncOrData::new(name.clone(), ""));
+            } else if macro_regex.is_match(&l) {
                 // .macro x
                 self.update(&section_name, &obj_name, &obj_body)
                     .map_err(|e| format!("line {}: {}", lnum, e))?;
                 section_name = MACROS.to_owned();
                 obj_body = vec![];
-                obj_name = cap.get(1).unwrap().as_str().to_owned();
+                obj_name = macro_regex.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
+            } else if data_regex.is_match(&l) {
+                // .data
+                //ignore, not used
             } else if selector_regex.is_match(&l) {
                 // .selector
                 self.update(&section_name, &obj_name, &obj_body)?;
                 section_name = SELECTOR.to_owned();
                 obj_name = "".to_owned();
                 obj_body = vec![];
-            } else if let Some(cap) = internal_regex.captures(&l) {
+            } else if internal_regex.is_match(&l) {
                 // .internal
                 self.update(&section_name, &obj_name, &obj_body)
                     .map_err(|e| format!("line {}: {}", lnum, e))?;
                 section_name = INTERNAL.to_owned();
                 obj_body = vec![];
-                obj_name = cap.get(1).unwrap().as_str().to_owned();
-            } else if let Some(cap) = alias_regex.captures(&l) {
+                obj_name = internal_regex.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
+            } else if alias_regex.is_match(&l) {
                 // .internal-alias
+                let cap = alias_regex.captures(&l).unwrap();
                 self.internal_alias_name_to_id_.insert(
                     cap.get(1).unwrap().as_str().to_owned(),
                     i32::from_str_radix(cap.get(2).unwrap().as_str(), 10)
@@ -367,7 +610,8 @@ impl ParseEngine {
                 );
             } else if label_regex.is_match(&l) {
                 // ignore labels
-            } else if let Some(cap) = loc_regex.captures(&l) {
+            } else if loc_regex.is_match(&l) {
+                let cap = loc_regex.captures(&l).unwrap();
                 let filename = String::from(cap.get(1).unwrap().as_str());
                 let line = cap.get(2).unwrap().as_str().parse::<usize>().unwrap();
                 if line == 0 { // special value for resetting current source pos
@@ -375,6 +619,16 @@ impl ParseEngine {
                 } else {
                     source_pos = Some(DbgPos { filename, line, line_code: lnum });
                 }
+            } else if dotted_regex.is_match(&l) {
+                // .param [value]
+                let cap = dotted_regex.captures(&l).unwrap();
+                let param = cap.get(1).unwrap().as_str();
+                match param {
+                    "blob" | "cell" | "byte" | "long" | "short" | "quad" | "comm" | "bss" | "asciz" | "compute" => {
+                        obj_body.push(Line { text: l.clone(), pos })
+                    },
+                    _ => Err(format!("line {}: invalid param \"{}\":{}", lnum, param, l))?,
+                };
             } else {
                 obj_body.push(Line { text: l.clone(), pos });
             }
@@ -408,12 +662,13 @@ impl ParseEngine {
     }
 
     fn resolve_nested_macros(&mut self) -> Result<(), String> {
-        let names = self.globl_name_to_func.keys().map(|k| k.clone()).collect::<Vec<_>>();
+        let names = self.globl_name_to_object.keys().map(|k| k.clone()).collect::<Vec<_>>();
         for name in &names {
-            let f = &self.globl_name_to_func.get_mut(name).unwrap().dtype;
-            let lines = f.body.clone();
-            let new_lines = self.resolve_nested_macros_in_lines(lines)?;
-            self.globl_name_to_func.get_mut(name).unwrap().dtype.body = new_lines;
+            if let GloblFuncOrDataType::Function(f) = &self.globl_name_to_object.get_mut(name).unwrap().dtype {
+                let lines = f.body.clone();
+                let new_lines = self.resolve_nested_macros_in_lines(lines)?;
+                self.globl_name_to_object.get_mut(name).unwrap().dtype.func_mut().unwrap().body = new_lines;
+            }
         }
 
         let ids = self.internal_id_to_code.keys().map(|x| *x).collect::<Vec<_>>();
@@ -458,19 +713,19 @@ impl ParseEngine {
             new_lines.append(&mut resolved);
         }
         Ok(new_lines)
-
     }
 
     fn replace_all_labels(&mut self) -> Result<(), String> {
-        let names = self.globl_name_to_func.keys().map(|k| k.clone()).collect::<Vec<_>>();
+        let names = self.globl_name_to_object.keys().map(|k| k.clone()).collect::<Vec<_>>();
         for name in &names {
-            let f = &self.globl_name_to_func.get(name).unwrap().dtype;
-            let lines = f.body.clone();
-            let obj_name = self.globl_name_to_func.get(name).unwrap().name.clone();
-            let new_lines = self.replace_labels_in_body(lines, FunctionId::Name(obj_name))?;
+            if let GloblFuncOrDataType::Function(f) = &self.globl_name_to_object.get(name).unwrap().dtype {
+                let lines = f.body.clone();
+                let obj_name = self.globl_name_to_object.get(name).unwrap().name.clone();
+                let new_lines = self.replace_labels_in_body(lines, FunctionId::Name(obj_name))?;
 
-            let body = &mut self.globl_name_to_func.get_mut(name).unwrap().dtype.body;
-            *body = new_lines;
+                let body = &mut self.globl_name_to_object.get_mut(name).unwrap().dtype.func_mut().unwrap().body;
+                *body = new_lines;
+            }
         }
 
         let ids = self.internal_id_to_code.keys().map(|x| *x).collect::<Vec<_>>();
@@ -486,7 +741,7 @@ impl ParseEngine {
     }
 
     fn create_function_id(&mut self, func: &str) -> u32 {
-        let is_public = self.globl_name_to_func.get(func).unwrap().public;
+        let is_public = self.globl_name_to_object.get(func).unwrap().public;
         if is_public {
             gen_abi_id(self.abi.clone(), func)
         } else {
@@ -516,24 +771,39 @@ impl ParseEngine {
             GLOBL => {
                 //do not reset public flag if symbol isn't included in ABI,
                 //because it can be marked as public in assembly.
-                // TODO really?
                 if self.is_public(name) {
-                    self.globl_name_to_func.get_mut(name).unwrap().public = true;
+                    self.globl_name_to_object.get_mut(name).unwrap().public = true;
                 }
 
-                // globl object is function
-                let func_id = self.create_function_id(name);
-                let item = self.globl_name_to_func.get_mut(name).unwrap();
-                let params = &mut item.dtype;
-                params.id = func_id;
-                params.body = body.clone();
-                let prev = self.globl_name_to_id.insert(name.to_string(), func_id);
-                if prev.is_some() {
-                    Err(format!(
-                        "global function with id = {:x} and name \"{}\" already exist",
-                        func_id,
-                        name,
-                    ))?;
+                if self.globl_name_to_object.get(name).unwrap().dtype.is_func() {
+                    // globl object is function
+                    let func_id = self.create_function_id(name);
+                    let item = self.globl_name_to_object.get_mut(name).unwrap();
+                    let params = item.dtype.func_mut().unwrap();
+                    params.id = func_id;
+                    params.body = body.clone();
+                    let prev = self.globl_name_to_id.insert(name.to_string(), func_id);
+                    if prev.is_some() {
+                        Err(format!(
+                            "global function with id = {:x} and name \"{}\" already exist",
+                            func_id,
+                            name,
+                        ))?;
+                    }
+                } else {
+                    // globl object is data
+                    let item = self.globl_name_to_object.get_mut(name).unwrap();
+                    let data = item.dtype.data_mut().unwrap();
+                    Self::update_data(body, name, &mut item.size, &mut data.values)?;
+                    let offset = (data.values.len() as Ptr) * WORD_SIZE;
+                    if name.ends_with(PERSISTENT_DATA_SUFFIX) {
+                        data.persistent = true;
+                        data.addr = self.persistent_ptr;
+                        self.persistent_ptr += offset;
+                    } else {
+                        data.addr = self.globl_ptr;
+                        self.globl_ptr += offset;
+                    }
                 }
             },
             INTERNAL => {
@@ -556,7 +826,126 @@ impl ParseEngine {
         Ok(())
     }
 
-   fn encode_computed_cell(&self, cell: &Cell, toplevel: bool) -> Lines {
+    fn update_data(
+        body: &Lines,
+        name: &str,
+        item_size: &mut usize,
+        values: &mut Vec<DataValue>,
+    ) -> Result<(), String> {
+        lazy_static! {
+            static ref PARAM_RE: Regex = Regex::new(PATTERN_PARAM).unwrap();
+            static ref COMM_RE:  Regex = Regex::new(PATTERN_COMM).unwrap();
+            static ref ASCI_RE:  Regex = Regex::new(PATTERN_ASCIZ).unwrap();
+        }
+        for param in body {
+            let mut value_len: usize = 0;
+            if let Some(cap) = COMM_RE.captures(param.text.as_str()) {
+                // .comm <symbol>, <size>, <align>
+                let size_bytes = usize::from_str_radix(
+                    cap.get(2).unwrap().as_str(),
+                    10,
+                ).map_err(|_| "invalid \".comm\": invalid size".to_string())?;
+                let align = usize::from_str_radix(
+                    cap.get(3).unwrap().as_str(),
+                    10,
+                ).map_err(|_| "\".comm\": invalid align".to_string())?;
+
+                if size_bytes == 0  {
+                    Err("\".comm\": invalid size".to_string())?;
+                }
+                if (align == 0) || (align % WORD_SIZE as usize != 0) {
+                    Err("\".comm\": invalid align".to_string())?;
+                }
+                value_len = (size_bytes + (align - 1)) & !(align - 1);
+                for _i in 0..(value_len / WORD_SIZE as usize) {
+                    values.push(DataValue::Number((IntegerData::zero(), WORD_SIZE as usize)));
+                }
+                *item_size = value_len;
+            } else if param.text.trim() == ".bss" {
+                //ignore this directive
+            } else if let Some(cap) = ASCI_RE.captures(param.text.as_str()) {
+                // .asciz "string"
+                let mut str_bytes = cap.get(1).unwrap().as_str().as_bytes().to_vec();
+                //include 1 byte for termination zero, assume that it is C string
+                value_len = str_bytes.len() + 1;
+                str_bytes.push(0);
+                for cur_char in str_bytes {
+                    values.push(DataValue::Number((IntegerData::from(cur_char).unwrap(), 1)));
+                }
+            } else if let Some(cap) = PARAM_RE.captures(param.text.as_str()) {
+                let pname = cap.get(1).unwrap().as_str();
+                value_len = match pname {
+                    "byte"  => 1,
+                    "long"  => 4,
+                    "short" => 2,
+                    "quad"  => 8,
+                    _ => Err(format!("invalid parameter: \"{}\"", param.text))?,
+                };
+                let value = cap.get(2).map_or("", |m| m.as_str()).trim();
+                values.push(DataValue::Number((
+                    IntegerData::from_str_radix(value, 10)
+                        .map_err(|_| format!("parameter \"{}\" has invalid value \"{}\"", pname, value))?,
+                    value_len,
+                )));
+            }
+            if *item_size < value_len {
+                Err(format!("global object {} has invalid .size parameter: too small", name))?;
+            }
+            *item_size -= value_len;
+        }
+        if *item_size > 0 {
+            Err(format!("global object {} has invalid \".size\" value: real size = {}", name, *item_size))?;
+        }
+        Ok(())
+    }
+
+    fn build_data(&self) -> Option<Cell> {
+        let filter = |persistent: bool| {
+            self.globl_name_to_object.iter().filter_map(move |item| {
+                item.1.dtype.data().and_then(|data| {
+                    if data.persistent == persistent {
+                        Some((&data.addr, &data.values))
+                    } else {
+                        None
+                    }
+                })
+            })
+        };
+        let globl_data_vec: Vec<(&Ptr, &Vec<DataValue>)> = filter(false).collect();
+        let pers_data_vec: Vec<(&Ptr, &Vec<DataValue>)> = filter(true).collect();
+
+        let build_dict = |data_vec: &Vec<(&Ptr, &Vec<DataValue>)>| {
+            let mut dict = HashmapE::with_bit_len(64);
+            for item in data_vec {
+                let mut ptr = item.0.clone();
+                for subitem in item.1 {
+                    dict.set(ptr_to_builder(ptr).unwrap().into_cell().unwrap().into(), &subitem.write().unwrap_or(BuilderData::default()).into_cell().unwrap().into()).unwrap();
+                    ptr += subitem.size();
+                }
+            }
+            dict
+        };
+
+        let globl_dict = build_dict(&globl_data_vec);
+        let mut pers_dict = build_dict(&pers_data_vec);
+        let mut globl_cell = BuilderData::new();
+        if let Some(cell) = globl_dict.data() {
+            globl_cell.append_bit_one()
+                .unwrap()
+                .checked_append_reference(cell.clone())
+                .unwrap();
+        } else {
+            globl_cell.append_bit_zero().unwrap();
+        }
+        pers_dict.set(
+            ptr_to_builder(self.persistent_base + OFFSET_GLOBL_DATA).unwrap().into_cell().unwrap().into(),
+            &globl_cell.into_cell().unwrap().into()
+        ).unwrap();
+
+        pers_dict.data().map(|cell| cell.clone())
+    }
+
+    fn encode_computed_cell(&self, cell: &Cell, toplevel: bool) -> Lines {
         let slice = SliceData::from(cell);
         let mut lines = vec!();
         let opening = if toplevel { "{\n" } else { ".cell {\n" };
@@ -613,34 +1002,45 @@ impl ParseEngine {
     }
 
     fn replace_labels(&mut self, line: &Line, cur_obj_name: &FunctionId) -> Result<Lines, String> {
-        if let Some(cap) = NAMES.captures(&line.text) {
-            let name = cap.get(2).unwrap().as_str().to_string();
-            let id_str;
-            if let Some(id) = self.globl_name_to_id.get(&name) {
-                id_str = id.to_string();
-                let local_id = *id;
-                self.insert_called_func(&cur_obj_name, local_id);
-            } else if let Some(id) = self.internal_name_to_id.get(&name) {
-                id_str = id.to_string();
-            } else {
-                return Err("Internal error in resolving ".to_string() + &line.text);
+        resolve_name(line, |name| {
+            self.internal_name_to_id.get(name).and_then(|id| {
+                Some(id.clone())
+            })
+        })
+        .or_else(|_| resolve_name(line, |name| {
+            let mut res = self.globl_name_to_id.get(name).map(|id| id.clone());
+            if res.is_some(){
+                let id = res.unwrap();
+                self.insert_called_func(&cur_obj_name, id);
+                res = Some(id);
             }
-            let mut res = [cap.get(1).unwrap().as_str(), id_str.to_string().as_str(), cap.get(3).unwrap().as_str()].join("");
-            if !res.ends_with('\n') { // TODO why here?
-                res += "\n";
+            res
+        }))
+        .or_else(|_| resolve_name(line, |name| {
+            self.globl_name_to_object.get(name).and_then(|obj| {
+                obj.dtype.data().and_then(|data| {
+                    Some(data.addr.clone())
+                })
+            })
+        }))
+        .or_else(|_| resolve_name(line, |name| {
+            match name {
+                "global-base" => Some(self.globl_base.clone()),
+                "persistent-base" => Some(self.persistent_base.clone()),
+                _ => None,
             }
-            return Ok(vec![Line::new(res.as_str(), line.pos.filename.as_str(), line.pos.line)]);
-        }
-        return Ok(vec![line.clone()]);
+        }))
     }
 
     fn insert_called_func(&mut self, from_func: &FunctionId, to_func: u32) {
         match from_func {
             FunctionId::Name(name) => {
-                self.globl_name_to_func.get_mut(name)
+                self.globl_name_to_object.get_mut(name)
                     .and_then(|obj| {
-                        obj.dtype.called_ids.push(to_func);
-                        Some(obj)
+                        obj.dtype.func_mut().and_then(|f| {
+                            f.called_ids.push(to_func);
+                            Some(f)
+                        })
                     });
             }
             FunctionId::Id(id) => {
@@ -654,8 +1054,9 @@ impl ParseEngine {
 
     fn drop_unused_objects(&mut self) {
         let mut ids = HashSet::new();
-        let publics_iter = self.globl_name_to_func.iter().filter_map(|obj| {
-            if obj.1.public { Some(&obj.1.dtype) } else { None }
+        let publics_iter = self.globl_name_to_object.iter().filter_map(|obj| {
+            obj.1.dtype.func()
+                .and_then(|i| if obj.1.public { Some(i) } else { None })
         });
 
         for func in publics_iter {
@@ -665,8 +1066,10 @@ impl ParseEngine {
             self.enum_calling_funcs(&func.1, &mut ids);
         }
 
-        self.globl_name_to_func.retain(|_k, v| {
-            ids.contains(&v.dtype.id)
+        self.globl_name_to_object.retain(|_k, v| {
+            v.dtype.func()
+                .map(|f| ids.contains(&f.id))
+                .unwrap_or(true)
         });
         self.globl_name_to_id.retain(|_k, v| {
             ids.contains(&v)
@@ -678,10 +1081,10 @@ impl ParseEngine {
 
         for id in &func.called_ids {
             if ids.insert(*id) {
-                let subfunc = self.globl_name_to_func.iter().find(|(_name, obj)| {
-                    obj.dtype.id == *id
+                let subfunc = self.globl_name_to_object.iter().find(|(_name, obj)| {
+                    obj.dtype.func().map(|f| f.id == *id).unwrap_or(false)
                 })
-                    .map(|(_name, obj)| &obj.dtype);
+                    .map(|(_name, obj)| obj.dtype.func().unwrap());
                 if subfunc.is_some() {
                     self.enum_calling_funcs(&subfunc.unwrap(), ids);
                 }
@@ -701,7 +1104,7 @@ impl ParseEngine {
             println! ("Function {:30}: id={:08X} public={}",
                       k,
                       self.globl_name_to_id.get(k).unwrap(),
-                      self.globl_name_to_func.get(k).unwrap().public);
+                      self.globl_name_to_object.get(k).unwrap().public);
         }
         println!("private:");
         for (k, v) in &self.privates() {
@@ -727,6 +1130,113 @@ impl ParseEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ton_vm::executor::Engine;
+    use ton_labs_assembler::compile_code;
+    use ton_vm::stack::{Stack, StackItem};
+    use std::sync::Arc;
+
+    #[test]
+    fn test_parser_testlib() {
+        let sources = vec![Path::new("./tests/test.tvm")];
+        let parser = ParseEngine::new(sources, None);
+        assert_eq!(parser.is_ok(), true);
+        let parser = parser.unwrap();
+
+        let mut data_dict = BuilderData::new();
+        data_dict.append_bit_one().unwrap().checked_append_reference(parser.data().unwrap()).unwrap();
+
+        let code = compile_code(&format!("
+        ;s0 - persistent data dictionary
+            PLDDICT
+        ;read public key from persistent_base index,
+        ;it must be empty slice
+            PUSHINT {base}
+            DUP
+            PUSH s2
+            PUSHINT 64
+            DICTIGET
+            THROWIFNOT 100
+            SEMPTY
+            THROWIFNOT 100
+
+        ;get base+8 value from the dict - it's a global data dictionary
+            ADDCONST {offset}
+            DUP
+            PUSH s2
+            PUSHINT 64
+            DICTIGET
+            THROWIFNOT 100
+            PLDDICT
+
+        ;read 4 integers starting with address 8 from global dict
+            DUP
+            PUSHINT 8
+            SWAP
+            PUSHINT 64
+            DICTIGET
+            THROWIFNOT 100
+            PUSHINT 257 LDIX
+            ENDS
+            SWAP
+
+            PUSHINT 12
+            OVER
+            PUSHINT 64
+            DICTIGET
+            THROWIFNOT 100
+            PUSHINT 257 LDIX
+            ENDS
+            SWAP
+
+            PUSHINT 16
+            OVER
+            PUSHINT 64
+            DICTIGET
+            THROWIFNOT 100
+            PUSHINT 257 LDIX
+            ENDS
+            SWAP
+
+            PUSHINT 20
+            OVER
+            PUSHINT 64
+            DICTIGET
+            THROWIFNOT 100
+            PUSHINT 257 LDIX
+            ENDS
+            NIP
+
+        ;read integer with address persistent_base+16 from persistent dict
+            PUSH s4
+            ADDCONST {offset}
+            PUSH s6
+            PUSHINT 64
+            DICTIGET
+            THROWIFNOT 100
+            PUSHINT 257 LDIX
+            ENDS
+
+            BLKSWAP 2, 5
+            BLKDROP 2
+        ",
+        base = 1000000,
+        offset = OFFSET_GLOBL_DATA,
+        )).expect("Couldn't compile code");
+
+        let mut stack = Stack::new();
+        stack.push(StackItem::Slice(data_dict.into_cell().unwrap().into()));
+
+        let mut engine = Engine::new().setup_with_libraries(code, None, Some(stack), None, vec![]);
+        engine.set_trace(Engine::TRACE_ALL);
+        engine.execute().unwrap();
+
+        engine.assert_stack(Stack::new()
+            .push(int!(1))
+            .push(int!(2))
+            .push(int!(3))
+            .push(int!(4))
+            .push(int!(127)));
+    }
 
     #[test]
     fn test_parser_var_without_globl() {
@@ -800,7 +1310,7 @@ mod tests {
         let publics = parser.publics();
         let body = publics.get(&0x0D6E4079).unwrap();
         let globals = parser.globals(false);
-        let internal = globals.get(&1).unwrap();
+        let internal = globals.get(&2).unwrap();
 
         assert_eq!(
             *body,
@@ -812,7 +1322,7 @@ mod tests {
                  Line::new("ADD\n",        "test_macros_02.code", 13),
                  Line::new("\n",           "test_macros_02.code", 14),
                  Line::new("PUSHINT 3\n",  "test_macros_02.code", 7),
-                 Line::new("CALL 1\n",     "test_macros_02.code", 8),
+                 Line::new("CALL 2\n",     "test_macros_02.code", 8),
                  Line::new("\n",           "test_macros_02.code", 9)]
         );
         assert_eq!(

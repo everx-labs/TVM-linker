@@ -52,17 +52,24 @@ impl Program {
     }
 
     pub fn data(&self) -> std::result::Result<Cell, String> {
-        let pubkey =
+        let bytes =
             if let Some(ref pair) = self.keypair {
                 pair.public.to_bytes()
             } else {
                 [0u8; PUBLIC_KEY_LENGTH]
             };
 
+        // Persistent data feature is obsolete and should be removed.
         // Off-chain constructor should be used to create data layout instead.
+        let (persistent_base, persistent_data) = self.engine.persistent_data();
         let mut data_dict = HashmapE::with_hashmap(64, None);
-        let key:SliceData = ptr_to_builder(0)?.into_cell().map_err(|e| format!("failed to pack body in cell: {}", e))?.into();
-        BuilderData::with_raw(pubkey.to_vec(), PUBLIC_KEY_LENGTH * 8)
+        if let Some(ref lang) = self.language {
+            if lang == "C" || lang == "c" {
+                data_dict = HashmapE::with_hashmap(64, persistent_data)
+            }
+        }
+        let key:SliceData = ptr_to_builder(persistent_base)?.into_cell().map_err(|e| format!("failed to pack body in cell: {}", e))?.into();
+        BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8)
             .and_then(|data| data_dict.set(key, &data.into_cell()?.into()))
             .map_err(|e| format!("failed to pack pubkey to data dictionary: {}", e))?;
         let mut builder = BuilderData::new();
