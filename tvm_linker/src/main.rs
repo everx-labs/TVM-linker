@@ -117,6 +117,7 @@ fn linker_main() -> Result<(), String> {
             (@arg SETKEY: --setkey +takes_value conflicts_with[GENKEY] "Loads existing keypair from the file")
             (@arg WC: -w +takes_value "Workchain id used to print contract address, -1 by default.")
             (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
+            (@arg VERBOSE: --verbose "Prints verbose execution info")
             (@arg DEBUG_MAP: --("debug-map") +takes_value "Generates debug map file")
             (@arg DATA: --("data") +takes_value "Overwrites data with a cell from a file")
             (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file. If not specified lib is loaded from environment variable TVM_LINKER_LIB_PATH if it exists.")
@@ -264,6 +265,7 @@ fn linker_main() -> Result<(), String> {
             None => None
         };
         let out_file = compile_matches.value_of("OUT_FILE");
+        let verbose = compile_matches.is_present("VERBOSE");
         let mut sources = Vec::new();
         for lib in compile_matches.values_of("LIB").unwrap_or_default() {
             let path = Path::new(lib);
@@ -287,8 +289,11 @@ fn linker_main() -> Result<(), String> {
             return Err(format!("File {} doesn't exist", input));
         }
         sources.push(path);
+        if verbose {
+            println!("VERBOSE: List of source files: {:?}", sources);
+        }
         let mut prog = Program::new(
-            ParseEngine::new(sources, abi_json)?
+            ParseEngine::new(sources, abi_json, verbose)?
         );
 
         match compile_matches.value_of("GENKEY") {
@@ -389,7 +394,7 @@ fn replace_command(matches: &ArgMatches) -> Result<(), String> {
     sources.push(path);
 
     let mut prog = Program::new(
-        ParseEngine::new(sources, abi_json)?
+        ParseEngine::new(sources, abi_json, false)?
     );
 
     let code = prog.compile_asm(false)?;
@@ -486,7 +491,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
                         return Err(format!("File {} doesn't exist", source));
                     }
                     Some(ParseEngineResults::new(
-                        ParseEngine::new(vec![path], None)?
+                        ParseEngine::new(vec![path], None, false)?
                     ))
                 },
                 None => None
