@@ -52,24 +52,17 @@ impl Program {
     }
 
     pub fn data(&self) -> std::result::Result<Cell, String> {
-        let bytes =
+        let pubkey =
             if let Some(ref pair) = self.keypair {
                 pair.public.to_bytes()
             } else {
                 [0u8; PUBLIC_KEY_LENGTH]
             };
 
-        // Persistent data feature is obsolete and should be removed.
         // Off-chain constructor should be used to create data layout instead.
-        let (persistent_base, persistent_data) = self.engine.persistent_data();
         let mut data_dict = HashmapE::with_hashmap(64, None);
-        if let Some(ref lang) = self.language {
-            if lang == "C" || lang == "c" {
-                data_dict = HashmapE::with_hashmap(64, persistent_data)
-            }
-        }
-        let key:SliceData = ptr_to_builder(persistent_base)?.into_cell().map_err(|e| format!("failed to pack body in cell: {}", e))?.into();
-        BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8)
+        let key:SliceData = ptr_to_builder(0)?.into_cell().map_err(|e| format!("failed to pack body in cell: {}", e))?.into();
+        BuilderData::with_raw(pubkey.to_vec(), PUBLIC_KEY_LENGTH * 8)
             .and_then(|data| data_dict.set(key, &data.into_cell()?.into()))
             .map_err(|e| format!("failed to pack pubkey to data dictionary: {}", e))?;
         let mut builder = BuilderData::new();
@@ -435,7 +428,7 @@ mod tests {
     fn test_comm_var_addresses() {
         let sources = vec![Path::new("./tests/test_stdlib.tvm"),
                                      Path::new("./tests/comm_test2.s")];
-        let parser = ParseEngine::new(sources, None, false);
+        let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
         let body = {
@@ -454,7 +447,7 @@ mod tests {
     fn test_asciz_var() {
         let sources = vec![Path::new("./tests/test_stdlib.tvm"),
                                      Path::new("./tests/asci_test1.s")];
-        let parser = ParseEngine::new(sources, None, false);
+        let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
         let body = {
@@ -473,7 +466,7 @@ mod tests {
     fn test_sender_pubkey() {
         let sources = vec![Path::new("./tests/test_stdlib_c.tvm"),
                                      Path::new("./tests/sign-test.s")];
-        let parser = ParseEngine::new(sources, None, false);
+        let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
         let body = {
@@ -498,7 +491,7 @@ mod tests {
     fn test_ticktock() {
         let sources = vec![Path::new("./tests/test_stdlib_sol.tvm"),
                                      Path::new("./tests/ticktock.code")];
-        let parser = ParseEngine::new(sources, None, false);
+        let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
         let contract_file = prog.compile_to_file(-1).unwrap();
@@ -512,7 +505,7 @@ mod tests {
     fn test_recursive_call() {
         let sources = vec![Path::new("./tests/test_stdlib.tvm"),
                                      Path::new("./tests/test_recursive.code")];
-        let parser = ParseEngine::new(sources, None, false);
+        let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
         let contract_file = prog.compile_to_file(-1).unwrap();
@@ -535,7 +528,7 @@ mod tests {
         let abi_str = abi::load_abi_json_string("./tests/test_public.abi.json").unwrap();
         let abi = abi::load_abi_contract(&abi_str).unwrap();
 
-        let parser = ParseEngine::new(sources, Some(abi_str), false);
+        let parser = ParseEngine::new(sources, Some(abi_str));
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
 
@@ -573,7 +566,7 @@ mod tests {
                                      Path::new("./tests/Wallet.code")];
         let abi = abi::load_abi_json_string("./tests/Wallet.abi.json").unwrap();
 
-        let parser = ParseEngine::new(sources, Some(abi), false);
+        let parser = ParseEngine::new(sources, Some(abi));
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
 
@@ -611,7 +604,7 @@ mod tests {
                                      Path::new("tests/Wallet.code")];
         let abi = abi::load_abi_json_string("tests/Wallet.abi.json").unwrap();
 
-        let parser = ParseEngine::new(sources, Some(abi), false);
+        let parser = ParseEngine::new(sources, Some(abi));
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
 
@@ -648,7 +641,7 @@ mod tests {
     }
 
     fn get_version(filename: &str) -> Result<String, String> {
-        let parser = ParseEngine::new(vec![Path::new(filename)], None, false);
+        let parser = ParseEngine::new(vec![Path::new(filename)], None);
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
         let file_name = prog.compile_to_file(-1).unwrap();
@@ -676,7 +669,7 @@ mod tests {
         let sources = vec![Path::new("tests/test_stdlib_sol.tvm"), Path::new("tests/mycode.code")];
         let abi = abi::load_abi_json_string("tests/mycode.abi.json").unwrap();
 
-        let parser = ParseEngine::new(sources, Some(abi), false);
+        let parser = ParseEngine::new(sources, Some(abi));
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
 
