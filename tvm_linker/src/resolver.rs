@@ -13,13 +13,13 @@
 use regex::Regex;
 use std::convert::TryFrom;
 use std::fmt::{LowerHex, UpperHex, Display};
-use ton_labs_assembler::{Line, Lines};
+use ton_labs_assembler::Line;
 
 lazy_static! {
     pub static ref NAMES: Regex = Regex::new(r"\$(?P<id>:?[-_0-9a-zA-Z\.]+)(?P<offset>\+\d+)?(:(?P<len>\d*)?(?P<fmt>[xX])?)?\$").unwrap();
 }
 
-pub fn resolve_name<F, T>(line: &Line, mut get: F) -> Result<Lines, String>
+pub fn resolve_name<F, T>(line: &Line, mut get: F) -> Result<Line, String>
     where
         F: FnMut(&str) -> Option<T>,
         T: LowerHex + UpperHex + Display + TryFrom<isize> + std::ops::AddAssign {
@@ -27,6 +27,9 @@ pub fn resolve_name<F, T>(line: &Line, mut get: F) -> Result<Lines, String>
     let mut end = 0;
     let semicolon_pos = line.text.find(';').unwrap_or(line.text.len());
     let (text_old, text_rem) = line.text.split_at(semicolon_pos);
+    if !text_old.contains('$') {
+        return Ok(line.clone());
+    }
     for cap in NAMES.captures_iter(text_old) {
         if cap.name("id").is_none() {
             return Err("invalid syntax: object name not found".to_string());
@@ -73,7 +76,7 @@ pub fn resolve_name<F, T>(line: &Line, mut get: F) -> Result<Lines, String>
     }
     res_str += text_rem;
     let res = Line::new(res_str.as_str(), line.pos.filename.as_str(), line.pos.line);
-    Ok(vec![res])
+    Ok(res)
 }
 
 #[cfg(test)]
@@ -103,8 +106,7 @@ mod tests {
         let line = Line::new(text, "", 0);
         let res = super::resolve_name(&line, get);
         res.map(|lines| {
-            assert!(lines.len() == 1);
-            lines[0].text.clone()
+            lines.text.clone()
         })
     }
 
@@ -157,6 +159,6 @@ mod tests {
 
     #[test]
     fn test_resolve_with_comments() {
-        assert_eq!(resolve_name("text; ignore this $ctor$", id_by_name), Ok("text ; ignore this $ctor$".to_string()));
+        assert_eq!(resolve_name("text ; ignore this $ctor$", id_by_name), Ok("text ; ignore this $ctor$".to_string()));
     }
 }
