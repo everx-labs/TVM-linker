@@ -17,8 +17,7 @@ use ton_types::{BuilderData, Cell};
 fn get_version(root: &Cell) -> Result<String, String> {
     let cell1 = root.reference(0).map_err(|e| format!("not found ({})", e))?;
     let cell2 = cell1.reference(1).map_err(|e| format!("not found ({})", e))?;
-    let data = cell2.data();
-    let bytes = &data[..data.len() - 1];
+    let bytes = cell2.data();
     match String::from_utf8(bytes.to_vec()) {
         Ok(string) => if string.is_empty() { Ok("<empty>".to_string()) } else { Ok(string) },
         Err(e) => Err(format!("decoding failed ({})", e))
