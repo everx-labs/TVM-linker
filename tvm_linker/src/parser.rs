@@ -964,7 +964,7 @@ impl ParseEngine {
         let (code, _) = ton_labs_assembler::compile_code_debuggable(collected)
             .map_err(|ce| ce.to_string())?;
 
-        let mut engine = ton_vm::executor::Engine::new().setup_with_libraries(
+        let mut engine = ton_vm::executor::Engine::with_capabilities(0).setup_with_libraries(
             code, None, None, None, vec![]);
         match engine.execute() {
             Err(e) => {
@@ -1224,7 +1224,9 @@ mod tests {
         let mut stack = Stack::new();
         stack.push(StackItem::Slice(data_dict.into_cell().unwrap().into()));
 
-        let mut engine = Engine::new().setup_with_libraries(code, None, Some(stack), None, vec![]);
+        let mut engine = Engine::with_capabilities(0).setup_with_libraries(
+            code, None, Some(stack), None, vec![]
+        );
         engine.set_trace(Engine::TRACE_ALL);
         engine.execute().unwrap();
 
