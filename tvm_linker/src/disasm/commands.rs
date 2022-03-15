@@ -13,16 +13,17 @@
 
 use std::collections::HashSet;
 use std::str::FromStr;
+use failure::{bail, format_err};
 use ton_block::Serializable;
 use clap::ArgMatches;
 use ton_types::cells_serialization::deserialize_cells_tree;
-use ton_types::{Cell, HashmapE, HashmapType, SliceData, UInt256};
+use ton_types::{Cell, HashmapE, HashmapType, SliceData, UInt256, Status};
 use std::io::Cursor;
 
 use super::types::Shape;
 use super::loader::{load, print_code};
 
-pub fn disasm_command(m: &ArgMatches) -> core::result::Result<(), String> {
+pub fn disasm_command(m: &ArgMatches) -> Status {
     if let Some(m) = m.subcommand_matches("dump") {
         return disasm_dump_command(m);
     } else if let Some(m) = m.subcommand_matches("graphviz") {
@@ -30,14 +31,14 @@ pub fn disasm_command(m: &ArgMatches) -> core::result::Result<(), String> {
     } else if let Some(m) = m.subcommand_matches("text") {
         return disasm_text_command(m);
     }
-    Err("unknown command".to_owned())
+    bail!("unknown command")
 }
 
-fn disasm_graphviz_command(m: &ArgMatches) -> core::result::Result<(), String> {
+fn disasm_graphviz_command(m: &ArgMatches) -> Status {
     let filename = m.value_of("TVC");
-    let tvc = filename.map(|f| std::fs::read(f))
+    let tvc = filename.map(std::fs::read)
         .transpose()
-        .map_err(|e| format!(" failed to read tvc file: {}", e))?
+        .map_err(|e| format_err!(" failed to read tvc file: {}", e))?
         .unwrap();
     let mut csor = Cursor::new(tvc);
     let mut roots = deserialize_cells_tree(&mut csor).unwrap();
@@ -51,15 +52,15 @@ fn disasm_graphviz_command(m: &ArgMatches) -> core::result::Result<(), String> {
             } else if string == "ticktock" {
                 graphviz(&root.reference(3).unwrap())
             } else {
-                let method_id = u32::from_str(string).map_err(|e| -> String { e.to_string() })?;
+                let method_id = u32::from_str(string).map_err(|e| format_err!("{}", e))?;
                 let dict_cell = root.reference(0).unwrap().reference(0).unwrap();
                 let dict = HashmapE::with_hashmap(32, Some(dict_cell));
                 if dict.len().is_err() {
-                    return Err("empty internal methods dictionary".to_string())
+                    bail!("empty internal methods dictionary")
                 }
                 let key = method_id.serialize().unwrap().into();
-                let data = dict.get(key).map_err(|e| -> String { e.to_string() })?
-                    .ok_or(format!("internal method {} not found", method_id))?;
+                let data = dict.get(key).map_err(|e| format_err!("{}", e))?
+                    .ok_or_else(|| format_err!("internal method {} not found", method_id))?;
                 let cell = data.into_cell();
                 graphviz(&cell)
             }
@@ -72,7 +73,7 @@ fn disasm_graphviz_command(m: &ArgMatches) -> core::result::Result<(), String> {
 fn data_pretty_printed(cell: &Cell) -> String {
     let mut string = String::new();
     let mut hex = cell.to_hex_string(true);
-    if hex.len() > 0 {
+    if hex.is_empty() {
         while hex.len() > 32 {
             let tail = hex.split_off(32);
             string += format!("<tr><td align=\"left\">{}</td></tr>", hex).as_str();
@@ -96,7 +97,7 @@ fn tree_walk_graphviz(cell: &Cell, visited: &mut HashSet<UInt256>) {
             let child = cell.reference(i).unwrap();
             let child_hash = child.repr_hash().to_hex_string();
             let child_id = &child_hash.as_str()[..8];
-            println!("  \"{}\" -> \"{}\" [ taillabel=\"{}\"];", cell_id, child_id, i.to_string());
+            println!("  \"{}\" -> \"{}\" [ taillabel=\"{}\"];", cell_id, child_id, i);
         }
     }
     for i in 0..cell.references_count() {
@@ -111,19 +112,19 @@ fn graphviz(cell: &Cell) {
     println!("digraph code {{");
     println!("  node [shape=box, fontname=\"DejaVu Sans Mono\"]");
     let mut visited = HashSet::new();
-    tree_walk_graphviz(&cell, &mut visited);
+    tree_walk_graphviz(cell, &mut visited);
     println!("}}");
 }
 
-fn disasm_dump_command(m: &ArgMatches) -> core::result::Result<(), String> {
+fn disasm_dump_command(m: &ArgMatches) -> Status {
     let filename = m.value_of("TVC");
-    let tvc = filename.map(|f| std::fs::read(f))
+    let tvc = filename.map(std::fs::read)
         .transpose()
-        .map_err(|e| format!(" failed to read tvc file: {}", e))?
+        .map_err(|e| format_err!(" failed to read tvc file: {}", e))?
         .unwrap();
     let mut csor = Cursor::new(tvc);
-    let roots = deserialize_cells_tree(&mut csor).map_err(|e| e.to_string())?;
-    if roots.len() == 0 {
+    let roots = deserialize_cells_tree(&mut csor).map_err(|e| format_err!("{}", e))?;
+    if roots.is_empty() {
         println!("empty");
     } else {
         println!("{} {} in total", roots.len(), if roots.len() < 2 { "root" } else { "roots" });
@@ -140,7 +141,7 @@ pub(super) fn print_tree_of_cells(toc: &Cell) {
     fn print_tree_of_cells(cell: &Cell, prefix: String, last: bool) {
         let indent = if last { "└ " } else { "├ " };
         let mut hex = cell.to_hex_string(true);
-        if hex.len() > 0 {
+        if !hex.is_empty() {
             let mut first = true;
             let indent_next = if !last { "│ " } else { "  " };
             while hex.len() > 64 {
@@ -151,7 +152,7 @@ pub(super) fn print_tree_of_cells(toc: &Cell) {
             }
             println!("{}{}{}", prefix, if first { indent } else { indent_next }, hex);
         } else {
-            println!("{}{}{}", prefix, indent, "8_");
+            println!("{}{}8_", prefix, indent);
         }
 
         let prefix_child = if last { "  " } else { "│ " };
@@ -164,7 +165,7 @@ pub(super) fn print_tree_of_cells(toc: &Cell) {
             }
         }
     }
-    print_tree_of_cells(&toc, "".to_string(), true);
+    print_tree_of_cells(toc, "".to_string(), true);
 }
 
 fn print_code_dict(cell: &Cell, key_size: usize) {
@@ -176,13 +177,13 @@ fn print_code_dict(cell: &Cell, key_size: usize) {
     for (key, slice) in dict.iter().map(|r| r.unwrap()) {
         let cell = key.into_cell().unwrap();
         let id = SliceData::from(cell).get_next_int(key_size).unwrap();
-        println!("");
+        println!();
         println!(";; function id 0x{:x}", id);
         print!("{}", disasm(&mut slice.clone()));
     }
 }
 
-fn disasm_text_command(m: &ArgMatches) -> core::result::Result<(), String> {
+fn disasm_text_command(m: &ArgMatches) -> Status {
     let shape_deprecated = Shape::literal("ff00f4a42022c00192f4a0e18aed535830f4a1")
         .branch(Shape::var("dict-public"))
         .branch(Shape::literal("f4a420f4a1")
@@ -207,12 +208,12 @@ fn disasm_text_command(m: &ArgMatches) -> core::result::Result<(), String> {
             .branch(Shape::any())); // just to mark any() as used, can be omitted
 
     let filename = m.value_of("TVC");
-    let tvc = filename.map(|f| std::fs::read(f))
+    let tvc = filename.map(std::fs::read)
         .transpose()
-        .map_err(|e| format!(" failed to read tvc file: {}", e))?
+        .map_err(|e| format_err!(" failed to read tvc file: {}", e))?
         .unwrap();
     let mut csor = Cursor::new(tvc);
-    let mut roots = deserialize_cells_tree(&mut csor).map_err(|e| e.to_string())?;
+    let mut roots = deserialize_cells_tree(&mut csor).map_err(|e| format_err!("{}", e))?;
     let code = roots.remove(0).reference(0).unwrap();
 
     if let Ok(assigned) = shape_deprecated.captures(&code) {
@@ -237,7 +238,7 @@ fn disasm_text_command(m: &ArgMatches) -> core::result::Result<(), String> {
         println!(";; internal functions dictionary");
         print_code_dict(&assigned["dict-c3"], 19);
     } else {
-        return Err("failed to recognize selector".to_string())
+        bail!("failed to recognize selector")
     }
 
     Ok(())

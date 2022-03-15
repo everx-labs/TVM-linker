@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 
-pub(crate) mod disasm;
+pub(crate) mod commands;
 mod handlers;
 mod loader;
 #[cfg(test)]

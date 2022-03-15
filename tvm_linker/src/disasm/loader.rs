@@ -12,6 +12,7 @@
  */
 
 use ton_types::{Result, SliceData, fail};
+use std::cmp::Ordering;
 use std::ops::Not;
 use num_traits::Zero;
 
@@ -104,12 +105,12 @@ pub(super) fn load(slice: &mut SliceData) -> Result<Code> {
     let mut code = Code::new();
     loop {
         if slice.is_empty() {
-            if slice.remaining_references() > 1 {
-                fail!("two or more remaining references");
-            } else if slice.remaining_references() == 1 {
-                *slice = SliceData::from(slice.reference(0).unwrap())
-            } else {
-                break;
+            match slice.remaining_references().cmp(&1) {
+                Ordering::Less => break,
+                Ordering::Equal => {
+                    *slice = SliceData::from(slice.reference(0).unwrap())
+                }
+                Ordering::Greater => fail!("two or more remaining references")
             }
         }
         while slice.remaining_bits() > 0 {
@@ -414,7 +415,7 @@ pub(super) fn load_tuple_index3(slice: &mut SliceData) -> Result<Instruction> {
 }
 pub(super) fn load_pushint(slice: &mut SliceData) -> Result<Instruction> {
     let opc = slice.get_next_int(8)?;
-    assert!(0x70 <= opc && opc < 0x82);
+    assert!((0x70..0x82).contains(&opc));
     let mut x: i16 = 0;
     if opc <= 0x7a {
         x = opc as i16 - 0x70;
@@ -1650,12 +1651,11 @@ pub fn print_code(code: &Code, indent: &str) -> String {
         if insn.is_quiet() {
             disasm += "Q";
         }
-        let mut index = 0;
         let len = insn.params().len();
         if len > 0 {
             disasm += " ";
         }
-        for param in insn.params() {
+        for (index, param) in insn.params().iter().enumerate() {
             let last = len == (index + 1);
             match param {
                 InstructionParameter::BigInteger(i) => {
@@ -1709,7 +1709,6 @@ pub fn print_code(code: &Code, indent: &str) -> String {
             if !last {
                 disasm += ", ";
             }
-            index += 1;
         }
         disasm += "\n";
     }

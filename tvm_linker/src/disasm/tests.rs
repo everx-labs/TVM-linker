@@ -12,7 +12,7 @@
  */
 
 use ton_types::SliceData;
-use super::disasm::{disasm, print_tree_of_cells};
+use super::commands::{disasm, print_tree_of_cells};
 
 fn round_trip_test(raw0: &str, check_bin: bool) {
     let bin0 = base64::decode(raw0).unwrap();

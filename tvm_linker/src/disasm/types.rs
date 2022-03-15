@@ -132,7 +132,7 @@ impl Shape {
                 }
             }
             ShapeKind::Var(name) => {
-                map.insert(name.clone(), cell.clone());
+                map.insert(*name, cell.clone());
                 return Ok(map)
             }
         }
