@@ -179,7 +179,8 @@ impl Program {
             None, // ticktock,
             None, // gas_limit,
             Some(action_decoder),
-            if trace { TraceLevel::Full } else { TraceLevel::None }
+            if trace { TraceLevel::Full } else { TraceLevel::None },
+            None  // specific capabilities
         )?;
 
         if is_vm_success {
@@ -599,6 +600,7 @@ mod tests {
             Some(|_, _| {}),
             TraceLevel::None,
             String::from(""),
+            None
         );
         // must equal to out of gas exception
         assert!(exit_code.is_ok());
@@ -642,6 +644,7 @@ mod tests {
             Some(|_, _| {}),
             TraceLevel::Full,
             debug_map_filename,
+            None
         );
         assert!(exit_code.is_ok());
         assert_eq!(exit_code.unwrap(), 0);
@@ -702,6 +705,7 @@ mod tests {
             Some(|_, _| {}),
             TraceLevel::None,
             String::new(),
+            Some(GlobalCapabilities::CapMycode as u64)
         );
         assert!(exit_code.is_ok());
         assert_eq!(exit_code.unwrap(), 0);
