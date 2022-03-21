@@ -11,7 +11,7 @@
 * limitations under the License.
 */
 
-use ton_types::cells_serialization::{deserialize_tree_of_cells, serialize_tree_of_cells};
+use ton_types::cells_serialization::{deserialize_tree_of_cells_inmem, serialize_tree_of_cells};
 use ton_types::SliceData;
 use ton_types::types::AccountId;
 use std::fs;
@@ -168,9 +168,14 @@ where
     where
         R: Read + io::Seek,
     {
-        let code = deserialize_tree_of_cells(&mut contract.by_name("code.cells")?)
+        let mut code_bytes = Vec::new();
+        contract.by_name("code.cells")?.read_to_end(&mut code_bytes)?;
+        let code = deserialize_tree_of_cells_inmem(code_bytes)
             .unwrap_or_else(|err| panic!("Code error: {}", err)).into();
-        let persistent_data = deserialize_tree_of_cells(&mut contract.by_name("data.cells")?)
+
+        let mut data_bytes = Vec::new();
+        contract.by_name("data.cells")?.read_to_end(&mut data_bytes)?;
+        let persistent_data = deserialize_tree_of_cells_inmem(data_bytes)
             .unwrap_or_else(|err| panic!("Data error: {}", err)).into();
 
         Ok(Contract {
