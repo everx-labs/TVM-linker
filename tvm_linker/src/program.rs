@@ -436,7 +436,7 @@ mod tests {
     fn test_comm_var_addresses() {
         let sources = vec![Path::new("./tests/test_stdlib.tvm"),
                                      Path::new("./tests/comm_test2.s")];
-        let parser = ParseEngine::new(sources, None, false);
+        let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
         let body = {
@@ -455,7 +455,7 @@ mod tests {
     fn test_asciz_var() {
         let sources = vec![Path::new("./tests/test_stdlib.tvm"),
                                      Path::new("./tests/asci_test1.s")];
-        let parser = ParseEngine::new(sources, None, false);
+        let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
         let body = {
@@ -474,7 +474,7 @@ mod tests {
     fn test_sender_pubkey() {
         let sources = vec![Path::new("./tests/test_stdlib_c.tvm"),
                                      Path::new("./tests/sign-test.s")];
-        let parser = ParseEngine::new(sources, None, false);
+        let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
         let body = {
@@ -499,7 +499,7 @@ mod tests {
     fn test_ticktock() {
         let sources = vec![Path::new("./tests/test_stdlib_sol.tvm"),
                                      Path::new("./tests/ticktock.code")];
-        let parser = ParseEngine::new(sources, None, false);
+        let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
         let contract_file = prog.compile_to_file(-1).unwrap();
@@ -513,7 +513,7 @@ mod tests {
     fn test_recursive_call() {
         let sources = vec![Path::new("./tests/test_stdlib.tvm"),
                                      Path::new("./tests/test_recursive.code")];
-        let parser = ParseEngine::new(sources, None, false);
+        let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
         let contract_file = prog.compile_to_file(-1).unwrap();
@@ -536,7 +536,7 @@ mod tests {
         let abi_str = abi::load_abi_json_string("./tests/test_public.abi.json").unwrap();
         let abi = abi::load_abi_contract(&abi_str).unwrap();
 
-        let parser = ParseEngine::new(sources, Some(abi_str), false);
+        let parser = ParseEngine::new(sources, Some(abi_str));
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
 
@@ -574,7 +574,7 @@ mod tests {
                                      Path::new("./tests/Wallet.code")];
         let abi = abi::load_abi_json_string("./tests/Wallet.abi.json").unwrap();
 
-        let parser = ParseEngine::new(sources, Some(abi), false);
+        let parser = ParseEngine::new(sources, Some(abi));
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
 
@@ -613,7 +613,7 @@ mod tests {
                                      Path::new("tests/Wallet.code")];
         let abi = abi::load_abi_json_string("tests/Wallet.abi.json").unwrap();
 
-        let parser = ParseEngine::new(sources, Some(abi), false);
+        let parser = ParseEngine::new(sources, Some(abi));
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
 
@@ -651,7 +651,7 @@ mod tests {
     }
 
     fn get_version(filename: &str) -> Result<String, String> {
-        let parser = ParseEngine::new(vec![Path::new(filename)], None, false);
+        let parser = ParseEngine::new(vec![Path::new(filename)], None);
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
         let file_name = prog.compile_to_file(-1).unwrap();
@@ -679,7 +679,7 @@ mod tests {
         let sources = vec![Path::new("tests/test_stdlib_sol.tvm"), Path::new("tests/mycode.code")];
         let abi = abi::load_abi_json_string("tests/mycode.abi.json").unwrap();
 
-        let parser = ParseEngine::new(sources, Some(abi), false);
+        let parser = ParseEngine::new(sources, Some(abi));
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
 
