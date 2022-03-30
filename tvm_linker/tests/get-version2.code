@@ -1,6 +1,0 @@
-.pragma selector-save-my-code
-.version 0.43.0+commit.e8c3d877.mod.Linux.g++
-
-.internal-alias :main_internal, -1
-.internal       :main_internal
-PRINTSTR hello
