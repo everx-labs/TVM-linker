@@ -1,0 +1,14 @@
+    .type	x,@object
+	.data
+	.globl	x
+	.p2align	3
+x:
+	.quad	-1
+	.quad	2
+	.size	x, 16
+
+	.type	y.a,@object
+y.a:
+	.byte	1
+	.size	y.a, 1
+

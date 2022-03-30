@@ -1,0 +1,6 @@
+    .globl hello_external
+    .type hello_external, @function
+hello_external:
+    BLKDROP 5
+    PUSHINT 1
+    PRINTSTR Hello

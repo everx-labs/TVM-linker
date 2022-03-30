@@ -1,0 +1,13 @@
+    .internal-alias :main_external,     -1
+    .internal-alias :authenticate,      2
+
+    .internal :main_external
+    PUSHINT -1
+
+    .internal :authenticate
+    PUSHINT 2
+
+    .globl foo
+    .type foo, @function
+foo:
+    PRINTSTR foo

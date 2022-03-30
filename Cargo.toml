@@ -1,0 +1,41 @@
+[package]
+authors = [ 'TON DEV SOLUTIONS LTD <support@tonlabs.io>' ]
+build = 'build/build.rs'
+description = 'TVM Linker'
+documentation = 'https://docs.ton.dev'
+homepage = 'https://ton.dev'
+keywords = [ 'TON', 'linker', 'TVM', 'tonlabs' ]
+license-file = 'LICENSE.md'
+name = 'tvm_linker'
+readme = 'README.md'
+repository = 'https://github.com/tonlabs/TVM-linker'
+version = '0.15.1'
+
+[dependencies]
+base64 = '0.10.0'
+clap = '2.32'
+crc16 = '*'
+ed25519 = '1.0.1'
+ed25519-dalek = '1.0.1'
+failure = '0.1.0'
+hex = '0.3.2'
+lazy_static = '1.1.0'
+log = '0.4.6'
+num = '0.4'
+num-traits = '0.2'
+rand = '0.7.3'
+regex = '1'
+serde_json = '1.0.41'
+sha2 = '0.8.0'
+simplelog = '0.5.3'
+serde = { features = [ 'derive' ], version = '1.0.100' }
+ton_abi = { git = 'https://github.com/tonlabs/ton-labs-abi.git', tag = '2.1.14' }
+ton_block = { git = 'https://github.com/tonlabs/ton-labs-block.git', tag = '1.7.39' }
+ton_labs_assembler = { git = 'https://github.com/tonlabs/ton-labs-assembler.git', tag = '1.2.31' }
+ton_sdk = { default-features = false, git = 'https://github.com/tonlabs/ton-sdk.git', tag = '1.31.0' }
+ton_types = { git = 'https://github.com/tonlabs/ton-labs-types.git', tag = '1.10.12' }
+ton_vm = { default-features = false, git = 'https://github.com/tonlabs/ton-labs-vm.git', tag = '1.8.32' }
+
+[dev-dependencies]
+assert_cmd = '0.11'
+predicates = '1'

@@ -1,0 +1,22 @@
+    .internal-alias :main_ticktock,   -2
+
+    .globl constructor
+    .type constructor, @function
+
+
+    .internal :main_ticktock
+    PUSHCONT {
+        PUSHINT 10
+        PRINTSTR tock
+    }
+    PUSHCONT {
+        PUSHINT 5
+        PRINTSTR tick
+    }
+    IFELSE
+
+    .globl fallback
+    .type fallback,@function
+
+    .globl onBounce
+    .type onBounce,@function
