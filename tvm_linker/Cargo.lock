@@ -37,8 +37,8 @@ dependencies = [
 
 [[package]]
 name = "api_derive"
-version = "1.28.0"
-source = "git+https://github.com/tonlabs/ton-sdk.git?tag=1.28.0#3c299a04aa415bc919b57bddbd89a397d009d6da"
+version = "1.31.0"
+source = "git+https://github.com/tonlabs/ton-sdk.git?tag=1.31.0#7b70f3d29afb27488980b79de01906e6e943e0b4"
 dependencies = [
  "api_info",
  "quote",
@@ -48,8 +48,8 @@ dependencies = [
 
 [[package]]
 name = "api_info"
-version = "1.28.0"
-source = "git+https://github.com/tonlabs/ton-sdk.git?tag=1.28.0#3c299a04aa415bc919b57bddbd89a397d009d6da"
+version = "1.31.0"
+source = "git+https://github.com/tonlabs/ton-sdk.git?tag=1.31.0#7b70f3d29afb27488980b79de01906e6e943e0b4"
 dependencies = [
  "serde",
  "serde_derive",
@@ -267,9 +267,9 @@ checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
 name = "cpufeatures"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95059428f66df56b63431fdb4e1947ed2190586af5c5a8a8b71122bdf5a7f469"
+checksum = "59a6001667ab124aebae2a495118e11d30984c3a653e99d86d58971708cf5e4b"
 dependencies = [
  "libc",
 ]
@@ -285,9 +285,9 @@ dependencies = [
 
 [[package]]
 name = "crc-any"
-version = "2.4.1"
+version = "2.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "073375684a58dece169afbdc9879a027f3698118ad3814938316c6002b7aa921"
+checksum = "a3fc9f32c34de51ba0a727fd84d2cc83587efeca519cfca1105e3efa9c1c78fb"
 dependencies = [
  "debug-helper",
 ]
@@ -336,9 +336,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-channel"
-version = "0.5.2"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e54ea8bc3fb1ee042f5aace6e3c6e025d3874866da222930f70ce62aceba0bfa"
+checksum = "5aaa7bd5fb665c6864b5f963dd9097905c54125909c7aa94c9e18507cdbe6c53"
 dependencies = [
  "cfg-if",
  "crossbeam-utils",
@@ -357,10 +357,11 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-epoch"
-version = "0.9.7"
+version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c00d6d2ea26e8b151d99093005cb442fb9a37aeaca582a03ec70946f49ab5ed9"
+checksum = "1145cf131a2c6ba0615079ab6a638f7e1973ac9c2634fcbeaaad6114246efe8c"
 dependencies = [
+ "autocfg",
  "cfg-if",
  "crossbeam-utils",
  "lazy_static",
@@ -370,9 +371,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-utils"
-version = "0.8.7"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5e5bed1f1c269533fa816a0a5492b3545209a205ca1a54842be180eb63a16a6"
+checksum = "0bf124c720b7686e3c2663cf54062ab0f68a88af2fb6a030e87e30bf721fcb38"
 dependencies = [
  "cfg-if",
  "lazy_static",
@@ -415,9 +416,9 @@ dependencies = [
 
 [[package]]
 name = "debug-helper"
-version = "0.3.12"
+version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76fbd10dce159c002b9c688ae8ab7cd531151e185e0ad360f4bfea3b0eede3a8"
+checksum = "f578e8e2c440e7297e008bb5486a3a8a194775224bbc23729b0dbdfaeebf162e"
 
 [[package]]
 name = "difference"
@@ -456,9 +457,9 @@ dependencies = [
 
 [[package]]
 name = "ed25519"
-version = "1.4.0"
+version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eed12bbf7b5312f8da1c2722bc06d8c6b12c2d86a7fb35a194c7f3e6fc2bbe39"
+checksum = "3d5c4b5e5959dc2c2b89918d8e2cc40fcdd623cef026ed09d2f0ee05199dc8e4"
 dependencies = [
  "signature",
 ]
@@ -644,9 +645,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.119"
+version = "0.2.121"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bf2e165bb3457c8e098ea76f3e3bc9db55f87aa90d52d0e6be741470916aaa4"
+checksum = "efaa7b300f3b5fe8eb6bf21ce3895e1751d9665086af2d64b42f19701015ff4f"
 
 [[package]]
 name = "lockfree"
@@ -658,9 +659,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.14"
+version = "0.4.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
+checksum = "6389c490849ff5bc16be905ae24bc913a9c8892e19b2341dbc175e14c341c2b8"
 dependencies = [
  "cfg-if",
 ]
@@ -947,9 +948,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.15"
+version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "864d3e96a899863136fc6e99f3d7cae289dafe43bf2c5ac19b70df7210c0a145"
+checksum = "b4af2ec4714533fcdf07e886f17025ace8b997b9ce51204ee69b6da831c3da57"
 dependencies = [
  "proc-macro2",
 ]
@@ -1069,9 +1070,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.5.4"
+version = "1.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d07a8629359eb56f1e2fb1652bb04212c072a87ba68546a04065d525673ac461"
+checksum = "1a11647b6b25ff05a515cb92c365cec08801e83423a235b51e231e1808747286"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -1247,9 +1248,9 @@ checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 
 [[package]]
 name = "syn"
-version = "1.0.86"
+version = "1.0.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a65b3f4ffa0092e9887669db0eae07941f023991ab58ea44da8fe8e2d511c6b"
+checksum = "ea297be220d52398dcc07ce15a209fce436d361735ac1db700cab3b6cdfb9f54"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1316,8 +1317,8 @@ dependencies = [
 
 [[package]]
 name = "ton_abi"
-version = "2.1.7"
-source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.1.7#0aad74c3d6a8800d5a033acc43fd07308ae3dd16"
+version = "2.1.14"
+source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.1.14#ed3f54ffeb646ba9fe86bd69cc19c9d62a752426"
 dependencies = [
  "base64 0.10.1",
  "byteorder",
@@ -1326,20 +1327,20 @@ dependencies = [
  "ed25519-dalek",
  "failure",
  "hex 0.3.2",
- "num-bigint 0.2.6",
+ "num-bigint 0.4.3",
  "num-traits",
  "serde",
  "serde_derive",
  "serde_json",
  "sha2 0.8.2",
- "ton_block 1.7.37",
+ "ton_block",
  "ton_types",
 ]
 
 [[package]]
 name = "ton_block"
-version = "1.7.36"
-source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.7.36#2a5ec43f63a1c5b9361bcc4cbb1c005d2277d450"
+version = "1.7.39"
+source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.7.39#4b34a73619b53ebda37f3cb6cc44d26925053219"
 dependencies = [
  "base64 0.13.0",
  "crc",
@@ -1348,26 +1349,7 @@ dependencies = [
  "failure",
  "hex 0.4.3",
  "log",
- "num 0.2.1",
- "num-traits",
- "rand 0.7.3",
- "sha2 0.8.2",
- "ton_types",
-]
-
-[[package]]
-name = "ton_block"
-version = "1.7.37"
-source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.7.37#d6fd047515ece6f3c02c8e34aa98bd7dbe6037f4"
-dependencies = [
- "base64 0.13.0",
- "crc",
- "ed25519",
- "ed25519-dalek",
- "failure",
- "hex 0.4.3",
- "log",
- "num 0.2.1",
+ "num 0.4.0",
  "num-traits",
  "rand 0.7.3",
  "sha2 0.8.2",
@@ -1376,8 +1358,8 @@ dependencies = [
 
 [[package]]
 name = "ton_labs_assembler"
-version = "1.2.30"
-source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.30#be4bcbae766f37fba2466398b692d92667df9225"
+version = "1.2.31"
+source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.31#51de8425ad1a99ad5355f43f03266bd325d05da3"
 dependencies = [
  "failure",
  "hex 0.4.3",
@@ -1391,8 +1373,8 @@ dependencies = [
 
 [[package]]
 name = "ton_sdk"
-version = "1.28.0"
-source = "git+https://github.com/tonlabs/ton-sdk.git?tag=1.28.0#3c299a04aa415bc919b57bddbd89a397d009d6da"
+version = "1.31.0"
+source = "git+https://github.com/tonlabs/ton-sdk.git?tag=1.31.0#7b70f3d29afb27488980b79de01906e6e943e0b4"
 dependencies = [
  "api_derive",
  "api_info",
@@ -1404,22 +1386,22 @@ dependencies = [
  "hex 0.3.2",
  "lazy_static",
  "log",
- "num-bigint 0.2.6",
+ "num-bigint 0.4.3",
  "num-traits",
  "serde",
  "serde_derive",
  "serde_json",
  "sha2 0.8.2",
  "ton_abi",
- "ton_block 1.7.36",
+ "ton_block",
  "ton_types",
- "ton_vm 1.8.27",
+ "ton_vm",
 ]
 
 [[package]]
 name = "ton_types"
 version = "1.10.12"
-source = "git+https://github.com/tonlabs/ton-labs-types.git?tag=1.10.12#fcb8420d172f11ab39e6c3599e18e4e977cb0a04"
+source = "git+https://github.com/tonlabs/ton-labs-types.git?tag=1.10.12#af1dc71a9a2b46cb0d55a0956e44726374ba7c0c"
 dependencies = [
  "base64 0.13.0",
  "crc",
@@ -1438,8 +1420,8 @@ dependencies = [
 
 [[package]]
 name = "ton_vm"
-version = "1.8.27"
-source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.27#ab4c02666afcd981e9cd2e6958e4bc7afe233d1d"
+version = "1.8.32"
+source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.32#55730ac7ca4c745f80ce1e114b88e11c3164cb1f"
 dependencies = [
  "criterion",
  "ed25519",
@@ -1452,33 +1434,14 @@ dependencies = [
  "num-traits",
  "rand 0.7.3",
  "sha2 0.9.9",
- "ton_labs_assembler",
- "ton_types",
-]
-
-[[package]]
-name = "ton_vm"
-version = "1.8.28"
-source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.28#55cb6211fb2f758c65d36fd6d6854921f14bb44c"
-dependencies = [
- "criterion",
- "ed25519",
- "ed25519-dalek",
- "failure",
- "hex 0.4.3",
- "lazy_static",
- "log",
- "num 0.4.0",
- "num-traits",
- "rand 0.7.3",
- "sha2 0.9.9",
+ "ton_block",
  "ton_labs_assembler",
  "ton_types",
 ]
 
 [[package]]
 name = "tvm_linker"
-version = "0.14.43"
+version = "0.14.53"
 dependencies = [
  "assert_cmd",
  "base64 0.10.1",
@@ -1490,7 +1453,7 @@ dependencies = [
  "hex 0.3.2",
  "lazy_static",
  "log",
- "num 0.2.1",
+ "num 0.4.0",
  "num-traits",
  "predicates",
  "rand 0.7.3",
@@ -1500,11 +1463,11 @@ dependencies = [
  "sha2 0.8.2",
  "simplelog",
  "ton_abi",
- "ton_block 1.7.36",
+ "ton_block",
  "ton_labs_assembler",
  "ton_sdk",
  "ton_types",
- "ton_vm 1.8.28",
+ "ton_vm",
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 TON DEV SOLUTIONS LTD.
+ * Copyright 2018-2022 TON DEV SOLUTIONS LTD.
  *
  * Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
  * this file except in compliance with the License.
@@ -72,7 +72,7 @@ fn adjust_debug_map(map: &mut DbgInfo, before: SliceData, after: SliceData) -> R
     let hash_old = before.cell().repr_hash();
     let hash_new = after.cell().repr_hash();
     let old = map.remove(&hash_old)
-        .ok_or("Failed to remove old value.".to_string())?;
+        .ok_or_else(|| "Failed to remove old value.".to_string())?;
 
     let adjustment = after.pos();
     let mut new = BTreeMap::new();
