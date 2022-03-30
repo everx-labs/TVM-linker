@@ -1,0 +1,19 @@
+.internal-alias :main_ticktock, -2
+.internal :main_ticktock
+
+PUSHREF
+.compute $cell2$
+DROP
+
+.macro cell1
+PUSHINT 222
+PUSHINT 111
+NEWC
+STU 32
+STU 64
+ENDC
+
+.macro cell2
+PUSHREF
+.compute $cell1$
+

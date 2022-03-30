@@ -1,0 +1,78 @@
+{
+	"ABI version": 1,
+	"functions": [
+		{
+			"name": "at32",
+			"inputs": [
+				{"name":"idx","type":"uint8"},
+				{"name":"arr","type":"uint32[]"}
+			],
+			"outputs": [
+				{"name":"value0","type":"uint32"}
+			]
+		},
+		{
+			"name": "pair64",
+			"inputs": [
+				{"name":"arr1","type":"uint64[]"},
+				{"name":"arr2","type":"uint64[]"}
+			],
+			"outputs": [
+				{"name":"value0","type":"uint64"}
+			]
+		},
+		{
+			"name": "pair8",
+			"inputs": [
+				{"name":"arr1","type":"uint8[]"},
+				{"name":"arr2","type":"uint8[]"}
+			],
+			"outputs": [
+				{"name":"value0","type":"uint8"}
+			]
+		},
+		{
+			"name": "at256",
+			"inputs": [
+				{"name":"idx","type":"uint8"},
+				{"name":"arr","type":"uint256[]"}
+			],
+			"outputs": [
+				{"name":"value0","type":"uint256"}
+			]
+		},
+		{
+			"name": "atAt32",
+			"inputs": [
+				{"name":"idx","type":"uint32"},
+				{"name":"arr","type":"uint32[]"},
+				{"name":"idy","type":"uint32"}
+			],
+			"outputs": [
+				{"name":"value0","type":"uint32"}
+			]
+		},
+		{
+			"name": "atAt256",
+			"inputs": [
+				{"name":"idx","type":"uint32"},
+				{"name":"arr","type":"uint256[]"},
+				{"name":"idy","type":"uint32"}
+			],
+			"outputs": [
+				{"name":"value0","type":"uint256"}
+			]
+		},
+		{
+			"name": "constructor",
+			"inputs": [
+			],
+			"outputs": [
+			]
+		}
+	],
+	"events": [
+	],
+	"data": [
+	]
+}
