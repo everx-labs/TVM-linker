@@ -231,8 +231,8 @@ pub struct ParseEngine {
     internal_alias_name_to_id_: HashMap<String, i32>, // TODO delete this or internal_name_to_id
 
     /// it's about private/public .globl or variables, e.g.
-    /// .globl	sendMessage_internal
-    /// .type	sendMessage_internal, @function
+    /// .globl  sendMessage_internal
+    /// .type   sendMessage_internal, @function
     /// ...
     /// name -> id
     globl_name_to_id: HashMap<String, u32>,
@@ -299,7 +299,7 @@ const SCI_NAME:         &str = "tvm_contract_info";
 fn start_with(sample: &str, pattern: &str) -> bool {
     let s = sample.as_bytes();
     let mut i = 0;
-    while i < s.len() && (s[i] == '\t' as u8 || s[i] == ' ' as u8) {
+    while i < s.len() && (s[i] == b'\t' || s[i] == b' ') {
         i += 1;
     }
     let p = pattern.as_bytes();
@@ -542,16 +542,16 @@ impl ParseEngine {
                 obj_body = vec![];
                 let cap = TYPE_REGEX.captures(&l).unwrap();
                 obj_name = cap.get(1).unwrap().as_str().to_owned();
-                let type_name = cap.get(2).ok_or(format_err!("line {}: .type option is invalid", lnum))?.as_str();
-                let obj = self.globl_name_to_object.entry(obj_name.clone()).or_insert_with(|| GloblFuncOrData::new(obj_name.clone(), &type_name));
+                let type_name = cap.get(2).ok_or_else(|| format_err!("line {}: .type option is invalid", lnum))?.as_str();
+                let obj = self.globl_name_to_object.entry(obj_name.clone()).or_insert_with(|| GloblFuncOrData::new(obj_name.clone(), type_name));
                 obj.dtype = GloblFuncOrDataType::from(type_name);
             } else if start_with(&l, ".size") {
                 // .size x, val
                 let cap = SIZE_REGEX.captures(&l).unwrap();
                 let name = cap.get(1).unwrap().as_str().to_owned();
-                let size_str = cap.get(2).ok_or(format_err!("line {}: .size option is invalid", lnum))?.as_str();
+                let size_str = cap.get(2).ok_or_else(|| format_err!("line {}: .size option is invalid", lnum))?.as_str();
                 let item_ref = self.globl_name_to_object.entry(name.clone()).or_insert_with(|| GloblFuncOrData::new(name, ""));
-                item_ref.size = usize::from_str_radix(size_str, 10).unwrap_or(0);
+                item_ref.size = size_str.parse::<usize>().unwrap_or(0);
             } else if start_with(&l, ".public") {
                 // .public x
                 let cap = PUBLIC_REGEX.captures(&l).unwrap();
@@ -583,7 +583,7 @@ impl ParseEngine {
                 let cap = ALIAS_REGEX.captures(&l).unwrap();
                 self.internal_alias_name_to_id_.insert(
                     cap.get(1).unwrap().as_str().to_owned(),
-                    i32::from_str_radix(cap.get(2).unwrap().as_str(), 10)
+                    cap.get(2).unwrap().as_str().parse::<i32>()
                         .map_err(|_| format_err!("line: '{}': failed to parse id", lnum))?,
                 );
             } else if start_with(&l, ".internal") {
@@ -660,7 +660,7 @@ impl ParseEngine {
             }
         }
 
-        let ids = self.internal_id_to_code.keys().map(|x| *x).collect::<Vec<_>>();
+        let ids = self.internal_id_to_code.keys().copied().collect::<Vec<_>>();
         for id in &ids {
             let lines = self.internal_id_to_code.get(id).unwrap().body.clone();
             let new_lines = self.resolve_nested_macros_in_lines(lines)?;
@@ -670,7 +670,7 @@ impl ParseEngine {
         Ok(())
     }
 
-    fn resolve_nested_macro(&mut self, name: &String) -> Status {
+    fn resolve_nested_macro(&mut self, name: &str) -> Status {
         if let Some(is_computed) = self.is_computed_macros.get(name) {
             return if *is_computed {
                 Ok(())
@@ -689,7 +689,7 @@ impl ParseEngine {
     fn replace_labels_in_body(&mut self, lines: Lines, obj_name: FunctionId) -> Result<Lines> {
         let mut new_lines = vec![];
         for line in lines {
-            if start_with(&line.text.as_str(), ".compute") {
+            if start_with(&line.text, ".compute") {
                 let name = COMPUTE_REGEX.captures(&line.text).unwrap().get(1).unwrap().as_str();
                 let mut resolved = self.compute_cell(name)?;
                 new_lines.append(&mut resolved);
@@ -705,7 +705,7 @@ impl ParseEngine {
     }
 
     fn replace_all_labels(&mut self) -> Status {
-        let names = self.globl_name_to_object.keys().map(|k| k.clone()).collect::<Vec<_>>();
+        let names = self.globl_name_to_object.keys().cloned().collect::<Vec<_>>();
         for name in &names {
             if let GloblFuncOrDataType::Function(f) = &self.globl_name_to_object.get(name).unwrap().dtype {
                 let lines = f.body.clone();
@@ -988,24 +988,17 @@ impl ParseEngine {
 
     fn replace_labels(&mut self, line: &Line, cur_obj_name: &FunctionId) -> Result<Line> {
         resolve_name(line, |name| {
-            self.internal_name_to_id.get(name).and_then(|id| {
-                Some(id.clone())
-            })
+            self.internal_name_to_id.get(name).copied()
         })
         .or_else(|_| resolve_name(line, |name| {
-            let mut res = self.globl_name_to_id.get(name).map(|id| id.clone());
-            if res.is_some(){
-                let id = res.unwrap();
+            self.globl_name_to_id.get(name).copied().map(|id| {
                 self.insert_called_func(cur_obj_name, id);
-                res = Some(id);
-            }
-            res
+                id
+            })
         }))
         .or_else(|_| resolve_name(line, |name| {
             self.globl_name_to_object.get(name).and_then(|obj| {
-                obj.dtype.data().and_then(|data| {
-                    Some(data.addr.clone())
-                })
+                obj.dtype.data().map(|data| data.addr)
             })
         }))
         .or_else(|_| resolve_name(line, |name| {
@@ -1029,7 +1022,7 @@ impl ParseEngine {
                     });
             }
             FunctionId::Id(id) => {
-                self.internal_id_to_code.get_mut(&id).map(|f| {
+                self.internal_id_to_code.get_mut(id).map(|f| {
                     f.called_ids.push(to_func);
                     Some(f)
                 });
