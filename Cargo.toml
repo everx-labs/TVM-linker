@@ -1,6 +1,5 @@
 [package]
 authors = [ 'TON DEV SOLUTIONS LTD <support@tonlabs.io>' ]
-build = 'build/build.rs'
 description = 'TVM Linker'
 documentation = 'https://docs.ton.dev'
 homepage = 'https://ton.dev'
