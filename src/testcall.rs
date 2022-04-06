@@ -43,7 +43,9 @@ fn create_external_inbound_msg(src: MsgAddressExt, dst: MsgAddressInt, body: Opt
         import_fee: Grams(0x1234u32.into())
     };
     let mut msg = Message::with_ext_in_header(hdr);
-    *msg.body_mut() = body;
+    if let Some(body) = body {
+        msg.set_body(body);
+    }
     msg
 }
 
@@ -68,7 +70,9 @@ fn create_internal_msg(
     hdr.created_lt = lt;
     hdr.created_at = UnixTime32(at);
     let mut msg = Message::with_int_header(hdr);
-    *msg.body_mut() = body;
+    if let Some(body) = body {
+        msg.set_body(body);
+    }
     msg
 }
 
