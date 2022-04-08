@@ -88,7 +88,7 @@ def compile2(source_name, directory = "tests_sol", lib_file = STDLIB_SOL):
 	source_file = "./" + directory + "/{}.code".format(source_name)
 	abi_file = "./" + directory + "/{}.abi.json".format(source_name)
 	
-	cmd = "{} compile {} --abi-json {} --lib {} --setkey key1 --debug > compile_log.tmp"
+	cmd = "{} compile {} --abi-json {} --lib {} --setkey tests/key1 --debug > compile_log.tmp"
 	cmd = cmd.format(TVM_PATH, source_file, abi_file, lib_file)
 	# print cmd
 	ec = os.system(cmd)
@@ -202,14 +202,14 @@ def testOld():
 
 	compile1('test_signature.code', STDLIB_SOL)
 	expect_failure('constructor', "", 100, "")
-	SIGN = "key1"
+	SIGN = "tests/key1"
 	expect_success('constructor', "", "", "--trace")
 	expect_success('get_role', "", "1", "")
 	SIGN = None
 	expect_failure('get_role', "", 100, "")
 	expect_failure('set_role', "", 9, "")
 	expect_failure('set_role', "01", 100, "")
-	SIGN = "key2"
+	SIGN = "tests/key2"
 	expect_success('get_role', "", "0", "")
 	expect_success('set_role', "02", "", "")
 	expect_success('get_role', "", "2", "")
@@ -322,7 +322,7 @@ def testArrays():
 	#expect_success2("test_arrays", "at32", '{"idx":  "54", ' + abi_params + '}', "1000001137", linker_options)
 
 def testCall():
-	linker_options = "--sign key1 --decode-c6"
+	linker_options = "--sign tests/key1 --decode-c6"
 	compile2('test_call1', 'tests')
 
 	expect_success2('test_call1', 'constructor', '{}', '', linker_options)
@@ -333,7 +333,7 @@ def testCall():
 
 def testLlvmPiggyBank():
 	#it maybe '--sign key1' or '--internal 0' - test will work correctly
-	linker_options = "--sign key1 --decode-c6 --trace"
+	linker_options = "--sign tests/key1 --decode-c6 --trace"
 	compile2('piggybank', 'tests', lib_file = "stdlib_c.tvm")
 	expect_success2("piggybank", "initialize_target", '{"target": 100}', None, linker_options)
 	expect_success2("piggybank", "transfer", '{"destination_account": 2147483649}', None, linker_options)
@@ -341,7 +341,7 @@ def testLlvmPiggyBank():
 	expect_output(r"value       : CurrencyCollection: Grams vui16\[len = 5, value = 99990000000\], other curencies:")
 
 def testEvents():
-	linker_options = "--sign key1 --decode-c6"
+	linker_options = "--sign tests/key1 --decode-c6"
 	compile2('event', 'tests')
 	expect_success2("event", "constructor", '{}', None, linker_options)
 	expect_success2("event", "emitValue", '{"id":"0x1234"}', None, linker_options)
@@ -351,7 +351,7 @@ def testEvents():
 	expect_output(r"data: 45b72e0e")
 
 def testWallet():
-	linker_options = "--sign key1 --decode-c6"
+	linker_options = "--sign tests/key1 --decode-c6"
 	compile2('Wallet', 'tests')
 	expect_success2("Wallet", "constructor", '{}', None, linker_options)
 	dest = '11' * 32

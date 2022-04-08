@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 TON DEV SOLUTIONS LTD.
+ * Copyright 2018-2022 TON DEV SOLUTIONS LTD.
  *
  * Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
  * this file except in compliance with the License.
@@ -12,13 +12,14 @@
  */
 use abi::{gen_abi_id, load_abi_contract};
 use abi_json::Contract;
+use failure::{format_err, bail};
 use regex::Regex;
 use resolver::resolve_name;
 use std::collections::{HashSet, HashMap};
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 use std::path::Path;
-use ton_types::{BuilderData, IBitstring, SliceData, Cell};
+use ton_types::{BuilderData, IBitstring, SliceData, Cell, Result, Status};
 use ton_types::dictionary::{HashmapE, HashmapType};
 use ton_vm::stack::integer::{IntegerData, serialization::{Encoding, SignedIntegerBigEndianEncoding}};
 use ton_vm::stack::serialization::Serializer;
@@ -71,9 +72,9 @@ impl ParseEngineResults {
     }
 }
 
-pub fn ptr_to_builder(n: Ptr) -> Result<BuilderData, String> {
+pub fn ptr_to_builder(n: Ptr) -> Result<BuilderData> {
     let mut b = BuilderData::new();
-    b.append_i64(n).map_err(|_| format!("failed to serialize an i64 to builder"))?;
+    b.append_i64(n).map_err(|e| format_err!("failed to serialize an i64 to builder: {}", e))?;
     Ok(b)
 }
 
@@ -120,10 +121,7 @@ impl From<&str> for GloblFuncOrDataType {
 
 impl GloblFuncOrDataType {
     pub fn is_func(&self) -> bool {
-        match self {
-            GloblFuncOrDataType::Function(_) => true,
-            _ => false,
-        }
+        matches!(self, GloblFuncOrDataType::Function(_))
     }
 
     pub fn func_mut(&mut self) -> Option<&mut InternalFunc> {
@@ -176,15 +174,13 @@ impl std::fmt::Display for DataValue {
 }
 
 impl DataValue {
-    pub fn write(&self) -> Result<BuilderData, String> {
+    pub fn write(&self) -> Result<BuilderData> {
         let mut b = BuilderData::new();
         Ok(match self {
             DataValue::Number(ref integer) => {
                 let encoding = SignedIntegerBigEndianEncoding::new(257);
-                let bitstring = encoding.try_serialize(&integer.0)
-                    .map_err(|e| format!("Failed to serialize data: {}", e))?;
-                b.append_builder(&bitstring)
-                    .map_err(|e| format!("Failed to store data: {}", e))?;
+                let bitstring = encoding.try_serialize(&integer.0)?;
+                b.append_builder(&bitstring)?;
                 b
             },
             DataValue::Empty => b,
@@ -288,17 +284,17 @@ lazy_static! {
     static ref CALL_REGEX: Regex = Regex::new(r"^\s*CALL\s+\$([\w\.:]+)\$").unwrap();
 }
 
-const GLOBL:            &'static str = ".globl";
-const INTERNAL:         &'static str = ".internal";
-const MACROS:           &'static str = ".macro";
-const SELECTOR:         &'static str = ".selector";
+const GLOBL:            &str = ".globl";
+const INTERNAL:         &str = ".internal";
+const MACROS:           &str = ".macro";
+const SELECTOR:         &str = ".selector";
 
-const DATA_TYPENAME:    &'static str = "object";
+const DATA_TYPENAME:    &str = "object";
 
-const PERSISTENT_DATA_SUFFIX: &'static str = "_persistent";
+const PERSISTENT_DATA_SUFFIX: &str = "_persistent";
 
-const PUBKEY_NAME:      &'static str = "tvm_public_key";
-const SCI_NAME:         &'static str = "tvm_contract_info";
+const PUBKEY_NAME:      &str = "tvm_public_key";
+const SCI_NAME:         &str = "tvm_contract_info";
 
 fn start_with(sample: &str, pattern: &str) -> bool {
     let s = sample.as_bytes();
@@ -312,7 +308,7 @@ fn start_with(sample: &str, pattern: &str) -> bool {
 
 impl ParseEngine {
 
-    pub fn new(sources: Vec<&Path>, abi_json: Option<String>) -> Result<Self, String> {
+    pub fn new(sources: Vec<&Path>, abi_json: Option<String>) -> Result<Self> {
         let mut engine = ParseEngine {
             globl_name_to_id:      HashMap::new(),
             internal_name_to_id:    HashMap::new(),
@@ -336,7 +332,7 @@ impl ParseEngine {
         Ok(engine)
     }
 
-    fn parse(&mut self, sources: Vec<&Path>, abi_json: Option<String>) -> Result<(), String> {
+    fn parse(&mut self, sources: Vec<&Path>, abi_json: Option<String>) -> Status {
         if let Some(s) = abi_json {
             self.abi = Some(load_abi_contract(&s)?);
         }
@@ -365,7 +361,7 @@ impl ParseEngine {
     fn internals(&self) -> HashMap<i32, Lines> {
         let mut funcs = HashMap::new();
         self.internal_id_to_code.iter().for_each(|x| {
-            funcs.insert(x.0.clone(), x.1.body.clone());
+            funcs.insert(*x.0, x.1.body.clone());
         });
         funcs
     }
@@ -412,11 +408,11 @@ impl ParseEngine {
 
     fn global_by_name(&self, name: &str) -> Option<(u32, Lines)> {
         self.globl_name_to_object.get(name).and_then(|v| {
-            v.dtype.func().and_then(|func| Some((func.id.clone(), func.body.clone()) ))
+            v.dtype.func().map(|func| (func.id, func.body.clone()))
         })
     }
 
-    fn preinit(&mut self) -> Result <(), String> {
+    fn preinit(&mut self) -> Status {
         // TODO delete
         self.globl_name_to_object.insert(
             PUBKEY_NAME.to_string(),
@@ -426,10 +422,10 @@ impl ParseEngine {
             .unwrap()
             .dtype
             .data_mut()
-            .and_then(|data| {
+            .map(|data| {
                 data.persistent = true;
                 data.values.push(DataValue::Empty);
-                Some(data)
+                data
             });
 
         // TODO delete
@@ -441,10 +437,10 @@ impl ParseEngine {
             .unwrap()
             .dtype
             .data_mut()
-            .and_then(|data| {
+            .map(|data| {
                 data.persistent = false;
                 data.values.push(DataValue::Empty);
-                Some(data)
+                data
             });
         Ok(())
     }
@@ -473,7 +469,7 @@ impl ParseEngine {
         self.save_my_code
     }
 
-    fn parse_code(&mut self, path: &Path) -> Result<(), String> {
+    fn parse_code(&mut self, path: &Path) -> Status {
         let mut section_name: String = String::new();
         let mut obj_body: Lines = vec![];
         let mut obj_name: String = "".to_owned();
@@ -484,15 +480,14 @@ impl ParseEngine {
         self.persistent_ptr = self.persistent_base + OFFSET_PERS_DATA;
 
         let filename = path.file_name().unwrap().to_str().unwrap().to_string();
-        let file = File::open(path).map_err(|e| format!("Can't open file {}: {}", filename, e))?;
+        let file = File::open(path)?;
         let mut reader = BufReader::new(file);
         let mut source_pos: Option<DbgPos> = None;
 
-        while reader.read_line(&mut l)
-            .map_err(|_| format!("error while reading line (file: {})", filename))? != 0 {
+        while reader.read_line(&mut l)? != 0 {
             lnum += 1;
 
-            l = l.replace("\r", "");
+            l = l.replace('\r', "");
             if !l.ends_with('\n') {
                 l += "\n";
             }
@@ -515,63 +510,62 @@ impl ParseEngine {
                 self.version = Some(cap.get(1).unwrap().as_str().to_owned());
             } else if start_with(&l, ".pragma") {
                 let cap = PRAGMA_REGEX.captures(&l).unwrap();
-                match cap.get(1) {
-                    Some(m) => if m.as_str() == "selector-save-my-code" {
+                if let Some(m) = cap.get(1) {
+                    if m.as_str() == "selector-save-my-code" {
                         self.save_my_code = true
-                    },
-                    None => {}
+                    }
                 }
             } else if start_with(&l, ".global-base") {
                 // .global-base
                 let cap = BASE_GLBL_REGEX.captures(&l).unwrap();
                 let base = cap.get(1).map(|m| m.as_str())
-                    .ok_or(format!("line {}: invalid syntax for global base", lnum))?;
+                    .ok_or_else(|| format_err!("line {}: invalid syntax for global base", lnum))?;
                 self.globl_base = Ptr::from_str_radix(base, 10)
-                    .map_err(|_| format!("line {}: invalid global base address", lnum))?;
+                    .map_err(|_| format_err!("line {}: invalid global base address", lnum))?;
                 self.globl_ptr = self.globl_base + OFFSET_GLOBL_DATA;
                 self.update_predefined();
             } else if start_with(&l, ".persistent-base") {
                 // .persistent-base
                 let cap = BASE_PERS_REGEX.captures(&l).unwrap();
                 let base = cap.get(1).map(|m| m.as_str())
-                    .ok_or(format!("line {}: invalid syntax for persistent base", lnum))?;
+                    .ok_or_else(|| format_err!("line {}: invalid syntax for persistent base", lnum))?;
                 self.persistent_base = Ptr::from_str_radix(base, 10)
-                    .map_err(|_| format!("line {}: invalid persistent base address", lnum))?;
+                    .map_err(|_| format_err!("line {}: invalid persistent base address", lnum))?;
                 self.persistent_ptr = self.persistent_base + OFFSET_PERS_DATA;
                 self.update_predefined();
             } else if start_with(&l, ".type") {
                 // .type x, @...
                 //it's a mark for beginning of a new object (func or data)
                 self.update(&section_name, &obj_name, &obj_body)
-                    .map_err(|e| format!("line {}: {}", lnum, e))?;
+                    .map_err(|e| format_err!("line {}: {}", lnum, e))?;
                 section_name = GLOBL.to_owned();
                 obj_body = vec![];
                 let cap = TYPE_REGEX.captures(&l).unwrap();
                 obj_name = cap.get(1).unwrap().as_str().to_owned();
-                let type_name = cap.get(2).ok_or(format!("line {}: .type option is invalid", lnum))?.as_str();
-                let obj = self.globl_name_to_object.entry(obj_name.clone()).or_insert(GloblFuncOrData::new(obj_name.clone(), &type_name));
+                let type_name = cap.get(2).ok_or(format_err!("line {}: .type option is invalid", lnum))?.as_str();
+                let obj = self.globl_name_to_object.entry(obj_name.clone()).or_insert_with(|| GloblFuncOrData::new(obj_name.clone(), &type_name));
                 obj.dtype = GloblFuncOrDataType::from(type_name);
             } else if start_with(&l, ".size") {
                 // .size x, val
                 let cap = SIZE_REGEX.captures(&l).unwrap();
                 let name = cap.get(1).unwrap().as_str().to_owned();
-                let size_str = cap.get(2).ok_or(format!("line {}: .size option is invalid", lnum))?.as_str();
-                let item_ref = self.globl_name_to_object.entry(name.clone()).or_insert(GloblFuncOrData::new(name, ""));
+                let size_str = cap.get(2).ok_or(format_err!("line {}: .size option is invalid", lnum))?.as_str();
+                let item_ref = self.globl_name_to_object.entry(name.clone()).or_insert_with(|| GloblFuncOrData::new(name, ""));
                 item_ref.size = usize::from_str_radix(size_str, 10).unwrap_or(0);
             } else if start_with(&l, ".public") {
                 // .public x
                 let cap = PUBLIC_REGEX.captures(&l).unwrap();
                 let name = cap.get(1).unwrap().as_str();
-                self.globl_name_to_object.get_mut(name).and_then(|obj| {obj.public = true; Some(obj)});
+                self.globl_name_to_object.get_mut(name).map(|obj| { obj.public = true; Some(obj) });
             } else if start_with(&l, ".globl") {
                 // .globl x
                 let cap = GLOBL_REGEX.captures(&l).unwrap();
                 let name = cap.get(1).unwrap().as_str().to_owned();
-                self.globl_name_to_object.entry(name.clone()).or_insert(GloblFuncOrData::new(name.clone(), ""));
+                self.globl_name_to_object.entry(name.clone()).or_insert_with(|| GloblFuncOrData::new(name.clone(), ""));
             } else if start_with(&l, ".macro") {
                 // .macro x
                 self.update(&section_name, &obj_name, &obj_body)
-                    .map_err(|e| format!("line {}: {}", lnum, e))?;
+                    .map_err(|e| format_err!("line {}: {}", lnum, e))?;
                 section_name = MACROS.to_owned();
                 obj_body = vec![];
                 obj_name = MACRO_REGEX.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
@@ -590,12 +584,12 @@ impl ParseEngine {
                 self.internal_alias_name_to_id_.insert(
                     cap.get(1).unwrap().as_str().to_owned(),
                     i32::from_str_radix(cap.get(2).unwrap().as_str(), 10)
-                        .map_err(|_| format!("line: '{}': failed to parse id", lnum))?,
+                        .map_err(|_| format_err!("line: '{}': failed to parse id", lnum))?,
                 );
             } else if start_with(&l, ".internal") {
                 // .internal
                 self.update(&section_name, &obj_name, &obj_body)
-                    .map_err(|e| format!("line {}: {}", lnum, e))?;
+                    .map_err(|e| format_err!("line {}: {}", lnum, e))?;
                 section_name = INTERNAL.to_owned();
                 obj_body = vec![];
                 obj_name = INTERNAL_REGEX.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
@@ -631,15 +625,15 @@ impl ParseEngine {
         }
 
         if section_name.is_empty() {
-            return Err("input file has no assembler definitions".to_string());
+            bail!("input file has no assembler definitions");
         }
 
         self.update(&section_name, &obj_name, &obj_body)
-            .map_err(|e| format!("line {}: {}", lnum, e))?;
+            .map_err(|e| format_err!("line {}: {}", lnum, e))?;
         Ok(())
     }
 
-    fn resolve_nested_macros_in_lines(&mut self, lines: Lines) -> Result<Lines, String> {
+    fn resolve_nested_macros_in_lines(&mut self, lines: Lines) -> Result<Lines> {
         let mut new_lines: Lines = vec![];
         for line in lines {
             if start_with(&line.text, "CALL $") {
@@ -656,8 +650,8 @@ impl ParseEngine {
         Ok(new_lines)
     }
 
-    fn resolve_nested_macros(&mut self) -> Result<(), String> {
-        let names = self.globl_name_to_object.keys().map(|k| k.clone()).collect::<Vec<_>>();
+    fn resolve_nested_macros(&mut self) -> Status {
+        let names = self.globl_name_to_object.keys().cloned().collect::<Vec<_>>();
         for name in &names {
             if let GloblFuncOrDataType::Function(f) = &self.globl_name_to_object.get_mut(name).unwrap().dtype {
                 let lines = f.body.clone();
@@ -676,12 +670,12 @@ impl ParseEngine {
         Ok(())
     }
 
-    fn resolve_nested_macro(&mut self, name: &String) -> Result<(), String> {
+    fn resolve_nested_macro(&mut self, name: &String) -> Status {
         if let Some(is_computed) = self.is_computed_macros.get(name) {
             return if *is_computed {
                 Ok(())
             } else {
-                Err("Internal error. Macros have a cycle. See ".to_string() + name)
+                Err(format_err!("Internal error. Macros have a cycle. See {}", name))
             }
         }
         self.is_computed_macros.insert(name.to_string(), false);
@@ -692,7 +686,7 @@ impl ParseEngine {
         Ok(())
     }
 
-    fn replace_labels_in_body(&mut self, lines: Lines, obj_name: FunctionId) -> Result<Lines, String> {
+    fn replace_labels_in_body(&mut self, lines: Lines, obj_name: FunctionId) -> Result<Lines> {
         let mut new_lines = vec![];
         for line in lines {
             if start_with(&line.text.as_str(), ".compute") {
@@ -704,13 +698,13 @@ impl ParseEngine {
 
             let resolved =
                 self.replace_labels(&line, &obj_name)
-                    .map_err(|e| format!("line {}: cannot resolve label: {}", line.pos.line, e))?;
+                    .map_err(|e| format_err!("line {}: cannot resolve label: {}", line.pos.line, e))?;
             new_lines.push(resolved);
         }
         Ok(new_lines)
     }
 
-    fn replace_all_labels(&mut self) -> Result<(), String> {
+    fn replace_all_labels(&mut self) -> Status {
         let names = self.globl_name_to_object.keys().map(|k| k.clone()).collect::<Vec<_>>();
         for name in &names {
             if let GloblFuncOrDataType::Function(f) = &self.globl_name_to_object.get(name).unwrap().dtype {
@@ -723,7 +717,7 @@ impl ParseEngine {
             }
         }
 
-        let ids = self.internal_id_to_code.keys().map(|x| *x).collect::<Vec<_>>();
+        let ids = self.internal_id_to_code.keys().copied().collect::<Vec<_>>();
         for id in &ids {
             let lines = self.internal_id_to_code.get(id).unwrap().body.clone();
             let new_lines = self.replace_labels_in_body(lines, FunctionId::Id(*id))?;
@@ -754,13 +748,13 @@ impl ParseEngine {
             .unwrap_or(false)
     }
 
-    fn update(&mut self, section: &str, name: &str, body: &Lines) -> Result<(), String> {
+    fn update(&mut self, section: &str, name: &str, body: &Lines) -> Status {
         match section {
             SELECTOR => {
                 if self.entry_point.is_empty() {
                     self.entry_point = body.clone();
                 } else {
-                    return Err("Another selector found".to_string());
+                    bail!("Another selector found");
                 }
             },
             GLOBL => {
@@ -779,11 +773,11 @@ impl ParseEngine {
                     params.body = body.clone();
                     let prev = self.globl_name_to_id.insert(name.to_string(), func_id);
                     if prev.is_some() {
-                        Err(format!(
+                        bail!(
                             "global function with id = {:x} and name \"{}\" already exist",
                             func_id,
                             name,
-                        ))?;
+                        );
                     }
                 } else {
                     // globl object is data
@@ -802,18 +796,18 @@ impl ParseEngine {
                 }
             },
             INTERNAL => {
-                let func_id = self.internal_alias_name_to_id_.get(name).ok_or(format!("id for '{}' not found", name))?;
+                let func_id = self.internal_alias_name_to_id_.get(name).ok_or_else(|| format_err!("id for '{}' not found", name))?;
                 self.internal_name_to_id.insert(name.to_string(), *func_id);
                 let prev = self.internal_id_to_code.insert(*func_id, InternalFunc::new());
                 if prev.is_some() {
-                    Err(format!("internal function with id = {} already exist", *func_id))?;
+                    bail!("internal function with id = {} already exist", *func_id);
                 }
                 self.internal_id_to_code.get_mut(func_id).unwrap().body = body.clone();
             },
             MACROS => {
                 let prev = self.macro_name_to_lines.insert(name.to_string(), body.clone());
                 if prev.is_some() {
-                    Err(format!("macros with name \"{}\" already exist", name))?;
+                    bail!("macros with name \"{}\" already exist", name);
                 }
             },
             _ => (),
@@ -826,7 +820,7 @@ impl ParseEngine {
         name: &str,
         item_size: &mut usize,
         values: &mut Vec<DataValue>,
-    ) -> Result<(), String> {
+    ) -> Status {
         lazy_static! {
             static ref PARAM_RE: Regex = Regex::new(r#"^\s+\.(\w+),?\s*([a-zA-Z0-9-_\s"]+)"#).unwrap();
             static ref COMM_RE:  Regex = Regex::new(r"^\s*\.comm\s+([\w\.]+),\s*(\d+),\s*(\d+)").unwrap();
@@ -836,20 +830,16 @@ impl ParseEngine {
             let mut value_len: usize = 0;
             if let Some(cap) = COMM_RE.captures(param.text.as_str()) {
                 // .comm <symbol>, <size>, <align>
-                let size_bytes = usize::from_str_radix(
-                    cap.get(2).unwrap().as_str(),
-                    10,
-                ).map_err(|_| "invalid \".comm\": invalid size".to_string())?;
-                let align = usize::from_str_radix(
-                    cap.get(3).unwrap().as_str(),
-                    10,
-                ).map_err(|_| "\".comm\": invalid align".to_string())?;
+                let size_bytes = cap.get(2).unwrap().as_str().parse::<usize>()
+                    .map_err(|_| format_err!("invalid \".comm\": invalid size"))?;
+                let align = cap.get(3).unwrap().as_str().parse::<usize>()
+                    .map_err(|_| format_err!("\".comm\": invalid align"))?;
 
                 if size_bytes == 0  {
-                    Err("\".comm\": invalid size".to_string())?;
+                    bail!("\".comm\": invalid size".to_string());
                 }
                 if (align == 0) || (align % WORD_SIZE as usize != 0) {
-                    Err("\".comm\": invalid align".to_string())?;
+                    bail!("\".comm\": invalid align".to_string());
                 }
                 value_len = (size_bytes + (align - 1)) & !(align - 1);
                 for _i in 0..(value_len / WORD_SIZE as usize) {
@@ -874,22 +864,22 @@ impl ParseEngine {
                     "long"  => 4,
                     "short" => 2,
                     "quad"  => 8,
-                    _ => Err(format!("invalid parameter: \"{}\"", param.text))?,
+                    _ => bail!("invalid parameter: \"{}\"", param.text),
                 };
                 let value = cap.get(2).map_or("", |m| m.as_str()).trim();
                 values.push(DataValue::Number((
                     IntegerData::from_str_radix(value, 10)
-                        .map_err(|_| format!("parameter \"{}\" has invalid value \"{}\"", pname, value))?,
+                        .map_err(|_| format_err!("parameter \"{}\" has invalid value \"{}\"", pname, value))?,
                     value_len,
                 )));
             }
             if *item_size < value_len {
-                Err(format!("global object {} has invalid .size parameter: too small", name))?;
+                bail!("global object {} has invalid .size parameter: too small", name);
             }
             *item_size -= value_len;
         }
         if *item_size > 0 {
-            Err(format!("global object {} has invalid \".size\" value: real size = {}", name, *item_size))?;
+            bail!("global object {} has invalid \".size\" value: real size = {}", name, *item_size);
         }
         Ok(())
     }
@@ -912,9 +902,9 @@ impl ParseEngine {
         let build_dict = |data_vec: &Vec<(&Ptr, &Vec<DataValue>)>| {
             let mut dict = HashmapE::with_bit_len(64);
             for item in data_vec {
-                let mut ptr = item.0.clone();
+                let mut ptr = *item.0;
                 for subitem in item.1 {
-                    dict.set(ptr_to_builder(ptr).unwrap().into_cell().unwrap().into(), &subitem.write().unwrap_or(BuilderData::default()).into_cell().unwrap().into()).unwrap();
+                    dict.set(ptr_to_builder(ptr).unwrap().into_cell().unwrap().into(), &subitem.write().unwrap_or_default().into_cell().unwrap().into()).unwrap();
                     ptr += subitem.size();
                 }
             }
@@ -937,7 +927,7 @@ impl ParseEngine {
             &globl_cell.into_cell().unwrap().into()
         ).unwrap();
 
-        pers_dict.data().map(|cell| cell.clone())
+        pers_dict.data().cloned()
     }
 
     fn encode_computed_cell(&self, cell: &Cell, toplevel: bool) -> Lines {
@@ -955,12 +945,12 @@ impl ParseEngine {
         lines
     }
 
-    fn compute_cell(&mut self, name: &str) -> Result<Lines, String> {
+    fn compute_cell(&mut self, name: &str) -> Result<Lines> {
         if let Some(computed) = self.computed.get(name) {
             return Ok(computed.clone())
         }
 
-        let lines = self.macro_name_to_lines.get(name).ok_or(format!("macro {} was not found", name))?.clone();
+        let lines = self.macro_name_to_lines.get(name).ok_or_else(|| format_err!("macro {} was not found", name))?.clone();
 
         let mut collected = vec!();
         for line in lines {
@@ -973,30 +963,30 @@ impl ParseEngine {
         }
 
         let (code, _) = ton_labs_assembler::compile_code_debuggable(collected)
-            .map_err(|ce| ce.to_string())?;
+            .map_err(|e| format_err!("{}", e))?;
 
         let mut engine = ton_vm::executor::Engine::with_capabilities(0).setup_with_libraries(
             code, None, None, None, vec![]);
         match engine.execute() {
             Err(e) => {
                 println!("failed to compute cell: {}", e);
-                return Err(name.to_string())
+                bail!(name.to_string())
             }
             Ok(code) => {
                 if code != 0 {
                     println!("failed to compute cell, exit code {}", code);
-                    return Err(name.to_string())
+                    bail!(name.to_string())
                 }
             }
         };
 
-        let cell = engine.stack().get(0).as_cell().map_err(|_| name)?;
+        let cell = engine.stack().get(0).as_cell().map_err(|e| format_err!("{}: {}", name, e))?;
         let res = self.encode_computed_cell(cell, true);
         self.computed.insert(String::from(name), res.clone());
         Ok(res)
     }
 
-    fn replace_labels(&mut self, line: &Line, cur_obj_name: &FunctionId) -> Result<Line, String> {
+    fn replace_labels(&mut self, line: &Line, cur_obj_name: &FunctionId) -> Result<Line> {
         resolve_name(line, |name| {
             self.internal_name_to_id.get(name).and_then(|id| {
                 Some(id.clone())
@@ -1006,7 +996,7 @@ impl ParseEngine {
             let mut res = self.globl_name_to_id.get(name).map(|id| id.clone());
             if res.is_some(){
                 let id = res.unwrap();
-                self.insert_called_func(&cur_obj_name, id);
+                self.insert_called_func(cur_obj_name, id);
                 res = Some(id);
             }
             res
@@ -1020,8 +1010,8 @@ impl ParseEngine {
         }))
         .or_else(|_| resolve_name(line, |name| {
             match name {
-                "global-base" => Some(self.globl_base.clone()),
-                "persistent-base" => Some(self.persistent_base.clone()),
+                "global-base" => Some(self.globl_base),
+                "persistent-base" => Some(self.persistent_base),
                 _ => None,
             }
         }))
@@ -1032,14 +1022,14 @@ impl ParseEngine {
             FunctionId::Name(name) => {
                 self.globl_name_to_object.get_mut(name)
                     .and_then(|obj| {
-                        obj.dtype.func_mut().and_then(|f| {
+                        obj.dtype.func_mut().map(|f| {
                             f.called_ids.push(to_func);
                             Some(f)
                         })
                     });
             }
             FunctionId::Id(id) => {
-                self.internal_id_to_code.get_mut(&id).and_then(|f| {
+                self.internal_id_to_code.get_mut(&id).map(|f| {
                     f.called_ids.push(to_func);
                     Some(f)
                 });
@@ -1055,10 +1045,10 @@ impl ParseEngine {
         });
 
         for func in publics_iter {
-            self.enum_calling_funcs(&func, &mut ids);
+            self.enum_calling_funcs(func, &mut ids);
         }
         for func in self.internal_id_to_code.iter() {
-            self.enum_calling_funcs(&func.1, &mut ids);
+            self.enum_calling_funcs(func.1, &mut ids);
         }
 
         self.globl_name_to_object.retain(|_k, v| {
@@ -1067,7 +1057,7 @@ impl ParseEngine {
                 .unwrap_or(true)
         });
         self.globl_name_to_id.retain(|_k, v| {
-            ids.contains(&v)
+            ids.contains(v)
         });
     }
 
@@ -1080,8 +1070,8 @@ impl ParseEngine {
                     obj.dtype.func().map(|f| f.id == *id).unwrap_or(false)
                 })
                     .map(|(_name, obj)| obj.dtype.func().unwrap());
-                if subfunc.is_some() {
-                    self.enum_calling_funcs(&subfunc.unwrap(), ids);
+                if let Some(subfunc) = subfunc {
+                    self.enum_calling_funcs(subfunc, ids);
                 }
             }
         }
@@ -1103,7 +1093,7 @@ impl ParseEngine {
         }
         println!("private:");
         for (k, v) in &self.privates() {
-            let code = lines_to_string(&v);
+            let code = lines_to_string(v);
             println! ("Function {:08X}\n{}\n{}\n{}", k, line, code, line);
         }
         println!("public:");

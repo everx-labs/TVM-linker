@@ -2,4 +2,6 @@ target
 .vscode
 .idea/
 
-tvm_linker/tests/Wallet.map.json
+tests/Wallet.map.json
+*.tvc
+*.tmp

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 TON DEV SOLUTIONS LTD.
+ * Copyright 2018-2022 TON DEV SOLUTIONS LTD.
  *
  * Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
  * this file except in compliance with the License.
@@ -17,6 +17,7 @@ extern crate clap;
 extern crate crc16;
 extern crate ed25519;
 extern crate ed25519_dalek;
+extern crate failure;
 #[macro_use]
 extern crate lazy_static;
 extern crate rand;
@@ -36,12 +37,10 @@ extern crate ton_labs_assembler;
 extern crate num_traits;
 
 mod abi;
-mod initdata;
 mod keyman;
 mod parser;
 mod printer;
 mod program;
-mod real_ton;
 mod resolver;
 mod methdict;
 mod testcall;
@@ -49,31 +48,30 @@ mod disasm;
 
 use abi::{build_abi_body, decode_body, load_abi_json_string, load_abi_contract};
 use clap::ArgMatches;
-use initdata::set_initial_data;
+use failure::{format_err, bail};
 use keyman::KeypairManager;
 use parser::{ParseEngine, ParseEngineResults};
-use program::{Program, get_now};
-use real_ton::{decode_boc, compile_message};
+use program::{Program, get_now, save_to_file};
 use resolver::resolve_name;
-use ton_block::{Deserializable, Message, StateInit, Serializable, Account};
+use ton_block::{Deserializable, Message, StateInit, Serializable, Account, MsgAddressInt, ExternalInboundMessageHeader};
+use std::io::Write;
 use std::{path::Path};
 use testcall::{call_contract, MsgInfo, TraceLevel};
-use ton_types::{BuilderData, SliceData};
+use ton_types::{BuilderData, SliceData, Result, Status, AccountId, BagOfCells, BocSerialiseMode};
 use std::env;
-use disasm::disasm::disasm_command;
+use disasm::commands::disasm_command;
 use ton_labs_assembler::Line;
 use std::fs::File;
+use std::str::FromStr;
 
-use crate::real_ton::load_stateinit;
-
-fn main() -> Result<(), i32> {
+fn main() -> std::result::Result<(), i32> {
     linker_main().map_err(|err_str| {
         println!("Error: {}", err_str);
         1
     })
 }
 
-fn linker_main() -> Result<(), String> {
+fn linker_main() -> Status {
     let build_info = format!(
         "v{}\nBUILD_GIT_COMMIT: {}\nBUILD_GIT_DATE:   {}\nBUILD_TIME:       {}",
         env!("CARGO_PKG_VERSION"),
@@ -228,13 +226,9 @@ fn linker_main() -> Result<(), String> {
 
         let msg_body = match msg_matches.value_of("DATA") {
             Some(data) => {
-                let buf = hex::decode(data).map_err(|_| "data argument has invalid format".to_string())?;
+                let buf = hex::decode(data).map_err(|e| format_err!("data argument has invalid format: {}", e))?;
                 let len = buf.len() * 8;
-                let body: SliceData = BuilderData::with_raw(buf, len)
-                    .map_err(|e| format!("failed to pack body in cell: {}", e))?
-                    .into_cell()
-                    .map_err(|e| format!("failed to pack body in cell: {}", e))?
-                    .into();
+                let body: SliceData = BuilderData::with_raw(buf, len)?.into_cell()?.into();
                 Some(body)
             },
             None => {
@@ -242,7 +236,7 @@ fn linker_main() -> Result<(), String> {
             },
         };
 
-        return compile_message(
+        return build_message(
             msg_matches.value_of("INPUT").unwrap(),
             msg_matches.value_of("WORKCHAIN"),
             msg_body,
@@ -268,7 +262,7 @@ fn linker_main() -> Result<(), String> {
         for lib in compile_matches.values_of("LIB").unwrap_or_default() {
             let path = Path::new(lib);
             if !path.exists() {
-                return Err(format!("File {} doesn't exist", lib));
+                bail!("File {} doesn't exist", lib);
             }
             sources.push(path);
         }
@@ -277,14 +271,14 @@ fn linker_main() -> Result<(), String> {
             println!("TVM_LINKER_LIB_PATH: {:?}", &env_lib);
             let path = Path::new(&env_lib);
             if !path.exists() {
-                return Err(format!("File {} doesn't exist", &env_lib));
+                bail!("File {} doesn't exist", &env_lib);
             }
             sources.push(path);
         }
-            
+
         let path = Path::new(input);
         if !path.exists() {
-            return Err(format!("File {} doesn't exist", input));
+            bail!("File {} doesn't exist", input);
         }
         sources.push(path);
         let mut prog = Program::new(
@@ -298,13 +292,10 @@ fn linker_main() -> Result<(), String> {
                 pair.store_secret(file)?;
                 prog.set_keypair(pair.drain());
             },
-            None => match compile_matches.value_of("SETKEY") {
-                Some(file) => {
-                    let pair = KeypairManager::from_secret_file(file)
-                        .ok_or("Failed to read keypair.")?;
-                    prog.set_keypair(pair.drain());
-                },
-                None => (),
+            None => if let Some(file) = compile_matches.value_of("SETKEY") {
+                let pair = KeypairManager::from_secret_file(file)
+                    .ok_or_else(|| format_err!("Failed to read keypair"))?;
+                prog.set_keypair(pair.drain());
             },
         };
 
@@ -316,13 +307,13 @@ fn linker_main() -> Result<(), String> {
         }
 
         let wc = compile_matches.value_of("WC")
-            .map(|wc| i8::from_str_radix(wc, 10).unwrap_or(-1))
+            .map(|wc| wc.parse::<i8>().unwrap_or(-1))
             .unwrap_or(-1);
 
         let ctor_params = compile_matches.value_of("CTOR_PARAMS");
-        if ctor_params.is_some() && !abi_file.is_some() {
+        if ctor_params.is_some() && abi_file.is_none() {
             let msg = "ABI is mandatory when CTOR_PARAMS is specified.";
-            return Err(msg.to_string());
+            bail!(msg);
         }
 
         let data_filename = compile_matches.value_of("DATA");
@@ -331,10 +322,8 @@ fn linker_main() -> Result<(), String> {
 
         if compile_matches.is_present("DEBUG_MAP") {
             let filename = compile_matches.value_of("DEBUG_MAP").unwrap();
-            let file = File::create(filename)
-                .map_err(|e| format!("Failed to create file {}: {}", filename, e))?;
-            serde_json::to_writer_pretty(file, &prog.dbgmap)
-                .map_err(|e| format!("Failed to write data to file: {}", e))?;
+            let file = File::create(filename)?;
+            serde_json::to_writer_pretty(file, &prog.dbgmap)?;
         }
 
         return Ok(());
@@ -351,7 +340,7 @@ fn linker_main() -> Result<(), String> {
     unreachable!()
 }
 
-fn replace_command(matches: &ArgMatches) -> Result<(), String> {
+fn replace_command(matches: &ArgMatches) -> Status {
     let input = matches.value_of("INPUT").unwrap();
     let abi_from_input = format!("{}{}", input.trim_end_matches("code"), "abi.json");
     let abi_file = matches.value_of("ABI").or_else(|| {
@@ -368,7 +357,7 @@ fn replace_command(matches: &ArgMatches) -> Result<(), String> {
     for lib in matches.values_of("LIB").unwrap_or_default() {
         let path = Path::new(lib);
         if !path.exists() {
-            return Err(format!("File {} doesn't exist", lib));
+            bail!("File {} doesn't exist", lib);
         }
         sources.push(path);
     }
@@ -377,14 +366,14 @@ fn replace_command(matches: &ArgMatches) -> Result<(), String> {
         println!("TVM_LINKER_LIB_PATH: {:?}", &env_lib);
         let path = Path::new(&env_lib);
         if !path.exists() {
-            return Err(format!("File {} doesn't exist", &env_lib));
+            bail!("File {} doesn't exist", &env_lib);
         }
         sources.push(path);
     }
 
     let path = Path::new(input);
     if !path.exists() {
-        return Err(format!("File {} doesn't exist", input));
+        bail!("File {} doesn't exist", input);
     }
     sources.push(path);
 
@@ -397,55 +386,47 @@ fn replace_command(matches: &ArgMatches) -> Result<(), String> {
     let input_path = matches.value_of("CONTRACT_PATH").unwrap();
     let out_file = out_file.unwrap_or(input_path);
     if matches.is_present("TVC") {
-        let mut state_init = StateInit::construct_from_file(input_path)
-            .map_err(|e| format!("Failed to load stateInit from the file {}: {}", input_path, e))?;
+        let mut state_init = StateInit::construct_from_file(input_path)?;
         state_init.set_code(code);
-        state_init.write_to_file(out_file)
-            .map_err(|e| format!("Failed to save stateInit: {}", e))?;
+        state_init.write_to_file(out_file)?;
     } else {
-        let mut account = Account::construct_from_file(input_path)
-            .map_err(|e| format!("Failed to load account from the file {}: {}", input_path, e))?;
+        let mut account = Account::construct_from_file(input_path)?;
         match account.state_init() {
             Some(_) => {
                 account.set_code(code);
             }
             None => {
-                return Err("Account doesn't contain stateInit.".to_string())
+                bail!("Account doesn't contain stateInit.")
             }
         }
-        account.write_to_file(out_file)
-            .map_err(|e| format!("Failed to save account: {}", e))?;
+        account.write_to_file(out_file)?;
     }
     println!("Result saved to file: {}", out_file);
     if matches.is_present("DEBUG_MAP") {
         let filename = matches.value_of("DEBUG_MAP").unwrap();
-        let file = File::create(filename)
-            .map_err(|e| format!("Failed to create file {}: {}", filename, e))?;
-        serde_json::to_writer_pretty(file, &prog.dbgmap)
-            .map_err(|e| format!("Failed to write data to file: {}", e))?;
+        let file = File::create(filename)?;
+        serde_json::to_writer_pretty(file, &prog.dbgmap)?;
     }
 
-    return Ok(());
-
+    Ok(())
 }
 
-fn parse_now(now: Option<&str>) -> Result<u32, String> {
+fn parse_now(now: Option<&str>) -> Result<u32> {
     let now = match now {
         Some(now_str) => {
-            u32::from_str_radix(now_str, 10)
-                .map_err(|e| format!(r#"failed to parse "now" option: {}"#, e))?
+            now_str.parse::<u32>().map_err(|e| format_err!("failed to parse \"now\" option: {}", e))?
         },
         None => get_now(),
     };
     Ok(now)
 }
 
-fn parse_ticktock(ticktock: Option<&str>) -> Result<Option<i8>, String> {
+fn parse_ticktock(ticktock: Option<&str>) -> Result<Option<i8>> {
     let error = "invalid ticktock value: must be 0 for tick and -1 for tock.";
     if let Some(tt) = ticktock {
-        let tt = i8::from_str_radix(tt, 10).map_err(|_| error.to_string())?;
+        let tt = tt.parse::<i8>().map_err(|e| format_err!("{}: {}", error, e))?;
         if tt != 0 && tt != -1 {
-            Err(error.to_string())
+            bail!(error)
         } else {
             Ok(Some(tt))
         }
@@ -454,27 +435,57 @@ fn parse_ticktock(ticktock: Option<&str>) -> Result<Option<i8>, String> {
     }
 }
 
-fn run_init_subcmd(matches: &ArgMatches) -> Result<(), String> {
-    let tvc = matches.value_of("INPUT").unwrap();
-    let vars = matches.value_of("DATA").unwrap();
-    let abi = matches.value_of("ABI").unwrap();
-    set_initial_data(tvc, None, vars, abi)
+fn set_initial_data(tvc: &str, data: &str, abi: &str) -> Status {
+    let mut state_init = std::fs::OpenOptions::new().read(true).open(tvc)
+        .map_err(|e| format_err!("unable to open contract file {}: {}", tvc, e))?;
+    let abi = load_abi_json_string(abi)?;
+
+    let mut contract_image =
+        ton_sdk::ContractImage::from_state_init(&mut state_init)
+            .map_err(|e| format_err!("unable to load contract image: {}", e))?;
+
+    contract_image.update_data(data, &abi)
+        .map_err(|e| format_err!("unable to update contract image data: {}", e))?;
+
+    save_to_file(contract_image.state_init(), None, 0)?;
+    Ok(())
 }
 
-fn decode_hex_string(hex_str: String) -> Result<(Vec<u8>, usize), String> {
+fn run_init_subcmd(matches: &ArgMatches) -> Status {
+    let tvc = matches.value_of("INPUT").unwrap();
+    let data = matches.value_of("DATA").unwrap();
+    let abi = matches.value_of("ABI").unwrap();
+    set_initial_data(tvc, data, abi)
+}
+
+fn decode_hex_string(hex_str: String) -> Result<(Vec<u8>, usize)> {
     if hex_str.to_ascii_lowercase().starts_with('x') {
         let buf = SliceData::from_string(&hex_str[1..])
-            .map_err(|_| format!("body {} is invalid literal slice", hex_str))?;
+            .map_err(|_| format_err!("body {} is invalid literal slice", hex_str))?;
         Ok((buf.get_bytestring(0), buf.remaining_bits()))
     } else {
         let buf = hex::decode(&hex_str)
-            .map_err(|_| format!("body {} is invalid hex string", hex_str))?;
+            .map_err(|_| format_err!("body {} is invalid hex string", hex_str))?;
         let buf_bits = buf.len() * 8;
         Ok((buf, buf_bits))
     }
 }
 
-fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
+fn decode_boc(filename: &str, is_tvc: bool) -> Status {
+    let (mut root_slice, orig_bytes) = program::load_stateinit(filename)?;
+
+    println!("Encoded: {}\n", hex::encode(orig_bytes));
+    if is_tvc {
+        let state = StateInit::construct_from(&mut root_slice)?;
+        println!("Decoded:\n{}", printer::state_init_printer(&state));
+    } else {
+        let msg = Message::construct_from(&mut root_slice)?;
+        println!("Decoded:\n{}", printer::msg_printer(&msg)?);
+    }
+    Ok(())
+}
+
+fn run_test_subcmd(matches: &ArgMatches) -> Status {
     let (body, sign) = match matches.value_of("BODY") {
         Some(hex_str) => {
             let mut hex_str = hex_str.to_string();
@@ -483,7 +494,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
                 Some(source) => {
                     let path = Path::new(source);
                     if !path.exists() {
-                        return Err(format!("File {} doesn't exist", source));
+                        bail!("File {} doesn't exist", source);
                     }
                     Some(ParseEngineResults::new(
                         ParseEngine::new(vec![path], None)?
@@ -500,14 +511,14 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
                 };
                 id.map(|id| id.0)
             })
-            .map_err(|e| format!("failed to resolve body {}: {}", hex_str, e))?;
+            .map_err(|e| format_err!("failed to resolve body {}: {}", hex_str, e))?;
             hex_str = resolved.text.clone();
 
             let (buf, buf_bits) = decode_hex_string(hex_str)?;
             let body: SliceData = BuilderData::with_raw(buf, buf_bits)
-                .map_err(|e| format!("failed to pack body in cell: {}", e))?
+                .map_err(|e| format_err!("failed to pack body in cell: {}", e))?
                 .into_cell()
-                .map_err(|e| format!("failed to pack body in cell: {}", e))?
+                .map_err(|e| format_err!("failed to pack body in cell: {}", e))?
                 .into();
             (Some(body), Some(matches.value_of("SIGN")))
         },
@@ -520,13 +531,15 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
     let action_decoder = |body, is_internal| {
         let abi_file = matches.value_of("ABI_JSON");
         let method = matches.value_of("ABI_METHOD");
-        if abi_file.is_some() && method.is_some() {
-            let result = decode_body(abi_file.unwrap(), method.unwrap(), body, is_internal)
-                .unwrap_or_default();
-            println!("{}", result);
+        if let Some(abi_file) = abi_file {
+            if let Some(method) = method {
+                let result = decode_body(abi_file, method, body, is_internal)
+                    .unwrap_or_default();
+                println!("{}", result);
+            }
         }
     };
-    
+
     let abi_json = matches.value_of("ABI_JSON");
 
     let _abi_contract = match abi_json {
@@ -547,20 +560,15 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
         body,
     };
 
-    match matches.value_of("BODY_FROM_BOC") {
-        Some(filename) => {
-            let (mut root_slice, _) = load_stateinit(filename)?;
-            let msg = Message::construct_from(&mut root_slice)
-                .map_err(|e| format!("Failed to read message from slice: {}", e))?;
-            msg_info.body = msg.body();
-        }
-        None => {}
+    if let Some(filename) = matches.value_of("BODY_FROM_BOC") {
+        let (mut root_slice, _) = program::load_stateinit(filename)?;
+        let msg = Message::construct_from(&mut root_slice)?;
+        msg_info.body = msg.body();
     }
 
     let gas_limit = matches.value_of("GASLIMIT")
-        .map(|v| i64::from_str_radix(v, 10))
-        .transpose()
-        .map_err(|e| format!("cannot parse gas limit value: {}", e))?;
+        .map(|v| v.parse::<i64>())
+        .transpose()?;
 
     let mut trace_level = TraceLevel::None;
     if matches.is_present("TRACE") {
@@ -573,7 +581,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
     let addr_from_input = if hex::decode(input).is_ok() {
         input.to_owned()
     } else {
-        std::iter::repeat("0").take(64).collect::<String>()
+        "0".repeat(64)
     };
     let address = matches.value_of("ADDRESS")
         .unwrap_or(&addr_from_input);
@@ -599,10 +607,10 @@ fn run_test_subcmd(matches: &ArgMatches) -> Result<(), String> {
     )?;
 
     println!("TEST COMPLETED");
-    return Ok(());
+    Ok(())
 }
 
-fn build_body(matches: &ArgMatches) -> Result<Option<SliceData>, String> {
+fn build_body(matches: &ArgMatches) -> Result<Option<SliceData>> {
     let mut mask = 0u8;
     let abi_file = matches.value_of("ABI_JSON").map(|m| {mask |= 1; m });
     let method_name = matches.value_of("ABI_METHOD").map(|m| {mask |= 2; m });
@@ -612,7 +620,7 @@ fn build_body(matches: &ArgMatches) -> Result<Option<SliceData>, String> {
         let key_file = match matches.value_of("SIGN") {
             Some(path) => {
                 let pair = KeypairManager::from_secret_file(path)
-                    .ok_or("Failed to read keypair.")?;
+                    .ok_or_else(|| format_err!("Failed to read keypair."))?;
                 Some(pair.drain())
             },
             _ => None
@@ -620,7 +628,7 @@ fn build_body(matches: &ArgMatches) -> Result<Option<SliceData>, String> {
         let params = params.map_or(Ok("{}".to_owned()), |params|
             if params.find('{').is_none() {
                 std::fs::read_to_string(params)
-                    .map_err(|e| format!("failed to load params from file: {}", e))
+                    .map_err(|e| format_err!("failed to load params from file: {}", e))
             } else {
                 Ok(params.to_owned())
             }
@@ -633,13 +641,59 @@ fn build_body(matches: &ArgMatches) -> Result<Option<SliceData>, String> {
             header,
             key_file,
             is_internal
-        )?.into_cell()
-        .map_err(|e| format!("failed to pack body in cell: {}", e))?
-        .into();
+        )?.into_cell()?.into();
         Ok(Some(body))
     } else if mask == 0 {
         Ok(None)
     } else {
-        Err("All ABI parameters must be supplied: ABI_JSON, ABI_METHOD".to_string())
+        bail!("All ABI parameters must be supplied: ABI_JSON, ABI_METHOD")
     }
+}
+
+fn build_message(
+    address_str: &str,
+    wc: Option<&str>,
+    body: Option<SliceData>,
+    pack_code: bool,
+    suffix: &str,
+) -> Status {
+    let wc = match wc {
+        Some(w) => w.parse::<i8>()?,
+        None => -1,
+    };
+    println!("contract address {}", address_str);
+    let dest_address = MsgAddressInt::with_standart(
+        None,
+        wc,
+        AccountId::from_str(address_str)?
+    )?;
+
+    let state = if pack_code {
+        Some(program::load_from_file(&format!("{}.tvc", address_str))?)
+    } else {
+        None
+    };
+
+    let msg_hdr = ExternalInboundMessageHeader {
+        dst: dest_address,
+        ..Default::default()
+    };
+    let mut msg = Message::with_ext_in_header(msg_hdr);
+    *msg.state_init_mut() = state;
+    *msg.body_mut() = body;
+
+    let root_cell = msg.serialize()?;
+    let boc = BagOfCells::with_root(&root_cell);
+    let mut bytes = Vec::new();
+    let mode = BocSerialiseMode::Generic { index: false, crc: true, cache_bits: false, flags: 0 };
+    boc.write_to_ex(&mut bytes, mode, None, Some(4))?;
+
+    println!("Encoded msg: {}", hex::encode(&bytes));
+
+    let output_file_name = address_str.get(0..8).unwrap_or("00000000").to_string() + suffix;
+    let mut f = File::create(&output_file_name)?;
+    f.write_all(&bytes)?;
+
+    println!("boc file created: {}", output_file_name);
+    Ok(())
 }
