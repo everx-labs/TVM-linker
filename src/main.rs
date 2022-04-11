@@ -53,7 +53,7 @@ use keyman::KeypairManager;
 use parser::{ParseEngine, ParseEngineResults};
 use program::{Program, get_now, save_to_file, load_from_file};
 use resolver::resolve_name;
-use ton_block::{Deserializable, Message, StateInit, Serializable, Account, MsgAddressInt, ExternalInboundMessageHeader};
+use ton_block::{Deserializable, Message, StateInit, Serializable, Account, MsgAddressInt, ExternalInboundMessageHeader, InternalMessageHeader, MsgAddressIntOrNone};
 use std::io::Write;
 use std::{path::Path};
 use testcall::{call_contract, MsgInfo, TestCallParams, TraceLevel};
@@ -150,11 +150,12 @@ fn linker_main() -> Status {
         )
         (@subcommand message =>
             (@setting AllowNegativeNumbers)
-            (about: "generate external inbound message for the blockchain")
+            (about: "generate inbound message for the blockchain")
             (version: build_info.as_str())
             (author: "TON Labs")
             (@arg INIT: -i --init "Generates constructor message with code and data of the contract")
             (@arg DATA: -d --data +takes_value "Supplies body for the message in hex format (empty data by default)")
+            (@arg INTERNAL: --internal +takes_value "Generates inbound internal message with provided value (instead of external message by default)")
             (@arg WORKCHAIN: -w --workchain +takes_value "Supplies workchain id for the contract address")
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[DATA] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[DATA] "Supplies the name of the calling contract method")
@@ -242,6 +243,7 @@ fn linker_main() -> Status {
             msg_body,
             msg_matches.is_present("INIT"),
             &suffix,
+            msg_matches.is_present("INTERNAL")
         )
     }
 
@@ -656,6 +658,7 @@ fn build_message(
     body: Option<SliceData>,
     pack_code: bool,
     suffix: &str,
+    internal: bool,
 ) -> Status {
     let wc = match wc {
         Some(w) => w.parse::<i8>()?,
@@ -668,11 +671,25 @@ fn build_message(
         AccountId::from_str(address_str)?
     )?;
 
-    let msg_hdr = ExternalInboundMessageHeader {
-        dst: dest_address,
-        ..Default::default()
+    let mut msg = if internal {
+        let source_address = MsgAddressIntOrNone::Some(MsgAddressInt::with_standart(
+            None,
+            -1,
+            AccountId::from_str("55".repeat(32).as_str())?
+        )?);
+        Message::with_int_header(InternalMessageHeader {
+            ihr_disabled: true,
+            bounce: true,
+            src: source_address,
+            dst: dest_address,
+            ..Default::default()
+        })
+    } else {
+        Message::with_ext_in_header(ExternalInboundMessageHeader {
+            dst: dest_address,
+            ..Default::default()
+        })
     };
-    let mut msg = Message::with_ext_in_header(msg_hdr);
     if pack_code {
         msg.set_state_init(program::load_from_file(&format!("{}.tvc", address_str))?);
     }
