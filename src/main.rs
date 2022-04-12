@@ -668,19 +668,17 @@ fn build_message(
         AccountId::from_str(address_str)?
     )?;
 
-    let state = if pack_code {
-        Some(program::load_from_file(&format!("{}.tvc", address_str))?)
-    } else {
-        None
-    };
-
     let msg_hdr = ExternalInboundMessageHeader {
         dst: dest_address,
         ..Default::default()
     };
     let mut msg = Message::with_ext_in_header(msg_hdr);
-    *msg.state_init_mut() = state;
-    *msg.body_mut() = body;
+    if pack_code {
+        msg.set_state_init(program::load_from_file(&format!("{}.tvc", address_str))?);
+    }
+    if let Some(body) = body {
+        msg.set_body(body);
+    }
 
     let root_cell = msg.serialize()?;
     let boc = BagOfCells::with_root(&root_cell);
