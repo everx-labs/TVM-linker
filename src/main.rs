@@ -673,7 +673,7 @@ fn build_message(
         ..Default::default()
     };
     let mut msg = Message::with_ext_in_header(msg_hdr);
-    let state = if pack_code {
+    if pack_code {
         msg.set_state_init(program::load_from_file(&format!("{}.tvc", address_str))?);
     }
     if let Some(body) = body {
