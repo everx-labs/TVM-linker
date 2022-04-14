@@ -16,7 +16,7 @@ use failure::format_err;
 use keyman::KeypairManager;
 use log::Level::Error;
 use crate::printer::msg_printer;
-use program::{load_from_file, save_to_file, get_now};
+use program::{load_from_file, get_now};
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use serde_json::Value;
 use std::fs::File;
@@ -43,7 +43,9 @@ fn create_external_inbound_msg(src: MsgAddressExt, dst: MsgAddressInt, body: Opt
         import_fee: Grams(0x1234u32.into())
     };
     let mut msg = Message::with_ext_in_header(hdr);
-    *msg.body_mut() = body;
+    if let Some(body) = body {
+        msg.set_body(body);
+    }
     msg
 }
 
@@ -68,7 +70,9 @@ fn create_internal_msg(
     hdr.created_lt = lt;
     hdr.created_at = UnixTime32(at);
     let mut msg = Message::with_int_header(hdr);
-    *msg.body_mut() = body;
+    if let Some(body) = body {
+        msg.set_body(body);
+    }
     msg
 }
 
@@ -186,7 +190,7 @@ fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: 
     Ok(())
 }
 
-fn load_code_and_data(state_init: &StateInit) -> (SliceData, SliceData) {
+pub fn load_code_and_data(state_init: &StateInit) -> (SliceData, SliceData) {
     let code: SliceData = state_init.code.clone().unwrap_or_default().into();
     let data = state_init.data.clone().unwrap_or_default().into();
     (code, data)
@@ -228,11 +232,18 @@ pub struct MsgInfo<'a> {
     pub body: Option<SliceData>,
 }
 
-fn load_debug_info(filename: String) -> Option<DbgInfo> {
+pub fn load_debug_info(filename: &str) -> Option<DbgInfo> {
     File::open(filename)
         .ok()
-        .map(|file| { serde_json::from_reader(file).ok() })
+        .and_then(|file| { serde_json::from_reader(file).ok() })
         .flatten()
+}
+
+pub fn load_config(filename: &str) -> Option<Cell> {
+    let state = load_from_file(filename).unwrap_or_default();
+    let (_code, data) = load_code_and_data(&state);
+    // config dictionary is located in the first reference of the storage root cell
+    data.into_cell().reference(0).ok()
 }
 
 #[derive(PartialEq)]
@@ -240,54 +251,6 @@ pub enum TraceLevel {
     Full,
     Minimal,
     None
-}
-
-pub fn call_contract<F>(
-    smc_file: &str,
-    address: &str,
-    smc_balance: Option<&str>,
-    msg_info: MsgInfo,
-    config_file: Option<&str>,
-    key_file: Option<Option<&str>>,
-    ticktock: Option<i8>,
-    gas_limit: Option<i64>,
-    action_decoder: Option<F>,
-    trace_level: TraceLevel,
-    debug_map_filename: String,
-    capabilities: Option<u64>
-) -> Result<i32>
-    where F: Fn(SliceData, bool)
-{
-    let wc = match msg_info.balance {
-        Some(_) => 0,
-        None => if ticktock.is_some() { -1 } else { 0 },
-    };
-
-    let addr = if address.find(':').is_none() {
-        format!("{}:{}", wc, address)
-    } else {
-        address.to_owned()
-    };
-    let addr = ton_block::MsgAddressInt::from_str(&addr)?;
-
-    let state_init = load_from_file(smc_file)?;
-    let debug_info = load_debug_info(debug_map_filename);
-    let config_cell = config_file.map(|filename| {
-        let state = load_from_file(filename).unwrap_or_default();
-        let (_code, data) = load_code_and_data(&state);
-        // config dictionary is located in the first reference of the storage root cell
-        data.into_cell().reference(0)
-    }).transpose()?;
-    let (exit_code, state_init, is_vm_success) = call_contract_ex(
-        addr, state_init, debug_info, smc_balance,
-        msg_info, config_cell, key_file, ticktock, gas_limit, action_decoder, trace_level,
-        capabilities
-    )?;
-    if is_vm_success {
-        save_to_file(state_init, Some(smc_file), 0)?;
-        println!("Contract persistent data updated");
-    }
-    Ok(exit_code)
 }
 
 fn get_position(info: &EngineTraceInfo, debug_info: &Option<DbgInfo>) -> Option<String> {
@@ -316,12 +279,10 @@ fn trace_callback_minimal(_engine: &Engine, info: &EngineTraceInfo, debug_info: 
 }
 
 fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debug_info: &Option<DbgInfo>) {
-
     if info.info_type == EngineTraceInfoType::Dump {
         println!("{}", info.cmd_str);
-        return;
+        return
     }
-
     println!("{}: {}",
         info.step,
         info.cmd_str
@@ -336,12 +297,10 @@ fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debu
         info.gas_used,
         info.gas_cmd
     );
-
     let position = get_position(info, debug_info);
     if position.is_some() {
         println!("Position: {}", position.unwrap());
     }
-
     println!("\n--- Stack trace ------------------------");
     for item in info.stack.iter() {
         println!("{}", item);
@@ -349,44 +308,48 @@ fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debu
     println!("----------------------------------------\n");
 }
 
-pub fn call_contract_ex<F>(
+pub struct TestCallParams<'a, F: Fn(SliceData, bool)> {
+    pub balance: Option<&'a str>,
+    pub msg_info: MsgInfo<'a>,
+    pub config: Option<Cell>,
+    pub key_file: Option<Option<&'a str>>,
+    pub ticktock: Option<i8>,
+    pub gas_limit: Option<i64>,
+    pub action_decoder: Option<F>,
+    pub trace_level: TraceLevel,
+    pub debug_info: Option<DbgInfo>,
+    pub capabilities: Option<u64>
+}
+
+pub fn call_contract<F>(
     addr: MsgAddressInt,
     state_init: StateInit,
-    debug_info: Option<DbgInfo>,
-    smc_balance: Option<&str>,
-    msg_info: MsgInfo,
-    config: Option<Cell>,
-    key_file: Option<Option<&str>>,
-    ticktock: Option<i8>,
-    gas_limit: Option<i64>,
-    action_decoder: Option<F>,
-    trace_level: TraceLevel,
-    capabilities: Option<u64>
+    params: TestCallParams<F>,
 ) -> Result<(i32, StateInit, bool)>
     where F: Fn(SliceData, bool)
 {
-    let func_selector = match msg_info.balance {
+    let func_selector = match params.msg_info.balance {
         Some(_) => 0,
-        None => if ticktock.is_some() { -2 } else { -1 },
+        None => if params.ticktock.is_some() { -2 } else { -1 },
     };
 
-    let msg = create_inbound_msg(func_selector, &msg_info, addr.address())?;
+    let msg = create_inbound_msg(func_selector, &params.msg_info, addr.address())?;
 
     if !log_enabled!(Error) {
-        init_logger(trace_level == TraceLevel::Full)?;
+        init_logger(params.trace_level == TraceLevel::Full)?;
     }
 
     let mut state_init = state_init;
     let (code, data) = load_code_and_data(&state_init);
 
-    let (smc_value, smc_balance) = decode_balance(smc_balance)?;
+    let (smc_value, smc_balance) = decode_balance(params.balance)?;
     let registers = initialize_registers(
         data,
         code.clone().into_cell(),
         addr.clone(),
-        msg_info.now,
+        params.msg_info.now,
         (smc_value, smc_balance),
-        config,
+        params.config,
     )?;
 
     let mut stack = Stack::new();
@@ -395,19 +358,19 @@ pub fn call_contract_ex<F>(
             msg.ok_or_else(|| format_err!("Failed to create message"))?.serialize()?
         );
 
-        let mut body = match msg_info.body {
+        let mut body = match params.msg_info.body {
             Some(b) => b,
             None => Cell::default().into(),
         };
 
         if func_selector == -1 {
-            if let Some(key_file) = key_file {
+            if let Some(key_file) = params.key_file {
                 sign_body(&mut body, key_file)?;
             }
         }
 
         let msg_value = if func_selector == 0 {
-            decode_balance(msg_info.balance)?.0 // for internal message
+            decode_balance(params.msg_info.balance)?.0 // for internal message
         } else {
             0 // for external message
         };
@@ -424,11 +387,11 @@ pub fn call_contract_ex<F>(
         stack
             .push(int!(smc_value))
             .push(StackItem::Integer(Arc::new(addr_int))) //contract address
-            .push(int!(ticktock.unwrap())) //tick or tock
+            .push(int!(params.ticktock.unwrap())) //tick or tock
             .push(int!(func_selector));
     }
 
-    let gas = if let Some(gas_limit) = gas_limit {
+    let gas = if let Some(gas_limit) = params.gas_limit {
         let mut tmp_gas = Gas::test();
         tmp_gas.new_gas_limit(gas_limit);
         tmp_gas
@@ -437,12 +400,13 @@ pub fn call_contract_ex<F>(
     };
 
     let mut engine = Engine::with_capabilities(
-        capabilities.unwrap_or(0)
+        params.capabilities.unwrap_or(0)
     ).setup_with_libraries(
         code, Some(registers), Some(stack), Some(gas), vec![]
     );
     engine.set_trace(0);
-    match trace_level {
+    let debug_info = params.debug_info;
+    match params.trace_level {
         TraceLevel::Full => engine.set_trace_callback(move |engine, info| { trace_callback(engine, info, true, &debug_info); }),
         TraceLevel::Minimal => engine.set_trace_callback(move |engine, info| { trace_callback_minimal(engine, info, &debug_info); }),
         TraceLevel::None => {}
@@ -467,7 +431,7 @@ pub fn call_contract_ex<F>(
     println!("{}", engine.dump_ctrls(false));
 
     if is_vm_success {
-        if let Some(decoder) = action_decoder {
+        if let Some(decoder) = params.action_decoder {
             decode_actions(engine.get_actions(), &mut state_init, decoder)?;
         }
 
@@ -478,45 +442,6 @@ pub fn call_contract_ex<F>(
     }
 
     Ok((exit_code, state_init, is_vm_success))
-}
-
-#[cfg(test)]
-pub fn perform_contract_call<F>(
-    contract_file: &str,
-    body: Option<SliceData>,
-    key_file: Option<Option<&str>>,
-    trace_level: TraceLevel,
-    decode_c5: bool,
-    msg_balance: Option<&str>,
-    ticktock: Option<i8>,
-    src: Option<&str>,
-    balance: Option<&str>,
-    now: u32,
-    action_decoder: F,
-) -> i32
-    where F: Fn(SliceData, bool)
-{
-    let file = format!("{}.tvc", contract_file);
-    call_contract(
-        &file,
-        contract_file,
-        balance,
-        MsgInfo{
-            balance: msg_balance,
-            src,
-            now,
-            bounced: false,
-            body
-        },
-        None,
-        key_file,
-        ticktock,
-        None,
-        if decode_c5 { Some(action_decoder) } else { None },
-        trace_level,
-        String::from(""),
-        None
-    ).unwrap_or(-1)
 }
 
 #[cfg(test)]
