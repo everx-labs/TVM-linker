@@ -32,7 +32,6 @@ extern crate ton_types;
 extern crate ton_vm;
 #[macro_use]
 extern crate log;
-extern crate ton_sdk;
 extern crate ton_labs_assembler;
 extern crate num_traits;
 
@@ -438,18 +437,15 @@ fn parse_ticktock(ticktock: Option<&str>) -> Result<Option<i8>> {
 }
 
 fn set_initial_data(tvc: &str, data: &str, abi: &str) -> Status {
-    let mut state_init = std::fs::OpenOptions::new().read(true).open(tvc)
-        .map_err(|e| format_err!("unable to open contract file {}: {}", tvc, e))?;
     let abi = load_abi_json_string(abi)?;
-
-    let mut contract_image =
-        ton_sdk::ContractImage::from_state_init(&mut state_init)
-            .map_err(|e| format_err!("unable to load contract image: {}", e))?;
-
-    contract_image.update_data(data, &abi)
-        .map_err(|e| format_err!("unable to update contract image data: {}", e))?;
-
-    save_to_file(contract_image.state_init(), None, 0)?;
+    let mut state_init = load_from_file(tvc)?;
+    let new_data = ton_abi::json_abi::update_contract_data(
+        &abi,
+        data,
+        state_init.data.clone().unwrap_or_default().into(),
+    )?;
+    state_init.set_data(new_data.into_cell());
+    save_to_file(state_init, None, 0)?;
     Ok(())
 }
 
