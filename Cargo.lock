@@ -662,40 +662,15 @@ checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
 
 [[package]]
 name = "num"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8536030f9fea7127f841b45bb6243b27255787fb4eb83958aa1ef9d2fdc0c36"
-dependencies = [
- "num-bigint 0.2.6",
- "num-complex 0.2.4",
- "num-integer",
- "num-iter",
- "num-rational 0.2.4",
- "num-traits",
-]
-
-[[package]]
-name = "num"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43db66d1170d347f9a065114077f7dccb00c1b9478c89384490a3425279a4606"
 dependencies = [
- "num-bigint 0.4.3",
- "num-complex 0.4.0",
+ "num-bigint",
+ "num-complex",
  "num-integer",
  "num-iter",
- "num-rational 0.4.0",
- "num-traits",
-]
-
-[[package]]
-name = "num-bigint"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "090c7f9998ee0ff65aa5b723e4009f7b217707f1fb5ea551329cc4d6231fb304"
-dependencies = [
- "autocfg",
- "num-integer",
+ "num-rational",
  "num-traits",
 ]
 
@@ -707,16 +682,6 @@ checksum = "f93ab6289c7b344a8a9f60f88d80aa20032336fe78da341afc91c8a2341fc75f"
 dependencies = [
  "autocfg",
  "num-integer",
- "num-traits",
-]
-
-[[package]]
-name = "num-complex"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6b19411a9719e753aff12e5187b74d60d3dc449ec3f4dc21e3989c3f554bc95"
-dependencies = [
- "autocfg",
  "num-traits",
 ]
 
@@ -763,24 +728,12 @@ dependencies = [
 
 [[package]]
 name = "num-rational"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c000134b5dbf44adc5cb772486d335293351644b801551abe8f75c84cfa4aef"
-dependencies = [
- "autocfg",
- "num-bigint 0.2.6",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
-name = "num-rational"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d41702bd167c2df5520b384281bc111a4b5efcf7fbc4c9c222c815b07e0a6a6a"
 dependencies = [
  "autocfg",
- "num-bigint 0.4.3",
+ "num-bigint",
  "num-integer",
  "num-traits",
 ]
@@ -1279,8 +1232,8 @@ dependencies = [
 
 [[package]]
 name = "ton_abi"
-version = "2.1.14"
-source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.1.14#ed3f54ffeb646ba9fe86bd69cc19c9d62a752426"
+version = "2.1.19"
+source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.1.19#a5357f3dc7ba5badc913fc23de0cad98b18f6c80"
 dependencies = [
  "base64 0.10.1",
  "byteorder",
@@ -1289,7 +1242,7 @@ dependencies = [
  "ed25519-dalek",
  "failure",
  "hex 0.3.2",
- "num-bigint 0.4.3",
+ "num-bigint",
  "num-traits",
  "serde",
  "serde_derive",
@@ -1301,8 +1254,8 @@ dependencies = [
 
 [[package]]
 name = "ton_block"
-version = "1.7.39"
-source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.7.39#4b34a73619b53ebda37f3cb6cc44d26925053219"
+version = "1.7.43"
+source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.7.43#7d1a59345d2665083c96ba1d007d2df506209ed5"
 dependencies = [
  "base64 0.13.0",
  "crc",
@@ -1311,7 +1264,7 @@ dependencies = [
  "failure",
  "hex 0.4.3",
  "log",
- "num 0.4.0",
+ "num",
  "num-traits",
  "rand 0.7.3",
  "sha2 0.8.2",
@@ -1320,13 +1273,13 @@ dependencies = [
 
 [[package]]
 name = "ton_labs_assembler"
-version = "1.2.31"
-source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.31#51de8425ad1a99ad5355f43f03266bd325d05da3"
+version = "1.2.34"
+source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.34#0ec106a8be2028a183f9b00969a2f39d0efb492b"
 dependencies = [
  "failure",
  "hex 0.4.3",
  "log",
- "num 0.2.1",
+ "num",
  "num-traits",
  "serde",
  "serde_json",
@@ -1335,8 +1288,8 @@ dependencies = [
 
 [[package]]
 name = "ton_types"
-version = "1.10.12"
-source = "git+https://github.com/tonlabs/ton-labs-types.git?tag=1.10.12#af1dc71a9a2b46cb0d55a0956e44726374ba7c0c"
+version = "1.10.14"
+source = "git+https://github.com/tonlabs/ton-labs-types.git?tag=1.10.14#96a0333a0a0a3e2b62226c3a81577dcf1e1bff89"
 dependencies = [
  "base64 0.13.0",
  "crc",
@@ -1345,7 +1298,7 @@ dependencies = [
  "lazy_static",
  "lockfree",
  "log",
- "num 0.4.0",
+ "num",
  "num-derive",
  "num-traits",
  "rand 0.8.5",
@@ -1355,8 +1308,8 @@ dependencies = [
 
 [[package]]
 name = "ton_vm"
-version = "1.8.32"
-source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.32#aab4b9c82b9ef9ae12b19804d83bdc8b49d9c065"
+version = "1.8.33"
+source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.33#d7950fe2faa07aff10f5c3fecda8ebbec76b6943"
 dependencies = [
  "criterion",
  "ed25519",
@@ -1365,7 +1318,7 @@ dependencies = [
  "hex 0.4.3",
  "lazy_static",
  "log",
- "num 0.4.0",
+ "num",
  "num-traits",
  "rand 0.7.3",
  "sha2 0.9.9",
@@ -1376,7 +1329,7 @@ dependencies = [
 
 [[package]]
 name = "tvm_linker"
-version = "0.15.7"
+version = "0.15.21"
 dependencies = [
  "assert_cmd",
  "base64 0.10.1",
@@ -1388,7 +1341,7 @@ dependencies = [
  "hex 0.3.2",
  "lazy_static",
  "log",
- "num 0.4.0",
+ "num",
  "num-traits",
  "predicates",
  "rand 0.7.3",
