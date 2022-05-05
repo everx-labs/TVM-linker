@@ -37,3 +37,11 @@ ton_vm = { default-features = false, git = 'https://github.com/tonlabs/ton-labs-
 [dev-dependencies]
 assert_cmd = '0.11'
 predicates = '1'
+
+[lib]
+name = "ton_utils"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tvm_linker"
+path = "src/main.rs"
