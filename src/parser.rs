@@ -308,7 +308,7 @@ fn start_with(sample: &str, pattern: &str) -> bool {
 
 impl ParseEngine {
 
-    pub fn new(sources: Vec<&Path>, abi_json: Option<String>) -> Result<Self> {
+    pub fn new(sources: &[&Path], abi_json: Option<String>) -> Result<Self> {
         let mut engine = ParseEngine {
             globl_name_to_id:      HashMap::new(),
             internal_name_to_id:    HashMap::new(),
@@ -332,14 +332,14 @@ impl ParseEngine {
         Ok(engine)
     }
 
-    fn parse(&mut self, sources: Vec<&Path>, abi_json: Option<String>) -> Status {
+    fn parse(&mut self, sources: &[&Path], abi_json: Option<String>) -> Status {
         if let Some(s) = abi_json {
             self.abi = Some(load_abi_contract(&s)?);
         }
 
         self.preinit()?;
 
-        for source in &sources {
+        for source in sources {
             self.parse_code(source)?;
         }
 
@@ -884,7 +884,7 @@ impl ParseEngine {
         Ok(())
     }
 
-    fn build_data(&self) -> Option<Cell> {
+    pub fn build_data(&self) -> Option<Cell> {
         let filter = |persistent: bool| {
             self.globl_name_to_object.iter().filter_map(move |item| {
                 item.1.dtype.data().and_then(|data| {

@@ -282,7 +282,7 @@ fn linker_main() -> Status {
         }
         sources.push(path);
         let mut prog = Program::new(
-            ParseEngine::new(sources, abi_json)?
+            ParseEngine::new(&sources, abi_json)?
         );
 
         match compile_matches.value_of("GENKEY") {
@@ -378,7 +378,7 @@ fn replace_command(matches: &ArgMatches) -> Status {
     sources.push(path);
 
     let mut prog = Program::new(
-        ParseEngine::new(sources, abi_json)?
+        ParseEngine::new(&sources, abi_json)?
     );
 
     let code = prog.compile_asm(false)?;
@@ -497,7 +497,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
                         bail!("File {} doesn't exist", source);
                     }
                     Some(ParseEngineResults::new(
-                        ParseEngine::new(vec![path], None)?
+                        ParseEngine::new(&[path], None)?
                     ))
                 },
                 None => None
@@ -673,7 +673,7 @@ fn build_message(
         ..Default::default()
     };
     let mut msg = Message::with_ext_in_header(msg_hdr);
-    let state = if pack_code {
+    if pack_code {
         msg.set_state_init(program::load_from_file(&format!("{}.tvc", address_str))?);
     }
     if let Some(body) = body {
