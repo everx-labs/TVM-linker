@@ -32,7 +32,6 @@ extern crate ton_types;
 extern crate ton_vm;
 #[macro_use]
 extern crate log;
-extern crate ton_sdk;
 extern crate ton_labs_assembler;
 extern crate num_traits;
 
@@ -51,12 +50,12 @@ use clap::ArgMatches;
 use failure::{format_err, bail};
 use keyman::KeypairManager;
 use parser::{ParseEngine, ParseEngineResults};
-use program::{Program, get_now, save_to_file};
+use program::{Program, get_now, save_to_file, load_from_file};
 use resolver::resolve_name;
-use ton_block::{Deserializable, Message, StateInit, Serializable, Account, MsgAddressInt, ExternalInboundMessageHeader};
+use ton_block::{Deserializable, Message, StateInit, Serializable, Account, MsgAddressInt, ExternalInboundMessageHeader, InternalMessageHeader, MsgAddressIntOrNone};
 use std::io::Write;
 use std::{path::Path};
-use testcall::{call_contract, MsgInfo, TraceLevel};
+use testcall::{call_contract, MsgInfo, TestCallParams, TraceLevel};
 use ton_types::{BuilderData, SliceData, Result, Status, AccountId, BagOfCells, BocSerialiseMode};
 use std::env;
 use disasm::commands::disasm_command;
@@ -150,11 +149,12 @@ fn linker_main() -> Status {
         )
         (@subcommand message =>
             (@setting AllowNegativeNumbers)
-            (about: "generate external inbound message for the blockchain")
+            (about: "generate inbound message for the blockchain")
             (version: build_info.as_str())
             (author: "TON Labs")
             (@arg INIT: -i --init "Generates constructor message with code and data of the contract")
             (@arg DATA: -d --data +takes_value "Supplies body for the message in hex format (empty data by default)")
+            (@arg INTERNAL: --internal +takes_value "Generates inbound internal message with provided value (instead of external message by default)")
             (@arg WORKCHAIN: -w --workchain +takes_value "Supplies workchain id for the contract address")
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[DATA] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[DATA] "Supplies the name of the calling contract method")
@@ -242,6 +242,7 @@ fn linker_main() -> Status {
             msg_body,
             msg_matches.is_present("INIT"),
             &suffix,
+            msg_matches.is_present("INTERNAL")
         )
     }
 
@@ -282,7 +283,7 @@ fn linker_main() -> Status {
         }
         sources.push(path);
         let mut prog = Program::new(
-            ParseEngine::new(&sources, abi_json)?
+            ParseEngine::new(sources, abi_json)?
         );
 
         match compile_matches.value_of("GENKEY") {
@@ -378,7 +379,7 @@ fn replace_command(matches: &ArgMatches) -> Status {
     sources.push(path);
 
     let mut prog = Program::new(
-        ParseEngine::new(&sources, abi_json)?
+        ParseEngine::new(sources, abi_json)?
     );
 
     let code = prog.compile_asm(false)?;
@@ -436,18 +437,15 @@ fn parse_ticktock(ticktock: Option<&str>) -> Result<Option<i8>> {
 }
 
 fn set_initial_data(tvc: &str, data: &str, abi: &str) -> Status {
-    let mut state_init = std::fs::OpenOptions::new().read(true).open(tvc)
-        .map_err(|e| format_err!("unable to open contract file {}: {}", tvc, e))?;
     let abi = load_abi_json_string(abi)?;
-
-    let mut contract_image =
-        ton_sdk::ContractImage::from_state_init(&mut state_init)
-            .map_err(|e| format_err!("unable to load contract image: {}", e))?;
-
-    contract_image.update_data(data, &abi)
-        .map_err(|e| format_err!("unable to update contract image data: {}", e))?;
-
-    save_to_file(contract_image.state_init(), None, 0)?;
+    let mut state_init = load_from_file(tvc)?;
+    let new_data = ton_abi::json_abi::update_contract_data(
+        &abi,
+        data,
+        state_init.data.clone().unwrap_or_default().into(),
+    )?;
+    state_init.set_data(new_data.into_cell());
+    save_to_file(state_init, None, 0)?;
     Ok(())
 }
 
@@ -488,8 +486,6 @@ fn decode_boc(filename: &str, is_tvc: bool) -> Status {
 fn run_test_subcmd(matches: &ArgMatches) -> Status {
     let (body, sign) = match matches.value_of("BODY") {
         Some(hex_str) => {
-            let mut hex_str = hex_str.to_string();
-
             let parse_results = match matches.value_of("SOURCE") {
                 Some(source) => {
                     let path = Path::new(source);
@@ -497,13 +493,13 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
                         bail!("File {} doesn't exist", source);
                     }
                     Some(ParseEngineResults::new(
-                        ParseEngine::new(&[path], None)?
+                        ParseEngine::new(vec![path], None)?
                     ))
                 },
                 None => None
             };
 
-            let line = Line::new(hex_str.as_str(), "", 0);
+            let line = Line::new(hex_str, "", 0);
             let resolved = resolve_name(&line, |name| {
                 let id = match &parse_results {
                     Some(parse_results) => parse_results.global_by_name(name),
@@ -512,9 +508,8 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
                 id.map(|id| id.0)
             })
             .map_err(|e| format_err!("failed to resolve body {}: {}", hex_str, e))?;
-            hex_str = resolved.text.clone();
 
-            let (buf, buf_bits) = decode_hex_string(hex_str)?;
+            let (buf, buf_bits) = decode_hex_string(resolved.text)?;
             let body: SliceData = BuilderData::with_raw(buf, buf_bits)
                 .map_err(|e| format_err!("failed to pack body in cell: {}", e))?
                 .into_cell()
@@ -547,7 +542,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
         None => None
     };
 
-    let debug_map_filename = format!("{}{}", abi_json.map_or("debug_map.", |a| a.trim_end_matches("abi.json")), "map.json");
+    let debug_map_filename = format!("{}.map.json", abi_json.map_or("debug_map", |a| a.trim_end_matches(".abi.json")));
 
     println!("TEST STARTED");
     println!("body = {:?}", body);
@@ -583,28 +578,31 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
     } else {
         "0".repeat(64)
     };
-    let address = matches.value_of("ADDRESS")
-        .unwrap_or(&addr_from_input);
-
-    let input = if input.contains(".tvc") {
+    let address = matches.value_of("ADDRESS").unwrap_or(&addr_from_input);
+    let input = if input.ends_with(".tvc") {
         input.to_owned()
     } else {
         format!("{}.tvc", input)
     };
-    call_contract(
-        &input,
-        address,
-        matches.value_of("BALANCE"),
+    let addr = ton_block::MsgAddressInt::from_str(&address)?;
+    let state_init = load_from_file(&input)?;
+    let config = matches.value_of("CONFIG").and_then(testcall::load_config);
+    let (_, state_init, is_success) = call_contract(addr, state_init, TestCallParams {
+        balance: matches.value_of("BALANCE"),
         msg_info,
-        matches.value_of("CONFIG"),
-        sign,
+        config,
+        key_file: sign,
         ticktock,
         gas_limit,
-        if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
+        action_decoder: if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
         trace_level,
-        debug_map_filename,
-        None
-    )?;
+        debug_info: testcall::load_debug_info(&debug_map_filename),
+        capabilities: None,
+    })?;
+    if is_success {
+        save_to_file(state_init, Some(&input), 0)?;
+        println!("Contract persistent data updated");
+    }
 
     println!("TEST COMPLETED");
     Ok(())
@@ -612,8 +610,8 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
 
 fn build_body(matches: &ArgMatches) -> Result<Option<SliceData>> {
     let mut mask = 0u8;
-    let abi_file = matches.value_of("ABI_JSON").map(|m| {mask |= 1; m });
-    let method_name = matches.value_of("ABI_METHOD").map(|m| {mask |= 2; m });
+    let abi_file = matches.value_of("ABI_JSON").map(|m| { mask |= 1; m });
+    let method_name = matches.value_of("ABI_METHOD").map(|m| { mask |= 2; m });
     let params = matches.value_of("ABI_PARAMS");
     let header = matches.value_of("ABI_HEADER");
     if mask == 0x3 {
@@ -656,6 +654,7 @@ fn build_message(
     body: Option<SliceData>,
     pack_code: bool,
     suffix: &str,
+    internal: bool,
 ) -> Status {
     let wc = match wc {
         Some(w) => w.parse::<i8>()?,
@@ -668,11 +667,25 @@ fn build_message(
         AccountId::from_str(address_str)?
     )?;
 
-    let msg_hdr = ExternalInboundMessageHeader {
-        dst: dest_address,
-        ..Default::default()
+    let mut msg = if internal {
+        let source_address = MsgAddressIntOrNone::Some(MsgAddressInt::with_standart(
+            None,
+            -1,
+            AccountId::from_str("55".repeat(32).as_str())?
+        )?);
+        Message::with_int_header(InternalMessageHeader {
+            ihr_disabled: true,
+            bounce: true,
+            src: source_address,
+            dst: dest_address,
+            ..Default::default()
+        })
+    } else {
+        Message::with_ext_in_header(ExternalInboundMessageHeader {
+            dst: dest_address,
+            ..Default::default()
+        })
     };
-    let mut msg = Message::with_ext_in_header(msg_hdr);
     if pack_code {
         msg.set_state_init(program::load_from_file(&format!("{}.tvc", address_str))?);
     }

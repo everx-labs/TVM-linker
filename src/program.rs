@@ -31,6 +31,8 @@ use ton_types::dictionary::{HashmapE, HashmapType};
 use parser::{ptr_to_builder, ParseEngine, ParseEngineResults};
 use testcall::TraceLevel;
 
+use crate::testcall::TestCallParams;
+
 pub struct Program {
     language: Option<String>,
     engine: ParseEngineResults,
@@ -156,25 +158,27 @@ impl Program {
             false   // is_internal
         )?.into_cell()?.into();
 
-        let (exit_code, mut state_init, is_vm_success) = crate::testcall::call_contract_ex(
+        let (exit_code, mut state_init, is_vm_success) = crate::testcall::call_contract(
             ton_block::MsgAddressInt::default(),
             state_init,
-            None, // debug_info
-            None, // balance,
-            crate::testcall::MsgInfo {
+            TestCallParams {
                 balance: None,
-                src: None,
-                now: get_now(),
-                bounced: false,
-                body: Some(body),
-            },
-            None, // config
-            None, // key_file,
-            None, // ticktock,
-            None, // gas_limit,
-            Some(|_, _| { }),
-            if trace { TraceLevel::Full } else { TraceLevel::None },
-            None  // specific capabilities
+                msg_info: crate::testcall::MsgInfo {
+                    balance: None,
+                    src: None,
+                    now: get_now(),
+                    bounced: false,
+                    body: Some(body),
+                },
+                config: None,
+                key_file: None,
+                ticktock: None,
+                gas_limit: None,
+                action_decoder: Some(|_, _| { }),
+                trace_level: if trace { TraceLevel::Full } else { TraceLevel::None },
+                debug_info: None,
+                capabilities: None,
+            }
         )?;
 
         if is_vm_success {
@@ -408,15 +412,105 @@ pub fn get_now() -> u32 {
 #[cfg(test)]
 mod tests {
     use abi;
-    use std::fs::File;
+    use std::{fs::File, str::FromStr};
     use std::path::Path;
+    use crate::testcall::{load_config, load_debug_info, call_contract, MsgInfo, TestCallParams};
     use crate::{printer::get_version_mycode_aware, program::load_stateinit};
 
     use super::*;
-    use testcall::{perform_contract_call, call_contract, MsgInfo};
 
     fn compile_to_file(prog: &mut Program, wc: i8) -> Result<String> {
         prog.compile_to_file_ex(wc, None, None, None, false, None)
+    }
+
+    fn call_contract_1<F>(
+        smc_file: &str,
+        address: &str,
+        smc_balance: Option<&str>,
+        msg_info: MsgInfo,
+        config_file: Option<&str>,
+        key_file: Option<Option<&str>>,
+        ticktock: Option<i8>,
+        gas_limit: Option<i64>,
+        action_decoder: Option<F>,
+        trace_level: TraceLevel,
+        debug_map_filename: &str,
+        capabilities: Option<u64>
+    ) -> Result<i32>
+        where F: Fn(SliceData, bool)
+    {
+        let wc = match msg_info.balance {
+            Some(_) => 0,
+            None => if ticktock.is_some() { -1 } else { 0 },
+        };
+
+        let addr = if address.find(':').is_none() {
+            format!("{}:{}", wc, address)
+        } else {
+            address.to_owned()
+        };
+        let addr = ton_block::MsgAddressInt::from_str(&addr)?;
+
+        let state_init = load_from_file(smc_file)?;
+        let debug_info = load_debug_info(debug_map_filename);
+        let config_cell = config_file.and_then(load_config);
+        let (exit_code, state_init, is_vm_success) = call_contract(
+            addr, state_init, TestCallParams {
+                balance: smc_balance,
+                msg_info,
+                config: config_cell,
+                key_file,
+                ticktock,
+                gas_limit,
+                action_decoder,
+                trace_level,
+                debug_info,
+                capabilities,
+            }
+        )?;
+        if is_vm_success {
+            save_to_file(state_init, Some(smc_file), 0)?;
+            println!("Contract persistent data updated");
+        }
+        Ok(exit_code)
+    }
+
+    fn call_contract_2<F>(
+        contract_file: &str,
+        body: Option<SliceData>,
+        key_file: Option<Option<&str>>,
+        trace_level: TraceLevel,
+        decode_c5: bool,
+        msg_balance: Option<&str>,
+        ticktock: Option<i8>,
+        src: Option<&str>,
+        balance: Option<&str>,
+        now: u32,
+        action_decoder: F,
+    ) -> i32
+        where F: Fn(SliceData, bool)
+    {
+        let file = format!("{}.tvc", contract_file);
+        call_contract_1(
+            &file,
+            contract_file,
+            balance,
+            MsgInfo{
+                balance: msg_balance,
+                src,
+                now,
+                bounced: false,
+                body
+            },
+            None,
+            key_file,
+            ticktock,
+            None,
+            if decode_c5 { Some(action_decoder) } else { None },
+            trace_level,
+            "",
+            None
+        ).unwrap_or(-1)
     }
 
     #[test]
@@ -436,7 +530,7 @@ mod tests {
         let contract_file = compile_to_file(&mut prog, -1).unwrap();
         let name = contract_file.split('.').next().unwrap();
 
-        assert_eq!(perform_contract_call(name, None, None, TraceLevel::None, false, None, Some(-1), None, None, 0, |_b,_i| {}), 0);
+        assert_eq!(call_contract_2(name, None, None, TraceLevel::None, false, None, Some(-1), None, None, 0, |_b,_i| {}), 0);
     }
 
     #[test]
@@ -453,7 +547,7 @@ mod tests {
         let name = contract_file.split('.').next().unwrap();
         let body = abi::build_abi_body("./tests/Wallet.abi.json", "constructor", "{}", None, None, false)
             .unwrap();
-        let exit_code = call_contract(
+        let exit_code = call_contract_1(
             &contract_file,
             &name,
             Some("10000000000"), //account balance 10T
@@ -470,7 +564,7 @@ mod tests {
             Some(3000), // gas limit
             Some(|_, _| {}),
             TraceLevel::None,
-            String::from(""),
+            "",
             None
         );
         // must equal to out of gas exception
@@ -497,7 +591,7 @@ mod tests {
         let body = abi::build_abi_body("tests/Wallet.abi.json", "constructor", "{}", None, None, false)
             .unwrap();
 
-        let exit_code = call_contract(
+        let exit_code = call_contract_1(
             &contract_file,
             &name,
             Some("10000000000"), //account balance 10T
@@ -514,7 +608,7 @@ mod tests {
             None,
             Some(|_, _| {}),
             TraceLevel::Full,
-            debug_map_filename,
+            &debug_map_filename,
             None
         );
         assert!(exit_code.is_ok());
@@ -557,7 +651,7 @@ mod tests {
         let name = contract_file.split('.').next().unwrap();
         let body = abi::build_abi_body("tests/mycode.abi.json", "constructor", "{}", None, None, false)
             .unwrap();
-        let exit_code = call_contract(
+        let exit_code = call_contract_1(
             &contract_file,
             &name,
             Some("10000000000"), //account balance 10T
@@ -574,7 +668,7 @@ mod tests {
             None,
             Some(|_, _| {}),
             TraceLevel::None,
-            String::new(),
+            "",
             Some(GlobalCapabilities::CapMycode as u64)
         );
         assert!(exit_code.is_ok());
