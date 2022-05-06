@@ -40,7 +40,7 @@ fn create_external_inbound_msg(src: MsgAddressExt, dst: MsgAddressInt, body: Opt
     let hdr = ExternalInboundMessageHeader {
         dst,
         src,
-        import_fee: Grams(0x1234u32.into())
+        import_fee: 0x1234u32.into()
     };
     let mut msg = Message::with_ext_in_header(hdr);
     if let Some(body) = body {
@@ -68,7 +68,7 @@ fn create_internal_msg(
     hdr.ihr_disabled = true;
     hdr.ihr_fee = Grams::from(0u64);
     hdr.created_lt = lt;
-    hdr.created_at = UnixTime32(at);
+    hdr.created_at = UnixTime32::new(at);
     let mut msg = Message::with_int_header(hdr);
     if let Some(body) = body {
         msg.set_body(body);

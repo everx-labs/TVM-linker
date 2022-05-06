@@ -38,8 +38,8 @@ pub fn get_version_mycode_aware(root: Option<&Cell>) -> Result<String> {
 
 pub fn state_init_printer(state: &StateInit) -> String {
     format!("StateInit\n split_depth: {}\n special: {}\n data: {}\n code: {}\n code_hash: {}\n data_hash: {}\n code_depth: {}\n data_depth: {}\n version: {}\n lib:  {}\n",
-        state.split_depth.as_ref().map(|x| format!("{:?}", (x.0 as u8))).unwrap_or_else(|| "None".to_string()),
-        state.special.as_ref().map(|x| format!("{:?}", x)).unwrap_or_else(|| "None".to_string()),
+        state.split_depth.as_ref().map_or("None".to_string(), |x| x.as_u32().to_string()),
+        state.special.as_ref().map_or("None".to_string(), ToString::to_string),
         tree_of_cells_into_base64(state.data.as_ref()),
         tree_of_cells_into_base64(state.code.as_ref()),
         state.code.as_ref().map(|code| code.repr_hash().to_hex_string()).unwrap_or_else(|| "None".to_string()),
@@ -119,7 +119,7 @@ fn print_msg_header(header: &CommonMsgInfo) -> String {
 }
 
 fn print_grams(grams: &Grams) -> String {
-    grams.0.to_string()
+    grams.to_string()
 }
 
 fn print_cc(cc: &CurrencyCollection) -> String {
@@ -127,7 +127,7 @@ fn print_cc(cc: &CurrencyCollection) -> String {
     if !cc.other.is_empty() {
         result += " other: {";
         cc.other.iterate_with_keys(|key: u32, value| {
-            result += &format!(" \"{}\": \"{}\",", key, value.0);
+            result += &format!(" \"{}\": \"{}\",", key, value);
             Ok(true)
         }).ok();
         result.pop(); // remove extra comma
