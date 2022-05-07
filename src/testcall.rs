@@ -40,7 +40,7 @@ fn create_external_inbound_msg(src: MsgAddressExt, dst: MsgAddressInt, body: Opt
     let hdr = ExternalInboundMessageHeader {
         dst,
         src,
-        import_fee: 0x1234u32.into()
+        import_fee: 0x1234u64.into()
     };
     let mut msg = Message::with_ext_in_header(hdr);
     if let Some(body) = body {
