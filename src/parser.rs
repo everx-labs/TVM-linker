@@ -16,7 +16,7 @@ use failure::{format_err, bail};
 use regex::Regex;
 use resolver::resolve_name;
 use std::collections::{HashSet, HashMap};
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::fs::File;
 use std::path::Path;
 use ton_types::{BuilderData, IBitstring, SliceData, Cell, Result, Status};
@@ -227,7 +227,7 @@ pub struct ParseEngine {
     internal_name_to_id: HashMap<String, i32>,
     /// id -> code
     internal_id_to_code: HashMap<i32, InternalFunc>,
-    /// aliases for function names, e.g. main_internal -> 0, main_internalXXX -> 0,
+    /// aliases for function names, e.g. main_internal -> 0, main_internal -> 0,
     internal_alias_name_to_id_: HashMap<String, i32>, // TODO delete this or internal_name_to_id
 
     /// it's about private/public .globl or variables, e.g.
@@ -306,9 +306,25 @@ fn start_with(sample: &str, pattern: &str) -> bool {
     s.get(i..).unwrap().starts_with(p)
 }
 
+pub struct ParseEngineInput<'a> {
+    pub buf: Box<dyn Read + 'a>,
+    pub name: String,
+}
+
 impl ParseEngine {
 
-    pub fn new(sources: &[&Path], abi_json: Option<String>) -> Result<Self> {
+    pub fn new(sources: Vec<&Path>, abi_json: Option<String>) -> Result<Self> {
+        let mut inputs = vec!();
+        for path in sources {
+            let name = path.file_name().unwrap().to_str().unwrap().to_string();
+            let file = File::open(path)
+                .map_err(|e| format_err!("Failed to open file {}: {}", path.to_str().unwrap(), e))?;
+            inputs.push(ParseEngineInput { buf: Box::new(file), name });
+        }
+        Self::new_generic(inputs, abi_json)
+    }
+
+    pub fn new_generic(inputs: Vec<ParseEngineInput>, abi_json: Option<String>) -> Result<Self> {
         let mut engine = ParseEngine {
             globl_name_to_id:      HashMap::new(),
             internal_name_to_id:    HashMap::new(),
@@ -328,18 +344,18 @@ impl ParseEngine {
             save_my_code:    false,
             computed:        HashMap::new(),
         };
-        engine.parse(sources, abi_json)?;
+        engine.parse(inputs, abi_json)?;
         Ok(engine)
     }
 
-    fn parse(&mut self, sources: &[&Path], abi_json: Option<String>) -> Status {
+    fn parse(&mut self, inputs: Vec<ParseEngineInput>, abi_json: Option<String>) -> Status {
         if let Some(s) = abi_json {
             self.abi = Some(load_abi_contract(&s)?);
         }
 
         self.preinit()?;
 
-        for source in sources {
+        for source in inputs {
             self.parse_code(source)?;
         }
 
@@ -469,24 +485,22 @@ impl ParseEngine {
         self.save_my_code
     }
 
-    fn parse_code(&mut self, path: &Path) -> Status {
-        let mut section_name: String = String::new();
-        let mut obj_body: Lines = vec![];
-        let mut obj_name: String = "".to_owned();
+    fn parse_code(&mut self, mut input: ParseEngineInput) -> Status {
+        let mut section_name = String::new();
+        let mut obj_body = vec![];
+        let mut obj_name = String::new();
         let mut lnum = 0;
         let mut l = String::new();
+        let mut source_pos: Option<DbgPos> = None;
 
         self.globl_ptr = self.globl_base + OFFSET_GLOBL_DATA;
         self.persistent_ptr = self.persistent_base + OFFSET_PERS_DATA;
 
-        let filename = path.file_name().unwrap().to_str().unwrap().to_string();
-        let file = File::open(path)
-            .map_err(|e| failure::err_msg(format!("Failed to open file {}: {}", path.to_str().unwrap(), e)))?;
-        let mut reader = BufReader::new(file);
-        let mut source_pos: Option<DbgPos> = None;
+        let filename = input.name;
+        let mut reader = BufReader::new(&mut input.buf);
 
         while reader.read_line(&mut l)
-            .map_err(|e| failure::err_msg(format!("Failed to read file {}: {}", path.to_str().unwrap(), e)))? != 0 {
+            .map_err(|e| failure::err_msg(format!("Failed to read file {}: {}", filename.clone(), e)))? != 0 {
             lnum += 1;
 
             l = l.replace('\r', "");
