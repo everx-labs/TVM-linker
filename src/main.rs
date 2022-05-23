@@ -283,7 +283,7 @@ fn linker_main() -> Status {
         }
         sources.push(path);
         let mut prog = Program::new(
-            ParseEngine::new(&sources, abi_json)?
+            ParseEngine::new(sources, abi_json)?
         );
 
         match compile_matches.value_of("GENKEY") {
@@ -379,7 +379,7 @@ fn replace_command(matches: &ArgMatches) -> Status {
     sources.push(path);
 
     let mut prog = Program::new(
-        ParseEngine::new(&sources, abi_json)?
+        ParseEngine::new(sources, abi_json)?
     );
 
     let code = prog.compile_asm(false)?;
@@ -493,7 +493,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
                         bail!("File {} doesn't exist", source);
                     }
                     Some(ParseEngineResults::new(
-                        ParseEngine::new(&[path], None)?
+                        ParseEngine::new(vec![path], None)?
                     ))
                 },
                 None => None
