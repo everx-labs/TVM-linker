@@ -900,7 +900,7 @@ impl ParseEngine {
         Ok(())
     }
 
-    fn build_data(&self) -> Option<Cell> {
+    pub fn build_data(&self) -> Option<Cell> {
         let filter = |persistent: bool| {
             self.globl_name_to_object.iter().filter_map(move |item| {
                 item.1.dtype.data().and_then(|data| {
