@@ -39,7 +39,7 @@ pub fn get_version_mycode_aware(root: Option<&Cell>) -> Result<String> {
 
 pub fn state_init_printer(state: &StateInit) -> String {
     format!("StateInit\n split_depth: {}\n special: {}\n data: {}\n code: {}\n code_hash: {}\n data_hash: {}\n code_depth: {}\n data_depth: {}\n version: {}\n lib:  {}\n",
-        state.split_depth.as_ref().map_or("None".to_string(), |x| x.to_string()),
+        state.split_depth.as_ref().map_or("None".to_string(), |x| x.0.to_string()),
         state.special.as_ref().map_or("None".to_string(), ToString::to_string),
         tree_of_cells_into_base64(state.data.as_ref()),
         tree_of_cells_into_base64(state.code.as_ref()),
