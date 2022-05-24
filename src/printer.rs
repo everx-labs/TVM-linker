@@ -18,7 +18,8 @@ use ton_types::{BuilderData, Cell, Result};
 fn get_version(root: &Cell) -> Result<String> {
     let cell1 = root.reference(0).map_err(|e| format_err!("not found ({})", e))?;
     let cell2 = cell1.reference(1).map_err(|e| format_err!("not found ({})", e))?;
-    let bytes = cell2.data();
+    let data = cell2.data();
+    let bytes = &data[..data.len() - 1];
     match String::from_utf8(bytes.to_vec()) {
         Ok(string) => if string.is_empty() { Ok("<empty>".to_string()) } else { Ok(string) },
         Err(e) => Err(format_err!("decoding failed ({})", e))
@@ -38,7 +39,7 @@ pub fn get_version_mycode_aware(root: Option<&Cell>) -> Result<String> {
 
 pub fn state_init_printer(state: &StateInit) -> String {
     format!("StateInit\n split_depth: {}\n special: {}\n data: {}\n code: {}\n code_hash: {}\n data_hash: {}\n code_depth: {}\n data_depth: {}\n version: {}\n lib:  {}\n",
-        state.split_depth.as_ref().map_or("None".to_string(), |x| x.as_u32().to_string()),
+        state.split_depth.as_ref().map_or("None".to_string(), |x| x.to_string()),
         state.special.as_ref().map_or("None".to_string(), ToString::to_string),
         tree_of_cells_into_base64(state.data.as_ref()),
         tree_of_cells_into_base64(state.code.as_ref()),
