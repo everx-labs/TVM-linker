@@ -1,8 +1,0 @@
-    .internal-alias :main_external,   1
-
-    .selector
-    CALL $:main_external$
-
-    .internal :main_external
-    PUSHINT $foo$
-    CALL 1
