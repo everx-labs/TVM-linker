@@ -1,0 +1,20 @@
+.globl	constructor
+.public	constructor
+.type	constructor, @function
+MYCODE
+CTOS
+SREFS
+GTINT 0
+THROWIFNOT 123
+DROP
+
+.globl	fallback
+.public fallback
+.type	fallback, @function
+DROP
+RET
+
+.globl	onBounce
+.type	onBounce, @function
+DROP
+RET
