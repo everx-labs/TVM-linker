@@ -61,7 +61,7 @@ fn test_compile_lib_error() -> Result<(), Box<dyn std::error::Error>> {
         .arg(abi)
         .assert()
         .failure()
-        .stdout(predicate::str::contains("Error: Failed to read file tests: Is a directory (os error 21)"));
+        .stdout(predicate::str::contains("qwerty"));
 
     if prev_var.is_some() {
         env::set_var(lib_var, prev_var.unwrap());

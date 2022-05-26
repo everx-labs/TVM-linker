@@ -1232,8 +1232,8 @@ dependencies = [
 
 [[package]]
 name = "ton_abi"
-version = "2.2.4"
-source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.2.4#47359d765da1dc5b235844d80caf5f107a9e3f5a"
+version = "2.2.5"
+source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.2.5#58a385a19e99b7d2c160ffd98e5bee4c2c8e4497"
 dependencies = [
  "base64 0.10.1",
  "byteorder",
@@ -1254,8 +1254,8 @@ dependencies = [
 
 [[package]]
 name = "ton_block"
-version = "1.7.47"
-source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.7.47#d834152e891b68f152c86f60df7061a569013fa0"
+version = "1.7.48"
+source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.7.48#1c3648dedb9e98f1e30f84fa9beadabfe252582b"
 dependencies = [
  "base64 0.13.0",
  "crc",
@@ -1273,8 +1273,8 @@ dependencies = [
 
 [[package]]
 name = "ton_labs_assembler"
-version = "1.2.36"
-source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.36#a1c81eb337d3e5c941877a30b1ba8758867937a8"
+version = "1.2.38"
+source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.38#4274d926cc77e07488cf371b3ac24c344c70da8d"
 dependencies = [
  "failure",
  "hex 0.4.3",
@@ -1288,8 +1288,8 @@ dependencies = [
 
 [[package]]
 name = "ton_types"
-version = "1.11.0"
-source = "git+https://github.com/tonlabs/ton-labs-types.git?tag=1.11.0#78d754bf2520c9b23080d2759d14adcebdc129d5"
+version = "1.11.1"
+source = "git+https://github.com/tonlabs/ton-labs-types.git?tag=1.11.1#112033dfab92b066735679770934b55208aa6466"
 dependencies = [
  "base64 0.13.0",
  "crc",
@@ -1308,8 +1308,8 @@ dependencies = [
 
 [[package]]
 name = "ton_vm"
-version = "1.8.34"
-source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.34#c51ccbbd47e4aa4abeb83cdff12efa19116c7a1b"
+version = "1.8.35"
+source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.35#81a4cbc1539f745f89cc982f951a9e8f8f5e91b2"
 dependencies = [
  "criterion",
  "ed25519",
@@ -1329,7 +1329,7 @@ dependencies = [
 
 [[package]]
 name = "tvm_linker"
-version = "0.15.31"
+version = "0.15.33"
 dependencies = [
  "assert_cmd",
  "base64 0.10.1",
