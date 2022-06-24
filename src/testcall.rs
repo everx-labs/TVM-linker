@@ -95,16 +95,17 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) -> Status {
 fn initialize_registers(data: SliceData, code: Cell, myself: MsgAddressInt, now: u32, balance: (u64, CurrencyCollection), config: Option<Cell>) -> Result<SaveList> {
     let mut ctrls = SaveList::new();
     let mut info = SmartContractInfo::with_myself(myself.serialize()?.into());
-    *info.balance_remaining_grams_mut() = balance.0 as u128;
-    *info.balance_remaining_other_mut() = balance.1.other_as_hashmap();
-    *info.unix_time_mut() = now;
+    info.capabilities = 0x572e;
+    info.balance.grams = ton_block::Grams::from(balance.0);
+    info.balance.other = ton_block::ExtraCurrencyCollection::from(balance.1.other_as_hashmap());
+    info.unix_time = now;
     if let Some(cell) = config {
-        info.set_config_params(cell);
+        info.config_params = Some(cell);
     }
     // TODO info.set_init_code_hash()
     info.set_mycode(code);
     ctrls.put(4, &mut StackItem::Cell(data.into_cell()))?;
-    ctrls.put(7, &mut info.into_temp_data())?;
+    ctrls.put(7, &mut info.into_temp_data_item())?;
     Ok(ctrls)
 }
 
