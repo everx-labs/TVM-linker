@@ -124,6 +124,7 @@ impl Program {
         out_file: Option<&str>,
         trace: bool,
         data_filename: Option<&str>,
+        silent: bool,
     ) -> Result<String> {
         let mut state_init = self.compile_to_state()?;
         if let Some(ctor_params) = ctor_params {
@@ -135,9 +136,9 @@ impl Program {
             state_init.set_data(data_cell);
         }
         let ret = save_to_file(state_init.clone(), out_file, wc);
-        if out_file.is_some() && ret.is_ok() {
+        if out_file.is_some() && ret.is_ok() && !silent {
             println!("Contract successfully compiled. Saved to file {}.", out_file.unwrap());
-            println!("Contract address: {:x}", state_init.hash().unwrap());
+            println!("Contract initial hash: {:x}", state_init.hash().unwrap());
         }
         ret
     }
@@ -420,7 +421,7 @@ mod tests {
     use super::*;
 
     fn compile_to_file(prog: &mut Program, wc: i8) -> Result<String> {
-        prog.compile_to_file_ex(wc, None, None, None, false, None)
+        prog.compile_to_file_ex(wc, None, None, None, false, None, false)
     }
 
     fn call_contract_1<F>(

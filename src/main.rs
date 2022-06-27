@@ -319,7 +319,7 @@ fn linker_main() -> Status {
 
         let data_filename = compile_matches.value_of("DATA");
 
-        prog.compile_to_file_ex(wc, abi_file, ctor_params, out_file, debug, data_filename)?;
+        prog.compile_to_file_ex(wc, abi_file, ctor_params, out_file, debug, data_filename, false)?;
 
         if compile_matches.is_present("DEBUG_MAP") {
             let filename = compile_matches.value_of("DEBUG_MAP").unwrap();
