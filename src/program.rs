@@ -50,10 +50,6 @@ impl Program {
         }
     }
 
-    pub fn set_keypair(&mut self, pair: Keypair) {
-        self.keypair = Some(pair);
-    }
-
     pub fn set_language(&mut self, lang: Option<&str>) {
         self.language = lang.map(|s| s.to_owned());
     }
