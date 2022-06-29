@@ -28,7 +28,7 @@ tvm_linker has several modes of work:
 ### 1) Generating a ready-to-deploy contract.
 
 ```bash
-$ tvm_linker compile [--lib <lib_file>] [--abi-json <abi_file>] [--genkey | --setkey <keyfile>] [-w <workchain_id>] [--debug] [--verbose] [--debug-map <debug_info_path>] <source>
+$ tvm_linker compile [--lib <lib_file>] [--abi-json <abi_file>] [-w <workchain_id>] [--debug] [--verbose] [--debug-map <debug_info_path>] <source>
 ```
 
 Here `source` is a name of tvm assembly source file, `library` is a runtime library file (can be more than one: `--lib` 
@@ -41,23 +41,10 @@ checks whether file `source`(without extension) + `.abi.json` exists. If file ex
 
 Linker generates the `<address>.tvc` file, where `<address>` is a hash from initial data and code of the contract.
 
-Linker prints contract address in different formats: raw and user-friendly (testnet and mainnet). Define the workchain
+Linker prints initial contract address in different formats: raw and user-friendly (testnet and mainnet). Define the workchain
 ID option `-w` to generate proper user-friendly address. -1 is used by default.
 
-To generate a new keypair and store the public key to the contract file:
-
-```bash
-$ tvm_linker compile <source> --genkey <key_file>
-```
-
-where `key_file` is a name of the file to store public and private keys. The linker will generate 2 files:
-`key_file.pub` for public key and `key_file` for private key.
-
-To load existing keypair use:
-
-```bash
-$ tvm_linker compile <source> --setkey <key_file>
-```
+To add a key to the contract data and obtain real contract address user should use [`tonos-cli genaddr` command](https://github.com/tonlabs/tonos-cli/blob/master/README.md#41-generate-contract-address). 
 
 While execution if option `--debug-map <debug_info_path>` is specified, this command can generate a debug info file, 
 which contains mapping that can bind contract code with source files. This file can be used while debugging the
@@ -150,22 +137,7 @@ $ tvm_linker address test --body 00$main:x$ -s source
 
 The `--body-from-boc` option is analogous to `--body` but extracts the message body from the specified message boc file.
 
-### 5) Initialize static variables in compiled contract
-
-```bash
-$ tvm_linker init <tvc_file> <data_json> <abi_file>
-```
-
-Updates contract's static state variables (see section `data` in `*.abi.json` file) with values
-defined in `data_json` argument.
-
-Example:
-
-```bash
-$ tvm_linker init contract.tvc '{"var1": 10}' contract.abi.json
-```
-
-### 6) Disassembler
+### 5) Disassembler
 
 There are a number of tools under the `disasm` umbrella:
 
