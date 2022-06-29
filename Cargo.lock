@@ -950,8 +950,8 @@ dependencies = [
 
 [[package]]
 name = "ton_abi"
-version = "2.2.8"
-source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.2.8#87620862896790292c459f1f1ce73e18d9dfb7d4"
+version = "2.2.9"
+source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.2.9#c9d7823e74a1ac51359f48bd34ec74b566e3e972"
 dependencies = [
  "base64 0.10.1",
  "byteorder",
@@ -1045,7 +1045,7 @@ dependencies = [
 
 [[package]]
 name = "tvm_linker"
-version = "0.15.44"
+version = "0.15.45"
 dependencies = [
  "assert_cmd",
  "base64 0.10.1",
