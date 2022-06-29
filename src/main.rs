@@ -109,7 +109,6 @@ fn linker_main() -> Status {
             (author: "TON Labs")
             (@arg INPUT: +required +takes_value "TVM assembler source file")
             (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids. If not specified abi can be loaded from file path obtained from <INPUT> path if it exists.")
-            (@arg CTOR_PARAMS: -p --("ctor-params") +takes_value "Supplies arguments for the constructor")
             (@arg WC: -w +takes_value "Workchain id used to print contract address, -1 by default.")
             (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
             (@arg DEBUG_MAP: --("debug-map") +takes_value "Generates debug map file")
@@ -161,13 +160,6 @@ fn linker_main() -> Status {
             (@arg SIGN: --setkey +takes_value "Loads existing keypair from the file")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name")
         )
-        (@subcommand init =>
-            (about: "initialize smart contract public variables")
-            (version: build_info.as_str())
-            (@arg INPUT: +required +takes_value "Path to compiled smart contract file")
-            (@arg DATA: +required +takes_value "Set of public variables with values in json format")
-            (@arg ABI: +required +takes_value "Path to smart contract ABI file")
-        )
         (@subcommand disasm =>
             (about: "disassemble a tvc or dumps its tree of cells")
             (version: build_info.as_str())
@@ -192,10 +184,6 @@ fn linker_main() -> Status {
         (@setting SubcommandRequired)
     ).get_matches();
 
-    //SUBCOMMAND INIT
-    if let Some(matches) = matches.subcommand_matches("init") {
-        return run_init_subcmd(matches);
-    }
 
     //SUBCOMMAND TEST
     if let Some(test_matches) = matches.subcommand_matches("test") {
@@ -295,15 +283,9 @@ fn linker_main() -> Status {
             .map(|wc| wc.parse::<i8>().unwrap_or(-1))
             .unwrap_or(-1);
 
-        let ctor_params = compile_matches.value_of("CTOR_PARAMS");
-        if ctor_params.is_some() && abi_file.is_none() {
-            let msg = "ABI is mandatory when CTOR_PARAMS is specified.";
-            bail!(msg);
-        }
-
         let data_filename = compile_matches.value_of("DATA");
 
-        prog.compile_to_file_ex(wc, abi_file, ctor_params, out_file, debug, data_filename, false)?;
+        prog.compile_to_file_ex(wc, out_file, data_filename, false)?;
 
         if compile_matches.is_present("DEBUG_MAP") {
             let filename = compile_matches.value_of("DEBUG_MAP").unwrap();
@@ -418,26 +400,6 @@ fn parse_ticktock(ticktock: Option<&str>) -> Result<Option<i8>> {
     } else {
         Ok(None)
     }
-}
-
-fn set_initial_data(tvc: &str, data: &str, abi: &str) -> Status {
-    let abi = load_abi_json_string(abi)?;
-    let mut state_init = load_from_file(tvc)?;
-    let new_data = ton_abi::json_abi::update_contract_data(
-        &abi,
-        data,
-        state_init.data.clone().unwrap_or_default().into(),
-    )?;
-    state_init.set_data(new_data.into_cell());
-    save_to_file(state_init, None, 0)?;
-    Ok(())
-}
-
-fn run_init_subcmd(matches: &ArgMatches) -> Status {
-    let tvc = matches.value_of("INPUT").unwrap();
-    let data = matches.value_of("DATA").unwrap();
-    let abi = matches.value_of("ABI").unwrap();
-    set_initial_data(tvc, data, abi)
 }
 
 fn decode_hex_string(hex_str: String) -> Result<(Vec<u8>, usize)> {

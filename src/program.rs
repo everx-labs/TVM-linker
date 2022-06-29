@@ -13,7 +13,6 @@
 use base64::encode;
 use crc16::*;
 use ed25519_dalek::*;
-use failure::bail;
 use failure::format_err;
 use ton_types::deserialize_cells_tree_ex;
 use std::fs::File;
@@ -29,9 +28,7 @@ use ton_types::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use ton_types::{Cell, SliceData, BuilderData, IBitstring, Result};
 use ton_types::dictionary::{HashmapE, HashmapType};
 use parser::{ptr_to_builder, ParseEngine, ParseEngineResults};
-use testcall::TraceLevel;
 
-use crate::testcall::TestCallParams;
 
 pub struct Program {
     language: Option<String>,
@@ -115,17 +112,11 @@ impl Program {
     pub fn compile_to_file_ex(
         &mut self,
         wc: i8,
-        abi_file: Option<&str>,
-        ctor_params: Option<&str>,
         out_file: Option<&str>,
-        trace: bool,
         data_filename: Option<&str>,
         silent: bool,
     ) -> Result<String> {
         let mut state_init = self.compile_to_state()?;
-        if let Some(ctor_params) = ctor_params {
-            state_init = self.apply_constructor(state_init, abi_file.unwrap(), ctor_params, trace)?;
-        }
         if let Some(data_filename) = data_filename {
             let mut data_cursor = Cursor::new(std::fs::read(data_filename).unwrap());
             let data_cell = deserialize_cells_tree(&mut data_cursor).unwrap().remove(0);
@@ -137,55 +128,6 @@ impl Program {
             println!("Contract initial hash: {:x}", state_init.hash().unwrap());
         }
         ret
-    }
-
-    fn apply_constructor(
-        &mut self,
-        state_init: StateInit,
-        abi_file: &str,
-        ctor_params : &str,
-        trace: bool
-    ) -> Result<StateInit> {
-        let body = crate::abi::build_abi_body(
-            abi_file,
-            "constructor",
-            ctor_params,
-            None,   // header,
-            None,   // key_file,
-            false   // is_internal
-        )?.into_cell()?.into();
-
-        let (exit_code, mut state_init, is_vm_success) = crate::testcall::call_contract(
-            ton_block::MsgAddressInt::default(),
-            state_init,
-            TestCallParams {
-                balance: None,
-                msg_info: crate::testcall::MsgInfo {
-                    balance: None,
-                    src: None,
-                    now: get_now(),
-                    bounced: false,
-                    body: Some(body),
-                },
-                config: None,
-                key_file: None,
-                ticktock: None,
-                gas_limit: None,
-                action_decoder: Some(|_, _| { }),
-                trace_level: if trace { TraceLevel::Full } else { TraceLevel::None },
-                debug_info: None,
-                capabilities: None,
-            }
-        )?;
-
-        if is_vm_success {
-            // TODO: check that no action is fired.
-            // Rebuild code with removed constructor
-            state_init.set_code(self.compile_asm(true)?);
-            Ok(state_init)
-        } else {
-            bail!("Constructor failed ec = {}", exit_code)
-        }
     }
 
     fn compile_to_state(&mut self) -> Result<StateInit> {
@@ -413,11 +355,12 @@ mod tests {
     use std::path::Path;
     use crate::testcall::{load_config, load_debug_info, call_contract, MsgInfo, TestCallParams};
     use crate::{printer::get_version_mycode_aware, program::load_stateinit};
+    use testcall::TraceLevel;
 
     use super::*;
 
     fn compile_to_file(prog: &mut Program, wc: i8) -> Result<String> {
-        prog.compile_to_file_ex(wc, None, None, None, false, None, false)
+        prog.compile_to_file_ex(wc, None, None, false)
     }
 
     fn call_contract_1<F>(
