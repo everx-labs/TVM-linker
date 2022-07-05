@@ -23,6 +23,7 @@ pub fn build_abi_body(
     header: Option<&str>,
     keypair: Option<ed25519_dalek::Keypair>,
     internal: bool,
+    address: Option<String>,
 ) -> Result<BuilderData> {
     encode_function_call(
         load_abi_json_string(abi_file)?,
@@ -31,6 +32,7 @@ pub fn build_abi_body(
         params.to_owned(),
         internal,
         keypair.as_ref(),
+        address,
     )
 }
 
