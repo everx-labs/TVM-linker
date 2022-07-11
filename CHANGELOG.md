@@ -8,6 +8,11 @@ All notable changes to this project will be documented in this file.
 - Removed deprecated `init` command. `tonos-cli genaddr` command should be used instead.
 - Removed `genkey`, `setkey` and `ctor-params` options for `compile` command. `tonos-cli genaddr` command should be used instead.
 
+## Version: 0.15.44
+
+### New
+ - Added support for ABI 2.3
+
 ## Version: 0.15.0
 
 ### New

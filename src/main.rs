@@ -158,6 +158,7 @@ fn linker_main() -> Status {
             (@arg ABI_PARAMS: -p --("abi-params") +takes_value conflicts_with[DATA] "Supplies ABI arguments for the contract method")
             (@arg ABI_HEADER: -h --("abi-header") +takes_value conflicts_with[DATA] "Supplies ABI header")
             (@arg SIGN: --setkey +takes_value "Loads existing keypair from the file")
+            (@arg ADDRESS: --addr +takes_value "Optional destination address to support ABI 2.3")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name")
         )
         (@subcommand disasm =>
@@ -218,7 +219,7 @@ fn linker_main() -> Status {
                 Some(body)
             },
             None => {
-                build_body(msg_matches)?
+                build_body(msg_matches, msg_matches.value_of("ADDRESS").map(|s| s.to_string()))?
             },
         };
 
@@ -430,6 +431,13 @@ fn decode_boc(filename: &str, is_tvc: bool) -> Status {
 }
 
 fn run_test_subcmd(matches: &ArgMatches) -> Status {
+    let input = matches.value_of("INPUT").unwrap();
+    let addr_from_input = if hex::decode(input).is_ok() {
+        input.to_owned()
+    } else {
+        "0".repeat(64)
+    };
+    let address = matches.value_of("ADDRESS").unwrap_or(&addr_from_input);
     let (body, sign) = match matches.value_of("BODY") {
         Some(hex_str) => {
             let parse_results = match matches.value_of("SOURCE") {
@@ -463,7 +471,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
                 .into();
             (Some(body), Some(matches.value_of("SIGN")))
         },
-        None => (build_body(matches)?, None),
+        None => (build_body(matches, Some(address.to_string()))?, None),
     };
 
     let ticktock = parse_ticktock(matches.value_of("TICKTOCK"))?;
@@ -518,13 +526,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
         trace_level = TraceLevel::Minimal;
     }
 
-    let input = matches.value_of("INPUT").unwrap();
-    let addr_from_input = if hex::decode(input).is_ok() {
-        input.to_owned()
-    } else {
-        "0".repeat(64)
-    };
-    let address = matches.value_of("ADDRESS").unwrap_or(&addr_from_input);
+
     let input = if input.ends_with(".tvc") {
         input.to_owned()
     } else {
@@ -554,7 +556,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
     Ok(())
 }
 
-fn build_body(matches: &ArgMatches) -> Result<Option<SliceData>> {
+fn build_body(matches: &ArgMatches, address: Option<String>) -> Result<Option<SliceData>> {
     let mut mask = 0u8;
     let abi_file = matches.value_of("ABI_JSON").map(|m| { mask |= 1; m });
     let method_name = matches.value_of("ABI_METHOD").map(|m| { mask |= 2; m });
@@ -583,7 +585,8 @@ fn build_body(matches: &ArgMatches) -> Result<Option<SliceData>> {
             &params,
             header,
             key_file,
-            is_internal
+            is_internal,
+            address,
         )?.into_cell()?.into();
         Ok(Some(body))
     } else if mask == 0 {

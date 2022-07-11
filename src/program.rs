@@ -485,7 +485,7 @@ mod tests {
 
         let contract_file = compile_to_file(&mut prog, 0).unwrap();
         let name = contract_file.split('.').next().unwrap();
-        let body = abi::build_abi_body("./tests/Wallet.abi.json", "constructor", "{}", None, None, false)
+        let body = abi::build_abi_body("./tests/Wallet.abi.json", "constructor", "{}", None, None, false, None)
             .unwrap();
         let exit_code = call_contract_1(
             &contract_file,
@@ -528,7 +528,7 @@ mod tests {
         serde_json::to_writer_pretty(debug_map_file, &prog.dbgmap).unwrap();
 
         let name = contract_file.split('.').next().unwrap();
-        let body = abi::build_abi_body("tests/Wallet.abi.json", "constructor", "{}", None, None, false)
+        let body = abi::build_abi_body("tests/Wallet.abi.json", "constructor", "{}", None, None, false, None)
             .unwrap();
 
         let exit_code = call_contract_1(
@@ -589,7 +589,7 @@ mod tests {
 
         let contract_file = compile_to_file(&mut prog, 0).unwrap();
         let name = contract_file.split('.').next().unwrap();
-        let body = abi::build_abi_body("tests/mycode.abi.json", "constructor", "{}", None, None, false)
+        let body = abi::build_abi_body("tests/mycode.abi.json", "constructor", "{}", None, None, false, None)
             .unwrap();
         let exit_code = call_contract_1(
             &contract_file,
