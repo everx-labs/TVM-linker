@@ -145,6 +145,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "block-buffer"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bf7fe51849ea569fd452f37822f606a5cabb684dc918707a0193fd4664ff324"
+dependencies = [
+ "generic-array 0.14.5",
+]
+
+[[package]]
 name = "block-padding"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -236,6 +245,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "crc"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53757d12b596c16c78b83458d732a5d1a17ab3f53f2f7412f6fb57cc8a140ab3"
+dependencies = [
+ "crc-catalog",
+]
+
+[[package]]
+name = "crc-catalog"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d0165d2900ae6778e36e80bbc4da3b5eefccee9ba939761f9c2882a5d9af3ff"
+
+[[package]]
 name = "crc16"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -249,6 +273,16 @@ checksum = "7d82ee10ce34d7bc12c2122495e7593a9c41347ecdd64185af4ecf72cb1a7f83"
 dependencies = [
  "cfg-if",
  "once_cell",
+]
+
+[[package]]
+name = "crypto-common"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ccfd8c0ee4cce11e45b3fd6f9d5e69e0cc62912aa6a0cb1bf4617b0eba5a12f"
+dependencies = [
+ "generic-array 0.14.5",
+ "typenum",
 ]
 
 [[package]]
@@ -286,6 +320,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
 dependencies = [
  "generic-array 0.14.5",
+]
+
+[[package]]
+name = "digest"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2fb860ca6fafa5552fb6d0e816a69c8e49f0908bf524e30a90d97c85892d506"
+dependencies = [
+ "block-buffer 0.10.2",
+ "crypto-common",
 ]
 
 [[package]]
@@ -854,6 +898,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha2"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55deaec60f81eefe3cce0dc50bda92d6d8e88f2a27df7c5033b42afeb1ed2676"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest 0.10.3",
+]
+
+[[package]]
 name = "signature"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -950,8 +1005,8 @@ dependencies = [
 
 [[package]]
 name = "ton_abi"
-version = "2.3.0"
-source = "git+https://github.com/tonlabs/ton-labs-abi.git?branch=abi-v2_3#a62068ac9f1f14ff0e9e973e17cd72f1c4954c70"
+version = "2.3.1"
+source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.3.1#cb442bca8244a6bfd316c96c2fc0a99114ab32c3"
 dependencies = [
  "base64 0.10.1",
  "byteorder",
@@ -972,11 +1027,11 @@ dependencies = [
 
 [[package]]
 name = "ton_block"
-version = "1.7.51"
-source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.7.51#7243ec8b0d827a6fab8ae2683cb7623d8ed2e93b"
+version = "1.8.0"
+source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.8.0#403010107636ec9cb2bcc75d09b75147c72b0d82"
 dependencies = [
  "base64 0.13.0",
- "crc",
+ "crc 3.0.0",
  "ed25519",
  "ed25519-dalek",
  "failure",
@@ -984,15 +1039,14 @@ dependencies = [
  "log",
  "num",
  "num-traits",
- "rand 0.7.3",
- "sha2 0.8.2",
+ "sha2 0.10.2",
  "ton_types",
 ]
 
 [[package]]
 name = "ton_labs_assembler"
-version = "1.2.42"
-source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.42#68dcf1fbe5cfd8ccf922c800ffecc97be19765f8"
+version = "1.2.44"
+source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.44#028be2e35b8b39c73a60ab386384ea6ff62eb219"
 dependencies = [
  "failure",
  "hex 0.4.3",
@@ -1006,11 +1060,11 @@ dependencies = [
 
 [[package]]
 name = "ton_types"
-version = "1.11.2"
-source = "git+https://github.com/tonlabs/ton-labs-types.git?tag=1.11.2#0fb6b9cfacc84a3974dcb0aa674335fcf74de7ee"
+version = "1.11.3"
+source = "git+https://github.com/tonlabs/ton-labs-types.git?tag=1.11.3#d62ead62339f17fda171fe45f19f5c7452e724bb"
 dependencies = [
  "base64 0.13.0",
- "crc",
+ "crc 1.8.1",
  "failure",
  "hex 0.4.3",
  "lazy_static",
@@ -1026,8 +1080,8 @@ dependencies = [
 
 [[package]]
 name = "ton_vm"
-version = "1.8.39"
-source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.39#b75d857c8d6c4f94be44abb3d3ae97cf7c027059"
+version = "1.8.40"
+source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.40#3bd45a44c3ca454e4f16f2de06994b404500cce2"
 dependencies = [
  "ed25519",
  "ed25519-dalek",
@@ -1045,7 +1099,7 @@ dependencies = [
 
 [[package]]
 name = "tvm_linker"
-version = "0.15.44"
+version = "0.15.53"
 dependencies = [
  "assert_cmd",
  "base64 0.10.1",
