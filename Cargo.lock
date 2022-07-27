@@ -338,15 +338,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "524cbf6897b527295dff137cec09ecf3a05f4fddffd7dfcd1585403449e74198"
 
 [[package]]
-name = "diffy"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c27ec7cef89a63c063e06570bb861b7d35e406d6885551b346d77c459b34d3db"
-dependencies = [
- "ansi_term",
-]
-
-[[package]]
 name = "digest"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -979,12 +970,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f054c6c1a6e95179d6f23ed974060dcefb2d9388bb7256900badad682c499de4"
 
 [[package]]
-name = "similar"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62ac7f900db32bf3fd12e0117dd3dc4da74bc52ebaac97f39668446d89694803"
-
-[[package]]
 name = "simplelog"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1098,7 +1083,7 @@ dependencies = [
 [[package]]
 name = "ton_block"
 version = "1.8.1"
-source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.8.1#7d02b60537f2bd0fead24ab2c57089a8d735763b"
+source = "git+ssh://git@github.com/tonlabs/ton-block.git#5e6b44ed599ab48948474cb752888dfd11401ed5"
 dependencies = [
  "base64 0.13.0",
  "crc 3.0.0",
@@ -1116,7 +1101,7 @@ dependencies = [
 [[package]]
 name = "ton_labs_assembler"
 version = "1.2.45"
-source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.45#029972291958511e003e6dc9b0425a0189dda407"
+source = "git+ssh://git@github.com/tonlabs/assembler.git#91cc3aaa0e5e753690cd80d3cd9eb7b0a61cfd66"
 dependencies = [
  "failure",
  "hex 0.4.3",
@@ -1130,8 +1115,8 @@ dependencies = [
 
 [[package]]
 name = "ton_types"
-version = "1.11.3"
-source = "git+https://github.com/tonlabs/ton-labs-types.git?tag=1.11.3#d62ead62339f17fda171fe45f19f5c7452e724bb"
+version = "1.11.4"
+source = "git+ssh://git@github.com/tonlabs/ton-types.git#2d4b328d49a066acf877fed22254f3920c6029f9"
 dependencies = [
  "base64 0.13.0",
  "crc 1.8.1",
@@ -1150,10 +1135,9 @@ dependencies = [
 
 [[package]]
 name = "ton_vm"
-version = "1.8.42"
-source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.42#ad32423fc8edda680ab03b08d5b8e002b4a89e55"
+version = "1.8.40"
+source = "git+ssh://git@github.com/tonlabs/ton-vm.git?branch=new-exc-model#61cf72668d194677415b44a35fba1ad211343742"
 dependencies = [
- "diffy",
  "ed25519",
  "ed25519-dalek",
  "failure",
@@ -1164,7 +1148,6 @@ dependencies = [
  "num-traits",
  "rand 0.7.3",
  "sha2 0.9.9",
- "similar",
  "ton_block",
  "ton_types",
 ]

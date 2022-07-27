@@ -28,11 +28,20 @@ serde_json = '1.0.41'
 sha2 = '0.8.0'
 simplelog = '0.5.3'
 serde = { features = [ 'derive' ], version = '1.0.100' }
+
+
 ton_abi = { git = 'https://github.com/tonlabs/ton-labs-abi.git', tag = '2.3.5' }
-ton_block = { git = 'https://github.com/tonlabs/ton-labs-block.git', tag = '1.8.1' }
-ton_labs_assembler = { git = 'https://github.com/tonlabs/ton-labs-assembler.git', tag = '1.2.45', features = ['gosh']  }
-ton_types = { git = 'https://github.com/tonlabs/ton-labs-types.git', tag = '1.11.3' }
-ton_vm = { default-features = false, git = 'https://github.com/tonlabs/ton-labs-vm.git', tag = '1.8.42' }
+ton_block = { git = 'ssh://git@github.com/tonlabs/ton-block.git' }
+ton_labs_assembler = { git = 'ssh://git@github.com/tonlabs/assembler.git' }
+ton_types = { git = 'ssh://git@github.com/tonlabs/ton-types.git' }
+ton_vm = { default-features = false, git = 'ssh://git@github.com/tonlabs/ton-vm.git', branch = 'new-exc-model' }
+
+[patch.'https://github.com/tonlabs/ton-labs-block.git']
+ton_block = { git = 'ssh://git@github.com/tonlabs/ton-block.git' }
+
+[patch.'https://github.com/tonlabs/ton-labs-types.git']
+ton_types = { git = 'ssh://git@github.com/tonlabs/ton-types.git' }
+
 
 [dev-dependencies]
 assert_cmd = '0.11'
