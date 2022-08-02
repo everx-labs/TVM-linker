@@ -28,11 +28,11 @@ serde_json = '1.0.41'
 sha2 = '0.8.0'
 simplelog = '0.5.3'
 serde = { features = [ 'derive' ], version = '1.0.100' }
-ton_abi = { git = 'https://github.com/tonlabs/ton-labs-abi.git', tag = '2.3.1' }
-ton_block = { git = 'https://github.com/tonlabs/ton-labs-block.git', tag = '1.8.0' }
-ton_labs_assembler = { git = 'https://github.com/tonlabs/ton-labs-assembler.git', tag = '1.2.44' }
+ton_abi = { git = 'https://github.com/tonlabs/ton-labs-abi.git', tag = '2.3.3' }
+ton_block = { git = 'https://github.com/tonlabs/ton-labs-block.git', tag = '1.8.1' }
+ton_labs_assembler = { git = 'https://github.com/tonlabs/ton-labs-assembler.git', tag = '1.2.45' }
 ton_types = { git = 'https://github.com/tonlabs/ton-labs-types.git', tag = '1.11.3' }
-ton_vm = { default-features = false, git = 'https://github.com/tonlabs/ton-labs-vm.git', tag = '1.8.40' }
+ton_vm = { default-features = false, git = 'https://github.com/tonlabs/ton-labs-vm.git', tag = '1.8.42' }
 
 [dev-dependencies]
 assert_cmd = '0.11'
