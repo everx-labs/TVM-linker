@@ -80,8 +80,7 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) -> Status {
     let mut signed_body = BuilderData::from_slice(body);
     let mut sign_builder = BuilderData::new();
     if let Some(f) = key_file {
-        let pair = KeypairManager::from_secret_file(f)
-            .ok_or_else(|| format_err!("Failed to read keypair."))?.drain();
+        let pair = KeypairManager::from_file(f)?.drain();
         let pub_key = pair.public.to_bytes();
         let signature = pair.sign(body.cell().repr_hash().as_slice()).to_bytes();
         sign_builder.append_raw(&signature, signature.len() * 8)?;

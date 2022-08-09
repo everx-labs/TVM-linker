@@ -88,7 +88,7 @@ def compile2(source_name, directory = "tests_sol", lib_file = STDLIB_SOL):
 	source_file = "./" + directory + "/{}.code".format(source_name)
 	abi_file = "./" + directory + "/{}.abi.json".format(source_name)
 	
-	cmd = "{} compile {} --abi-json {} --lib {} --setkey tests/key1 --debug > compile_log.tmp"
+	cmd = "{} compile {} --abi-json {} --lib {} --debug > compile_log.tmp"
 	cmd = cmd.format(TVM_PATH, source_file, abi_file, lib_file)
 	# print cmd
 	ec = os.system(cmd)

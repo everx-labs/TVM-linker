@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Version: 0.15.45
+
+### Breaking changes
+- Removed deprecated `init` command. `tonos-cli genaddr` command should be used instead.
+- Removed `genkey`, `setkey` and `ctor-params` options for `compile` command. `tonos-cli genaddr` command should be used instead.
+
 ## Version: 0.15.44
 
 ### New

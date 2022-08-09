@@ -5,6 +5,8 @@ use predicates::prelude::*;
 use assert_cmd::prelude::*;
 use std::process::Command;
 use std::env;
+use std::thread::sleep;
+use std::time::Duration;
 
 const BIN_NAME: &str = "tvm_linker";
 
@@ -17,7 +19,7 @@ fn test_compile_lib() -> Result<(), Box<dyn std::error::Error>> {
 
     let lib_var = "TVM_LINKER_LIB_PATH";
     let prev_var =  env::var_os(lib_var);
-
+    sleep(Duration::new(1, 0));
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
     cmd.arg("compile")
         .arg(contract)
@@ -27,7 +29,7 @@ fn test_compile_lib() -> Result<(), Box<dyn std::error::Error>> {
         .stdout(predicate::str::contains("Error"));
 
     env::set_var(lib_var, lib_path);
-
+    sleep(Duration::new(1, 0));
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
     cmd.arg("compile")
         .arg(contract)
