@@ -27,6 +27,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "android_system_properties"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7ed72e1635e121ca3e79420540282af22da58be50de153d36f81ddc6b83aa9e"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "ansi_term"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -200,10 +209,11 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chrono"
-version = "0.4.20"
+version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6127248204b9aba09a362f6c930ef6a78f2c1b2215f8a7b398c06e1083f17af0"
+checksum = "3f725f340c3854e3cb3ab736dc21f0cca183303acea3b3ffec30f141503ac8eb"
 dependencies = [
+ "iana-time-zone",
  "js-sys",
  "num-integer",
  "num-traits",
@@ -232,6 +242,22 @@ name = "constant_time_eq"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
+
+[[package]]
+name = "core-foundation"
+version = "0.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "194a7a9e6de53fa55116934067c844d9d749312f75c6f6d0980e8c252f8c2146"
+dependencies = [
+ "core-foundation-sys",
+ "libc",
+]
+
+[[package]]
+name = "core-foundation-sys"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
 
 [[package]]
 name = "cpufeatures"
@@ -310,6 +336,15 @@ name = "difference"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "524cbf6897b527295dff137cec09ecf3a05f4fddffd7dfcd1585403449e74198"
+
+[[package]]
+name = "diffy"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c27ec7cef89a63c063e06570bb861b7d35e406d6885551b346d77c459b34d3db"
+dependencies = [
+ "ansi_term",
+]
 
 [[package]]
 name = "digest"
@@ -491,6 +526,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
+name = "iana-time-zone"
+version = "0.1.41"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1779539f58004e5dba1c1f093d44325ebeb244bfc04b791acdc0aaeca9c04570"
+dependencies = [
+ "android_system_properties",
+ "core-foundation",
+ "js-sys",
+ "wasm-bindgen",
+ "winapi",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -513,9 +561,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.127"
+version = "0.2.129"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "505e71a4706fa491e9b1b55f51b95d4037d0821ee40131190475f692b35b009b"
+checksum = "64de3cc433455c14174d42e554d4027ee631c4d046d43e3ecc6efc4636cdc7a7"
 
 [[package]]
 name = "lockfree"
@@ -859,18 +907,18 @@ checksum = "4501abdff3ae82a1c1b477a17252eb69cee9e66eb915c1abaa4f44d873df9f09"
 
 [[package]]
 name = "serde"
-version = "1.0.142"
+version = "1.0.143"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e590c437916fb6b221e1d00df6e3294f3fccd70ca7e92541c475d6ed6ef5fee2"
+checksum = "53e8e5d5b70924f74ff5c6d64d9a5acd91422117c60f48c4e07855238a254553"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.142"
+version = "1.0.143"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34b5b8d809babe02f538c2cfec6f2c1ed10804c0e5a6a041a049a4f5588ccc2e"
+checksum = "d3d8e8de557aee63c26b85b947f5e59b690d0454c753f3adeb5cd7835ab88391"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -929,6 +977,12 @@ name = "signature"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f054c6c1a6e95179d6f23ed974060dcefb2d9388bb7256900badad682c499de4"
+
+[[package]]
+name = "similar"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62ac7f900db32bf3fd12e0117dd3dc4da74bc52ebaac97f39668446d89694803"
 
 [[package]]
 name = "simplelog"
@@ -1021,8 +1075,8 @@ dependencies = [
 
 [[package]]
 name = "ton_abi"
-version = "2.3.1"
-source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.3.1#cb442bca8244a6bfd316c96c2fc0a99114ab32c3"
+version = "2.3.5"
+source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.3.5#10d1790dc87a90cd51ad080deeddc93a85031513"
 dependencies = [
  "base64 0.10.1",
  "byteorder",
@@ -1043,8 +1097,8 @@ dependencies = [
 
 [[package]]
 name = "ton_block"
-version = "1.8.0"
-source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.8.0#403010107636ec9cb2bcc75d09b75147c72b0d82"
+version = "1.8.1"
+source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.8.1#7d02b60537f2bd0fead24ab2c57089a8d735763b"
 dependencies = [
  "base64 0.13.0",
  "crc 3.0.0",
@@ -1061,8 +1115,8 @@ dependencies = [
 
 [[package]]
 name = "ton_labs_assembler"
-version = "1.2.44"
-source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.44#028be2e35b8b39c73a60ab386384ea6ff62eb219"
+version = "1.2.45"
+source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.45#029972291958511e003e6dc9b0425a0189dda407"
 dependencies = [
  "failure",
  "hex 0.4.3",
@@ -1096,9 +1150,10 @@ dependencies = [
 
 [[package]]
 name = "ton_vm"
-version = "1.8.40"
-source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.40#3bd45a44c3ca454e4f16f2de06994b404500cce2"
+version = "1.8.42"
+source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.42#ad32423fc8edda680ab03b08d5b8e002b4a89e55"
 dependencies = [
+ "diffy",
  "ed25519",
  "ed25519-dalek",
  "failure",
@@ -1109,13 +1164,14 @@ dependencies = [
  "num-traits",
  "rand 0.7.3",
  "sha2 0.9.9",
+ "similar",
  "ton_block",
  "ton_types",
 ]
 
 [[package]]
 name = "tvm_linker"
-version = "0.15.65"
+version = "0.15.66"
 dependencies = [
  "assert_cmd",
  "base64 0.10.1",
