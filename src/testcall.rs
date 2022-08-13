@@ -27,14 +27,14 @@ use ton_vm::error::tvm_exception;
 use ton_vm::stack::{StackItem, Stack, savelist::SaveList, integer::IntegerData};
 use ton_vm::SmartContractInfo;
 use ton_types::{AccountId, BuilderData, Cell, SliceData, Result, Status};
-use ton_block::{
-    CurrencyCollection, Deserializable, ExternalInboundMessageHeader, Grams,
-    InternalMessageHeader, Message, MsgAddressExt, MsgAddressInt, OutAction,
-    OutActions, Serializable, StateInit, UnixTime32
-};
+use ton_block::{CurrencyCollection, Deserializable, ExternalInboundMessageHeader, GlobalCapabilities, Grams, InternalMessageHeader, Message, MsgAddressExt, MsgAddressInt, OutAction, OutActions, Serializable, StateInit, UnixTime32};
 use ton_labs_assembler::DbgInfo;
 
 const DEFAULT_ACCOUNT_BALANCE: &str = "100000000000";
+const ALL_CAPABILITIES: u64 = 0x572e
+    | (GlobalCapabilities::CapDiff as u64)
+    | (GlobalCapabilities::CapStorageFeeToTvm as u64)
+    | (GlobalCapabilities::CapCopyleft as u64);
 
 fn create_external_inbound_msg(src: MsgAddressExt, dst: MsgAddressInt, body: Option<SliceData>) -> Message {
     let hdr = ExternalInboundMessageHeader {
@@ -94,7 +94,7 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) -> Status {
 fn initialize_registers(data: SliceData, code: Cell, myself: MsgAddressInt, now: u32, balance: (u64, CurrencyCollection), config: Option<Cell>) -> Result<SaveList> {
     let mut ctrls = SaveList::new();
     let mut info = SmartContractInfo::with_myself(myself.serialize()?.into());
-    info.capabilities = 0x572e;
+    info.capabilities = ALL_CAPABILITIES;
     info.balance.grams = ton_block::Grams::from(balance.0);
     info.balance.other = ton_block::ExtraCurrencyCollection::from(balance.1.other_as_hashmap());
     info.unix_time = now;
@@ -317,8 +317,7 @@ pub struct TestCallParams<'a, F: Fn(SliceData, bool)> {
     pub gas_limit: Option<i64>,
     pub action_decoder: Option<F>,
     pub trace_level: TraceLevel,
-    pub debug_info: Option<DbgInfo>,
-    pub capabilities: Option<u64>
+    pub debug_info: Option<DbgInfo>
 }
 
 pub fn call_contract<F>(
@@ -400,7 +399,7 @@ pub fn call_contract<F>(
     };
 
     let mut engine = Engine::with_capabilities(
-        params.capabilities.unwrap_or(0)
+        ALL_CAPABILITIES
     ).setup_with_libraries(
         code, Some(registers), Some(stack), Some(gas), vec![]
     );

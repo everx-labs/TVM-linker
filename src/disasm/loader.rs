@@ -1569,7 +1569,7 @@ pub(super) fn load_getglob(slice: &mut SliceData) -> Result<Instruction> {
     let opc = slice.get_next_int(11)?;
     check_eq!(opc << 1, 0xf84);
     let k = slice.get_next_int(5)? as usize;
-    assert!(k != 0);
+    assert_ne!(k, 0);
     Ok(Instruction::new("GETGLOB").with_param(InstructionParameter::Length(k)))
 }
 create_handler_2!(load_setglobvar, 0xf860, "SETGLOBVAR");
@@ -1577,7 +1577,7 @@ pub(super) fn load_setglob(slice: &mut SliceData) -> Result<Instruction> {
     let opc = slice.get_next_int(11)?;
     check_eq!(opc << 1, 0xf86);
     let k = slice.get_next_int(5)? as usize;
-    assert!(k != 0);
+    assert_ne!(k, 0);
     Ok(Instruction::new("SETGLOB").with_param(InstructionParameter::Length(k)))
 }
 create_handler_2!(load_hashcu,     0xf900, "HASHCU");
