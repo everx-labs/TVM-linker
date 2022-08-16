@@ -532,7 +532,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
     } else {
         format!("{}.tvc", input)
     };
-    let addr = ton_block::MsgAddressInt::from_str(&address)?;
+    let addr = MsgAddressInt::from_str(&address)?;
     let state_init = load_from_file(&input)?;
     let config = matches.value_of("CONFIG").and_then(testcall::load_config);
     let (_, state_init, is_success) = call_contract(addr, state_init, TestCallParams {
@@ -544,8 +544,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
         gas_limit,
         action_decoder: if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
         trace_level,
-        debug_info: testcall::load_debug_info(&debug_map_filename),
-        capabilities: None,
+        debug_info: testcall::load_debug_info(&debug_map_filename)
     })?;
     if is_success {
         save_to_file(state_init, Some(&input), 0)?;
@@ -635,7 +634,7 @@ fn build_message(
         })
     };
     if pack_code {
-        msg.set_state_init(program::load_from_file(&format!("{}.tvc", address_str))?);
+        msg.set_state_init(load_from_file(&format!("{}.tvc", address_str))?);
     }
     if let Some(body) = body {
         msg.set_body(body);

@@ -291,7 +291,7 @@ pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8) -> Result<Stri
         format!("{:x}.tvc", address)
     };
 
-    let mut file = std::fs::File::create(&file_name).unwrap();
+    let mut file = File::create(&file_name).unwrap();
     file.write_all(&buffer)?;
 
     if print_filename {
@@ -374,8 +374,7 @@ mod tests {
         gas_limit: Option<i64>,
         action_decoder: Option<F>,
         trace_level: TraceLevel,
-        debug_map_filename: &str,
-        capabilities: Option<u64>
+        debug_map_filename: &str
     ) -> Result<i32>
         where F: Fn(SliceData, bool)
     {
@@ -389,7 +388,7 @@ mod tests {
         } else {
             address.to_owned()
         };
-        let addr = ton_block::MsgAddressInt::from_str(&addr)?;
+        let addr = MsgAddressInt::from_str(&addr)?;
 
         let state_init = load_from_file(smc_file)?;
         let debug_info = load_debug_info(debug_map_filename);
@@ -404,8 +403,7 @@ mod tests {
                 gas_limit,
                 action_decoder,
                 trace_level,
-                debug_info,
-                capabilities,
+                debug_info
             }
         )?;
         if is_vm_success {
@@ -448,8 +446,7 @@ mod tests {
             None,
             if decode_c5 { Some(action_decoder) } else { None },
             trace_level,
-            "",
-            None
+            ""
         ).unwrap_or(-1)
     }
 
@@ -504,8 +501,7 @@ mod tests {
             Some(3000), // gas limit
             Some(|_, _| {}),
             TraceLevel::None,
-            "",
-            None
+            ""
         );
         // must equal to out of gas exception
         assert!(exit_code.is_ok());
@@ -548,8 +544,7 @@ mod tests {
             None,
             Some(|_, _| {}),
             TraceLevel::Full,
-            &debug_map_filename,
-            None
+            &debug_map_filename
         );
         assert!(exit_code.is_ok());
         assert_eq!(exit_code.unwrap(), 0);
@@ -608,8 +603,7 @@ mod tests {
             None,
             Some(|_, _| {}),
             TraceLevel::None,
-            "",
-            Some(GlobalCapabilities::CapMycode as u64)
+            ""
         );
         assert!(exit_code.is_ok());
         assert_eq!(exit_code.unwrap(), 0);
