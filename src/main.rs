@@ -52,16 +52,19 @@ use keyman::KeypairManager;
 use parser::{ParseEngine, ParseEngineResults};
 use program::{Program, get_now, save_to_file, load_from_file};
 use resolver::resolve_name;
-use ton_block::{Deserializable, Message, StateInit, Serializable, Account, MsgAddressInt, ExternalInboundMessageHeader, InternalMessageHeader, MsgAddressIntOrNone};
+use ton_block::{Deserializable, Message, StateInit, Serializable, Account, MsgAddressInt, ExternalInboundMessageHeader, InternalMessageHeader,
+                MsgAddressIntOrNone, ConfigParams};
 use std::io::Write;
 use std::{path::Path};
 use testcall::{call_contract, MsgInfo, TestCallParams, TraceLevel};
-use ton_types::{BuilderData, SliceData, Result, Status, AccountId, BagOfCells, BocSerialiseMode};
+use ton_types::{BuilderData, SliceData, Result, Status, AccountId, BagOfCells, BocSerialiseMode, UInt256};
 use std::env;
 use disasm::commands::disasm_command;
 use ton_labs_assembler::Line;
 use std::fs::File;
 use std::str::FromStr;
+
+const DEFAULT_CAPABILITIES:u64 = 0x42E;   // Default capabilities in the main network
 
 fn main() -> std::result::Result<(), i32> {
     linker_main().map_err(|err_str| {
@@ -532,19 +535,33 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
     } else {
         format!("{}.tvc", input)
     };
-    let addr = MsgAddressInt::from_str(&address)?;
+    let addr = ton_block::MsgAddressInt::from_str(&address)?;
     let state_init = load_from_file(&input)?;
-    let config = matches.value_of("CONFIG").and_then(testcall::load_config);
+    let config_cell_opt = matches.value_of("CONFIG").and_then(testcall::load_config);
+
+    let capabilities =
+        match config_cell_opt {
+            Some(ref config_cell) => {
+                let config_params = ConfigParams::with_address_and_root(
+                    UInt256::from_str(&"5".repeat(64)).unwrap(), // -1:5555...
+                    config_cell.clone());
+                config_params.capabilities()
+            }
+            None => {
+                DEFAULT_CAPABILITIES
+            }
+        };
     let (_, state_init, is_success) = call_contract(addr, state_init, TestCallParams {
         balance: matches.value_of("BALANCE"),
         msg_info,
-        config,
+        config: config_cell_opt,
         key_file: sign,
         ticktock,
         gas_limit,
         action_decoder: if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
         trace_level,
-        debug_info: testcall::load_debug_info(&debug_map_filename)
+        debug_info: testcall::load_debug_info(&debug_map_filename),
+        capabilities: capabilities
     })?;
     if is_success {
         save_to_file(state_init, Some(&input), 0)?;
@@ -634,7 +651,7 @@ fn build_message(
         })
     };
     if pack_code {
-        msg.set_state_init(load_from_file(&format!("{}.tvc", address_str))?);
+        msg.set_state_init(program::load_from_file(&format!("{}.tvc", address_str))?);
     }
     if let Some(body) = body {
         msg.set_body(body);
