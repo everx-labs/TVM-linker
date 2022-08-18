@@ -110,6 +110,13 @@ Use `--decode-c6` to see output actions in user-friendly format.
 
 Use `--balance <value>` to define account balance in nanograms. It will be available  at the bottom of initial stake and in SmartContractInfo tuple from c7 register .
 
+Use `--config <boc_file>` to define the config parameters to run VM with. The BOC file is a state of the config smart-contract of the Masterchain. 
+The capabilities field of the config defines the VM mode of operation. If the config parameter is omitted, the capabilities default value of 0x42E is used. 
+For the available capability codes consult [here](https://github.com/tonlabs/ton-labs-block/blob/8f39a1b467919d5fb3129800f07357883be82d77/src/config_params.rs#L336)
+
+Note: configuration smart-contract resides at the address: -1:5555555555555555555555555555555555555555555555555555555555555555
+
+
 Use `--internal` to send internal message to the contract with defined nanograms in `value`. By default, source address in internal message in zero address (`0000...0000`), to define another address use option `--src <address>`, where address should be in the format <wc>:<bytes32> (i.e. "0:1122...AABB"). 
 
 Account and message balance can have extended format with extra currencies: `{ "main": int, "extra": {"i": int, ...} }`.
