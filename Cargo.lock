@@ -179,9 +179,9 @@ checksum = "b4ae4235e6dac0694637c763029ecea1a2ec9e4e06ec2729bd21ba4d9c863eb7"
 
 [[package]]
 name = "bumpalo"
-version = "3.10.0"
+version = "3.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37ccbd214614c6783386c1af30caf03192f17891059cecc394b4fb119e363de3"
+checksum = "c1ad822118d20d2c234f427000d5acc36eabe1e29a348c89b63dd60b13f28e5d"
 
 [[package]]
 name = "byte-tools"
@@ -254,9 +254,9 @@ checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
 
 [[package]]
 name = "cpufeatures"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59a6001667ab124aebae2a495118e11d30984c3a653e99d86d58971708cf5e4b"
+checksum = "1079fb8528d9f9c888b1e8aa651e6e079ade467323d58f75faf1d30b1808f540"
 dependencies = [
  "libc",
 ]
@@ -520,9 +520,9 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "iana-time-zone"
-version = "0.1.45"
+version = "0.1.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef5528d9c2817db4e10cc78f8d4c8228906e5854f389ff6b076cee3572a09d35"
+checksum = "ad2bfd338099682614d3ee3fe0cd72e0b6a41ca6a87f6a74a3bd593c91650501"
 dependencies = [
  "android_system_properties",
  "core-foundation-sys",
@@ -563,9 +563,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.131"
+version = "0.2.132"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04c3b4822ccebfa39c02fc03d1534441b22ead323fa0f48bb7ddd8e6ba076a40"
+checksum = "8371e4e5341c3a96db127eb2465ac681ced4c433e01dd0e938adbef26ba93ba5"
 
 [[package]]
 name = "lockfree"
@@ -703,9 +703,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.13.0"
+version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18a6dbe30758c9f83eb00cbea4ac95966305f5a7772f3f42ebfc7fc7eddbd8e1"
+checksum = "074864da206b4973b84eb91683020dbefd6a8c3f0f38e054d93954e891935e4e"
 
 [[package]]
 name = "opaque-debug"
@@ -1077,8 +1077,8 @@ dependencies = [
 
 [[package]]
 name = "ton_abi"
-version = "2.3.5"
-source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.3.5#10d1790dc87a90cd51ad080deeddc93a85031513"
+version = "2.3.7"
+source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.3.7#958fba895b3a7c4f255d89a0f292e2136350022c"
 dependencies = [
  "base64 0.10.1",
  "byteorder",
@@ -1099,8 +1099,8 @@ dependencies = [
 
 [[package]]
 name = "ton_block"
-version = "1.8.1"
-source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.8.1#7d02b60537f2bd0fead24ab2c57089a8d735763b"
+version = "1.8.3"
+source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.8.3#8f39a1b467919d5fb3129800f07357883be82d77"
 dependencies = [
  "base64 0.13.0",
  "crc 3.0.0",
@@ -1117,8 +1117,8 @@ dependencies = [
 
 [[package]]
 name = "ton_labs_assembler"
-version = "1.2.45"
-source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.45#029972291958511e003e6dc9b0425a0189dda407"
+version = "1.2.47"
+source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.47#4f0e7e2bf848fc74604f895fca3e7b9400b9494a"
 dependencies = [
  "failure",
  "hex 0.4.3",
@@ -1132,8 +1132,8 @@ dependencies = [
 
 [[package]]
 name = "ton_types"
-version = "1.11.3"
-source = "git+https://github.com/tonlabs/ton-labs-types.git?tag=1.11.3#d62ead62339f17fda171fe45f19f5c7452e724bb"
+version = "1.11.4"
+source = "git+https://github.com/tonlabs/ton-labs-types.git?tag=1.11.4#fd69a6b848ddfacee86cc6b76c3ff36d61f3e1f7"
 dependencies = [
  "base64 0.13.0",
  "crc 1.8.1",
@@ -1152,8 +1152,8 @@ dependencies = [
 
 [[package]]
 name = "ton_vm"
-version = "1.8.42"
-source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.42#ad32423fc8edda680ab03b08d5b8e002b4a89e55"
+version = "1.8.43"
+source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.43#7aa03d20e32af14baeb0aae0babf4b9281453561"
 dependencies = [
  "diffy",
  "ed25519",
