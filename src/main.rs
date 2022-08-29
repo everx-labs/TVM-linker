@@ -116,6 +116,8 @@ fn linker_main() -> Status {
             (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file. If not specified lib is loaded from environment variable TVM_LINKER_LIB_PATH if it exists.")
             (@arg OUT_FILE: -o +takes_value "Output file name")
             (@arg LANGUAGE: --language +takes_value "Enable language-specific features in linkage")
+            (@arg PRINT_CODE: --print_code "Command will only print the code cell without generating the TVC file")
+            (@arg SILENT: --silent "Command will print necessary output")
         )
         (@subcommand test =>
             (@setting AllowLeadingHyphen)
@@ -237,8 +239,11 @@ fn linker_main() -> Status {
     if let Some(compile_matches) = matches.subcommand_matches("compile") {
         let input = compile_matches.value_of("INPUT").unwrap();
         let abi_from_input = format!("{}{}", input.trim_end_matches("code"), "abi.json");
+        let silent = compile_matches.is_present("SILENT");
         let abi_file = compile_matches.value_of("ABI").or_else(|| {
-            println!("ABI_PATH (obtained from INPUT): {}", abi_from_input);
+            if !silent {
+                println!("ABI_PATH (obtained from INPUT): {}", abi_from_input);
+            }
             Some(abi_from_input.as_ref())
         });
         let abi_json = match abi_file {
@@ -256,7 +261,9 @@ fn linker_main() -> Status {
         }
         let env_lib = env::var("TVM_LINKER_LIB_PATH").unwrap_or_default();
         if sources.is_empty() && !env_lib.is_empty() {
-            println!("TVM_LINKER_LIB_PATH: {:?}", &env_lib);
+            if !silent {
+                println!("TVM_LINKER_LIB_PATH: {:?}", &env_lib);
+            }
             let path = Path::new(&env_lib);
             if !path.exists() {
                 bail!("File {} doesn't exist", &env_lib);
@@ -286,7 +293,12 @@ fn linker_main() -> Status {
 
         let data_filename = compile_matches.value_of("DATA");
 
-        prog.compile_to_file_ex(wc, out_file, data_filename, false)?;
+        let print_code = compile_matches.is_present("PRINT_CODE");
+        prog.set_print_code(print_code);
+
+        prog.set_silent(silent);
+
+        prog.compile_to_file_ex(wc, out_file, data_filename)?;
 
         if compile_matches.is_present("DEBUG_MAP") {
             let filename = compile_matches.value_of("DEBUG_MAP").unwrap();
@@ -547,7 +559,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
         debug_info: testcall::load_debug_info(&debug_map_filename)
     })?;
     if is_success {
-        save_to_file(state_init, Some(&input), 0)?;
+        save_to_file(state_init, Some(&input), 0, false)?;
         println!("Contract persistent data updated");
     }
 

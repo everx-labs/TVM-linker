@@ -28,7 +28,7 @@ tvm_linker has several modes of work:
 ### 1) Generating a ready-to-deploy contract.
 
 ```bash
-$ tvm_linker compile [--lib <lib_file>] [--abi-json <abi_file>] [-w <workchain_id>] [--debug] [--verbose] [--debug-map <debug_info_path>] <source>
+$ tvm_linker compile [--lib <lib_file>] [--abi-json <abi_file>] [-w <workchain_id>] [--debug] [--print_code] [--silent] [--debug-map <debug_info_path>] <source>
 ```
 
 Here `source` is a name of tvm assembly source file, `library` is a runtime library file (can be more than one: `--lib` 
@@ -49,6 +49,9 @@ To add a key to the contract data and obtain real contract address user should u
 While execution if option `--debug-map <debug_info_path>` is specified, this command can generate a debug info file, 
 which contains mapping that can bind contract code with source files. This file can be used while debugging the
 contract.
+
+`--print_code` option allows user only generate code and print it without creating the TVC file.
+`--silent` option mutes all extra notifications.
 
 ### 2) Decoding of .boc messages prepared externally.
 To use this method, call
