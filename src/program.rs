@@ -272,9 +272,20 @@ impl Program {
 
         let mut dict = HashmapE::with_bit_len(19);
         dict.set(magic_key, &func_upgrade_code.0)?;
-        let cell = dict.serialize()?;
+        let dict_cell = dict.serialize()?;
 
-        Ok(cell)
+        let func_selector_text = vec![
+            Line::new("DICTPUSHCONST 19\n", "<func-selector-code>", 1),
+            Line::new("DICTIGETJMPZ\n",     "<func-selector-code>", 2),
+            Line::new("THROWARG 11\n",      "<func-selector-code>", 3),
+        ];
+
+        let mut func_selector_code = compile_code_debuggable(func_selector_text)
+            .map_err(|e| format_err!("compilation failed: {}", e))?;
+        assert_eq!(func_selector_code.1.len(), 1);
+        func_selector_code.0.append_reference(dict_cell.into());
+
+        Ok(func_selector_code.0.cell().clone())
     }
 
     pub fn debug_print(&self) {
