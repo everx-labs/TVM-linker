@@ -247,14 +247,18 @@ impl Program {
         }
 
         let func_upgrade_text = vec![
-            Line::new("PUSHREF\n", "<func-upgrade-code>", 1),
-            Line::new("DUP\n",     "<func-upgrade-code>", 2),
-            Line::new("SETCODE\n", "<func-upgrade-code>", 3),
-            Line::new("CTOS\n",    "<func-upgrade-code>", 4),
-            Line::new("PLDREF\n",  "<func-upgrade-code>", 5),
-            Line::new("BLESS\n",   "<func-upgrade-code>", 6),
-            Line::new("POP C3\n",  "<func-upgrade-code>", 7),
-            Line::new("CALL 2\n",  "<func-upgrade-code>", 8),
+            Line::new("PUSHINT 1666\n",    "<func-upgrade-code>", 1),
+            Line::new("EQUAL\n",           "<func-upgrade-code>", 2),
+            Line::new("THROWIFNOT 1666\n", "<func-upgrade-code>", 3),
+
+            Line::new("PUSHREF\n",         "<func-upgrade-code>", 4),
+            Line::new("DUP\n",             "<func-upgrade-code>", 5),
+            Line::new("SETCODE\n",         "<func-upgrade-code>", 6),
+            Line::new("CTOS\n",            "<func-upgrade-code>", 7),
+            Line::new("PLDREF\n",          "<func-upgrade-code>", 8),
+            Line::new("BLESS\n",           "<func-upgrade-code>", 9),
+            Line::new("POP C3\n",          "<func-upgrade-code>", 10),
+            Line::new("CALL 2\n",          "<func-upgrade-code>", 11),
         ];
         let mut func_upgrade_code = compile_code_debuggable(func_upgrade_text)
             .map_err(|e| format_err!("compilation failed: {}", e))?;
@@ -266,26 +270,7 @@ impl Program {
         let hash = func_upgrade_code.0.cell().repr_hash();
         self.dbgmap.insert(hash, entry.clone());
 
-        let mut b = BuilderData::new();
-        b.append_bits(1666, 19)?;
-        let magic_key = SliceData::from(b);
-
-        let mut dict = HashmapE::with_bit_len(19);
-        dict.set(magic_key, &func_upgrade_code.0)?;
-        let dict_cell = dict.serialize()?;
-
-        let func_selector_text = vec![
-            Line::new("DICTPUSHCONST 19\n", "<func-selector-code>", 1),
-            Line::new("DICTIGETJMPZ\n",     "<func-selector-code>", 2),
-            Line::new("THROWARG 11\n",      "<func-selector-code>", 3),
-        ];
-
-        let mut func_selector_code = compile_code_debuggable(func_selector_text)
-            .map_err(|e| format_err!("compilation failed: {}", e))?;
-        assert_eq!(func_selector_code.1.len(), 1);
-        func_selector_code.0.append_reference(dict_cell.into());
-
-        Ok(func_selector_code.0.cell().clone())
+        Ok(func_upgrade_code.0.cell().clone())
     }
 
     pub fn debug_print(&self) {
