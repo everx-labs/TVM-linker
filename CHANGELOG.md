@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## Version: 0.15.72
+## Version: 0.15.71
 
 ### New
 - Added option for `compile` command to print code cell and not generate TVC file.
