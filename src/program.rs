@@ -242,34 +242,39 @@ impl Program {
         let entry = entry_selector.1.first_entry().unwrap();
         self.dbgmap.insert(hash, entry.clone());
 
-        if !self.engine.save_my_code() {
+        if !self.engine.func_upgrade() {
             return Ok(entry_selector.0.cell().clone())
         }
 
-        let save_my_code_text = vec![
-            Line::new("PUSHREFCONT {\n", "<save-my-code>", 1),
-            Line::new("  DUP\n",         "<save-my-code>", 2),
-            Line::new("  SETGLOB 1\n",   "<save-my-code>", 3),
-            Line::new("  BLESS\n",       "<save-my-code>", 4),
-            Line::new("  JMPX\n",        "<save-my-code>", 5),
-            Line::new("}\n",             "<save-my-code>", 6),
-            Line::new("JMPXDATA\n",      "<save-my-code>", 7),
+        let func_upgrade_text = vec![
+            Line::new("PUSHREF\n", "<func-upgrade-code>", 1),
+            Line::new("DUP\n",     "<func-upgrade-code>", 2),
+            Line::new("SETCODE\n", "<func-upgrade-code>", 3),
+            Line::new("CTOS\n",    "<func-upgrade-code>", 4),
+            Line::new("PLDREF\n",  "<func-upgrade-code>", 5),
+            Line::new("BLESS\n",   "<func-upgrade-code>", 6),
+            Line::new("POP C3\n",  "<func-upgrade-code>", 7),
+            Line::new("CALL 2\n",  "<func-upgrade-code>", 8),
         ];
-        let mut save_my_code = compile_code_debuggable(save_my_code_text)
+        let mut func_upgrade_code = compile_code_debuggable(func_upgrade_text)
             .map_err(|e| format_err!("compilation failed: {}", e))?;
-        assert_eq!(save_my_code.1.len(), 2);
-        let old_hash = save_my_code.0.cell().repr_hash();
-        let entry = save_my_code.1.get(&old_hash).unwrap();
-        save_my_code.0.append_reference(entry_selector.0);
+        assert_eq!(func_upgrade_code.1.len(), 1);
+        let old_hash = func_upgrade_code.0.cell().repr_hash();
+        let entry = func_upgrade_code.1.get(&old_hash).unwrap();
+        func_upgrade_code.0.append_reference(entry_selector.0);
 
-        let hash = save_my_code.0.cell().repr_hash();
+        let hash = func_upgrade_code.0.cell().repr_hash();
         self.dbgmap.insert(hash, entry.clone());
 
-        let inner_hash = save_my_code.0.reference(0).unwrap().repr_hash();
-        let entry = save_my_code.1.get(&inner_hash).unwrap();
-        self.dbgmap.insert(inner_hash, entry.clone());
+        let mut b = BuilderData::new();
+        b.append_bits(1666, 19)?;
+        let magic_key = SliceData::from(b);
 
-        Ok(save_my_code.0.cell().clone())
+        let mut dict = HashmapE::with_bit_len(19);
+        dict.set(magic_key, &func_upgrade_code.0)?;
+        let cell = dict.serialize()?;
+
+        Ok(cell)
     }
 
     pub fn debug_print(&self) {
