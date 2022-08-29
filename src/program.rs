@@ -256,9 +256,10 @@ impl Program {
             Line::new("SETCODE\n",         "<func-upgrade-code>", 6),
             Line::new("CTOS\n",            "<func-upgrade-code>", 7),
             Line::new("PLDREF\n",          "<func-upgrade-code>", 8),
-            Line::new("BLESS\n",           "<func-upgrade-code>", 9),
-            Line::new("POP C3\n",          "<func-upgrade-code>", 10),
-            Line::new("CALL 2\n",          "<func-upgrade-code>", 11),
+            Line::new("CTOS\n",            "<func-upgrade-code>", 9),
+            Line::new("BLESS\n",           "<func-upgrade-code>", 10),
+            Line::new("POP C3\n",          "<func-upgrade-code>", 12),
+            Line::new("CALL 2\n",          "<func-upgrade-code>", 13),
         ];
         let mut func_upgrade_code = compile_code_debuggable(func_upgrade_text)
             .map_err(|e| format_err!("compilation failed: {}", e))?;
