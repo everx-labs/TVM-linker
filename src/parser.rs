@@ -67,8 +67,8 @@ impl ParseEngineResults {
     pub fn version(&self) -> Option<String> {
         self.engine.version()
     }
-    pub fn save_my_code(&self) -> bool {
-        self.engine.save_my_code()
+    pub fn func_upgrade(&self) -> bool {
+        self.engine.func_upgrade()
     }
 }
 
@@ -248,7 +248,7 @@ pub struct ParseEngine {
     /// selector code
     entry_point: Lines,
     /// Selector variant
-    save_my_code: bool,
+    func_upgrade: bool,
     /// Contract version
     version: Option<String>,
 
@@ -341,7 +341,7 @@ impl ParseEngine {
             persistent_ptr:  0,
             abi:             None,
             version:         None,
-            save_my_code:    false,
+            func_upgrade:    false,
             computed:        HashMap::new(),
         };
         engine.parse(inputs, abi_json)?;
@@ -481,8 +481,8 @@ impl ParseEngine {
         self.version.clone()
     }
 
-    fn save_my_code(&self) -> bool {
-        self.save_my_code
+    fn func_upgrade(&self) -> bool {
+        self.func_upgrade
     }
 
     fn parse_code(&mut self, mut input: ParseEngineInput) -> Status {
@@ -527,8 +527,8 @@ impl ParseEngine {
             } else if start_with(&l, ".pragma") {
                 let cap = PRAGMA_REGEX.captures(&l).unwrap();
                 if let Some(m) = cap.get(1) {
-                    if m.as_str() == "selector-save-my-code" {
-                        self.save_my_code = true
+                    if m.as_str() == "selector-func-solidity" {
+                        self.func_upgrade = true
                     }
                 }
             } else if start_with(&l, ".global-base") {
