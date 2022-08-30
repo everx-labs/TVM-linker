@@ -51,7 +51,7 @@ pub fn state_init_printer(state: &StateInit) -> String {
     )
 }
 
-fn tree_of_cells_into_base64(root_cell: Option<&Cell>) -> String {
+pub fn tree_of_cells_into_base64(root_cell: Option<&Cell>) -> String {
     match root_cell {
         Some(cell) => {
             let mut bytes = Vec::new();

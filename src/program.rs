@@ -28,6 +28,7 @@ use ton_types::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use ton_types::{Cell, SliceData, BuilderData, IBitstring, Result};
 use ton_types::dictionary::{HashmapE, HashmapType};
 use parser::{ptr_to_builder, ParseEngine, ParseEngineResults};
+use printer::tree_of_cells_into_base64;
 
 
 pub struct Program {
@@ -35,6 +36,8 @@ pub struct Program {
     engine: ParseEngineResults,
     keypair: Option<Keypair>,
     pub dbgmap: DbgInfo,
+    print_code: bool,
+    silent: bool,
 }
 
 impl Program {
@@ -44,7 +47,17 @@ impl Program {
             engine: ParseEngineResults::new(parser),
             keypair: None,
             dbgmap: DbgInfo::new(),
+            print_code: false,
+            silent: false,
         }
+    }
+
+    pub fn set_print_code(&mut self, print_code: bool) {
+        self.print_code = print_code;
+    }
+
+    pub fn set_silent(&mut self, silent: bool) {
+        self.silent = silent;
     }
 
     pub fn set_language(&mut self, lang: Option<&str>) {
@@ -114,25 +127,34 @@ impl Program {
         wc: i8,
         out_file: Option<&str>,
         data_filename: Option<&str>,
-        silent: bool,
     ) -> Result<String> {
-        let mut state_init = self.compile_to_state()?;
+        let mut state_init = self.compile_to_state(self.print_code)?;
+        if self.print_code {
+            return Ok("".to_string());
+        }
         if let Some(data_filename) = data_filename {
             let mut data_cursor = Cursor::new(std::fs::read(data_filename).unwrap());
             let data_cell = deserialize_cells_tree(&mut data_cursor).unwrap().remove(0);
             state_init.set_data(data_cell);
         }
-        let ret = save_to_file(state_init.clone(), out_file, wc);
-        if out_file.is_some() && ret.is_ok() && !silent {
+        let ret = save_to_file(state_init.clone(), out_file, wc, self.silent);
+        if out_file.is_some() && ret.is_ok() && !self.silent {
             println!("Contract successfully compiled. Saved to file {}.", out_file.unwrap());
             println!("Contract initial hash: {:x}", state_init.hash().unwrap());
         }
         ret
     }
 
-    fn compile_to_state(&mut self) -> Result<StateInit> {
+    fn compile_to_state(&mut self, only_print_code: bool) -> Result<StateInit> {
         let mut state = StateInit::default();
-        state.set_code(self.compile_asm(false)?);
+        let code = self.compile_asm(false)?;
+
+        if only_print_code {
+            println!("{{\n  \"code\":\"{}\"\n}}", tree_of_cells_into_base64(Some(&code)));
+            return Ok(state);
+        } else {
+            state.set_code(code);
+        }
         state.set_data(self.data()?);
         Ok(state)
     }
@@ -279,7 +301,7 @@ impl Program {
     }
 }
 
-pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8) -> Result<String> {
+pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8, silent: bool) -> Result<String> {
     let root_cell = state.write_to_new_cell()?.into_cell()?;
     let mut buffer = vec![];
     BagOfCells::with_root(&root_cell).write_to(&mut buffer, false)?;
@@ -297,13 +319,17 @@ pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8) -> Result<Stri
     file.write_all(&buffer)?;
 
     if print_filename {
-        println!("Saved contract to file {}", &file_name);
-        println!("testnet:");
-        println!("Non-bounceable address (for init): {}", &calc_userfriendly_address(wc, address.as_slice(), false, true));
-        println!("Bounceable address (for later access): {}", &calc_userfriendly_address(wc, address.as_slice(), true, true));
-        println!("mainnet:");
-        println!("Non-bounceable address (for init): {}", &calc_userfriendly_address(wc, address.as_slice(), false, false));
-        println!("Bounceable address (for later access): {}", &calc_userfriendly_address(wc, address.as_slice(), true, false));
+        if silent {
+            println!("{{\n  \"output_path\":\"{}\"\n}}", &file_name);
+        } else {
+            println!("Saved contract to file {}", &file_name);
+            println!("testnet:");
+            println!("Non-bounceable address (for init): {}", &calc_userfriendly_address(wc, address.as_slice(), false, true));
+            println!("Bounceable address (for later access): {}", &calc_userfriendly_address(wc, address.as_slice(), true, true));
+            println!("mainnet:");
+            println!("Non-bounceable address (for init): {}", &calc_userfriendly_address(wc, address.as_slice(), false, false));
+            println!("Bounceable address (for later access): {}", &calc_userfriendly_address(wc, address.as_slice(), true, false));
+        }
     }
     Ok(file_name)
 }
@@ -362,7 +388,7 @@ mod tests {
     use super::*;
 
     fn compile_to_file(prog: &mut Program, wc: i8) -> Result<String> {
-        prog.compile_to_file_ex(wc, None, None, false)
+        prog.compile_to_file_ex(wc, None, None)
     }
 
     fn call_contract_1<F>(
@@ -409,7 +435,7 @@ mod tests {
             }
         )?;
         if is_vm_success {
-            save_to_file(state_init, Some(smc_file), 0)?;
+            save_to_file(state_init, Some(smc_file), 0, false)?;
             println!("Contract persistent data updated");
         }
         Ok(exit_code)
