@@ -547,7 +547,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
     } else {
         format!("{}.tvc", input)
     };
-    let addr = ton_block::MsgAddressInt::from_str(&address)?;
+    let addr = MsgAddressInt::from_str(&address)?;
     let state_init = load_from_file(&input)?;
     let config_cell_opt = matches.value_of("CONFIG").and_then(testcall::load_config);
 
@@ -663,7 +663,7 @@ fn build_message(
         })
     };
     if pack_code {
-        msg.set_state_init(program::load_from_file(&format!("{}.tvc", address_str))?);
+        msg.set_state_init(load_from_file(&format!("{}.tvc", address_str))?);
     }
     if let Some(body) = body {
         msg.set_body(body);
