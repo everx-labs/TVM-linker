@@ -28,9 +28,9 @@ dependencies = [
 
 [[package]]
 name = "android_system_properties"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7ed72e1635e121ca3e79420540282af22da58be50de153d36f81ddc6b83aa9e"
+checksum = "819e7219dbd41043ac279b19830f2efc897156490d7fd6ea916720117ee66311"
 dependencies = [
  "libc",
 ]
@@ -520,13 +520,14 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "iana-time-zone"
-version = "0.1.46"
+version = "0.1.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad2bfd338099682614d3ee3fe0cd72e0b6a41ca6a87f6a74a3bd593c91650501"
+checksum = "4c495f162af0bf17656d0014a0eded5f3cd2f365fdd204548c2869db89359dc7"
 dependencies = [
  "android_system_properties",
  "core-foundation-sys",
  "js-sys",
+ "once_cell",
  "wasm-bindgen",
  "winapi",
 ]
@@ -965,9 +966,9 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.10.2"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55deaec60f81eefe3cce0dc50bda92d6d8e88f2a27df7c5033b42afeb1ed2676"
+checksum = "899bf02746a2c92bf1053d9327dadb252b01af1f81f90cdb902411f518bc7215"
 dependencies = [
  "cfg-if",
  "cpufeatures",
@@ -1100,7 +1101,7 @@ dependencies = [
 [[package]]
 name = "ton_block"
 version = "1.8.3"
-source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.8.3#8f39a1b467919d5fb3129800f07357883be82d77"
+source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.8.3#19a77eb0cccf6dc097ac934458976e1e91402ade"
 dependencies = [
  "base64 0.13.0",
  "crc 3.0.0",
@@ -1111,7 +1112,7 @@ dependencies = [
  "log",
  "num",
  "num-traits",
- "sha2 0.10.2",
+ "sha2 0.10.3",
  "ton_types",
 ]
 
@@ -1133,7 +1134,7 @@ dependencies = [
 [[package]]
 name = "ton_types"
 version = "1.11.4"
-source = "git+https://github.com/tonlabs/ton-labs-types.git?tag=1.11.4#fd69a6b848ddfacee86cc6b76c3ff36d61f3e1f7"
+source = "git+https://github.com/tonlabs/ton-labs-types.git?tag=1.11.4#7f0063faa486298ba57ceb97e1d6e38447d6e0e3"
 dependencies = [
  "base64 0.13.0",
  "crc 1.8.1",
@@ -1153,7 +1154,7 @@ dependencies = [
 [[package]]
 name = "ton_vm"
 version = "1.8.43"
-source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.43#7aa03d20e32af14baeb0aae0babf4b9281453561"
+source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.43#1079e2836a1fb2ec3ddb11dfa9c86435fbcc0855"
 dependencies = [
  "diffy",
  "ed25519",

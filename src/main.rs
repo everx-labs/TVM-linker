@@ -573,7 +573,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
         action_decoder: if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
         trace_level,
         debug_info: testcall::load_debug_info(&debug_map_filename),
-        capabilities: capabilities
+        capabilities
     })?;
     if is_success {
         save_to_file(state_init, Some(&input), 0, false)?;
