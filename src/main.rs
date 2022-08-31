@@ -141,7 +141,7 @@ fn linker_main() -> Status {
             (@arg NOW: --now +takes_value "Supplies transaction creation unixtime")
             (@arg TICKTOCK: --ticktock +takes_value conflicts_with[BODY] "Emulates ticktock transaction in masterchain, 0 for tick and -1 for tock")
             (@arg GASLIMIT: -l --("gas-limit") +takes_value "Defines gas limit for tvm execution")
-            (@arg CONFIG: --config +takes_value "Imports config parameters from a config contract boc")
+            (@arg CONFIG: --config +takes_value "Imports config parameters from a config contract TVC")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name if used with test subcommand")
             (@arg ADDRESS: --address +takes_value "Contract address, which can be obtained from the contract with `address(this)`. If not specified address can be obtained from the INPUT argument or set to zero.")
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")

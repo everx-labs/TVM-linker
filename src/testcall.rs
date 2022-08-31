@@ -401,6 +401,7 @@ pub fn call_contract<F>(
         Gas::test()
     };
 
+    println!("Engine capabilities: {}", params.capabilities);
     let mut engine = Engine::with_capabilities(
         params.capabilities
     ).setup_with_libraries(
