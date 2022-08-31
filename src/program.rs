@@ -431,7 +431,8 @@ mod tests {
                 gas_limit,
                 action_decoder,
                 trace_level,
-                debug_info
+                debug_info,
+                capabilities: 0x42E, // default
             }
         )?;
         if is_vm_success {
