@@ -84,6 +84,25 @@ macro_rules! create_handler_2r {
     };
 }
 
+macro_rules! create_handler_3r {
+    ($func_name:ident, $opc:literal, $mnemonic:literal) => {
+        pub(super) fn $func_name(slice: &mut SliceData) -> Result<Instruction> {
+            let opc = slice.get_next_int(16)?;
+            if opc != $opc {
+                fail!("invalid opcode");
+            }
+            let mut subslice1 = SliceData::from(slice.reference(0)?);
+            let mut subslice2 = SliceData::from(slice.reference(1)?);
+            let code1 = load(&mut subslice1)?;
+            let code2 = load(&mut subslice2)?;
+            slice.shrink_references(2..);
+            Ok(Instruction::new($mnemonic)
+                .with_param(InstructionParameter::Code(code1))
+                .with_param(InstructionParameter::Code(code2)))
+        }
+    };
+}
+
 macro_rules! check {
     ($expr:expr) => {
         if !$expr {
@@ -121,8 +140,8 @@ pub(super) fn load(slice: &mut SliceData) -> Result<Code> {
     }
     Ok(code)
 }
-pub(super) fn load_unknown(_slice: &mut SliceData) -> Result<Instruction> {
-    fail!("unknown opcode")
+pub(super) fn load_unknown(slice: &mut SliceData) -> Result<Instruction> {
+    fail!("unknown opcode {}", slice.to_hex_string())
 }
 pub(super) fn load_setcp(slice: &mut SliceData) -> Result<Instruction> {
     let opc = slice.get_next_int(8)?;
@@ -390,6 +409,14 @@ create_handler_2!(load_istuple,                 0x6f8a, "ISTUPLE");
 create_handler_2!(load_tuple_last,              0x6f8b, "LAST");
 create_handler_2!(load_tuple_push,              0x6f8c, "TPUSH");
 create_handler_2!(load_tuple_pop,               0x6f8d, "TPOP");
+create_handler_2!(load_zeroswapif,              0x6f90, "ZEROSWAPIF");
+create_handler_2!(load_zeroswapifnot,           0x6f91, "ZEROSWAPIFNOT");
+create_handler_2!(load_zerorotrif,              0x6f92, "ZEROROTIF");
+create_handler_2!(load_zerorotrifnot,           0x6f93, "ZEROROTIFNOT");
+create_handler_2!(load_zeroswapif2,             0x6f94, "ZEROSWAPIF2");
+create_handler_2!(load_zeroswapifnot2,          0x6f95, "ZEROSWAPIFNOT2");
+create_handler_2!(load_zerorotrif2,             0x6f96, "ZEROROTRIF2");
+create_handler_2!(load_zerorotrifnot2,          0x6f97, "ZEROROTRIFNOT2");
 create_handler_2!(load_nullswapif,              0x6fa0, "NULLSWAPIF");
 create_handler_2!(load_nullswapifnot,           0x6fa1, "NULLSWAPIFNOT");
 create_handler_2!(load_nullrotrif,              0x6fa2, "NULLROTRIF");
@@ -1110,7 +1137,7 @@ create_handler_2!(load_ifretalt,     0xe308, "IFRETALT");
 create_handler_2!(load_ifnotretalt,  0xe309, "IFNOTRETALT");
 create_handler_2r!(load_ifrefelse,      0xe30d, "IFREFELSE");
 create_handler_2r!(load_ifelseref,      0xe30e, "IFELSEREF");
-create_handler_2r!(load_ifrefelseref,   0xe30f, "IFREFELSEREF");
+create_handler_3r!(load_ifrefelseref,   0xe30f, "IFREFELSEREF");
 create_handler_2!(load_repeat_break,    0xe314, "REPEATBRK");
 create_handler_2!(load_repeatend_break, 0xe315, "REPEATENDBRK");
 create_handler_2!(load_until_break,     0xe316, "UNTILBRK");
@@ -1657,6 +1684,7 @@ pub fn print_code(code: &Code, indent: &str) -> String {
         }
         for (index, param) in insn.params().iter().enumerate() {
             let last = len == (index + 1);
+            let mut curr_is_code = false;
             match param {
                 InstructionParameter::BigInteger(i) => {
                     disasm += format!("{}", i).as_str();
@@ -1698,15 +1726,16 @@ pub fn print_code(code: &Code, indent: &str) -> String {
                     disasm += format!("s{}, s{}, s{}", ra, rb, rc).as_str();
                 }
                 InstructionParameter::Code(code) => {
-                    assert!(last, "code param isn't last");
+                    // one or two (as in the case of ifrefelseref) code params are possible
                     disasm += "{\n";
                     let inner_indent = String::from("  ") + indent;
                     disasm += &print_code(code, inner_indent.as_str());
                     disasm += indent;
                     disasm += "}";
+                    curr_is_code = true;
                 }
             }
-            if !last {
+            if !last && !curr_is_code {
                 disasm += ", ";
             }
         }
