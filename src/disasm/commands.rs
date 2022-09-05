@@ -171,16 +171,29 @@ pub(super) fn print_tree_of_cells(toc: &Cell) {
 fn print_code_dict(cell: &Cell, key_size: usize) {
     let dict = HashmapE::with_hashmap(key_size, Some(cell.clone()));
     if dict.len().is_err() {
-        println!("failed to recognize dictionary");
+        println!(";; internal functions dictionary wasn't recognized");
         return
     }
     for (key, slice) in dict.iter().map(|r| r.unwrap()) {
         let cell = key.into_cell().unwrap();
         let id = SliceData::from(cell).get_next_int(key_size).unwrap();
         println!();
-        println!(";; function id 0x{:x}", id);
-        print!("{}", disasm(&mut slice.clone()));
+        print_entrypoint(id as i32, None);
+        println!("{}", disasm(&mut slice.clone()));
     }
+}
+
+fn print_version(cell: &Cell) {
+    match String::from_utf8(cell.data().to_vec()) {
+        Ok(version) => println!(".version {}", version),
+        Err(e) => println!(";; failed to parse version bytes: {}", e)
+    }
+}
+
+fn print_entrypoint(id: i32, name: Option<&str>) {
+    let name = name.map(str::to_string).unwrap_or(format!("{}", id));
+    println!(".internal-alias :function_{}, {}", name, id);
+    println!(".internal :function_{}", name);
 }
 
 fn disasm_text_command(m: &ArgMatches) -> Status {
@@ -190,7 +203,9 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
             .branch(Shape::var("dict-c3")));
 
     let shape_current = Shape::literal("8aed5320e30320c0ffe30220c0fee302f20b")
-        .branch(Shape::var("dict-c3"))
+        .branch(Shape::literal("f4a420f4a1")
+            .branch(Shape::var("dict-c3"))
+            .branch(Shape::var("version")))
         .branch(Shape::var("internal"))
         .branch(Shape::var("external"))
         .branch(Shape::var("ticktock"));
@@ -224,14 +239,18 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
         print_code_dict(&assigned["dict-c3"], 32);
     } else if let Ok(assigned) = shape_current.captures(&code)
             .or_else(|_| shape_current_mycode.captures(&code)) {
+        print_version(&assigned["version"]);
         println!(";; solidity selector detected");
         println!(";; internal functions dictionary");
         print_code_dict(&assigned["dict-c3"], 32);
         println!(";; internal transaction entry point");
+        print_entrypoint(0, Some("internal"));
         println!("{}", disasm(&mut SliceData::from(&assigned["internal"])));
         println!(";; external transaction entry point");
+        print_entrypoint(-1, Some("external"));
         println!("{}", disasm(&mut SliceData::from(&assigned["external"])));
         println!(";; ticktock transaction entry point");
+        print_entrypoint(-2, Some("ticktock"));
         println!("{}", disasm(&mut SliceData::from(&assigned["ticktock"])));
     } else if let Ok(assigned) = shape_fun_c.captures(&code) {
         println!(";; fun-c selector detected");
