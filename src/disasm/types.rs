@@ -64,6 +64,7 @@ pub enum InstructionParameter {
     StackRegisterPair(isize, isize),
     StackRegisterTriple(isize, isize, isize),
     Code(Code),
+    Cell(Cell),
 }
 
 // #[derive(Clone, Debug)]

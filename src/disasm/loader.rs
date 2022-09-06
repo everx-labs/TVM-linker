@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 
-use ton_types::{Result, SliceData, fail};
+use ton_types::{Result, Cell, SliceData, fail};
 use std::cmp::Ordering;
 use std::ops::Not;
 use num_traits::Zero;
@@ -533,14 +533,16 @@ pub(super) fn load_pushnegpow2(slice: &mut SliceData) -> Result<Instruction> {
 pub(super) fn load_pushref(slice: &mut SliceData) -> Result<Instruction> {
     let opc = slice.get_next_int(8)?;
     check_eq!(opc, 0x88);
+    let cell = slice.reference(0)?;
     slice.shrink_references(1..);
-    Ok(Instruction::new("PUSHREF"))
+    Ok(Instruction::new("PUSHREF").with_param(InstructionParameter::Cell(cell)))
 }
 pub(super) fn load_pushrefslice(slice: &mut SliceData) -> Result<Instruction> {
     let opc = slice.get_next_int(8)?;
     check_eq!(opc, 0x89);
+    let cell = slice.reference(0)?;
     slice.shrink_references(1..);
-    Ok(Instruction::new("PUSHREFSLICE"))
+    Ok(Instruction::new("PUSHREFSLICE").with_param(InstructionParameter::Cell(cell)))
 }
 pub(super) fn load_pushrefcont(slice: &mut SliceData) -> Result<Instruction> {
     let opc = slice.get_next_int(8)?;
@@ -1539,9 +1541,9 @@ pub(super) fn load_dictpushconst(slice: &mut SliceData) -> Result<Instruction> {
     let opc = slice.get_next_int(14)?;
     check_eq!(opc << 2, 0xf4a4);
     let n = slice.get_next_int(10)? as usize;
-    let subslice = SliceData::from(slice.reference(0)?);
+    let cell = slice.reference(0)?;
     slice.shrink_references(1..);
-    Ok(Instruction::new("DICTPUSHCONST").with_param(InstructionParameter::Slice(subslice)).with_param(InstructionParameter::Length(n)))
+    Ok(Instruction::new("DICTPUSHCONST").with_param(InstructionParameter::Length(n)).with_param(InstructionParameter::Cell(cell)))
 }
 create_handler_2!(load_pfxdictgetq,    0xf4a8, "PFXDICTGETQ");
 create_handler_2!(load_pfxdictget,     0xf4a9, "PFXDICTGET");
@@ -1551,9 +1553,9 @@ pub(super) fn load_pfxdictswitch(slice: &mut SliceData) -> Result<Instruction> {
     let opc = slice.get_next_int(14)?;
     check_eq!(opc << 2, 0xf4ac);
     let n = slice.get_next_int(10)? as usize;
-    let subslice = SliceData::from(slice.reference(0)?);
+    let cell = slice.reference(0)?;
     slice.shrink_references(1..);
-    Ok(Instruction::new("PFXDICTSWITCH").with_param(InstructionParameter::Slice(subslice)).with_param(InstructionParameter::Length(n)))
+    Ok(Instruction::new("PFXDICTSWITCH").with_param(InstructionParameter::Length(n)).with_param(InstructionParameter::Cell(cell)))
 }
 create_handler_2!(load_subdictget,    0xf4b1, "SUBDICTGET");
 create_handler_2!(load_subdictiget,   0xf4b2, "SUBDICTIGET");
@@ -1670,11 +1672,54 @@ pub(super) fn load_dump_string(slice: &mut SliceData) -> Result<Instruction> {
     }
 }
 
+fn print_cell(cell: &Cell, indent: &str) -> String {
+    let mut text = String::new();
+    if cell.bit_length() > 0 {
+        text += &format!("{}.blob x{}\n", indent, cell.to_hex_string(true));
+    }
+    let inner_indent = String::from("  ") + indent;
+    let refs = cell.references_count();
+    for i in 0..refs {
+        text += &format!("{}.cell {{\n", indent);
+        text += &print_cell(&cell.reference(i).unwrap(), inner_indent.as_str());
+        text += &format!("{}}}", indent);
+        if i < refs - 1 {
+            text += "\n";
+        }
+    }
+    text
+}
+
+fn print_dictpushconst_params(insn: &Instruction, indent: &str) -> String {
+    let mut disasm = String::new();
+    if let Some(InstructionParameter::Length(l)) = insn.params().get(0) {
+        disasm += format!(" {}\n", l).as_str();
+    } else {
+        unreachable!()
+    }
+    if let Some(InstructionParameter::Cell(cell)) = insn.params().get(1) {
+        disasm += &format!("{}.cell {{\n", indent);
+        let inner_indent = String::from("  ") + indent;
+        disasm += &print_cell(cell, inner_indent.as_str());
+        disasm += &format!("\n{}}}\n", indent);
+    } else {
+        unreachable!()
+    }
+    disasm
+}
+
 pub fn print_code(code: &Code, indent: &str) -> String {
     let mut disasm = String::new();
     for insn in code {
         disasm += indent;
         disasm += insn.name();
+        match insn.name() { // TODO better improve assembler for these two insns
+            "DICTPUSHCONST" | "PFXDICTSWITCH" => {
+                disasm += &print_dictpushconst_params(insn, indent);
+                continue
+            }
+            _ => ()
+        }
         if insn.is_quiet() {
             disasm += "Q";
         }
@@ -1684,7 +1729,7 @@ pub fn print_code(code: &Code, indent: &str) -> String {
         }
         for (index, param) in insn.params().iter().enumerate() {
             let last = len == (index + 1);
-            let mut curr_is_code = false;
+            let mut curr_is_block = false;
             match param {
                 InstructionParameter::BigInteger(i) => {
                     disasm += format!("{}", i).as_str();
@@ -1726,16 +1771,23 @@ pub fn print_code(code: &Code, indent: &str) -> String {
                     disasm += format!("s{}, s{}, s{}", ra, rb, rc).as_str();
                 }
                 InstructionParameter::Code(code) => {
-                    // one or two (as in the case of ifrefelseref) code params are possible
                     disasm += "{\n";
                     let inner_indent = String::from("  ") + indent;
                     disasm += &print_code(code, inner_indent.as_str());
                     disasm += indent;
                     disasm += "}";
-                    curr_is_code = true;
+                    curr_is_block = true;
+                }
+                InstructionParameter::Cell(cell) => {
+                    disasm += "{\n";
+                    let inner_indent = String::from("  ") + indent;
+                    disasm += &print_cell(cell, inner_indent.as_str());
+                    disasm += indent;
+                    disasm += "}";
+                    curr_is_block = true;
                 }
             }
-            if !last && !curr_is_code {
+            if !last && !curr_is_block {
                 disasm += ", ";
             }
         }

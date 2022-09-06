@@ -42,7 +42,7 @@ fn round_trip_test(raw0: &str, check_bin: bool) {
 
 #[test]
 fn round_trip() {
-    for n in 0..130 {
+    for n in 0..131 {
         let filename = format!("tests/disasm/{:03}.b64", n);
         let raw = std::fs::read_to_string(filename.clone()).unwrap();
         round_trip_test(&raw, false);
