@@ -197,6 +197,19 @@ fn print_entrypoint(id: i32, name: Option<&str>) {
 }
 
 fn disasm_text_command(m: &ArgMatches) -> Status {
+    let filename = m.value_of("TVC");
+    let tvc = filename.map(std::fs::read)
+        .transpose()
+        .map_err(|e| format_err!(" failed to read input file: {}", e))?
+        .unwrap();
+    let mut csor = Cursor::new(tvc);
+    let mut roots = deserialize_cells_tree(&mut csor).map_err(|e| format_err!("{}", e))?;
+
+    if m.is_present("RAW") {
+        println!("{}", disasm(&mut SliceData::from(roots.get(0).unwrap())));
+        return Ok(())
+    }
+
     let shape_deprecated = Shape::literal("ff00f4a42022c00192f4a0e18aed535830f4a1")
         .branch(Shape::var("dict-public"))
         .branch(Shape::literal("f4a420f4a1")
@@ -222,15 +235,7 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
         .branch(Shape::var("dict-c3")
             .branch(Shape::any())); // just to mark any() as used, can be omitted
 
-    let filename = m.value_of("TVC");
-    let tvc = filename.map(std::fs::read)
-        .transpose()
-        .map_err(|e| format_err!(" failed to read tvc file: {}", e))?
-        .unwrap();
-    let mut csor = Cursor::new(tvc);
-    let mut roots = deserialize_cells_tree(&mut csor).map_err(|e| format_err!("{}", e))?;
     let code = roots.remove(0).reference(0).unwrap();
-
     if let Ok(assigned) = shape_deprecated.captures(&code) {
         println!(";; solidity deprecated selector detected");
         println!(";; public methods dictionary");

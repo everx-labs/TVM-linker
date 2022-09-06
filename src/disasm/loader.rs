@@ -1672,20 +1672,23 @@ pub(super) fn load_dump_string(slice: &mut SliceData) -> Result<Instruction> {
     }
 }
 
-fn print_cell(cell: &Cell, indent: &str) -> String {
+fn print_cell(cell: &Cell, indent: &str, dot_cell: bool) -> String {
     let mut text = String::new();
-    if cell.bit_length() > 0 {
-        text += &format!("{}.blob x{}\n", indent, cell.to_hex_string(true));
+    if dot_cell {
+        text += &format!("{}.cell ", indent);
     }
+    text += "{\n";
     let inner_indent = String::from("  ") + indent;
+    if cell.bit_length() > 0 {
+        text += &format!("{}.blob x{}\n", inner_indent, cell.to_hex_string(true));
+    }
     let refs = cell.references_count();
     for i in 0..refs {
-        text += &format!("{}.cell {{\n", indent);
-        text += &print_cell(&cell.reference(i).unwrap(), inner_indent.as_str());
-        text += &format!("{}}}", indent);
-        if i < refs - 1 {
-            text += "\n";
-        }
+        text += &print_cell(&cell.reference(i).unwrap(), inner_indent.as_str(), true);
+    }
+    text += &format!("{}}}", indent);
+    if dot_cell {
+        text += "\n";
     }
     text
 }
@@ -1698,10 +1701,7 @@ fn print_dictpushconst_params(insn: &Instruction, indent: &str) -> String {
         unreachable!()
     }
     if let Some(InstructionParameter::Cell(cell)) = insn.params().get(1) {
-        disasm += &format!("{}.cell {{\n", indent);
-        let inner_indent = String::from("  ") + indent;
-        disasm += &print_cell(cell, inner_indent.as_str());
-        disasm += &format!("\n{}}}\n", indent);
+        disasm += &print_cell(cell, indent, true);
     } else {
         unreachable!()
     }
@@ -1779,11 +1779,7 @@ pub fn print_code(code: &Code, indent: &str) -> String {
                     curr_is_block = true;
                 }
                 InstructionParameter::Cell(cell) => {
-                    disasm += "{\n";
-                    let inner_indent = String::from("  ") + indent;
-                    disasm += &print_cell(cell, inner_indent.as_str());
-                    disasm += indent;
-                    disasm += "}";
+                    disasm += &print_cell(cell, indent, false);
                     curr_is_block = true;
                 }
             }
