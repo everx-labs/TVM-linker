@@ -1118,8 +1118,8 @@ dependencies = [
 
 [[package]]
 name = "ton_labs_assembler"
-version = "1.2.47"
-source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.47#4f0e7e2bf848fc74604f895fca3e7b9400b9494a"
+version = "1.2.48"
+source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.48#31eb9bf36eed726efb8683d025cb9abf645d4183"
 dependencies = [
  "failure",
  "hex 0.4.3",
