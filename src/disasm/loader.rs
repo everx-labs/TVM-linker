@@ -77,7 +77,7 @@ macro_rules! create_handler_2r {
                 fail!("invalid opcode");
             }
             let mut subslice = SliceData::from(slice.reference(0)?);
-            let code = load(&mut subslice)?;
+            let code = load(&mut subslice, false)?;
             slice.shrink_references(1..);
             Ok(Instruction::new($mnemonic).with_param(InstructionParameter::Code(code)))
         }
@@ -93,8 +93,8 @@ macro_rules! create_handler_3r {
             }
             let mut subslice1 = SliceData::from(slice.reference(0)?);
             let mut subslice2 = SliceData::from(slice.reference(1)?);
-            let code1 = load(&mut subslice1)?;
-            let code2 = load(&mut subslice2)?;
+            let code1 = load(&mut subslice1, false)?;
+            let code2 = load(&mut subslice2, false)?;
             slice.shrink_references(2..);
             Ok(Instruction::new($mnemonic)
                 .with_param(InstructionParameter::Code(code1))
@@ -119,24 +119,26 @@ macro_rules! check_eq {
     };
 }
 
-pub(super) fn load(slice: &mut SliceData) -> Result<Code> {
+pub(super) fn load(slice: &mut SliceData, inline: bool) -> Result<Code> {
     let handlers = Handlers::new_code_page_0();
     let mut code = Code::new();
-    loop {
-        if slice.is_empty() {
-            match slice.remaining_references().cmp(&1) {
-                Ordering::Less => break,
-                Ordering::Equal => {
-                    *slice = SliceData::from(slice.reference(0).unwrap())
-                }
-                Ordering::Greater => fail!("two or more remaining references")
+    while slice.remaining_bits() > 0 {
+        let handler = handlers.get_handler(&mut slice.clone())?;
+        let insn = handler(slice)?;
+        code.push(insn);
+    }
+    match slice.remaining_references().cmp(&1) {
+        Ordering::Less => (),
+        Ordering::Equal => {
+            let mut next_code = load(&mut SliceData::from(slice.reference(0).unwrap()), false)?;
+            if inline {
+                code.append(&mut next_code)
+            } else {
+                let next = Instruction::new("IMPLICIT-JMP").with_param(InstructionParameter::Code(next_code));
+                code.push(next)
             }
         }
-        while slice.remaining_bits() > 0 {
-            let handler = handlers.get_handler(&mut slice.clone())?;
-            let insn = handler(slice)?;
-            code.push(insn);
-        }
+        Ordering::Greater => fail!("two or more remaining references")
     }
     Ok(code)
 }
@@ -548,7 +550,7 @@ pub(super) fn load_pushrefcont(slice: &mut SliceData) -> Result<Instruction> {
     let opc = slice.get_next_int(8)?;
     check_eq!(opc, 0x8a);
     let mut subslice = SliceData::from(slice.reference(0)?);
-    let code = load(&mut subslice)?;
+    let code = load(&mut subslice, false)?;
     slice.shrink_references(1..);
     Ok(Instruction::new("PUSHREFCONT").with_param(InstructionParameter::Code(code)))
 }
@@ -590,7 +592,7 @@ pub(super) fn load_pushcont_long(slice: &mut SliceData) -> Result<Instruction> {
     let mut subslice = slice.clone();
     subslice.shrink_data(..bits);
     subslice.shrink_references(..r);
-    let code = load(&mut subslice)?;
+    let code = load(&mut subslice, true)?;
 
     slice.shrink_data(bits..);
     slice.shrink_references(r..);
@@ -602,7 +604,7 @@ pub(super) fn load_pushcont_short(slice: &mut SliceData) -> Result<Instruction> 
     check_eq!(opc, 0x9);
     let x = slice.get_next_int(4).unwrap() as usize;
     let mut body = slice.get_next_slice(x * 8)?;
-    let code = load(&mut body)?;
+    let code = load(&mut body, true)?;
     Ok(Instruction::new("PUSHCONT").with_param(InstructionParameter::Code(code)))
 }
 create_handler_1t!(load_add,    0xa0, "ADD");
@@ -1165,7 +1167,7 @@ pub(super) fn load_ifbitjmpref(slice: &mut SliceData) -> Result<Instruction> {
     check_eq!(opc << 1, 0xe3c);
     let n = slice.get_next_int(5)? as isize;
     let mut subslice = SliceData::from(slice.reference(0)?);
-    let code = load(&mut subslice)?;
+    let code = load(&mut subslice, false)?;
     slice.shrink_references(1..);
     Ok(Instruction::new("IFBITJMPREF").with_param(InstructionParameter::Integer(n)).with_param(InstructionParameter::Code(code)))
 }
@@ -1174,7 +1176,7 @@ pub(super) fn load_ifnbitjmpref(slice: &mut SliceData) -> Result<Instruction> {
     check_eq!(opc << 1, 0xe3e);
     let n = slice.get_next_int(5)? as isize;
     let mut subslice = SliceData::from(slice.reference(0)?);
-    let code = load(&mut subslice)?;
+    let code = load(&mut subslice, false)?;
     slice.shrink_references(1..);
     Ok(Instruction::new("IFNBITJMPREF").with_param(InstructionParameter::Integer(n)).with_param(InstructionParameter::Code(code)))
 }
@@ -1693,8 +1695,9 @@ fn print_cell(cell: &Cell, indent: &str, dot_cell: bool) -> String {
     text
 }
 
-fn print_dictpushconst_params(insn: &Instruction, indent: &str) -> String {
+fn print_dictpushconst(insn: &Instruction, indent: &str) -> String {
     let mut disasm = String::new();
+    disasm += insn.name();
     if let Some(InstructionParameter::Length(l)) = insn.params().get(0) {
         disasm += format!(" {}\n", l).as_str();
     } else {
@@ -1712,14 +1715,27 @@ pub fn print_code(code: &Code, indent: &str) -> String {
     let mut disasm = String::new();
     for insn in code {
         disasm += indent;
-        disasm += insn.name();
-        match insn.name() { // TODO better improve assembler for these two insns
+        match insn.name() {
             "DICTPUSHCONST" | "PFXDICTSWITCH" => {
-                disasm += &print_dictpushconst_params(insn, indent);
+                // TODO better improve assembler for these two insns
+                disasm += &print_dictpushconst(insn, indent);
+                continue
+            }
+            "IMPLICIT-JMP" => {
+                if let Some(InstructionParameter::Code(code)) = insn.params().get(0) {
+                    disasm += &format!(".cell {{ ;; implicit jump\n");
+                    let inner_indent = String::from("  ") + indent;
+                    disasm += &print_code(code, inner_indent.as_str());
+                    disasm += indent;
+                    disasm += "}\n";
+                } else {
+                    unreachable!()
+                }
                 continue
             }
             _ => ()
         }
+        disasm += insn.name();
         if insn.is_quiet() {
             disasm += "Q";
         }

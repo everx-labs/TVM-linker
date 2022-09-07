@@ -269,5 +269,5 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
 }
 
 pub(super) fn disasm(slice: &mut SliceData) -> String {
-    print_code(&load(slice).unwrap(), "")
+    print_code(&load(slice, false).unwrap(), "")
 }
