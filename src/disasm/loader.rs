@@ -119,11 +119,14 @@ macro_rules! check_eq {
     };
 }
 
+lazy_static::lazy_static! {
+    static ref HANDLERS: Handlers = Handlers::new_code_page_0();
+}
+
 pub(super) fn load(slice: &mut SliceData, inline: bool) -> Result<Code> {
-    let handlers = Handlers::new_code_page_0();
     let mut code = Code::new();
     while slice.remaining_bits() > 0 {
-        let handler = handlers.get_handler(&mut slice.clone())?;
+        let handler = HANDLERS.get_handler(&mut slice.clone())?;
         let insn = handler(slice)?;
         code.push(insn);
     }

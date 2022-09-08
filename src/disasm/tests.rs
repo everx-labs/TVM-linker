@@ -43,13 +43,35 @@ fn round_trip_test(raw0: &str, check_bin: bool) {
 #[test]
 fn round_trip() {
     for n in 0..130 {
+        let skip_check_bin = [105, 109, 113, 116, 117, 118, 119, 129].contains(&n);
+        // In general, a difference in binaries is completely legit since there are many ways
+        // to encode the same code: even a linear sequence of insns can be laid out into
+        // a sequence of cells in many different ways, thanks to implicit jumps.
+        // TODO However, sometimes the difference may be an indicator of some CQ issue
+        // in the assembler.
         let filename = format!("tests/disasm/{:03}.b64", n);
-        let raw = std::fs::read_to_string(filename.clone()).unwrap();
-        round_trip_test(&raw, false);
+        let raw = std::fs::read_to_string(filename).unwrap();
+        round_trip_test(&raw, !skip_check_bin);
     }
     for n in 200..331 {
         let filename = format!("tests/disasm/{:03}.b64", n);
-        let raw = std::fs::read_to_string(filename.clone()).unwrap();
+        let raw = std::fs::read_to_string(filename).unwrap();
+        round_trip_test(&raw, true);
+    }
+}
+
+#[test]
+fn round_trip_tonix() {
+    let paths = std::fs::read_dir("tests/disasm/tonix-ea2f96c/").unwrap();
+    let mut tonix_base64_files = vec!();
+    for entry in paths {
+        let path = entry.unwrap().path();
+        tonix_base64_files.push(path.to_str().unwrap().to_owned());
+    }
+    tonix_base64_files.sort();
+    for filename in tonix_base64_files {
+        println!("{}", filename);
+        let raw = std::fs::read_to_string(filename).unwrap();
         round_trip_test(&raw, true);
     }
 }

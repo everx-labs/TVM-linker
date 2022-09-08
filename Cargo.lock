@@ -1119,7 +1119,6 @@ dependencies = [
 [[package]]
 name = "ton_labs_assembler"
 version = "1.2.48"
-source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.48#31eb9bf36eed726efb8683d025cb9abf645d4183"
 dependencies = [
  "failure",
  "hex 0.4.3",
@@ -1175,7 +1174,7 @@ dependencies = [
 
 [[package]]
 name = "tvm_linker"
-version = "0.16.5"
+version = "0.16.6"
 dependencies = [
  "assert_cmd",
  "base64 0.10.1",
