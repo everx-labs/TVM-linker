@@ -16,7 +16,7 @@ use ton_types::{Cell, Result, /*Bitmask,*/ SliceData, fail};
 
 pub type Code = Vec<Instruction>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Instruction {
     name: &'static str,
     params: Vec<InstructionParameter>,
@@ -48,7 +48,7 @@ impl Instruction {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum InstructionParameter {
     BigInteger(num::BigInt),
     ControlRegister(usize),
@@ -64,7 +64,7 @@ pub enum InstructionParameter {
     StackRegisterPair(isize, isize),
     StackRegisterTriple(isize, isize, isize),
     Code(Code),
-    Cell(Cell),
+    Cell(Cell, bool),
 }
 
 // #[derive(Clone, Debug)]

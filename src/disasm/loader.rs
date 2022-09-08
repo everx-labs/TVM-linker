@@ -11,8 +11,9 @@
  * limitations under the License.
  */
 
-use ton_types::{Result, Cell, SliceData, fail};
+use ton_types::{Result, Cell, SliceData, fail, UInt256};
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::ops::Not;
 use num_traits::Zero;
 
@@ -76,8 +77,8 @@ macro_rules! create_handler_2r {
             if opc != $opc {
                 fail!("invalid opcode");
             }
-            let mut subslice = SliceData::from(slice.reference(0)?);
-            let code = self.load(&mut subslice, false)?;
+            let cell = slice.reference(0)?;
+            let code = self.load_cell(&cell)?;
             slice.shrink_references(1..);
             Ok(Instruction::new($mnemonic).with_param(InstructionParameter::Code(code)))
         }
@@ -91,10 +92,10 @@ macro_rules! create_handler_3r {
             if opc != $opc {
                 fail!("invalid opcode");
             }
-            let mut subslice1 = SliceData::from(slice.reference(0)?);
-            let mut subslice2 = SliceData::from(slice.reference(1)?);
-            let code1 = self.load(&mut subslice1, false)?;
-            let code2 = self.load(&mut subslice2, false)?;
+            let cell1 = slice.reference(0)?;
+            let cell2 = slice.reference(1)?;
+            let code1 = self.load_cell(&cell1)?;
+            let code2 = self.load_cell(&cell2)?;
             slice.shrink_references(2..);
             Ok(Instruction::new($mnemonic)
                 .with_param(InstructionParameter::Code(code1))
@@ -121,12 +122,16 @@ macro_rules! check_eq {
 
 pub struct Loader {
     handlers: Handlers,
+    collapse: bool,
+    history: HashMap<UInt256, Code>,
 }
 
 impl Loader {
-    pub fn new() -> Self {
+    pub fn new(collapse: bool) -> Self {
         Self {
             handlers: Handlers::new_code_page_0(),
+            collapse,
+            history: HashMap::new(),
         }
     }
     pub fn load(&mut self, slice: &mut SliceData, inline: bool) -> Result<Code> {
@@ -139,7 +144,7 @@ impl Loader {
         match slice.remaining_references().cmp(&1) {
             Ordering::Less => (),
             Ordering::Equal => {
-                let mut next_code = self.load(&mut SliceData::from(slice.reference(0).unwrap()), false)?;
+                let mut next_code = self.load_cell(&slice.reference(0).unwrap())?;
                 if inline {
                     code.append(&mut next_code)
                 } else {
@@ -150,6 +155,21 @@ impl Loader {
             Ordering::Greater => fail!("two or more remaining references")
         }
         Ok(code)
+    }
+    fn load_cell(&mut self, cell: &Cell) -> Result<Code> {
+        if let Some(code) = self.history.get(&cell.repr_hash()) {
+            if self.collapse {
+                Ok(vec!(
+                    Instruction::new(";;").with_param(InstructionParameter::Cell(cell.clone(), true))
+                ))
+            } else {
+                Ok(code.clone())
+            }
+        } else {
+            let code = self.load(&mut SliceData::from(cell), false)?;
+            self.history.insert(cell.repr_hash(), code.clone());
+            Ok(code)
+        }
     }
     pub(super) fn unknown(&mut self, slice: &mut SliceData) -> Result<Instruction> {
         fail!("unknown opcode {}", slice.to_hex_string())
@@ -546,20 +566,20 @@ impl Loader {
         check_eq!(opc, 0x88);
         let cell = slice.reference(0)?;
         slice.shrink_references(1..);
-        Ok(Instruction::new("PUSHREF").with_param(InstructionParameter::Cell(cell)))
+        Ok(Instruction::new("PUSHREF").with_param(InstructionParameter::Cell(cell, false)))
     }
     pub(super) fn pushrefslice(&mut self, slice: &mut SliceData) -> Result<Instruction> {
         let opc = slice.get_next_int(8)?;
         check_eq!(opc, 0x89);
         let cell = slice.reference(0)?;
         slice.shrink_references(1..);
-        Ok(Instruction::new("PUSHREFSLICE").with_param(InstructionParameter::Cell(cell)))
+        Ok(Instruction::new("PUSHREFSLICE").with_param(InstructionParameter::Cell(cell, false)))
     }
     pub(super) fn pushrefcont(&mut self, slice: &mut SliceData) -> Result<Instruction> {
         let opc = slice.get_next_int(8)?;
         check_eq!(opc, 0x8a);
-        let mut subslice = SliceData::from(slice.reference(0)?);
-        let code = self.load(&mut subslice, false)?;
+        let cell = slice.reference(0)?;
+        let code = self.load_cell(&cell)?;
         slice.shrink_references(1..);
         Ok(Instruction::new("PUSHREFCONT").with_param(InstructionParameter::Code(code)))
     }
@@ -1175,8 +1195,8 @@ impl Loader {
         let opc = slice.get_next_int(15)?;
         check_eq!(opc << 1, 0xe3c);
         let n = slice.get_next_int(5)? as isize;
-        let mut subslice = SliceData::from(slice.reference(0)?);
-        let code = self.load(&mut subslice, false)?;
+        let cell = slice.reference(0)?;
+        let code = self.load_cell(&cell)?;
         slice.shrink_references(1..);
         Ok(Instruction::new("IFBITJMPREF").with_param(InstructionParameter::Integer(n)).with_param(InstructionParameter::Code(code)))
     }
@@ -1184,8 +1204,8 @@ impl Loader {
         let opc = slice.get_next_int(15)?;
         check_eq!(opc << 1, 0xe3e);
         let n = slice.get_next_int(5)? as isize;
-        let mut subslice = SliceData::from(slice.reference(0)?);
-        let code = self.load(&mut subslice, false)?;
+        let cell = slice.reference(0)?;
+        let code = self.load_cell(&cell)?;
         slice.shrink_references(1..);
         Ok(Instruction::new("IFNBITJMPREF").with_param(InstructionParameter::Integer(n)).with_param(InstructionParameter::Code(code)))
     }
@@ -1554,7 +1574,7 @@ impl Loader {
         let n = slice.get_next_int(10)? as usize;
         let cell = slice.reference(0)?;
         slice.shrink_references(1..);
-        Ok(Instruction::new("DICTPUSHCONST").with_param(InstructionParameter::Length(n)).with_param(InstructionParameter::Cell(cell)))
+        Ok(Instruction::new("DICTPUSHCONST").with_param(InstructionParameter::Length(n)).with_param(InstructionParameter::Cell(cell, false)))
     }
     create_handler_2!(pfxdictgetq,    0xf4a8, "PFXDICTGETQ");
     create_handler_2!(pfxdictget,     0xf4a9, "PFXDICTGET");
@@ -1566,7 +1586,7 @@ impl Loader {
         let n = slice.get_next_int(10)? as usize;
         let cell = slice.reference(0)?;
         slice.shrink_references(1..);
-        Ok(Instruction::new("PFXDICTSWITCH").with_param(InstructionParameter::Length(n)).with_param(InstructionParameter::Cell(cell)))
+        Ok(Instruction::new("PFXDICTSWITCH").with_param(InstructionParameter::Length(n)).with_param(InstructionParameter::Cell(cell, false)))
     }
     create_handler_2!(subdictget,    0xf4b1, "SUBDICTGET");
     create_handler_2!(subdictiget,   0xf4b2, "SUBDICTIGET");
@@ -1689,7 +1709,7 @@ fn print_cell(cell: &Cell, indent: &str, dot_cell: bool) -> String {
     if dot_cell {
         text += &format!("{}.cell ", indent);
     }
-    text += "{\n";
+    text += &format!("{{ ;; {}\n", cell.repr_hash().to_hex_string());
     let inner_indent = String::from("  ") + indent;
     if cell.bit_length() > 0 {
         text += &format!("{}.blob x{}\n", inner_indent, cell.to_hex_string(true));
@@ -1713,7 +1733,8 @@ fn print_dictpushconst(insn: &Instruction, indent: &str) -> String {
     } else {
         unreachable!()
     }
-    if let Some(InstructionParameter::Cell(cell)) = insn.params().get(1) {
+    if let Some(InstructionParameter::Cell(cell, collapsed)) = insn.params().get(1) {
+        assert!(collapsed == &false);
         disasm += &print_cell(cell, indent, true);
     } else {
         unreachable!()
@@ -1804,8 +1825,13 @@ pub fn print_code(code: &Code, indent: &str) -> String {
                     disasm += "}";
                     curr_is_block = true;
                 }
-                InstructionParameter::Cell(cell) => {
-                    disasm += &print_cell(cell, indent, false);
+                InstructionParameter::Cell(cell, collapse) => {
+                    if *collapse {
+                        assert!(insn.name() == ";;");
+                        disasm += &format!("same as {}", cell.repr_hash().to_hex_string());
+                    } else {
+                        disasm += &print_cell(cell, indent, false);
+                    }
                     curr_is_block = true;
                 }
             }

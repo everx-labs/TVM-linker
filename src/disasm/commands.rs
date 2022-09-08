@@ -223,7 +223,7 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
     let mut roots = deserialize_cells_tree(&mut csor).map_err(|e| format_err!("{}", e))?;
 
     if m.is_present("RAW") {
-        println!("{}", disasm(&mut SliceData::from(roots.get(0).unwrap())));
+        println!("{}", disasm_collapsed(&mut SliceData::from(roots.get(0).unwrap())));
         return Ok(())
     }
 
@@ -286,6 +286,11 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
 }
 
 pub(super) fn disasm(slice: &mut SliceData) -> String {
-    let mut loader = Loader::new();
+    let mut loader = Loader::new(false);
+    print_code(&loader.load(slice, false).unwrap(), "")
+}
+
+pub(super) fn disasm_collapsed(slice: &mut SliceData) -> String {
+    let mut loader = Loader::new(true);
     print_code(&loader.load(slice, false).unwrap(), "")
 }
