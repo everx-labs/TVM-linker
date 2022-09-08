@@ -21,7 +21,7 @@ use ton_types::{Cell, HashmapE, HashmapType, SliceData, UInt256, Status};
 use std::io::Cursor;
 
 use super::types::Shape;
-use super::loader::{load, print_code};
+use super::loader::{Loader, print_code};
 
 pub fn disasm_command(m: &ArgMatches) -> Status {
     if let Some(m) = m.subcommand_matches("dump") {
@@ -286,5 +286,6 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
 }
 
 pub(super) fn disasm(slice: &mut SliceData) -> String {
-    print_code(&load(slice, false).unwrap(), "")
+    let mut loader = Loader::new();
+    print_code(&loader.load(slice, false).unwrap(), "")
 }
