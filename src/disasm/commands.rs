@@ -116,6 +116,20 @@ fn graphviz(cell: &Cell) {
     println!("}}");
 }
 
+fn count_unique_cells(cell: &Cell) -> usize {
+    let mut queue = vec!(cell.clone());
+    let mut set = HashSet::new();
+    while let Some(cell) = queue.pop() {
+        if set.insert(cell.repr_hash()) {
+            let count = cell.references_count();
+            for i in 0..count {
+                queue.push(cell.reference(i).unwrap());
+            }
+        }
+    }
+    set.len()
+}
+
 fn disasm_dump_command(m: &ArgMatches) -> Status {
     let filename = m.value_of("TVC");
     let tvc = filename.map(std::fs::read)
@@ -130,7 +144,10 @@ fn disasm_dump_command(m: &ArgMatches) -> Status {
         println!("{} {} in total", roots.len(), if roots.len() < 2 { "root" } else { "roots" });
         for i in 0..roots.len() {
             let root = roots.get(i).unwrap();
-            println!("root {}:", i);
+            println!("root {} ({} cells, {} unique):", i,
+                root.count_cells(usize::MAX).unwrap(),
+                count_unique_cells(root)
+            );
             print_tree_of_cells(root);
         }
     }
