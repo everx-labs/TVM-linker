@@ -238,8 +238,6 @@ pub struct ParseEngine {
     globl_name_to_id: HashMap<String, u32>,
     /// name -> object
     globl_name_to_object: HashMap<String, GloblFuncOrData>,
-    /// ID for next private global function
-    next_private_globl_funcid: u32,
 
     /// name -> code
     macro_name_to_lines: HashMap<String, Lines>,
@@ -249,6 +247,8 @@ pub struct ParseEngine {
     entry_point: Lines,
     /// Selector variant
     func_upgrade: bool,
+    ///
+    save_all_privat_functions: bool,
     /// Contract version
     version: Option<String>,
 
@@ -326,23 +326,23 @@ impl ParseEngine {
 
     pub fn new_generic(inputs: Vec<ParseEngineInput>, abi_json: Option<String>) -> Result<Self> {
         let mut engine = ParseEngine {
-            globl_name_to_id:      HashMap::new(),
-            internal_name_to_id:    HashMap::new(),
-            internal_alias_name_to_id_:    HashMap::new(),
-            globl_name_to_object:    HashMap::new(),
-            next_private_globl_funcid: 0,
-            internal_id_to_code:  HashMap::new(),
-            macro_name_to_lines:     HashMap::new(),
+            globl_name_to_id: HashMap::new(),
+            internal_name_to_id: HashMap::new(),
+            internal_alias_name_to_id_: HashMap::new(),
+            globl_name_to_object: HashMap::new(),
+            internal_id_to_code: HashMap::new(),
+            macro_name_to_lines: HashMap::new(),
             is_computed_macros: HashMap::new(),
             entry_point: vec![],
-            globl_base:      0,
-            globl_ptr:       0,
+            globl_base: 0,
+            globl_ptr: 0,
             persistent_base: 0,
-            persistent_ptr:  0,
-            abi:             None,
-            version:         None,
-            func_upgrade:    false,
-            computed:        HashMap::new(),
+            persistent_ptr: 0,
+            abi: None,
+            version: None,
+            func_upgrade: false,
+            computed: HashMap::new(),
+            save_all_privat_functions: false
         };
         engine.parse(inputs, abi_json)?;
         Ok(engine)
@@ -362,7 +362,9 @@ impl ParseEngine {
         self.resolve_nested_macros()?;
         self.replace_all_labels()?;
 
-        self.drop_unused_objects();
+        if !self.save_all_privat_functions {
+            self.drop_unused_objects();
+        }
         Ok(())
     }
 
@@ -529,6 +531,8 @@ impl ParseEngine {
                 if let Some(m) = cap.get(1) {
                     if m.as_str() == "selector-func-solidity" {
                         self.func_upgrade = true
+                    } else if m.as_str() == "save-all-private-functions" {
+                        self.save_all_privat_functions = true
                     }
                 }
             } else if start_with(&l, ".global-base") {
@@ -750,8 +754,8 @@ impl ParseEngine {
         if is_public {
             gen_abi_id(self.abi.clone(), func)
         } else {
-            self.next_private_globl_funcid += 1;
-            self.next_private_globl_funcid
+            let res = gen_abi_id(None, func);
+            res
         }
     }
 
@@ -1306,7 +1310,8 @@ mod tests {
         let publics = parser.publics();
         let body = publics.get(&0x0D6E4079).unwrap();
         let globals = parser.globals(false);
-        let internal = globals.get(&2).unwrap();
+        let fun_id = gen_abi_id(None, "getCredit_internal");
+        let internal = globals.get(&fun_id).unwrap();
 
         assert_eq!(
             *body,
@@ -1318,7 +1323,7 @@ mod tests {
                  Line::new("ADD\n",        "test_macros_02.code", 13),
                  Line::new("\n",           "test_macros_02.code", 14),
                  Line::new("PUSHINT 3\n",  "test_macros_02.code", 7),
-                 Line::new("CALL 2\n",     "test_macros_02.code", 8),
+                 Line::new(format!("CALL {}\n", fun_id).as_str(),      "test_macros_02.code", 8),
                  Line::new("\n",           "test_macros_02.code", 9)]
         );
         assert_eq!(
