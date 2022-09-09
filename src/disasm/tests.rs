@@ -14,6 +14,8 @@
 use ton_types::SliceData;
 use super::commands::{disasm, print_tree_of_cells};
 
+use rayon::prelude::*;
+
 fn round_trip_test(raw0: &str, check_bin: bool) {
     let bin0 = base64::decode(raw0).unwrap();
     let toc0 = ton_types::deserialize_tree_of_cells(&mut std::io::Cursor::new(bin0)).unwrap();
@@ -69,9 +71,8 @@ fn round_trip_tonix() {
         tonix_base64_files.push(path.to_str().unwrap().to_owned());
     }
     tonix_base64_files.sort();
-    for filename in tonix_base64_files {
-        println!("{}", filename);
+    tonix_base64_files.par_iter().for_each(|filename| {
         let raw = std::fs::read_to_string(filename).unwrap();
         round_trip_test(&raw, true);
-    }
+    })
 }
