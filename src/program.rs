@@ -21,14 +21,14 @@ use std::io::Read;
 use std::io::Write;
 use std::collections::HashMap;
 use std::time::SystemTime;
-use methdict::*;
+use crate::methdict::*;
 use ton_block::*;
 use ton_labs_assembler::{Line, Lines, compile_code_debuggable, DbgInfo};
 use ton_types::cells_serialization::{BagOfCells, deserialize_cells_tree};
 use ton_types::{Cell, SliceData, BuilderData, IBitstring, Result};
 use ton_types::dictionary::{HashmapE, HashmapType};
-use parser::{ptr_to_builder, ParseEngine, ParseEngineResults};
-use printer::tree_of_cells_into_base64;
+use crate::parser::{ptr_to_builder, ParseEngine, ParseEngineResults};
+use crate::printer::tree_of_cells_into_base64;
 
 
 pub struct Program {
@@ -378,14 +378,14 @@ pub fn get_now() -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use abi;
-    use std::{fs::File, str::FromStr};
-    use std::path::Path;
+    use crate::abi;
     use crate::testcall::{load_config, load_debug_info, call_contract, MsgInfo, TestCallParams};
     use crate::{printer::get_version_mycode_aware, program::load_stateinit};
-    use testcall::TraceLevel;
-
+    use crate::testcall::TraceLevel;
     use super::*;
+
+    use std::{fs::File, str::FromStr};
+    use std::path::Path;
 
     fn compile_to_file(prog: &mut Program, wc: i8) -> Result<String> {
         prog.compile_to_file_ex(wc, None, None)
