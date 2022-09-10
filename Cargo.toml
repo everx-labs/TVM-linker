@@ -10,6 +10,10 @@ readme = 'README.md'
 repository = 'https://github.com/tonlabs/TVM-linker'
 version = '0.16.6'
 
+[[bin]]
+name = 'tvm_linker'
+path = 'src/main.rs'
+
 [dependencies]
 base64 = '0.10.0'
 clap = '2.32'
@@ -42,6 +46,3 @@ predicates = '1'
 name = 'ton_utils'
 path = 'src/lib.rs'
 
-[[bin]]
-name = "tvm_linker"
-path = "src/main.rs"
