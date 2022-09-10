@@ -2,6 +2,7 @@
 authors = [ 'TON DEV SOLUTIONS LTD <support@tonlabs.io>' ]
 description = 'TVM Linker'
 documentation = 'https://docs.ton.dev'
+edition = '2021'
 homepage = 'https://ton.dev'
 keywords = [ 'TON', 'linker', 'TVM', 'tonlabs' ]
 license-file = 'LICENSE.md'
@@ -9,7 +10,10 @@ name = 'tvm_linker'
 readme = 'README.md'
 repository = 'https://github.com/tonlabs/TVM-linker'
 version = '0.16.6'
-edition = '2021'
+
+[[bin]]
+name = 'tvm_linker'
+path = 'src/main.rs'
 
 [dependencies]
 base64 = '0.10.0'
@@ -33,7 +37,7 @@ ton_abi = { git = 'https://github.com/tonlabs/ton-labs-abi.git', tag = '2.3.7' }
 ton_block = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ton-labs-block.git', tag = '1.8.3' }
 ton_labs_assembler = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ton-labs-assembler.git', tag = '1.2.48' }
 ton_types = { git = 'https://github.com/tonlabs/ton-labs-types.git', tag = '1.11.4' }
-ton_vm = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ton-labs-vm.git', tag = '1.8.43' }
+ton_vm = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ton-labs-vm.git', tag = '1.8.44' }
 
 [dev-dependencies]
 assert_cmd = '0.11'
@@ -44,9 +48,6 @@ rayon = '1.5.3'
 name = 'ton_utils'
 path = 'src/lib.rs'
 
-[[bin]]
-name = "tvm_linker"
-path = "src/main.rs"
+[profile]
+release = { debug = true }
 
-[profile.release]
-debug = true

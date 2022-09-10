@@ -172,6 +172,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bstr"
+version = "0.2.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba3569f383e8f1598449f1a423e72e99569137b47740b1da11ef19af3d5c3223"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "build_const"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1076,6 +1085,9 @@ name = "similar"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62ac7f900db32bf3fd12e0117dd3dc4da74bc52ebaac97f39668446d89694803"
+dependencies = [
+ "bstr",
+]
 
 [[package]]
 name = "simplelog"
@@ -1243,8 +1255,8 @@ dependencies = [
 
 [[package]]
 name = "ton_vm"
-version = "1.8.43"
-source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.43#1079e2836a1fb2ec3ddb11dfa9c86435fbcc0855"
+version = "1.8.44"
+source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.44#5a83076b448cb35d2da7611552f76dea5cffc9db"
 dependencies = [
  "diffy",
  "ed25519",
