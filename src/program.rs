@@ -11,10 +11,8 @@
  * limitations under the License.
  */
 use base64::encode;
-use crc16::*;
 use ed25519_dalek::*;
 use failure::format_err;
-use ton_types::deserialize_cells_tree_ex;
 use std::fs::File;
 use std::io::Cursor;
 use std::io::Read;
@@ -24,12 +22,14 @@ use std::time::SystemTime;
 use methdict::*;
 use ton_block::*;
 use ton_labs_assembler::{Line, Lines, compile_code_debuggable, DbgInfo};
-use ton_types::cells_serialization::{BagOfCells, deserialize_cells_tree};
+use ton_types::deserialize_cells_tree_ex;
+use ton_types::deserialize_cells_tree;
 use ton_types::{Cell, SliceData, BuilderData, IBitstring, Result};
-use ton_types::dictionary::{HashmapE, HashmapType};
+use ton_types::{HashmapE, HashmapType};
 use parser::{ptr_to_builder, ParseEngine, ParseEngineResults};
 use printer::tree_of_cells_into_base64;
 
+const XMODEM: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 
 pub struct Program {
     language: Option<String>,
@@ -302,9 +302,7 @@ impl Program {
 }
 
 pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8, silent: bool) -> Result<String> {
-    let root_cell = state.write_to_new_cell()?.into_cell()?;
-    let mut buffer = vec![];
-    BagOfCells::with_root(&root_cell).write_to(&mut buffer, false)?;
+    let buffer = state.write_to_bytes()?;
 
     let mut print_filename = false;
     let address = state.hash().unwrap();
@@ -339,7 +337,7 @@ fn calc_userfriendly_address(wc: i8, addr: &[u8], bounce: bool, testnet: bool) -
     bytes.push(if bounce { 0x11 } else { 0x51 } + if testnet { 0x80 } else { 0 });
     bytes.push(wc as u8);
     bytes.extend_from_slice(addr);
-    let crc = State::<XMODEM>::calculate(&bytes);
+    let crc = XMODEM.checksum(&bytes);
     bytes.extend_from_slice(&crc.to_be_bytes());
     encode(&bytes)
 }

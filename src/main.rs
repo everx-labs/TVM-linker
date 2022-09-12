@@ -14,7 +14,7 @@ extern crate ton_abi as abi_json;
 extern crate base64;
 #[macro_use]
 extern crate clap;
-extern crate crc16;
+extern crate crc;
 extern crate ed25519;
 extern crate ed25519_dalek;
 extern crate failure;
@@ -97,7 +97,7 @@ fn linker_main() -> Status {
             (about: "Compile assembler code file and replace contract code with a new one.")
             (version: build_info.as_str())
             (author: "TON Labs")
-            (@arg INPUT: +required +takes_value "TVM assembler source file")
+            (@arg INPUT: +required +takes_value "TVM assembler source file or boc with code cell")
             (@arg CONTRACT_PATH: +required +takes_value "Path to the file with the BOC of contract account state whose code should be replaced.")
             (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids. If not specified abi can be loaded from file path obtained from <INPUT> path if it exists.")
             (@arg DEBUG_MAP: --("debug-map") +takes_value "Generates debug map file")
@@ -147,7 +147,7 @@ fn linker_main() -> Status {
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[BODY] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[BODY] "Supplies the name of the calling contract method")
             (@arg ABI_PARAMS: -p --("abi-params") +takes_value conflicts_with[BODY] "Supplies ABI arguments for the contract method (can be passed via filename). Can be not specified for empty parameters.")
-            (@arg ABI_HEADER: -h --("abi-header") +takes_value conflicts_with[BODY] conflicts_with[INTERNAL] "Supplies ABI header")
+            (@arg ABI_HEADER: -d --("abi-header") +takes_value conflicts_with[BODY] conflicts_with[INTERNAL] "Supplies ABI header")
         )
         (@subcommand message =>
             (@setting AllowNegativeNumbers)
@@ -161,7 +161,7 @@ fn linker_main() -> Status {
             (@arg ABI_JSON: -a --("abi-json") +takes_value conflicts_with[DATA] "Supplies json file with contract ABI")
             (@arg ABI_METHOD: -m --("abi-method") +takes_value conflicts_with[DATA] "Supplies the name of the calling contract method")
             (@arg ABI_PARAMS: -p --("abi-params") +takes_value conflicts_with[DATA] "Supplies ABI arguments for the contract method")
-            (@arg ABI_HEADER: -h --("abi-header") +takes_value conflicts_with[DATA] "Supplies ABI header")
+            (@arg ABI_HEADER: -d --("abi-header") +takes_value conflicts_with[DATA] "Supplies ABI header")
             (@arg SIGN: --setkey +takes_value "Loads existing keypair from the file")
             (@arg ADDRESS: --addr +takes_value "Optional destination address to support ABI 2.3")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name")
@@ -317,7 +317,7 @@ fn linker_main() -> Status {
     }
 
     if let Some(matches) = matches.subcommand_matches("replace_code") {
-        return  replace_command(matches);
+        return replace_command(matches);
     }
 
     unreachable!()
@@ -358,13 +358,21 @@ fn replace_command(matches: &ArgMatches) -> Status {
     if !path.exists() {
         bail!("File {} doesn't exist", input);
     }
-    sources.push(path);
+    sources.push(path.clone());
 
-    let mut prog = Program::new(
-        ParseEngine::new(sources, abi_json)?
-    );
-
-    let code = prog.compile_asm(false)?;
+    let mut prog_opt = None;
+    let code = match ParseEngine::new(sources, abi_json) {
+        Ok(engine) => {
+            let mut prog = Program::new(engine);
+            let code = prog.compile_asm(false)?;
+            prog_opt = Some(prog);
+            code
+        }
+        Err(err) => {
+            let data = std::fs::read(path)?;
+            ton_types::deserialize_tree_of_cells(&mut std::io::Cursor::new(&data)).map_err(|_| err)?
+        }
+    };
 
     let input_path = matches.value_of("CONTRACT_PATH").unwrap();
     let out_file = out_file.unwrap_or(input_path);
@@ -388,7 +396,7 @@ fn replace_command(matches: &ArgMatches) -> Status {
     if matches.is_present("DEBUG_MAP") {
         let filename = matches.value_of("DEBUG_MAP").unwrap();
         let file = File::create(filename)?;
-        serde_json::to_writer_pretty(file, &prog.dbgmap)?;
+        serde_json::to_writer_pretty(file, &prog_opt.unwrap().dbgmap)?;
     }
 
     Ok(())
