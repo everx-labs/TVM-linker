@@ -248,7 +248,7 @@ pub struct ParseEngine {
     /// Selector variant
     func_upgrade: bool,
     ///
-    save_all_privat_functions: bool,
+    save_all_private_functions: bool,
     /// Contract version
     version: Option<String>,
 
@@ -342,7 +342,7 @@ impl ParseEngine {
             version: None,
             func_upgrade: false,
             computed: HashMap::new(),
-            save_all_privat_functions: false
+            save_all_private_functions: false
         };
         engine.parse(inputs, abi_json)?;
         Ok(engine)
@@ -362,7 +362,7 @@ impl ParseEngine {
         self.resolve_nested_macros()?;
         self.replace_all_labels()?;
 
-        if !self.save_all_privat_functions {
+        if !self.save_all_private_functions {
             self.drop_unused_objects();
         }
         Ok(())
@@ -532,7 +532,7 @@ impl ParseEngine {
                     if m.as_str() == "selector-func-solidity" {
                         self.func_upgrade = true
                     } else if m.as_str() == "save-all-private-functions" {
-                        self.save_all_privat_functions = true
+                        self.save_all_private_functions = true
                     }
                 }
             } else if start_with(&l, ".global-base") {
@@ -751,12 +751,7 @@ impl ParseEngine {
 
     fn create_function_id(&mut self, func: &str) -> u32 {
         let is_public = self.globl_name_to_object.get(func).unwrap().public;
-        if is_public {
-            gen_abi_id(self.abi.clone(), func)
-        } else {
-            let res = gen_abi_id(None, func);
-            res
-        }
+        gen_abi_id(if is_public { self.abi.clone() } else { None }, func)
     }
 
     fn is_public(&self, globl_name: &str) -> bool {
