@@ -197,7 +197,8 @@ impl Program {
         let internal_selector_text = vec![
             // indirect jump
             Line::new("DICTPUSHCONST 32\n", "<internal-selector>", 1),
-            Line::new("DICTUGETJMP\n",      "<internal-selector>", 2),
+            Line::new("DICTUGETJMPZ\n",      "<internal-selector>", 2),
+            Line::new("THROW 78\n",      "<internal-selector>", 3),
         ];
 
         let mut internal_selector = compile_code_debuggable(internal_selector_text)

@@ -1719,7 +1719,9 @@ PUSH s2
 ;; grams_value
 ;; stack=5
 PUSH s4
-CALL $send_int_msg$
+PUSHINT $send_int_msg$
+PUSH C3
+EXECUTE
 BLKDROP 3
 
 .globl	send_int_msg_2
@@ -1736,7 +1738,9 @@ DUP
 ;; stack=3
 PUSH s2
 PUSHINT 10000000
-CALL $send_int_msg$
+PUSHINT $send_int_msg$
+PUSH C3
+EXECUTE
 BLKDROP 2
 
 .globl	send_ext_msg
@@ -1750,7 +1754,9 @@ PRINTSTR send_ext_msg
 DUP
 LTIME
 MYADDR
-CALL $build_external_outbound_message$
+PUSHINT $build_external_outbound_message$
+PUSH C3
+EXECUTE
 PUSHINT 0
 SENDRAWMSG
 DROP

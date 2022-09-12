@@ -83,7 +83,11 @@ BLKDROP 5
 ACCEPT
 ; Decode input parameters
 DROP
-CALL $constructor_Wallet$
+
+PUSHINT $constructor_Wallet$
+PUSH C3
+EXECUTE
+
 PRINTSTR pushpdc7toc4
 PUSHROOT
 CTOS
@@ -148,13 +152,28 @@ THROWIFNOT 100
 PRINTSTR mod_accept
 ACCEPT
 ; Decode input parameters
-CALL $decode_addr$
+
+PUSHINT $decode_addr$
+PUSH C3
+EXECUTE
+
 PUSHINT 128
-CALL $smart_ldu$
+PUSHINT $smart_ldu$
+PUSH C3
+EXECUTE
+
 PUSHINT 1
-CALL $smart_ldi$
+
+PUSHINT $smart_ldi$
+PUSH C3
+EXECUTE
+
 DROP
-CALL $sendTransaction_internal$
+
+PUSHINT $sendTransaction_internal$
+PUSH C3
+EXECUTE
+
 PRINTSTR pushpdc7toc4
 PUSHROOT
 CTOS
@@ -197,7 +216,11 @@ GREATER
 ;; stack=4
 PUSH s2
 ;; get member balance
-CALL $get_contract_balance$
+
+PUSHINT $get_contract_balance$
+PUSH C3
+EXECUTE
+
 ;; <
 LESS
 ;; &&
@@ -215,7 +238,11 @@ PUSH s2
 ;; stack=5
 PUSH s2
 PUSHINT 0
-CALL $accurate_transfer$
+
+PUSHINT $accurate_transfer$
+PUSH C3
+EXECUTE
+
 BLKDROP 3
 
 .globl	fallback
