@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 
-use ton_types::{Result, Cell, SliceData, fail, UInt256};
+use ton_types::{Result, Cell, SliceData, fail, UInt256, HashmapE, HashmapType};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Not;
@@ -1727,8 +1727,121 @@ impl Loader {
     }
 }
 
-fn analyze_dictpushconst(code: &mut Code) -> bool {
-    false
+// TODO
+// fn analyze_dictpushconst(code: &mut Code) {
+// }
+
+struct DelimitedHashmapE {
+    dict: HashmapE,
+    map: HashMap<Vec<u8>, (u64, usize, Code)>,
+}
+
+impl DelimitedHashmapE {
+    pub fn new(cell: Cell, key_size: usize) -> Self {
+        Self {
+            dict: HashmapE::with_hashmap(key_size, Some(cell)),
+            map: HashMap::new(),
+        }
+    }
+    fn slice_eq_data(lhs: &SliceData, rhs: &SliceData) -> bool {
+        let bit_len = lhs.remaining_bits();
+        if bit_len != rhs.remaining_bits() {
+            return false;
+        }
+        let mut offset = 0;
+        while (offset + 8) <= bit_len {
+            if lhs.get_byte(offset).unwrap() != rhs.get_byte(offset).unwrap() {
+                return false;
+            }
+            offset += 8
+        }
+        if (bit_len > offset) && (lhs.get_bits(offset, bit_len - offset).unwrap() != rhs.get_bits(offset, bit_len - offset).unwrap()) {
+            return false;
+        }
+        true
+    }
+    fn slice_eq_children(lhs: &SliceData, rhs: &SliceData) -> bool {
+        let refs_count = lhs.remaining_references();
+        if refs_count != rhs.remaining_references() {
+            return false;
+        }
+        for i in 0..refs_count {
+            let ref1 = lhs.reference(i).unwrap();
+            let ref2 = rhs.reference(i).unwrap();
+            if ref1.repr_hash() != ref2.repr_hash() {
+                return false;
+            } 
+        }
+        true
+    }
+    fn locate(mut slice: SliceData, target: &SliceData, path: Vec<u8>) -> Result<(Vec<u8>, usize)> {
+        if Self::slice_eq_children(&slice, target) {
+            loop {
+                if Self::slice_eq_data(&slice, target) {
+                    return Ok((path, slice.pos()))
+                }
+                if slice.get_next_bit().is_err() {
+                    break
+                }
+            }
+        }
+        for i in 0..slice.remaining_references() {
+            let child = SliceData::from(slice.reference(i).unwrap());
+            let mut next = path.clone();
+            next.push(i as u8);
+            if let Ok(v) = Self::locate(child, target, next) {
+                return Ok(v)
+            }
+        }
+        fail!("not found")
+    }
+    pub fn mark(&mut self) -> Result<()> {
+        let dict_slice = SliceData::from(self.dict.data().unwrap());
+        for entry in self.dict.iter() {
+            let (key, mut slice) = entry?;
+            let id = SliceData::from(key).get_next_int(self.dict.bit_len())?;
+            let loc = Self::locate(dict_slice.clone(), &slice, vec!())?;
+            let mut loader = Loader::new(false);
+            let code = loader.load(&mut slice, true)?;
+            if self.map.insert(loc.0, (id, loc.1, code)).is_some() {
+                fail!("non-unique path found")
+            }
+        }
+        Ok(())
+    }
+    fn print_impl(&self, cell: &Cell, indent: &str, path: Vec<u8>) -> String {
+        let mut text = String::new();
+        text += &format!("{}.cell ", indent);
+        text += &format!("{{ ;; {}\n", cell.repr_hash().to_hex_string());
+        let inner_indent = String::from("  ") + indent;
+        let mut slice = SliceData::from(cell);
+        if let Some((id, offset, code)) = self.map.get(&path) {
+            let aux = slice.get_next_slice(*offset).unwrap();
+            text += &format!("{}.blob x{}\n", inner_indent, aux.to_hex_string());
+            text += &format!("{};; method {}\n", inner_indent, id);
+            text += &print_code(code, &inner_indent);
+        } else {
+            if slice.remaining_bits() > 0 {
+                text += &format!("{}.blob x{}\n", inner_indent, slice.to_hex_string());
+            }
+            for i in 0..cell.references_count() {
+                let mut path = path.clone();
+                path.push(i as u8);
+                text += &self.print_impl(&cell.reference(i).unwrap(), inner_indent.as_str(), path);
+            }
+        }
+        text += &format!("{}}}\n", indent);
+        text
+    }
+    pub fn print(&self, indent: &str) -> String {
+        self.print_impl(self.dict.data().unwrap(), indent, vec!())
+    }
+}
+
+fn print_code_dict(cell: &Cell, key_size: usize, _signed: bool, indent: &str) -> Result<String> {
+    let mut map = DelimitedHashmapE::new(cell.clone(), key_size);
+    map.mark()?;
+    Ok(map.print(indent))
 }
 
 fn print_cell(cell: &Cell, indent: &str, dot_cell: bool) -> String {
@@ -1753,20 +1866,20 @@ fn print_cell(cell: &Cell, indent: &str, dot_cell: bool) -> String {
 }
 
 fn print_dictpushconst(insn: &Instruction, indent: &str) -> String {
-    let mut disasm = String::new();
-    disasm += insn.name();
-    if let Some(InstructionParameter::Length(l)) = insn.params().get(0) {
-        disasm += format!(" {}\n", l).as_str();
+    let key_length = if let Some(InstructionParameter::Length(l)) = insn.params().get(0) {
+        *l
     } else {
         unreachable!()
-    }
-    if let Some(InstructionParameter::Cell { cell, collapsed }) = insn.params().get(1) {
+    };
+    let cell = if let Some(InstructionParameter::Cell { cell, collapsed }) = insn.params().get(1) {
         assert!(collapsed == &false);
-        disasm += &print_cell(cell, indent, true);
+        cell
     } else {
         unreachable!()
-    }
-    disasm
+    };
+    let text = print_code_dict(cell, key_length, false, indent)
+        .unwrap_or_else(|_| print_cell(cell, indent, true));
+    format!("{} {}\n{}", insn.name(), key_length, text)
 }
 
 pub fn print_code(code: &Code, indent: &str) -> String {
