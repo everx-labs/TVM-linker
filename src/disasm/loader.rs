@@ -1727,9 +1727,45 @@ impl Loader {
     }
 }
 
-// TODO
-// fn analyze_dictpushconst(code: &mut Code) {
-// }
+fn match_dictpushconst_dictugetjmp(pair: &mut [Instruction]) -> Option<&mut Vec<InstructionParameter>> {
+    let insn2 = pair.get(1)?.name();
+    if insn2 != "DICTUGETJMP" {
+        return None
+    }
+    let insn1 = pair.get_mut(0)?;
+    if insn1.name() != "DICTPUSHCONST" && insn1.name() != "PFXDICTSWITCH" {
+        return None
+    }
+    Some(insn1.params_mut())
+}
+
+fn process_dictpushconst_dictugetjmp(code: &mut Code) {
+    for pair in code.chunks_mut(2) {
+        if let Some(params) = match_dictpushconst_dictugetjmp(pair) {
+            // TODO transform cell to code right here (for nested dicts)
+            params.push(InstructionParameter::CodeDictMarker)
+        }
+    }
+}
+
+fn traverse_code_tree(code: &mut Code, process: fn(&mut Code)) {
+    let mut stack = vec!(code);
+    while let Some(code) = stack.pop() {
+        process(code);
+        for insn in code {
+            for param in insn.params_mut() {
+                match param {
+                    InstructionParameter::Code(ref mut inner) => stack.push(inner),
+                    _ => ()
+                }
+            }
+        }
+    }
+}
+
+pub fn elaborate_dictpushconst_dictugetjmp(code: &mut Code) {
+    traverse_code_tree(code, process_dictpushconst_dictugetjmp)
+}
 
 struct DelimitedHashmapE {
     dict: HashmapE,
@@ -1838,7 +1874,7 @@ impl DelimitedHashmapE {
     }
 }
 
-fn print_code_dict(cell: &Cell, key_size: usize, _signed: bool, indent: &str) -> Result<String> {
+fn print_code_dict(cell: &Cell, key_size: usize, indent: &str) -> Result<String> {
     let mut map = DelimitedHashmapE::new(cell.clone(), key_size);
     map.mark()?;
     Ok(map.print(indent))
@@ -1877,8 +1913,12 @@ fn print_dictpushconst(insn: &Instruction, indent: &str) -> String {
     } else {
         unreachable!()
     };
-    let text = print_code_dict(cell, key_length, false, indent)
-        .unwrap_or_else(|_| print_cell(cell, indent, true));
+    let text = if let Some(InstructionParameter::CodeDictMarker) = insn.params().get(2) {
+        print_code_dict(cell, key_length, indent)
+            .unwrap_or_else(|_| print_cell(cell, indent, true))
+    } else {
+        print_cell(cell, indent, true)
+    };
     format!("{} {}\n{}", insn.name(), key_length, text)
 }
 
@@ -1973,6 +2013,10 @@ pub fn print_code(code: &Code, indent: &str) -> String {
                         disasm += &print_cell(cell, indent, false);
                     }
                     curr_is_block = true;
+                }
+                InstructionParameter::CodeDictMarker => {
+                    // handled above for DICTPUSHCONST
+                    unreachable!()
                 }
             }
             if !last && !curr_is_block {

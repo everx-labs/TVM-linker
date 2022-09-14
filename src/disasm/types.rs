@@ -43,6 +43,9 @@ impl Instruction {
     pub fn params(&self) -> &Vec<InstructionParameter> {
         &self.params
     }
+    pub fn params_mut(&mut self) -> &mut Vec<InstructionParameter> {
+        &mut self.params
+    }
     pub fn is_quiet(&self) -> bool {
         self.quiet
     }
@@ -65,6 +68,7 @@ pub enum InstructionParameter {
     StackRegisterTriple(isize, isize, isize),
     Code(Code),
     Cell { cell: Cell, collapsed: bool },
+    CodeDictMarker,
 }
 
 // #[derive(Clone, Debug)]

@@ -21,7 +21,7 @@ use ton_types::{Cell, HashmapE, HashmapType, SliceData, UInt256, Status};
 use std::io::Cursor;
 
 use super::types::Shape;
-use super::loader::{Loader, print_code};
+use super::loader::{Loader, print_code, elaborate_dictpushconst_dictugetjmp};
 
 pub fn disasm_command(m: &ArgMatches) -> Status {
     if let Some(m) = m.subcommand_matches("dump") {
@@ -223,7 +223,7 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
     let mut roots = deserialize_cells_tree(&mut csor).map_err(|e| format_err!("{}", e))?;
 
     if m.is_present("RAW") {
-        println!("{}", disasm_collapsed(&mut SliceData::from(roots.get(0).unwrap())));
+        println!("{}", disasm_ex(&mut SliceData::from(roots.get(0).unwrap()), true));
         return Ok(())
     }
 
@@ -286,11 +286,12 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
 }
 
 pub(super) fn disasm(slice: &mut SliceData) -> String {
-    let mut loader = Loader::new(false);
-    print_code(&loader.load(slice, false).unwrap(), "")
+    disasm_ex(slice, false)
 }
 
-pub(super) fn disasm_collapsed(slice: &mut SliceData) -> String {
-    let mut loader = Loader::new(true);
-    print_code(&loader.load(slice, false).unwrap(), "")
+pub(super) fn disasm_ex(slice: &mut SliceData, collapsed: bool) -> String {
+    let mut loader = Loader::new(collapsed);
+    let mut code = loader.load(slice, false).unwrap();
+    elaborate_dictpushconst_dictugetjmp(&mut code);
+    print_code(&code, "")
 }
