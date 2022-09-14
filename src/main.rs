@@ -394,7 +394,7 @@ fn replace_command(matches: &ArgMatches) -> Status {
         account.write_to_file(out_file)?;
     }
     println!("Result saved to file: {}", out_file);
-    if matches.is_present("DEBUG_MAP") {
+    if matches.is_present("DEBUG_MAP") && prog_opt.is_some() {
         let filename = matches.value_of("DEBUG_MAP").unwrap();
         let file = File::create(filename)?;
         serde_json::to_writer_pretty(file, &prog_opt.unwrap().dbgmap)?;
