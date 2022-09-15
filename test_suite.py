@@ -359,8 +359,8 @@ def testWallet():
 
 #testOld()
 testArrays()
-# testCall()
-# testEvents()
+testCall()
+testEvents()
 testWallet()
 #testLlvmPiggyBank()
 
