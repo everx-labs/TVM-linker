@@ -2,6 +2,7 @@ target
 .vscode
 .idea/
 
-tests/Wallet.map.json
+tests/Wallet2.code
+tests/Wallet2.map.json
 *.tvc
 *.tmp
