@@ -43,6 +43,7 @@ ton_vm = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ton-labs-vm.
 assert_cmd = '0.11'
 predicates = '1'
 rayon = '1.5.3'
+similar = '2.2.0'
 
 [lib]
 name = 'ton_utils'

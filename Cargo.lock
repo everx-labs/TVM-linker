@@ -1298,6 +1298,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.8.2",
+ "similar",
  "simplelog",
  "ton_abi",
  "ton_block",

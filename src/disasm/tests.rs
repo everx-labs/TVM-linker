@@ -15,25 +15,37 @@ use ton_types::SliceData;
 use super::commands::{disasm, print_tree_of_cells};
 
 use rayon::prelude::*;
+use similar::{ChangeTag, TextDiff};
 
-fn round_trip_test(raw0: &str, check_bin: bool) {
+fn round_trip_test(filename: &str, check_bin: bool) {
+    let raw0 = &std::fs::read_to_string(filename).unwrap();
     let bin0 = base64::decode(raw0).unwrap();
     let toc0 = ton_types::deserialize_tree_of_cells(&mut std::io::Cursor::new(bin0)).unwrap();
     let asm0 = disasm(&mut SliceData::from(toc0.clone()));
     let toc1 = ton_labs_assembler::compile_code_to_cell(&asm0.clone()).unwrap();
     let asm1 = disasm(&mut SliceData::from(toc1.clone()));
-    if asm0 != asm1 {
-        println!(">>>");
-        print!("{}", asm0);
-        println!("<<<");
-        print!("{}", asm1);
-        assert!(false);
+
+    let diff = TextDiff::from_lines(&asm0, &asm1);
+    let mut differ = false;
+    for change in diff.iter_all_changes() {
+        match change.tag() {
+            ChangeTag::Delete => {
+                print!("-{}", change);
+                differ = true;
+            }
+            ChangeTag::Insert => {
+                print!("+{}", change);
+                differ = true;
+            }
+            _ => ()
+        }
     }
+    assert!(!differ, "roundtrip difference was detected for {}", filename);
 
     if check_bin {
         let bin1 = ton_types::serialize_toc(&toc1).unwrap();
         let raw1 = base64::encode(&bin1);
-        if raw0 != raw1 {
+        if raw0 != &raw1 {
             println!("{}", asm0);
             print_tree_of_cells(&toc0);
             print_tree_of_cells(&toc1);
@@ -51,14 +63,10 @@ fn round_trip() {
         // a sequence of cells in many different ways, thanks to implicit jumps.
         // TODO However, sometimes the difference may be an indicator of some CQ issue
         // in the assembler.
-        let filename = format!("tests/disasm/{:03}.b64", n);
-        let raw = std::fs::read_to_string(filename).unwrap();
-        round_trip_test(&raw, !skip_check_bin);
+        round_trip_test(&format!("tests/disasm/{:03}.b64", n), !skip_check_bin);
     }
     for n in 200..331 {
-        let filename = format!("tests/disasm/{:03}.b64", n);
-        let raw = std::fs::read_to_string(filename).unwrap();
-        round_trip_test(&raw, true);
+        round_trip_test(&format!("tests/disasm/{:03}.b64", n), true);
     }
 }
 
@@ -72,7 +80,6 @@ fn round_trip_tonix() {
     }
     tonix_base64_files.sort();
     tonix_base64_files.par_iter().for_each(|filename| {
-        let raw = std::fs::read_to_string(filename).unwrap();
-        round_trip_test(&raw, true);
+        round_trip_test(&filename, true);
     })
 }
