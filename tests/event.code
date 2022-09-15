@@ -83,7 +83,9 @@ BLKDROP 5
 ACCEPT
 ; Decode input parameters
 DROP
-CALL $constructor_Test$
+PUSHINT $constructor_Test$
+PUSH C3
+EXECUTE
 PRINTSTR pushpdc7toc4
 PUSHROOT
 CTOS
@@ -118,9 +120,13 @@ RET
 .type	emitValue, @function
 ; Decode input parameters
 PUSHINT 256
-CALL $smart_ldu$
+PUSHINT $smart_ldu$
+PUSH C3
+EXECUTE
 DROP
-CALL $emitValue_internal$
+PUSHINT $emitValue_internal$
+PUSH C3
+EXECUTE
 PRINTSTR pushpdc7toc4
 PUSHROOT
 CTOS
@@ -163,7 +169,9 @@ NEWC
 PUSH s2
 STUR 256
 STBREFR
-CALL $send_ext_msg$
+PUSHINT $send_ext_msg$
+PUSH C3
+EXECUTE
 DROP
 
 .globl	returnValue
@@ -171,9 +179,13 @@ DROP
 .type	returnValue, @function
 ; Decode input parameters
 PUSHINT 256
-CALL $smart_ldu$
+PUSHINT $smart_ldu$
+PUSH C3
+EXECUTE
 DROP
-CALL $returnValue_internal$
+PUSHINT $returnValue_internal$
+PUSH C3
+EXECUTE
 ;; emitting 1 value(s)
 NEWC
 PUSHINT $returnValue$
@@ -184,7 +196,9 @@ NEWC
 PUSH s2
 STUR 256
 STBREFR
-CALL $send_ext_msg$
+PUSHINT $send_ext_msg$
+PUSH C3
+EXECUTE
 PRINTSTR pushpdc7toc4
 PUSHROOT
 CTOS
@@ -227,7 +241,9 @@ NEWC
 PUSH s2
 STUR 256
 STBREFR
-CALL $send_ext_msg$
+PUSHINT $send_ext_msg$
+PUSH C3
+EXECUTE
 ;; id
 ;; stack=1
 DUP
