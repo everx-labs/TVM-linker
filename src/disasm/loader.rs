@@ -80,7 +80,7 @@ macro_rules! create_handler_2r {
             let cell = slice.reference(0)?;
             let code = self.load_cell(&cell)?;
             slice.shrink_references(1..);
-            Ok(Instruction::new($mnemonic).with_param(InstructionParameter::Code(code)))
+            Ok(Instruction::new($mnemonic).with_param(InstructionParameter::Code { code, cell: Some(cell) }))
         }
     };
 }
@@ -98,8 +98,8 @@ macro_rules! create_handler_3r {
             let code2 = self.load_cell(&cell2)?;
             slice.shrink_references(2..);
             Ok(Instruction::new($mnemonic)
-                .with_param(InstructionParameter::Code(code1))
-                .with_param(InstructionParameter::Code(code2)))
+                .with_param(InstructionParameter::Code { code: code1, cell: Some(cell1) })
+                .with_param(InstructionParameter::Code { code: code2, cell: Some(cell2) }))
         }
     };
 }
@@ -157,11 +157,13 @@ impl Loader {
         match slice.remaining_references().cmp(&1) {
             Ordering::Less => (),
             Ordering::Equal => {
-                let mut next_code = self.load_cell(&slice.reference(0).unwrap())?;
+                let next_cell = slice.reference(0).unwrap();
+                let mut next_code = self.load_cell(&next_cell)?;
                 if inline {
                     code.append(&mut next_code)
                 } else {
-                    let next = Instruction::new("IMPLICIT-JMP").with_param(InstructionParameter::Code(next_code));
+                    let next = Instruction::new("IMPLICIT-JMP")
+                        .with_param(InstructionParameter::Code { code: next_code, cell: Some(next_cell) });
                     code.push(next)
                 }
             }
@@ -604,7 +606,7 @@ impl Loader {
         let cell = slice.reference(0)?;
         let code = self.load_cell(&cell)?;
         slice.shrink_references(1..);
-        Ok(Instruction::new("PUSHREFCONT").with_param(InstructionParameter::Code(code)))
+        Ok(Instruction::new("PUSHREFCONT").with_param(InstructionParameter::Code { code, cell: Some(cell) }))
     }
     pub(super) fn pushslice_short(&mut self, slice: &mut SliceData) -> Result<Instruction> {
         let opc = slice.get_next_int(8)?;
@@ -649,7 +651,7 @@ impl Loader {
         slice.shrink_data(bits..);
         slice.shrink_references(r..);
 
-        Ok(Instruction::new("PUSHCONT").with_param(InstructionParameter::Code(code)))
+        Ok(Instruction::new("PUSHCONT").with_param(InstructionParameter::Code { code, cell: None }))
     }
     pub(super) fn pushcont_short(&mut self, slice: &mut SliceData) -> Result<Instruction> {
         let opc = slice.get_next_int(4)?;
@@ -657,7 +659,7 @@ impl Loader {
         let x = slice.get_next_int(4).unwrap() as usize;
         let mut body = slice.get_next_slice(x * 8)?;
         let code = self.load(&mut body, true)?;
-        Ok(Instruction::new("PUSHCONT").with_param(InstructionParameter::Code(code)))
+        Ok(Instruction::new("PUSHCONT").with_param(InstructionParameter::Code { code, cell: None }))
     }
     create_handler_1t!(add,    0xa0, "ADD");
     create_handler_1t!(sub,    0xa1, "SUB");
@@ -1221,7 +1223,7 @@ impl Loader {
         let cell = slice.reference(0)?;
         let code = self.load_cell(&cell)?;
         slice.shrink_references(1..);
-        Ok(Instruction::new("IFBITJMPREF").with_param(InstructionParameter::Integer(n)).with_param(InstructionParameter::Code(code)))
+        Ok(Instruction::new("IFBITJMPREF").with_param(InstructionParameter::Integer(n)).with_param(InstructionParameter::Code { code, cell: Some(cell) }))
     }
     pub(super) fn ifnbitjmpref(&mut self, slice: &mut SliceData) -> Result<Instruction> {
         let opc = slice.get_next_int(15)?;
@@ -1230,7 +1232,7 @@ impl Loader {
         let cell = slice.reference(0)?;
         let code = self.load_cell(&cell)?;
         slice.shrink_references(1..);
-        Ok(Instruction::new("IFNBITJMPREF").with_param(InstructionParameter::Integer(n)).with_param(InstructionParameter::Code(code)))
+        Ok(Instruction::new("IFNBITJMPREF").with_param(InstructionParameter::Integer(n)).with_param(InstructionParameter::Code { code, cell: Some(cell) }))
     }
     create_handler_1!(repeat,    0xe4, "REPEAT");
     create_handler_1!(repeatend, 0xe5, "REPEATEND");
@@ -1755,7 +1757,7 @@ fn traverse_code_tree(code: &mut Code, process: fn(&mut Code)) {
         for insn in code {
             for param in insn.params_mut() {
                 match param {
-                    InstructionParameter::Code(ref mut inner) => stack.push(inner),
+                    InstructionParameter::Code { code: ref mut inner, cell: _ } => stack.push(inner),
                     _ => ()
                 }
             }
@@ -1848,7 +1850,7 @@ impl DelimitedHashmapE {
     fn print_impl(&self, cell: &Cell, indent: &str, path: Vec<u8>) -> String {
         let mut text = String::new();
         text += &format!("{}.cell ", indent);
-        text += &format!("{{ ;; {}\n", cell.repr_hash().to_hex_string());
+        text += &format!("{{ ;; #{}\n", cell.repr_hash().to_hex_string());
         let inner_indent = String::from("  ") + indent;
         let mut slice = SliceData::from(cell);
         if let Some((id, offset, code)) = self.map.get(&path) {
@@ -1885,7 +1887,7 @@ fn print_cell(cell: &Cell, indent: &str, dot_cell: bool) -> String {
     if dot_cell {
         text += &format!("{}.cell ", indent);
     }
-    text += &format!("{{ ;; {}\n", cell.repr_hash().to_hex_string());
+    text += &format!("{{ ;; #{}\n", cell.repr_hash().to_hex_string());
     let inner_indent = String::from("  ") + indent;
     if cell.bit_length() > 0 {
         text += &format!("{}.blob x{}\n", inner_indent, cell.to_hex_string(true));
@@ -1933,8 +1935,9 @@ pub fn print_code(code: &Code, indent: &str) -> String {
                 continue
             }
             "IMPLICIT-JMP" => {
-                if let Some(InstructionParameter::Code(code)) = insn.params().get(0) {
-                    disasm += &format!(".cell {{ ;; implicit jump\n");
+                if let Some(InstructionParameter::Code { code, cell }) = insn.params().get(0) {
+                    let hash = cell.as_ref().unwrap().repr_hash().to_hex_string();
+                    disasm += &format!(".cell {{ ;; #{}\n", hash);
                     let inner_indent = String::from("  ") + indent;
                     disasm += &print_code(code, inner_indent.as_str());
                     disasm += indent;
@@ -1997,8 +2000,12 @@ pub fn print_code(code: &Code, indent: &str) -> String {
                 InstructionParameter::StackRegisterTriple(ra, rb, rc) => {
                     disasm += format!("s{}, s{}, s{}", ra, rb, rc).as_str();
                 }
-                InstructionParameter::Code(code) => {
-                    disasm += "{\n";
+                InstructionParameter::Code { code, cell } => {
+                    if let Some(cell) = cell {
+                        disasm += &format!("{{ ;; #{}\n", cell.repr_hash().to_hex_string());
+                    } else {
+                        disasm += "{\n";
+                    }
                     let inner_indent = String::from("  ") + indent;
                     disasm += &print_code(code, inner_indent.as_str());
                     disasm += indent;
@@ -2008,7 +2015,7 @@ pub fn print_code(code: &Code, indent: &str) -> String {
                 InstructionParameter::Cell { cell, collapsed } => {
                     if *collapsed {
                         assert!(insn.name() == ";;");
-                        disasm += &format!("same as {}", cell.repr_hash().to_hex_string());
+                        disasm += "<collapsed>";
                     } else {
                         disasm += &print_cell(cell, indent, false);
                     }

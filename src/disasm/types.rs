@@ -66,7 +66,7 @@ pub enum InstructionParameter {
     StackRegister(isize),
     StackRegisterPair(isize, isize),
     StackRegisterTriple(isize, isize, isize),
-    Code(Code),
+    Code { code: Code, cell: Option<Cell> },
     Cell { cell: Cell, collapsed: bool },
     CodeDictMarker,
 }

@@ -17,13 +17,30 @@ use super::commands::{disasm, print_tree_of_cells};
 use rayon::prelude::*;
 use similar::{ChangeTag, TextDiff};
 
+fn cut_asm_hashes(asm: String) -> String {
+    let mut out = String::new();
+    for line in asm.lines() {
+        if let Some((before, _)) = line.split_once(" ;; #") {
+            out += &format!("{}\n", before);
+        } else {
+            out += &format!("{}\n", line);
+        }
+    }
+    out
+}
+
 fn round_trip_test(filename: &str, check_bin: bool) {
     let raw0 = &std::fs::read_to_string(filename).unwrap();
     let bin0 = base64::decode(raw0).unwrap();
     let toc0 = ton_types::deserialize_tree_of_cells(&mut std::io::Cursor::new(bin0)).unwrap();
-    let asm0 = disasm(&mut SliceData::from(toc0.clone()));
+    let mut asm0 = disasm(&mut SliceData::from(toc0.clone()));
     let toc1 = ton_labs_assembler::compile_code_to_cell(&asm0.clone()).unwrap();
-    let asm1 = disasm(&mut SliceData::from(toc1.clone()));
+    let mut asm1 = disasm(&mut SliceData::from(toc1.clone()));
+
+    if !check_bin {
+        asm0 = cut_asm_hashes(asm0);
+        asm1 = cut_asm_hashes(asm1);
+    }
 
     let diff = TextDiff::from_lines(&asm0, &asm1);
     let mut differ = false;
