@@ -83,7 +83,9 @@ BLKDROP 5
 ACCEPT
 ; Decode input parameters
 DROP
-CALL $constructor_TestBody$
+PUSHINT $constructor_TestBody$
+PUSH C3
+EXECUTE
 PRINTSTR pushpdc7toc4
 PUSHROOT
 CTOS
@@ -117,9 +119,13 @@ RET
 .public	send
 .type	send, @function
 ; Decode input parameters
-CALL $decode_addr$
+PUSHINT $decode_addr$
+PUSH C3
+EXECUTE
 DROP
-CALL $send_internal$
+PUSHINT $send_internal$
+PUSH C3
+EXECUTE
 PRINTSTR pushpdc7toc4
 PUSHROOT
 CTOS
@@ -171,7 +177,9 @@ STUR 256
 STBREFR
 STBREFR
 STBREFR
-CALL $send_int_msg_2$
+PUSHINT $send_int_msg_2$
+PUSH C3
+EXECUTE
 DROP
 
 .globl	fallback
