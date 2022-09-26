@@ -646,7 +646,7 @@ impl Loader {
         let mut subslice = slice.clone();
         subslice.shrink_data(..bits);
         subslice.shrink_references(..r);
-        let code = self.load(&mut subslice, true)?;
+        let code = self.load(&mut subslice, false)?;
 
         slice.shrink_data(bits..);
         slice.shrink_references(r..);
