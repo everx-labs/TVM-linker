@@ -115,10 +115,16 @@ BLKDROP 2
 .type	at32, @function
 ; Decode input parameters
 PUSHINT 8
-CALL $smart_ldu$
-CALL $decode_array$
+PUSHINT $smart_ldu$
+PUSH C3
+EXECUTE
+PUSHINT $decode_array$
+PUSH C3
+EXECUTE
 DROP
-CALL $at32_internal$
+PUSHINT $at32_internal$
+PUSH C3
+EXECUTE
 ;; emitting 1 value(s)
 NEWC
 PUSHINT $at32$
@@ -129,7 +135,9 @@ NEWC
 PUSH s2
 STUR 32
 STBREFR
-CALL $send_ext_msg$
+PUSHINT $send_ext_msg$
+PUSH C3
+EXECUTE
 RET
 
 .globl	at32_internal
@@ -159,10 +167,16 @@ RET
 .public	pair64
 .type	pair64, @function
 ; Decode input parameters
-CALL $decode_array$
-CALL $decode_array$
+PUSHINT $decode_array$
+PUSH C3
+EXECUTE
+PUSHINT $decode_array$
+PUSH C3
+EXECUTE
 DROP
-CALL $pair64_internal$
+PUSHINT $pair64_internal$
+PUSH C3
+EXECUTE
 ;; emitting 1 value(s)
 NEWC
 PUSHINT $pair64$
@@ -173,7 +187,9 @@ NEWC
 PUSH s2
 STUR 64
 STBREFR
-CALL $send_ext_msg$
+PUSHINT $send_ext_msg$
+PUSH C3
+EXECUTE
 RET
 
 .globl	pair64_internal
@@ -215,10 +231,16 @@ RET
 .public	pair8
 .type	pair8, @function
 ; Decode input parameters
-CALL $decode_array$
-CALL $decode_array$
+PUSHINT $decode_array$
+PUSH C3
+EXECUTE
+PUSHINT $decode_array$
+PUSH C3
+EXECUTE
 DROP
-CALL $pair8_internal$
+PUSHINT $pair8_internal$
+PUSH C3
+EXECUTE
 ;; emitting 1 value(s)
 NEWC
 PUSHINT $pair8$
@@ -229,7 +251,9 @@ NEWC
 PUSH s2
 STUR 8
 STBREFR
-CALL $send_ext_msg$
+PUSHINT $send_ext_msg$
+PUSH C3
+EXECUTE
 RET
 
 .globl	pair8_internal
@@ -272,10 +296,16 @@ RET
 .type	at256, @function
 ; Decode input parameters
 PUSHINT 8
-CALL $smart_ldu$
-CALL $decode_array$
+PUSHINT $smart_ldu$
+PUSH C3
+EXECUTE
+PUSHINT $decode_array$
+PUSH C3
+EXECUTE
 DROP
-CALL $at256_internal$
+PUSHINT $at256_internal$
+PUSH C3
+EXECUTE
 ;; emitting 1 value(s)
 NEWC
 PUSHINT $at256$
@@ -286,7 +316,9 @@ NEWC
 PUSH s2
 STUR 256
 STBREFR
-CALL $send_ext_msg$
+PUSHINT $send_ext_msg$
+PUSH C3
+EXECUTE
 RET
 
 .globl	at256_internal
@@ -317,12 +349,20 @@ RET
 .type	atAt32, @function
 ; Decode input parameters
 PUSHINT 32
-CALL $smart_ldu$
-CALL $decode_array$
+PUSHINT $smart_ldu$
+PUSH C3
+EXECUTE
+PUSHINT $decode_array$
+PUSH C3
+EXECUTE
 PUSHINT 32
-CALL $smart_ldu$
+PUSHINT $smart_ldu$
+PUSH C3
+EXECUTE
 DROP
-CALL $atAt32_internal$
+PUSHINT $atAt32_internal$
+PUSH C3
+EXECUTE
 ;; emitting 1 value(s)
 NEWC
 PUSHINT $atAt32$
@@ -333,7 +373,9 @@ NEWC
 PUSH s2
 STUR 32
 STBREFR
-CALL $send_ext_msg$
+PUSHINT $send_ext_msg$
+PUSH C3
+EXECUTE
 RET
 
 .globl	atAt32_internal
@@ -370,12 +412,20 @@ RET
 .type	atAt256, @function
 ; Decode input parameters
 PUSHINT 32
-CALL $smart_ldu$
-CALL $decode_array$
+PUSHINT $smart_ldu$
+PUSH C3
+EXECUTE
+PUSHINT $decode_array$
+PUSH C3
+EXECUTE
 PUSHINT 32
-CALL $smart_ldu$
+PUSHINT $smart_ldu$
+PUSH C3
+EXECUTE
 DROP
-CALL $atAt256_internal$
+PUSHINT $atAt256_internal$
+PUSH C3
+EXECUTE
 ;; emitting 1 value(s)
 NEWC
 PUSHINT $atAt256$
@@ -386,7 +436,9 @@ NEWC
 PUSH s2
 STUR 256
 STBREFR
-CALL $send_ext_msg$
+PUSHINT $send_ext_msg$
+PUSH C3
+EXECUTE
 RET
 
 .globl	atAt256_internal
