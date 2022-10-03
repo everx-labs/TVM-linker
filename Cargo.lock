@@ -172,6 +172,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bstr"
+version = "0.2.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba3569f383e8f1598449f1a423e72e99569137b47740b1da11ef19af3d5c3223"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "build_const"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -284,12 +293,6 @@ name = "crc-catalog"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d0165d2900ae6778e36e80bbc4da3b5eefccee9ba939761f9c2882a5d9af3ff"
-
-[[package]]
-name = "crc16"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "338089f42c427b86394a5ee60ff321da23a5c89c9d89514c829687b26359fcff"
 
 [[package]]
 name = "crossbeam-utils"
@@ -564,9 +567,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.132"
+version = "0.2.133"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8371e4e5341c3a96db127eb2465ac681ced4c433e01dd0e938adbef26ba93ba5"
+checksum = "c0f80d65747a3e43d1596c7c5492d95d5edddaabd45a7fcdb02b95f644164966"
 
 [[package]]
 name = "lockfree"
@@ -704,9 +707,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.14.0"
+version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f7254b99e31cad77da24b08ebf628882739a608578bb1bcdfc1f9c21260d7c0"
+checksum = "e82dad04139b71a90c080c8463fe0dc7902db5192d939bd0950f074d014339e1"
 
 [[package]]
 name = "opaque-debug"
@@ -977,15 +980,18 @@ dependencies = [
 
 [[package]]
 name = "signature"
-version = "1.6.2"
+version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a622c5fc69cf2a070d3217981bded5071cdd1b1ac17ae906646debae83579b54"
+checksum = "deb766570a2825fa972bceff0d195727876a9cdf2460ab2e52d455dc2de47fd9"
 
 [[package]]
 name = "similar"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62ac7f900db32bf3fd12e0117dd3dc4da74bc52ebaac97f39668446d89694803"
+dependencies = [
+ "bstr",
+]
 
 [[package]]
 name = "simplelog"
@@ -1018,9 +1024,9 @@ checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 
 [[package]]
 name = "syn"
-version = "1.0.99"
+version = "1.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58dbef6ec655055e20b86b15a8cc6d439cca19b667537ac6a1369572d151ab13"
+checksum = "52205623b1b0f064a4e71182c3b18ae902267282930c6d5462c91b859668426e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1153,8 +1159,8 @@ dependencies = [
 
 [[package]]
 name = "ton_vm"
-version = "1.8.43"
-source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.43#1079e2836a1fb2ec3ddb11dfa9c86435fbcc0855"
+version = "1.8.44"
+source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.44#5a83076b448cb35d2da7611552f76dea5cffc9db"
 dependencies = [
  "diffy",
  "ed25519",
@@ -1175,16 +1181,16 @@ dependencies = [
 
 [[package]]
 name = "tvm_linker"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
  "assert_cmd",
- "base64 0.10.1",
+ "base64 0.13.0",
  "clap",
- "crc16",
+ "crc 3.0.0",
  "ed25519",
  "ed25519-dalek",
  "failure",
- "hex 0.3.2",
+ "hex 0.4.3",
  "lazy_static",
  "log",
  "num",
@@ -1194,7 +1200,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "sha2 0.8.2",
+ "sha2 0.10.6",
  "simplelog",
  "ton_abi",
  "ton_block",

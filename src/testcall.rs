@@ -30,7 +30,7 @@ use ton_types::{AccountId, BuilderData, Cell, SliceData, Result, Status};
 use ton_block::{
     CurrencyCollection, Deserializable, ExternalInboundMessageHeader, Grams,
     InternalMessageHeader, Message, MsgAddressExt, MsgAddressInt, OutAction,
-    OutActions, Serializable, StateInit, UnixTime32
+    OutActions, Serializable, StateInit,
 };
 use ton_labs_assembler::DbgInfo;
 
@@ -68,7 +68,7 @@ fn create_internal_msg(
     hdr.ihr_disabled = true;
     hdr.ihr_fee = Grams::from(0u64);
     hdr.created_lt = lt;
-    hdr.created_at = UnixTime32::new(at);
+    hdr.created_at = at.into();
     let mut msg = Message::with_int_header(hdr);
     if let Some(body) = body {
         msg.set_body(body);
@@ -91,19 +91,26 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) -> Status {
     Ok(())
 }
 
-fn initialize_registers(data: SliceData, code: Cell, myself: MsgAddressInt, now: u32, balance: (u64, CurrencyCollection), config: Option<Cell>,
-                        capabilities: u64) -> Result<SaveList> {
+fn initialize_registers(
+    data: SliceData,
+    mycode: Cell,
+    myself: MsgAddressInt,
+    unix_time: u32,
+    balance: CurrencyCollection,
+    config_params: Option<Cell>,
+    capabilities: u64,
+) -> Result<SaveList> {
     let mut ctrls = SaveList::new();
-    let mut info = SmartContractInfo::with_myself(myself.serialize()?.into());
-    info.capabilities = capabilities;
-    info.balance.grams = ton_block::Grams::from(balance.0);
-    info.balance.other = ton_block::ExtraCurrencyCollection::from(balance.1.other_as_hashmap());
-    info.unix_time = now;
-    if let Some(cell) = config {
-        info.config_params = Some(cell);
-    }
+    let info = SmartContractInfo {
+        capabilities,
+        balance,
+        myself: myself.serialize()?.into(),
+        mycode,
+        unix_time,
+        config_params,
+        ..Default::default()
+    };
     // TODO info.set_init_code_hash()
-    info.set_mycode(code);
     ctrls.put(4, &mut StackItem::Cell(data.into_cell()))?;
     ctrls.put(7, &mut info.into_temp_data_item())?;
     Ok(ctrls)
@@ -349,7 +356,7 @@ pub fn call_contract<F>(
         code.clone().into_cell(),
         addr.clone(),
         params.msg_info.now,
-        (smc_value, smc_balance),
+        smc_balance,
         params.config,
         params.capabilities
     )?;
