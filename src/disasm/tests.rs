@@ -73,16 +73,9 @@ fn round_trip_test(filename: &str, check_bin: bool) {
 
 #[test]
 fn round_trip() {
-    for n in 0..130 {
-        let skip_check_bin = [105, 109, 113, 116, 117, 118, 119, 129].contains(&n);
-        // In general, a difference in binaries is completely legit since there are many ways
-        // to encode the same code: even a linear sequence of insns can be laid out into
-        // a sequence of cells in many different ways, thanks to implicit jumps.
-        // TODO However, sometimes the difference may be an indicator of some CQ issue
-        // in the assembler.
-        round_trip_test(&format!("tests/disasm/{:03}.b64", n), !skip_check_bin);
-    }
-    for n in 200..331 {
+    let mut indices = (0..130).collect::<Vec<i32>>();
+    indices.append(&mut (200..331).collect());
+    for n in indices {
         round_trip_test(&format!("tests/disasm/{:03}.b64", n), true);
     }
 }

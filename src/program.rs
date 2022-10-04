@@ -46,7 +46,7 @@ impl Program {
             language: None,
             engine: ParseEngineResults::new(parser),
             keypair: None,
-            dbgmap: DbgInfo::new(),
+            dbgmap: DbgInfo::default(),
             print_code: false,
             silent: false,
         }
