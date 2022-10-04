@@ -1274,16 +1274,16 @@ dependencies = [
 
 [[package]]
 name = "tvm_linker"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
  "assert_cmd",
- "base64 0.10.1",
+ "base64 0.13.0",
  "clap",
- "crc16",
+ "crc 3.0.0",
  "ed25519",
  "ed25519-dalek",
  "failure",
- "hex 0.3.2",
+ "hex 0.4.3",
  "lazy_static",
  "log",
  "num",

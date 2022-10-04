@@ -13,7 +13,7 @@
 
 extern crate base64;
 extern crate clap;
-extern crate crc16;
+extern crate crc;
 extern crate ed25519;
 extern crate ed25519_dalek;
 extern crate failure;
