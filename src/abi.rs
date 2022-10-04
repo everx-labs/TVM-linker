@@ -74,9 +74,8 @@ pub fn gen_abi_id(mut abi: Option<Contract>, func_name: &str) -> u32 {
 }
 
 fn calc_func_id(func_interface: &str) -> u32 {
-    let mut hasher = Sha256::new();
-    hasher.input(func_interface.as_bytes());
     let mut id_bytes = [0u8; 4];
-    id_bytes.copy_from_slice(&hasher.result()[..4]);
+    let hash = Sha256::digest(func_interface.as_bytes());
+    id_bytes.copy_from_slice(&hash[..4]);
     u32::from_be_bytes(id_bytes)
 }
