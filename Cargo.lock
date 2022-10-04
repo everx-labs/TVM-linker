@@ -295,12 +295,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d0165d2900ae6778e36e80bbc4da3b5eefccee9ba939761f9c2882a5d9af3ff"
 
 [[package]]
-name = "crc16"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "338089f42c427b86394a5ee60ff321da23a5c89c9d89514c829687b26359fcff"
-
-[[package]]
 name = "crossbeam-channel"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1274,7 +1268,7 @@ dependencies = [
 
 [[package]]
 name = "tvm_linker"
-version = "0.17.1"
+version = "0.17.3"
 dependencies = [
  "assert_cmd",
  "base64 0.13.0",
@@ -1294,7 +1288,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "sha2 0.8.2",
+ "sha2 0.10.6",
  "similar",
  "simplelog",
  "ton_abi",
