@@ -24,7 +24,7 @@ where
 {
     let bit_len = SliceData::from(T::default().serialize().unwrap()).remaining_bits();
     let mut map = HashmapE::with_bit_len(bit_len);
-    let mut dbg = DbgInfo::new();
+    let mut dbg = DbgInfo::default();
     insert_methods(&mut map, &mut dbg, methods, adjust_entry_points)?;
     Ok((map, dbg))
 }

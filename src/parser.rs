@@ -10,20 +10,24 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
-use abi::{gen_abi_id, load_abi_contract};
-use abi_json::Contract;
-use failure::{format_err, bail};
-use regex::Regex;
-use resolver::resolve_name;
-use std::collections::{HashSet, HashMap};
-use std::io::{BufRead, BufReader, Read};
-use std::fs::File;
-use std::path::Path;
+
+use crate::abi::{gen_abi_id, load_abi_contract};
+use crate::resolver::resolve_name;
+
 use ton_types::{BuilderData, IBitstring, SliceData, Cell, Result, Status};
 use ton_types::dictionary::{HashmapE, HashmapType};
 use ton_vm::stack::integer::{IntegerData, serialization::{Encoding, SignedIntegerBigEndianEncoding}};
 use ton_vm::stack::serialization::Serializer;
 use ton_labs_assembler::{DbgPos, Line, Lines, lines_to_string};
+
+use abi_json::Contract;
+use failure::{format_err, bail};
+use regex::Regex;
+
+use std::collections::{HashSet, HashMap};
+use std::io::{BufRead, BufReader, Read};
+use std::fs::File;
+use std::path::Path;
 
 pub type Ptr = i64;
 
