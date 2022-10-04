@@ -48,3 +48,4 @@ similar = '2.2.0'
 [lib]
 name = 'ton_utils'
 path = 'src/lib.rs'
+
