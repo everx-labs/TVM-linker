@@ -26,7 +26,7 @@ use ton_types::deserialize_cells_tree_ex;
 use ton_types::deserialize_cells_tree;
 use ton_types::{Cell, SliceData, BuilderData, IBitstring, Result};
 use ton_types::dictionary::{HashmapE, HashmapType};
-use crate::parser::{ptr_to_builder, ParseEngine, ParseEngineResults};
+use crate::parser::{ptr_to_builder, ParseEngine, ParseEngineResults, SelectorVariant};
 use crate::printer::tree_of_cells_into_base64;
 
 const XMODEM: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
@@ -265,12 +265,19 @@ impl Program {
         let entry = entry_selector.1.first_entry().unwrap();
         self.dbgmap.insert(hash, entry.clone());
 
-        if !self.engine.func_upgrade() {
-            return Ok(entry_selector.0.cell().clone())
-        }
-
+        let func_id = match self.engine.func_upgrade() {
+            SelectorVariant::Default => {
+                return Ok(entry_selector.0.cell().clone());
+            }
+            SelectorVariant::UpdateFunc => {
+                1666
+            }
+            SelectorVariant::UpdateOldSol => {
+                2
+            }
+        };
         let func_upgrade_text = vec![
-            Line::new("PUSHINT 1666\n",    "<func-upgrade-code>", 1),
+            Line::new(format!("PUSHINT {}\n", func_id).as_str(),    "<func-upgrade-code>", 1),
             Line::new("EQUAL\n",           "<func-upgrade-code>", 2),
             Line::new("THROWIFNOT 1666\n", "<func-upgrade-code>", 3),
 

@@ -71,7 +71,7 @@ impl ParseEngineResults {
     pub fn version(&self) -> Option<String> {
         self.engine.version()
     }
-    pub fn func_upgrade(&self) -> bool {
+    pub fn func_upgrade(&self) -> SelectorVariant {
         self.engine.func_upgrade()
     }
 }
@@ -222,6 +222,14 @@ impl Default for GloblFuncOrData {
     }
 }
 
+#[derive(PartialEq)]
+#[derive(Copy, Clone)]
+pub enum SelectorVariant {
+    Default,
+    UpdateFunc,
+    UpdateOldSol,
+}
+
 pub struct ParseEngine {
     /// it's about .internal, e.g.
     ///.internal-alias :main_internal, 0
@@ -250,7 +258,7 @@ pub struct ParseEngine {
     /// selector code
     entry_point: Lines,
     /// Selector variant
-    func_upgrade: bool,
+    func_upgrade: SelectorVariant,
     ///
     save_all_private_functions: bool,
     /// Contract version
@@ -344,7 +352,7 @@ impl ParseEngine {
             persistent_ptr: 0,
             abi: None,
             version: None,
-            func_upgrade: false,
+            func_upgrade: SelectorVariant::Default,
             computed: HashMap::new(),
             save_all_private_functions: false
         };
@@ -487,7 +495,7 @@ impl ParseEngine {
         self.version.clone()
     }
 
-    fn func_upgrade(&self) -> bool {
+    fn func_upgrade(&self) -> SelectorVariant {
         self.func_upgrade
     }
 
@@ -534,9 +542,13 @@ impl ParseEngine {
                 let cap = PRAGMA_REGEX.captures(&l).unwrap();
                 if let Some(m) = cap.get(1) {
                     if m.as_str() == "selector-func-solidity" {
-                        self.func_upgrade = true
+                        self.func_upgrade = SelectorVariant::UpdateFunc;
+                    } else if m.as_str() == "selector-old-sol" {
+                        self.func_upgrade = SelectorVariant::UpdateOldSol;
                     } else if m.as_str() == "save-all-private-functions" {
                         self.save_all_private_functions = true
+                    } else {
+                        bail!(format!("Unknown pragma: {}", m.as_str()));
                     }
                 }
             } else if start_with(&l, ".global-base") {
