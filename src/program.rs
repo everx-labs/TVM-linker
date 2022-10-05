@@ -545,8 +545,11 @@ mod tests {
 
     #[test]
     fn test_debug_map() {
+        // suppress interference from test_call_with_gas_limit
+        std::fs::copy("tests/Wallet.code", "tests/Wallet2.code").unwrap();
+
         let sources = vec![Path::new("tests/test_stdlib_sol.tvm"),
-                                     Path::new("tests/Wallet.code")];
+                                     Path::new("tests/Wallet2.code")];
         let abi = abi::load_abi_json_string("tests/Wallet.abi.json").unwrap();
 
         let parser = ParseEngine::new(sources, Some(abi));
@@ -554,7 +557,7 @@ mod tests {
         let mut prog = Program::new(parser.unwrap());
 
         let contract_file = compile_to_file(&mut prog, 0).unwrap();
-        let debug_map_filename = String::from("tests/Wallet.map.json");
+        let debug_map_filename = String::from("tests/Wallet2.map.json");
         let debug_map_file = File::create(&debug_map_filename).unwrap();
         serde_json::to_writer_pretty(debug_map_file, &prog.dbgmap).unwrap();
 
