@@ -60,7 +60,7 @@ use testcall::{call_contract, MsgInfo, TestCallParams, TraceLevel};
 use ton_types::{BuilderData, SliceData, Result, Status, AccountId, BagOfCells, BocSerialiseMode, UInt256};
 use std::env;
 use disasm::commands::disasm_command;
-use ton_labs_assembler::Line;
+use ton_labs_assembler::{Line, compile_code_to_cell};
 use std::fs::File;
 use std::str::FromStr;
 
@@ -121,6 +121,7 @@ fn linker_main() -> Status {
             (@arg LANGUAGE: --language +takes_value "Enable language-specific features in linkage")
             (@arg PRINT_CODE: --print_code "Command will only print the code cell without generating the TVC file")
             (@arg SILENT: --silent "Command will print necessary output")
+            (@arg RAW: --raw "Assemble code as-is into a BOC")
         )
         (@subcommand test =>
             (@setting AllowLeadingHyphen)
@@ -186,6 +187,7 @@ fn linker_main() -> Status {
                 (about: "disassembles tvc's code into assembler text")
                 (version: build_info.as_str())
                 (@arg TVC: +required +takes_value "Path to tvc file")
+                (@arg RAW: --raw "Interpret the input as a raw TOC of code")
             )
         )
         (@setting SubcommandRequired)
@@ -242,6 +244,19 @@ fn linker_main() -> Status {
     //SUBCOMMAND COMPILE
     if let Some(compile_matches) = matches.subcommand_matches("compile") {
         let input = compile_matches.value_of("INPUT").unwrap();
+        let out_file = compile_matches.value_of("OUT_FILE");
+        if compile_matches.is_present("RAW") {
+            let output = out_file.unwrap();
+            let code = std::fs::read_to_string(input)
+                .map_err(|e| format_err!("failed to read input file: {}", e))?;
+            let cell = compile_code_to_cell(code.as_str())
+                .map_err(|e| format_err!("failed to assemble: {}", e))?;
+            let mut bytes = Vec::new();
+            BagOfCells::with_root(&cell).write_to(&mut bytes, false)?;
+            let mut file = File::create(&output).unwrap();
+            file.write_all(&bytes)?;
+            return Ok(())
+        }
         let abi_from_input = format!("{}{}", input.trim_end_matches("code"), "abi.json");
         let silent = compile_matches.is_present("SILENT");
         let abi_file = compile_matches.value_of("ABI").or_else(|| {
@@ -254,7 +269,6 @@ fn linker_main() -> Status {
             Some(abi_file_name) => Some(load_abi_json_string(abi_file_name)?),
             None => None
         };
-        let out_file = compile_matches.value_of("OUT_FILE");
         let mut sources = Vec::new();
         for lib in compile_matches.values_of("LIB").unwrap_or_default() {
             let path = Path::new(lib);

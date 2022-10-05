@@ -13,10 +13,10 @@
 
 use ed25519::signature::Signer;
 use failure::format_err;
-use keyman::KeypairManager;
+use crate::keyman::KeypairManager;
 use log::Level::Error;
 use crate::printer::msg_printer;
-use program::{load_from_file, get_now};
+use crate::program::{load_from_file, get_now};
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use serde_json::Value;
 use std::fs::File;

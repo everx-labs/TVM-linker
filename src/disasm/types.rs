@@ -16,7 +16,7 @@ use ton_types::{Cell, Result, /*Bitmask,*/ SliceData, fail};
 
 pub type Code = Vec<Instruction>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Instruction {
     name: &'static str,
     params: Vec<InstructionParameter>,
@@ -43,12 +43,15 @@ impl Instruction {
     pub fn params(&self) -> &Vec<InstructionParameter> {
         &self.params
     }
+    pub fn params_mut(&mut self) -> &mut Vec<InstructionParameter> {
+        &mut self.params
+    }
     pub fn is_quiet(&self) -> bool {
         self.quiet
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum InstructionParameter {
     BigInteger(num::BigInt),
     ControlRegister(usize),
@@ -63,7 +66,9 @@ pub enum InstructionParameter {
     StackRegister(isize),
     StackRegisterPair(isize, isize),
     StackRegisterTriple(isize, isize, isize),
-    Code(Code),
+    Code { code: Code, cell: Option<Cell> },
+    Cell { cell: Cell, collapsed: bool },
+    CodeDictMarker,
 }
 
 // #[derive(Clone, Debug)]

@@ -21,7 +21,7 @@ use ton_types::{Cell, HashmapE, HashmapType, SliceData, UInt256, Status};
 use std::io::Cursor;
 
 use super::types::Shape;
-use super::loader::{load, print_code};
+use super::loader::{Loader, print_code, elaborate_dictpushconst_dictugetjmp};
 
 pub fn disasm_command(m: &ArgMatches) -> Status {
     if let Some(m) = m.subcommand_matches("dump") {
@@ -116,6 +116,20 @@ fn graphviz(cell: &Cell) {
     println!("}}");
 }
 
+fn count_unique_cells(cell: &Cell) -> usize {
+    let mut queue = vec!(cell.clone());
+    let mut set = HashSet::new();
+    while let Some(cell) = queue.pop() {
+        if set.insert(cell.repr_hash()) {
+            let count = cell.references_count();
+            for i in 0..count {
+                queue.push(cell.reference(i).unwrap());
+            }
+        }
+    }
+    set.len()
+}
+
 fn disasm_dump_command(m: &ArgMatches) -> Status {
     let filename = m.value_of("TVC");
     let tvc = filename.map(std::fs::read)
@@ -130,7 +144,10 @@ fn disasm_dump_command(m: &ArgMatches) -> Status {
         println!("{} {} in total", roots.len(), if roots.len() < 2 { "root" } else { "roots" });
         for i in 0..roots.len() {
             let root = roots.get(i).unwrap();
-            println!("root {}:", i);
+            println!("root {} ({} cells, {} unique):", i,
+                root.count_cells(usize::MAX).unwrap(),
+                count_unique_cells(root)
+            );
             print_tree_of_cells(root);
         }
     }
@@ -171,26 +188,54 @@ pub(super) fn print_tree_of_cells(toc: &Cell) {
 fn print_code_dict(cell: &Cell, key_size: usize) {
     let dict = HashmapE::with_hashmap(key_size, Some(cell.clone()));
     if dict.len().is_err() {
-        println!("failed to recognize dictionary");
+        println!(";; internal functions dictionary wasn't recognized");
         return
     }
     for (key, slice) in dict.iter().map(|r| r.unwrap()) {
         let cell = key.into_cell().unwrap();
         let id = SliceData::from(cell).get_next_int(key_size).unwrap();
         println!();
-        println!(";; function id 0x{:x}", id);
-        print!("{}", disasm(&mut slice.clone()));
+        print_entrypoint(id as i32, None);
+        println!("{}", disasm(&mut slice.clone()));
     }
 }
 
+fn print_version(cell: &Cell) {
+    match String::from_utf8(cell.data().to_vec()) {
+        Ok(version) => println!(".version {}", version),
+        Err(e) => println!(";; failed to parse version bytes: {}", e)
+    }
+}
+
+fn print_entrypoint(id: i32, name: Option<&str>) {
+    let name = name.map(str::to_string).unwrap_or(format!("{}", id));
+    println!(".internal-alias :function_{}, {}", name, id);
+    println!(".internal :function_{}", name);
+}
+
 fn disasm_text_command(m: &ArgMatches) -> Status {
+    let filename = m.value_of("TVC");
+    let tvc = filename.map(std::fs::read)
+        .transpose()
+        .map_err(|e| format_err!(" failed to read input file: {}", e))?
+        .unwrap();
+    let mut csor = Cursor::new(tvc);
+    let mut roots = deserialize_cells_tree(&mut csor).map_err(|e| format_err!("{}", e))?;
+
+    if m.is_present("RAW") {
+        println!("{}", disasm_ex(&mut SliceData::from(roots.get(0).unwrap()), true));
+        return Ok(())
+    }
+
     let shape_deprecated = Shape::literal("ff00f4a42022c00192f4a0e18aed535830f4a1")
         .branch(Shape::var("dict-public"))
         .branch(Shape::literal("f4a420f4a1")
             .branch(Shape::var("dict-c3")));
 
     let shape_current = Shape::literal("8aed5320e30320c0ffe30220c0fee302f20b")
-        .branch(Shape::var("dict-c3"))
+        .branch(Shape::literal("f4a420f4a1")
+            .branch(Shape::var("dict-c3"))
+            .branch(Shape::var("version")))
         .branch(Shape::var("internal"))
         .branch(Shape::var("external"))
         .branch(Shape::var("ticktock"));
@@ -207,15 +252,7 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
         .branch(Shape::var("dict-c3")
             .branch(Shape::any())); // just to mark any() as used, can be omitted
 
-    let filename = m.value_of("TVC");
-    let tvc = filename.map(std::fs::read)
-        .transpose()
-        .map_err(|e| format_err!(" failed to read tvc file: {}", e))?
-        .unwrap();
-    let mut csor = Cursor::new(tvc);
-    let mut roots = deserialize_cells_tree(&mut csor).map_err(|e| format_err!("{}", e))?;
     let code = roots.remove(0).reference(0).unwrap();
-
     if let Ok(assigned) = shape_deprecated.captures(&code) {
         println!(";; solidity deprecated selector detected");
         println!(";; public methods dictionary");
@@ -224,14 +261,18 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
         print_code_dict(&assigned["dict-c3"], 32);
     } else if let Ok(assigned) = shape_current.captures(&code)
             .or_else(|_| shape_current_mycode.captures(&code)) {
+        print_version(&assigned["version"]);
         println!(";; solidity selector detected");
         println!(";; internal functions dictionary");
         print_code_dict(&assigned["dict-c3"], 32);
         println!(";; internal transaction entry point");
+        print_entrypoint(0, Some("internal"));
         println!("{}", disasm(&mut SliceData::from(&assigned["internal"])));
         println!(";; external transaction entry point");
+        print_entrypoint(-1, Some("external"));
         println!("{}", disasm(&mut SliceData::from(&assigned["external"])));
         println!(";; ticktock transaction entry point");
+        print_entrypoint(-2, Some("ticktock"));
         println!("{}", disasm(&mut SliceData::from(&assigned["ticktock"])));
     } else if let Ok(assigned) = shape_fun_c.captures(&code) {
         println!(";; fun-c selector detected");
@@ -245,5 +286,12 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
 }
 
 pub(super) fn disasm(slice: &mut SliceData) -> String {
-    print_code(&load(slice).unwrap(), "")
+    disasm_ex(slice, false)
+}
+
+pub(super) fn disasm_ex(slice: &mut SliceData, collapsed: bool) -> String {
+    let mut loader = Loader::new(collapsed);
+    let mut code = loader.load(slice, false).unwrap();
+    elaborate_dictpushconst_dictugetjmp(&mut code);
+    print_code(&code, "")
 }
