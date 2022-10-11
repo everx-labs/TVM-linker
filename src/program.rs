@@ -279,7 +279,7 @@ impl Program {
         let func_upgrade_text = vec![
             Line::new(format!("PUSHINT {}\n", func_id).as_str(),    "<func-upgrade-code>", 1),
             Line::new("EQUAL\n",           "<func-upgrade-code>", 2),
-            Line::new("THROWIFNOT 1666\n", "<func-upgrade-code>", 3),
+            Line::new("THROWIFNOT 79\n",   "<func-upgrade-code>", 3),
 
             Line::new("PUSHREF\n",         "<func-upgrade-code>", 4),
             Line::new("DUP\n",             "<func-upgrade-code>", 5),
