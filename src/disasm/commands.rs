@@ -227,13 +227,21 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
         return Ok(())
     }
 
-    let shape_deprecated = Shape::literal("ff00f4a42022c00192f4a0e18aed535830f4a1")
+    let shape_deprecated1 = Shape::literal("ff00f4a42022c00192f4a0e18aed535830f4a1")
         .branch(Shape::var("dict-public"))
         .branch(Shape::literal("f4a420f4a1")
             .branch(Shape::var("dict-c3")));
 
-    let shape_current = Shape::literal("8aed5320e30320c0ffe30220c0fee302f20b")
+    let shape_deprecated2 = Shape::literal("8aed5320e30320c0ffe30220c0fee302f20b")
         .branch(Shape::literal("f4a420f4a1")
+            .branch(Shape::var("dict-c3"))
+            .branch(Shape::var("version")))
+        .branch(Shape::var("internal"))
+        .branch(Shape::var("external"))
+        .branch(Shape::var("ticktock"));
+
+    let shape_current = Shape::literal("8aed5320e30320c0ffe30220c0fee302f20b")
+        .branch(Shape::literal("f4a420f4bdf2c04e")
             .branch(Shape::var("dict-c3"))
             .branch(Shape::var("version")))
         .branch(Shape::var("internal"))
@@ -253,13 +261,14 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
             .branch(Shape::any())); // just to mark any() as used, can be omitted
 
     let code = roots.remove(0).reference(0).unwrap();
-    if let Ok(assigned) = shape_deprecated.captures(&code) {
+    if let Ok(assigned) = shape_deprecated1.captures(&code) {
         println!(";; solidity deprecated selector detected");
         println!(";; public methods dictionary");
         print_code_dict(&assigned["dict-public"], 32);
         println!(";; internal functions dictionary");
         print_code_dict(&assigned["dict-c3"], 32);
-    } else if let Ok(assigned) = shape_current.captures(&code)
+    } else if let Ok(assigned) = shape_deprecated2.captures(&code)
+            .or_else(|_| shape_current.captures(&code))
             .or_else(|_| shape_current_mycode.captures(&code)) {
         print_version(&assigned["version"]);
         println!(";; solidity selector detected");
