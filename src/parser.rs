@@ -279,9 +279,9 @@ pub struct ParseEngine {
 
 lazy_static! {
     static ref GLOBL_REGEX: Regex = Regex::new(r"^\s*\.globl\s+(:?[\w.]+)").unwrap();
-    static ref INTERNAL_REGEX: Regex = Regex::new(r"^\s*\.internal\s+(:\w+)").unwrap();
+    static ref INTERNAL_REGEX: Regex = Regex::new(r"^\s*\.internal\s+(:?\w+)").unwrap();
     static ref LABEL_REGEX: Regex = Regex::new(r"^:?[.\w]+:").unwrap();
-    static ref ALIAS_REGEX: Regex = Regex::new(r"^\s*\.internal-alias (:\w+),\s+(-?\d+)").unwrap();
+    static ref ALIAS_REGEX: Regex = Regex::new(r"^\s*\.internal-alias (:?\w+),\s+(-?\d+)").unwrap();
     static ref TYPE_REGEX: Regex = Regex::new(r"^\s*\.type\s+(:?[\w.]+),\s*@([a-zA-Z]+)").unwrap();
     static ref SIZE_REGEX: Regex = Regex::new(r"^\s*\.size\s+([\w.]+),\s*([.\w]+)").unwrap();
     static ref BASE_GLBL_REGEX: Regex = Regex::new(r"^\s*\.global-base\s+(\d+)").unwrap();
