@@ -9,7 +9,7 @@ license-file = 'LICENSE.md'
 name = 'tvm_linker'
 readme = 'README.md'
 repository = 'https://github.com/tonlabs/TVM-linker'
-version = '0.18.3'
+version = '0.18.4'
 
 [[bin]]
 name = 'tvm_linker'
@@ -27,7 +27,7 @@ lazy_static = '1.4'
 log = '0.4.6'
 num = '0.4'
 num-traits = '0.2'
-rand = '0.7.3'
+rand = "0.8.5"
 regex = '1'
 serde_json = '1.0.41'
 sha2 = '0.10'
@@ -40,8 +40,8 @@ ton_types = { git = 'https://github.com/tonlabs/ton-labs-types.git', tag = '1.11
 ton_vm = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ton-labs-vm.git', tag = '1.8.44' }
 
 [dev-dependencies]
-assert_cmd = '0.11'
-predicates = '1'
+assert_cmd = "2.0.5"
+predicates = "2.1.1"
 rayon = '1.5.3'
 similar = '2.2.0'
 
