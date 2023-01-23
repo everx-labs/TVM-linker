@@ -188,7 +188,7 @@ impl Loader {
                 Ok(code.clone())
             }
         } else {
-            let code = self.load(&mut SliceData::from(cell), false).unwrap_or_else(|_| {
+            let code = self.load(&mut SliceData::load_cell_ref(cell)?, false).unwrap_or_else(|_| {
                 // failed to load the cell - emit it as-is
                 vec!(Instruction::new(".cell").with_param(InstructionParameter::Cell { cell: cell.clone(), collapsed: false }))
             });
@@ -1824,7 +1824,7 @@ impl DelimitedHashmapE {
             }
         }
         for i in 0..slice.remaining_references() {
-            let child = SliceData::from(slice.reference(i).unwrap());
+            let child = SliceData::load_cell(slice.reference(i)?)?;
             let mut next = path.clone();
             next.push(i as u8);
             if let Ok(v) = Self::locate(child, target, next) {
@@ -1834,10 +1834,10 @@ impl DelimitedHashmapE {
         fail!("not found")
     }
     pub fn mark(&mut self) -> Result<()> {
-        let dict_slice = SliceData::from(self.dict.data().unwrap());
+        let dict_slice = SliceData::load_cell_ref(self.dict.data().unwrap())?;
         for entry in self.dict.iter() {
             let (key, mut slice) = entry?;
-            let id = SliceData::from(key).get_next_int(self.dict.bit_len())?;
+            let id = SliceData::load_builder(key)?.get_next_int(self.dict.bit_len())?;
             let loc = Self::locate(dict_slice.clone(), &slice, vec!())?;
             let mut loader = Loader::new(false);
             let code = loader.load(&mut slice, true)?;
@@ -1852,7 +1852,7 @@ impl DelimitedHashmapE {
         text += &format!("{}.cell ", indent);
         text += &format!("{{ ;; #{}\n", cell.repr_hash().to_hex_string());
         let inner_indent = String::from("  ") + indent;
-        let mut slice = SliceData::from(cell);
+        let mut slice = SliceData::load_cell_ref(cell).unwrap();
         if let Some((id, offset, code)) = self.map.get(&path) {
             let aux = slice.get_next_slice(*offset).unwrap();
             text += &format!("{}.blob x{}\n", inner_indent, aux.to_hex_string());
