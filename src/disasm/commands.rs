@@ -58,7 +58,7 @@ fn disasm_graphviz_command(m: &ArgMatches) -> Status {
                 if dict.len().is_err() {
                     bail!("empty internal methods dictionary")
                 }
-                let key = method_id.serialize().unwrap().into();
+                let key = SliceData::load_cell(method_id.serialize()?)?;
                 let data = dict.get(key).map_err(|e| format_err!("{}", e))?
                     .ok_or_else(|| format_err!("internal method {} not found", method_id))?;
                 let cell = data.into_cell();
@@ -193,7 +193,7 @@ fn print_code_dict(cell: &Cell, key_size: usize) {
     }
     for (key, slice) in dict.iter().map(|r| r.unwrap()) {
         let cell = key.into_cell().unwrap();
-        let id = SliceData::from(cell).get_next_int(key_size).unwrap();
+        let id = SliceData::load_cell(cell).unwrap().get_next_int(key_size).unwrap();
         println!();
         print_entrypoint(id as i32, None);
         println!("{}", disasm(&mut slice.clone()));
@@ -223,7 +223,7 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
     let mut roots = deserialize_cells_tree(&mut csor).map_err(|e| format_err!("{}", e))?;
 
     if m.is_present("RAW") {
-        print!("{}", disasm_ex(&mut SliceData::from(roots.get(0).unwrap()), true));
+        print!("{}", disasm_ex(&mut SliceData::load_cell_ref(roots.get(0).unwrap())?, true));
         return Ok(())
     }
 
@@ -276,13 +276,13 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
         print_code_dict(&assigned["dict-c3"], 32);
         println!(";; internal transaction entry point");
         print_entrypoint(0, Some("internal"));
-        println!("{}", disasm(&mut SliceData::from(&assigned["internal"])));
+        println!("{}", disasm(&mut SliceData::load_cell_ref(&assigned["internal"])?));
         println!(";; external transaction entry point");
         print_entrypoint(-1, Some("external"));
-        println!("{}", disasm(&mut SliceData::from(&assigned["external"])));
+        println!("{}", disasm(&mut SliceData::load_cell_ref(&assigned["external"])?));
         println!(";; ticktock transaction entry point");
         print_entrypoint(-2, Some("ticktock"));
-        println!("{}", disasm(&mut SliceData::from(&assigned["ticktock"])));
+        println!("{}", disasm(&mut SliceData::load_cell_ref(&assigned["ticktock"])?));
     } else if let Ok(assigned) = shape_fun_c.captures(&code) {
         println!(";; fun-c selector detected");
         println!(";; internal functions dictionary");
