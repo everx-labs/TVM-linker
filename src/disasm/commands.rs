@@ -223,7 +223,7 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
     let mut roots = deserialize_cells_tree(&mut csor).map_err(|e| format_err!("{}", e))?;
 
     if m.is_present("RAW") {
-        println!("{}", disasm_ex(&mut SliceData::load_cell_ref(roots.get(0).unwrap())?, true));
+        print!("{}", disasm_ex(&mut SliceData::load_cell_ref(roots.get(0).unwrap())?, true));
         return Ok(())
     }
 
