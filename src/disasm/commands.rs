@@ -260,6 +260,11 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
         .branch(Shape::var("dict-c3")
             .branch(Shape::any())); // just to mark any() as used, can be omitted
 
+    let shape_cpp = Shape::literal("ff0020c101f4a4205892f4a0e05f028a20ed53d9")
+        .branch(Shape::var("dict-public"))
+        .branch(Shape::literal("f4a420f4a1")
+            .branch(Shape::var("code-c3")));
+
     let code = roots.remove(0).reference(0).unwrap();
     if let Ok(assigned) = shape_deprecated1.captures(&code) {
         println!(";; solidity deprecated selector detected");
@@ -287,6 +292,12 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
         println!(";; fun-c selector detected");
         println!(";; internal functions dictionary");
         print_code_dict(&assigned["dict-c3"], 19);
+    } else if let Ok(assigned) = shape_cpp.captures(&code) {
+        println!(";; cpp selector detected");
+        println!(";; public methods dictionary");
+        print_code_dict(&assigned["dict-public"], 32);
+        println!(";; internal functions dictionary");
+        print_code_dict(&assigned["code-c3"], 32);
     } else {
         bail!("failed to recognize selector")
     }

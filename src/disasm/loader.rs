@@ -1646,6 +1646,7 @@ impl Loader {
     create_handler_2!(balance,          0xf827, "BALANCE");
     create_handler_2!(my_addr,          0xf828, "MYADDR");
     create_handler_2!(config_root,      0xf829, "CONFIGROOT");
+    create_handler_2!(my_code,          0xf82a, "MYCODE");
     create_handler_2!(config_dict,      0xf830, "CONFIGDICT");
     create_handler_2!(config_ref_param, 0xf832, "CONFIGPARAM");
     create_handler_2!(config_opt_param, 0xf833, "CONFIGOPTPARAM");

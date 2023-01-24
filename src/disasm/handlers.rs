@@ -798,6 +798,7 @@ impl Handlers {
                 .set(0x27, Loader::balance)
                 .set(0x28, Loader::my_addr)
                 .set(0x29, Loader::config_root)
+                .set(0x2a, Loader::my_code)
                 .set(0x30, Loader::config_dict)
                 .set(0x32, Loader::config_ref_param)
                 .set(0x33, Loader::config_opt_param)
