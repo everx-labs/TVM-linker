@@ -81,14 +81,14 @@ impl Program {
                 data_dict = HashmapE::with_hashmap(64, persistent_data)
             }
         }
-        let key = ptr_to_builder(persistent_base)?.into_cell()?.into();
+        let key = SliceData::load_builder(ptr_to_builder(persistent_base)?)?;
         let data = BuilderData::with_raw(bytes.to_vec(), PUBLIC_KEY_LENGTH * 8)?;
-        data_dict.set(key, &data.into_cell()?.into())
+        data_dict.set(key, &SliceData::load_builder(data)?)
             .map_err(|e| format_err!("failed to pack pubkey to data dictionary: {}", e))?;
         let mut builder = BuilderData::new();
         builder
-            .append_bit_one().unwrap()
-            .checked_append_reference(data_dict.data().unwrap().clone()).unwrap();
+            .append_bit_one()?
+            .checked_append_reference(data_dict.data().unwrap().clone())?;
         builder.into_cell()
     }
 
@@ -166,7 +166,7 @@ impl Program {
         ];
         let mut internal_selector = compile_code_debuggable(internal_selector_text)
             .map_err(|e| format_err!("unexpected error while compiling internal selector: {}", e))?;
-        internal_selector.0.append_reference(self.internal_method_dict()?.unwrap_or_default().into());
+        internal_selector.0.append_reference(SliceData::load_cell(self.internal_method_dict()?.unwrap_or_default())?);
 
         // adjust hash of internal_selector cell
         let hash = internal_selector.0.cell().repr_hash();
@@ -176,7 +176,7 @@ impl Program {
 
         let (mut main_selector, main_selector_dbg) = compile_code_debuggable(self.entry())
             .map_err(|e| format_err!("unexpected error while compiling main selector: {}", e))?;
-        main_selector.append_reference(self.public_method_dict(remove_ctor)?.unwrap_or_default().into());
+        main_selector.append_reference(SliceData::load_cell(self.public_method_dict(remove_ctor)?.unwrap_or_default())?);
         main_selector.append_reference(internal_selector.0);
 
         // adjust hash of main_selector cell
@@ -215,13 +215,12 @@ impl Program {
 
         let mut entry_points = vec![];
         for id in -2..1i32 {
-            let key = id.serialize()?
-                .into();
-            let value = dict.0.remove(key).unwrap();
+            let key = SliceData::load_cell(id.serialize()?)?;
+            let value = dict.0.remove(key)?;
             entry_points.push(value.unwrap_or_default());
         }
 
-        internal_selector.0.append_reference(SliceData::from(dict.0.data().unwrap_or(&Cell::default())));
+        internal_selector.0.append_reference(SliceData::load_cell(dict.0.data().cloned().unwrap_or_default())?);
         self.dbgmap.append(&mut dict.1);
 
         let version = self.engine.version();
@@ -356,7 +355,7 @@ pub fn load_from_file(contract_file: &str) -> Result<StateInit> {
     // try appending a dummy library cell if there is no such cell in the tvc file
     if cell.references_count() == 2 {
         let mut adjusted_cell = BuilderData::from(cell);
-        adjusted_cell.append_reference(BuilderData::default());
+        adjusted_cell.checked_append_reference(Cell::default())?;
         cell = adjusted_cell.into_cell()?;
     }
     StateInit::construct_from_cell(cell)
@@ -372,10 +371,10 @@ pub fn load_stateinit(file_name: &str) -> Result<(SliceData, Vec<u8>)> {
     let mut root = root_cells[0].clone();
     if root.references_count() == 2 { // append empty library cell
         let mut adjusted_cell = BuilderData::from(root);
-        adjusted_cell.append_reference(BuilderData::default());
+        adjusted_cell.checked_append_reference(Cell::default())?;
         root = adjusted_cell.into_cell()?;
     }
-    Ok((SliceData::from(root), orig_bytes))
+    Ok((SliceData::load_cell(root)?, orig_bytes))
 }
 
 pub fn get_now() -> u32 {
@@ -528,7 +527,7 @@ mod tests {
                 src: None,
                 now: 1,
                 bounced: false,
-                body: Some(body.into_cell().unwrap().into())
+                body: Some(SliceData::load_builder(body).unwrap())
             },
             None,
             None,
@@ -574,7 +573,7 @@ mod tests {
                 src: None,
                 now: 1,
                 bounced: false,
-                body: Some(body.into_cell().unwrap().into())
+                body: Some(SliceData::load_builder(body).unwrap())
             },
             None,
             None,
@@ -633,7 +632,7 @@ mod tests {
                 src: None,
                 now: 1,
                 bounced: false,
-                body: Some(body.into_cell().unwrap().into())
+                body: Some(SliceData::load_builder(body).unwrap())
             },
             None,
             None,

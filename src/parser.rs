@@ -935,7 +935,10 @@ impl ParseEngine {
             for item in data_vec {
                 let mut ptr = *item.0;
                 for subitem in item.1 {
-                    dict.set(ptr_to_builder(ptr).unwrap().into_cell().unwrap().into(), &subitem.write().unwrap_or_default().into_cell().unwrap().into()).unwrap();
+                    dict.set(
+                        SliceData::load_builder(ptr_to_builder(ptr).unwrap()).unwrap(),
+                        &SliceData::load_builder(subitem.write().unwrap_or_default()).unwrap()
+                    ).unwrap();
                     ptr += subitem.size();
                 }
             }
@@ -954,15 +957,15 @@ impl ParseEngine {
             globl_cell.append_bit_zero().unwrap();
         }
         pers_dict.set(
-            ptr_to_builder(self.persistent_base + OFFSET_GLOBL_DATA).unwrap().into_cell().unwrap().into(),
-            &globl_cell.into_cell().unwrap().into()
+            SliceData::load_builder(ptr_to_builder(self.persistent_base + OFFSET_GLOBL_DATA).unwrap()).unwrap(),
+            &SliceData::load_builder(globl_cell).unwrap()
         ).unwrap();
 
         pers_dict.data().cloned()
     }
 
     fn encode_computed_cell(&self, cell: &Cell, toplevel: bool) -> Lines {
-        let slice = SliceData::from(cell);
+        let slice = SliceData::load_cell(cell.clone()).unwrap();
         let mut lines = vec!();
         let opening = if toplevel { "{\n" } else { ".cell {\n" };
         lines.push(Line::new(opening, "", 0));
@@ -1142,7 +1145,6 @@ mod tests {
     use ton_vm::executor::Engine;
     use ton_labs_assembler::compile_code;
     use ton_vm::stack::{Stack, StackItem};
-    use std::sync::Arc;
 
     #[test]
     fn test_parser_testlib() {
@@ -1233,7 +1235,7 @@ mod tests {
         )).expect("Couldn't compile code");
 
         let mut stack = Stack::new();
-        stack.push(StackItem::Slice(data_dict.into_cell().unwrap().into()));
+        stack.push(StackItem::Slice(SliceData::load_builder(data_dict).unwrap()));
 
         let mut engine = Engine::with_capabilities(0).setup_with_libraries(
             code, None, Some(stack), None, vec![]

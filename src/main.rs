@@ -57,7 +57,7 @@ use ton_block::{Deserializable, Message, StateInit, Serializable, Account, MsgAd
 use std::io::Write;
 use std::{path::Path};
 use testcall::{call_contract, MsgInfo, TestCallParams, TraceLevel};
-use ton_types::{BuilderData, SliceData, Result, Status, AccountId, BagOfCells, BocSerialiseMode, UInt256};
+use ton_types::{SliceData, Result, Status, AccountId, BagOfCells, BocSerialiseMode, UInt256};
 use std::env;
 use disasm::commands::disasm_command;
 use ton_labs_assembler::{Line, compile_code_to_cell};
@@ -223,7 +223,7 @@ fn linker_main() -> Status {
             Some(data) => {
                 let buf = hex::decode(data).map_err(|e| format_err!("data argument has invalid format: {}", e))?;
                 let len = buf.len() * 8;
-                let body: SliceData = BuilderData::with_raw(buf, len)?.into_cell()?.into();
+                let body = SliceData::from_raw(buf, len);
                 Some(body)
             },
             None => {
@@ -502,11 +502,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
             .map_err(|e| format_err!("failed to resolve body {}: {}", hex_str, e))?;
 
             let (buf, buf_bits) = decode_hex_string(resolved.text)?;
-            let body: SliceData = BuilderData::with_raw(buf, buf_bits)
-                .map_err(|e| format_err!("failed to pack body in cell: {}", e))?
-                .into_cell()
-                .map_err(|e| format_err!("failed to pack body in cell: {}", e))?
-                .into();
+            let body = SliceData::from_raw(buf, buf_bits);
             (Some(body), Some(matches.value_of("SIGN")))
         },
         None => (build_body(matches, Some(address.to_string()))?, None),
@@ -647,7 +643,7 @@ fn build_body(matches: &ArgMatches, address: Option<String>) -> Result<Option<Sl
             }
         )?;
         let is_internal = matches.is_present("INTERNAL");
-        let body: SliceData = build_abi_body(
+        let body = build_abi_body(
             abi_file.unwrap(),
             method_name.unwrap(),
             &params,
@@ -655,7 +651,8 @@ fn build_body(matches: &ArgMatches, address: Option<String>) -> Result<Option<Sl
             key_file,
             is_internal,
             address,
-        )?.into_cell()?.into();
+        )?;
+        let body = SliceData::load_builder(body)?;
         Ok(Some(body))
     } else if mask == 0 {
         Ok(None)

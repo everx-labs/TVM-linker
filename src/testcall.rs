@@ -86,8 +86,8 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) -> Status {
         sign_builder.append_raw(&signature, signature.len() * 8)?;
         sign_builder.append_raw(&pub_key, pub_key.len() * 8)?;
     }
-    signed_body.prepend_reference(sign_builder);
-    *body = signed_body.into_cell()?.into();
+    signed_body.checked_prepend_reference(sign_builder.into_cell()?)?;
+    *body = SliceData::load_cell(signed_body.into_cell()?)?;
     Ok(())
 }
 
@@ -104,7 +104,7 @@ fn initialize_registers(
     let info = SmartContractInfo {
         capabilities,
         balance,
-        myself: myself.serialize()?.into(),
+        myself: SliceData::load_cell(myself.serialize()?).unwrap(),
         mycode,
         unix_time,
         config_params,
@@ -152,7 +152,7 @@ fn create_inbound_msg(
                 Some(s) => MsgAddressExt::from_str(s)?,
                 None => {
                     MsgAddressExt::with_extern(
-                        BuilderData::with_raw(vec![0x55; 8], 64)?.into_cell()?.into()
+                        SliceData::from_raw(vec![0x55; 8], 64)
                     ).map_err(|e| format_err!("Failed to create address: {}", e))?
                 },
             };
@@ -171,7 +171,7 @@ fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: 
     where F: Fn(SliceData, bool)
 {
     if let StackItem::Cell(cell) = actions {
-        let actions: OutActions = OutActions::construct_from(&mut cell.into())?;
+        let actions: OutActions = OutActions::construct_from(&mut SliceData::load_cell(cell)?)?;
         println!("Output actions:\n----------------");
         for act in actions {
             match act {
@@ -199,8 +199,8 @@ fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: 
 }
 
 pub fn load_code_and_data(state_init: &StateInit) -> (SliceData, SliceData) {
-    let code: SliceData = state_init.code.clone().unwrap_or_default().into();
-    let data = state_init.data.clone().unwrap_or_default().into();
+    let code: SliceData = SliceData::load_cell(state_init.code.clone().unwrap_or_default()).unwrap();
+    let data = SliceData::load_cell(state_init.data.clone().unwrap_or_default()).unwrap();
     (code, data)
 }
 
@@ -369,7 +369,7 @@ pub fn call_contract<F>(
 
         let mut body = match params.msg_info.body {
             Some(b) => b,
-            None => Cell::default().into(),
+            None => SliceData::default(),
         };
 
         if func_selector == -1 {
@@ -472,10 +472,10 @@ mod tests {
     fn test_msg_print() {
         let msg = create_external_inbound_msg(
             MsgAddressExt::with_extern(
-                BuilderData::with_raw(vec![0x55; 8], 64).unwrap().into_cell().unwrap().into()
+                SliceData::from_raw(vec![0x55; 8], 64)
             ).unwrap(),
             MsgAddressInt::with_standart(None, 0, [0x11; 32].into()).unwrap(),
-            Some(create_inbound_body(10, 20, 0x11223344).unwrap().into()),
+            Some(SliceData::load_cell(create_inbound_body(10, 20, 0x11223344).unwrap()).unwrap()),
         );
 
         let _msg2 = create_internal_msg(

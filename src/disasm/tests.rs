@@ -33,9 +33,9 @@ fn round_trip_test(filename: &str, check_bin: bool) {
     let raw0 = &std::fs::read_to_string(filename).unwrap();
     let bin0 = base64::decode(raw0).unwrap();
     let toc0 = ton_types::deserialize_tree_of_cells(&mut std::io::Cursor::new(bin0)).unwrap();
-    let mut asm0 = disasm(&mut SliceData::from(toc0.clone()));
+    let mut asm0 = disasm(&mut SliceData::load_cell(toc0.clone()).unwrap());
     let toc1 = ton_labs_assembler::compile_code_to_cell(&asm0.clone()).unwrap();
-    let mut asm1 = disasm(&mut SliceData::from(toc1.clone()));
+    let mut asm1 = disasm(&mut SliceData::load_cell(toc1.clone()).unwrap());
 
     if !check_bin {
         asm0 = cut_asm_hashes(asm0);

@@ -9,7 +9,7 @@ license-file = 'LICENSE.md'
 name = 'tvm_linker'
 readme = 'README.md'
 repository = 'https://github.com/tonlabs/TVM-linker'
-version = '0.18.4'
+version = '0.19.0'
 
 [[bin]]
 name = 'tvm_linker'
@@ -33,11 +33,11 @@ serde_json = '1.0.41'
 sha2 = '0.10'
 simplelog = '0.5.3'
 serde = { features = [ 'derive' ], version = '1.0.100' }
-ton_abi = { git = 'https://github.com/tonlabs/ton-labs-abi.git', tag = '2.3.7' }
-ton_block = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ton-labs-block.git', tag = '1.8.3' }
-ton_labs_assembler = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ton-labs-assembler.git', tag = '1.2.49' }
-ton_types = { git = 'https://github.com/tonlabs/ton-labs-types.git', tag = '1.11.4' }
-ton_vm = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ton-labs-vm.git', tag = '1.8.44' }
+ton_abi = { git = 'https://github.com/tonlabs/ton-labs-abi.git', tag = '2.3.56' }
+ton_block = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ton-labs-block.git', tag = '1.9.20' }
+ton_labs_assembler = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ton-labs-assembler.git', tag = '1.2.76' }
+ton_types = { git = 'https://github.com/tonlabs/ton-labs-types.git', tag = '1.12.6' }
+ton_vm = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ton-labs-vm.git', tag = '1.8.100' }
 
 [dev-dependencies]
 assert_cmd = '2.0.5'

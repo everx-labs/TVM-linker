@@ -22,7 +22,7 @@ pub fn prepare_methods<T>(
 where
     T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash,
 {
-    let bit_len = SliceData::from(T::default().serialize().unwrap()).remaining_bits();
+    let bit_len = SliceData::load_cell(T::default().serialize().unwrap()).unwrap().remaining_bits();
     let mut map = HashmapE::with_bit_len(bit_len);
     let mut dbg = DbgInfo::default();
     insert_methods(&mut map, &mut dbg, methods, adjust_entry_points)?;
@@ -39,8 +39,8 @@ where
     T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash,
 {
     for pair in methods.iter() {
-        let key: SliceData = pair.0.clone().serialize()
-            .map_err(|e| (pair.0.clone(), format!("Failed to serialize data: {}", e)))?.into();
+        let key: SliceData = SliceData::load_cell(pair.0.clone().serialize()
+            .map_err(|e| (pair.0.clone(), format!("Failed to serialize data: {}", e)))?).unwrap();
         let mut val = compile_code_debuggable(pair.1.clone()).map_err(|e| {
             (pair.0.clone(), e.to_string())
         })?;
