@@ -1228,8 +1228,8 @@ dependencies = [
 
 [[package]]
 name = "ton_abi"
-version = "2.3.56"
-source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.3.56#4650ec840b143b6158f32048bbfa2a847574c733"
+version = "2.3.60"
+source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.3.60#2b595a53e0c844c1cd4eaf2faa167de31909dd3c"
 dependencies = [
  "base64 0.10.1",
  "byteorder",
@@ -1250,8 +1250,8 @@ dependencies = [
 
 [[package]]
 name = "ton_block"
-version = "1.9.20"
-source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.9.20#7714c0f8bcaa105f1b12755183f5a3bba19dd73d"
+version = "1.9.22"
+source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.9.22#bb1f4af6072e52618bdffcfa7614e8ca6ee6b947"
 dependencies = [
  "base64 0.13.1",
  "crc 3.0.0",
@@ -1303,8 +1303,8 @@ dependencies = [
 
 [[package]]
 name = "ton_vm"
-version = "1.8.100"
-source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.100#4ae66b88f6ee8ac96aa0cbfaef0bfb78fdc4f3de"
+version = "1.8.108"
+source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.108#f61649a6245fc8002a5a20062de75f49b5203652"
 dependencies = [
  "diffy",
  "ed25519",
