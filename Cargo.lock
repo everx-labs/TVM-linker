@@ -1325,7 +1325,7 @@ dependencies = [
 
 [[package]]
 name = "tvm_linker"
-version = "0.19.4"
+version = "0.19.3"
 dependencies = [
  "assert_cmd",
  "base64 0.13.1",
