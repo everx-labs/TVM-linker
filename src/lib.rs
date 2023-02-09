@@ -36,6 +36,7 @@ extern crate ton_types;
 extern crate ton_vm;
 
 pub mod abi;
+pub mod disasm;
 pub mod keyman;
 pub mod parser;
 pub mod printer;
