@@ -1926,29 +1926,35 @@ fn print_dictpushconst(insn: &Instruction, indent: &str) -> String {
 }
 
 pub fn print_code(code: &Code, indent: &str) -> String {
+    print_code_ex(code, indent, true)
+}
+
+pub fn print_code_ex(code: &Code, indent: &str, full: bool) -> String {
     let mut disasm = String::new();
     for insn in code {
         disasm += indent;
-        match insn.name() {
-            "DICTPUSHCONST" | "PFXDICTSWITCH" => {
-                // TODO better improve assembler for these two insns
-                disasm += &print_dictpushconst(insn, indent);
-                continue
-            }
-            "IMPLICIT-JMP" => {
-                if let Some(InstructionParameter::Code { code, cell }) = insn.params().get(0) {
-                    let hash = cell.as_ref().unwrap().repr_hash().to_hex_string();
-                    disasm += &format!(".cell {{ ;; #{}\n", hash);
-                    let inner_indent = String::from("  ") + indent;
-                    disasm += &print_code(code, inner_indent.as_str());
-                    disasm += indent;
-                    disasm += "}\n";
-                } else {
-                    unreachable!()
+        if full {
+            match insn.name() {
+                "DICTPUSHCONST" | "PFXDICTSWITCH" => {
+                    // TODO better improve assembler for these two insns
+                    disasm += &print_dictpushconst(insn, indent);
+                    continue
                 }
-                continue
+                "IMPLICIT-JMP" => {
+                    if let Some(InstructionParameter::Code { code, cell }) = insn.params().get(0) {
+                        let hash = cell.as_ref().unwrap().repr_hash().to_hex_string();
+                        disasm += &format!(".cell {{ ;; #{}\n", hash);
+                        let inner_indent = String::from("  ") + indent;
+                        disasm += &print_code(code, inner_indent.as_str());
+                        disasm += indent;
+                        disasm += "}\n";
+                    } else {
+                        unreachable!()
+                    }
+                    continue
+                }
+                _ => ()
             }
-            _ => ()
         }
         disasm += insn.name();
         if insn.is_quiet() {
@@ -2002,25 +2008,29 @@ pub fn print_code(code: &Code, indent: &str) -> String {
                     disasm += format!("s{}, s{}, s{}", ra, rb, rc).as_str();
                 }
                 InstructionParameter::Code { code, cell } => {
-                    if let Some(cell) = cell {
-                        disasm += &format!("{{ ;; #{}\n", cell.repr_hash().to_hex_string());
-                    } else {
-                        disasm += "{\n";
+                    if full {
+                        if let Some(cell) = cell {
+                            disasm += &format!("{{ ;; #{}\n", cell.repr_hash().to_hex_string());
+                        } else {
+                            disasm += "{\n";
+                        }
+                        let inner_indent = String::from("  ") + indent;
+                        disasm += &print_code(code, inner_indent.as_str());
+                        disasm += indent;
+                        disasm += "}";
+                        curr_is_block = true;
                     }
-                    let inner_indent = String::from("  ") + indent;
-                    disasm += &print_code(code, inner_indent.as_str());
-                    disasm += indent;
-                    disasm += "}";
-                    curr_is_block = true;
                 }
                 InstructionParameter::Cell { cell, collapsed } => {
-                    if *collapsed {
-                        assert!(insn.name() == ";;");
-                        disasm += "<collapsed>";
-                    } else {
-                        disasm += &print_cell(cell, indent, false);
+                    if full {
+                        if *collapsed {
+                            assert!(insn.name() == ";;");
+                            disasm += "<collapsed>";
+                        } else {
+                            disasm += &print_cell(cell, indent, false);
+                        }
+                        curr_is_block = true;
                     }
-                    curr_is_block = true;
                 }
                 InstructionParameter::CodeDictMarker => {
                     // handled above for DICTPUSHCONST

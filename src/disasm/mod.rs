@@ -11,9 +11,9 @@
  * limitations under the License.
  */
 
-pub(crate) mod commands;
+pub mod commands;
 mod handlers;
-mod loader;
+pub mod loader;
 #[cfg(test)]
 mod tests;
-mod types;
+pub mod types;
