@@ -1228,8 +1228,8 @@ dependencies = [
 
 [[package]]
 name = "ton_abi"
-version = "2.3.60"
-source = "git+https://github.com/tonlabs/ton-labs-abi.git?tag=2.3.60#2b595a53e0c844c1cd4eaf2faa167de31909dd3c"
+version = "2.3.65"
+source = "git+https://github.com/tonlabs/ever-abi.git?tag=2.3.65#00fca4378ed42feb776b759cee8f08adf696630c"
 dependencies = [
  "base64 0.10.1",
  "byteorder",
@@ -1250,8 +1250,8 @@ dependencies = [
 
 [[package]]
 name = "ton_block"
-version = "1.9.22"
-source = "git+https://github.com/tonlabs/ton-labs-block.git?tag=1.9.22#bb1f4af6072e52618bdffcfa7614e8ca6ee6b947"
+version = "1.9.28"
+source = "git+https://github.com/tonlabs/ever-block.git?tag=1.9.28#2d4130374d6b71e51156c51a589bfb92a05121bb"
 dependencies = [
  "base64 0.13.1",
  "crc 3.0.1",
@@ -1268,8 +1268,8 @@ dependencies = [
 
 [[package]]
 name = "ton_labs_assembler"
-version = "1.2.77"
-source = "git+https://github.com/tonlabs/ton-labs-assembler.git?tag=1.2.77#6257a674457627646237e74ee6eb402f052d214f"
+version = "1.2.82"
+source = "git+https://github.com/tonlabs/ever-assembler.git?tag=1.2.82#0db7626fce1f8d5f46264b0b6361b5d4e9584cbb"
 dependencies = [
  "failure",
  "hex 0.4.3",
@@ -1283,8 +1283,8 @@ dependencies = [
 
 [[package]]
 name = "ton_types"
-version = "1.12.6"
-source = "git+https://github.com/tonlabs/ton-labs-types.git?tag=1.12.6#8e218813db6bacc138dbbec7ab4ccbf84220da31"
+version = "1.12.7"
+source = "git+https://github.com/tonlabs/ever-types.git?tag=1.12.7#5acf1cc4bf275bd1c58040581df469161297ee4d"
 dependencies = [
  "base64 0.13.1",
  "crc 1.8.1",
@@ -1303,8 +1303,8 @@ dependencies = [
 
 [[package]]
 name = "ton_vm"
-version = "1.8.108"
-source = "git+https://github.com/tonlabs/ton-labs-vm.git?tag=1.8.108#f61649a6245fc8002a5a20062de75f49b5203652"
+version = "1.8.116"
+source = "git+https://github.com/tonlabs/ever-vm.git?tag=1.8.116#cde1a111cdc33dada3144cb0a553a48e648cb748"
 dependencies = [
  "diffy",
  "ed25519",
