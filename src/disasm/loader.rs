@@ -140,7 +140,7 @@ impl Loader {
             Ok(code) => code,
             Err(_) => {
                 // failed to load the slice - emit it as-is
-                let mut insns = vec!(
+                let mut insns = Code::single(
                     Instruction::new(".blob").with_param(InstructionParameter::Slice(orig_slice.clone()))
                 );
                 for i in 0..orig_slice.remaining_references() {
@@ -183,14 +183,14 @@ impl Loader {
     fn load_cell(&mut self, cell: &Cell) -> Result<Code> {
         if let Some(code) = self.history.get(&cell.repr_hash()) {
             if self.collapse {
-                Ok(vec!(Instruction::new(";;").with_param(InstructionParameter::Cell { cell: cell.clone(), collapsed: true })))
+                Ok(Code::single(Instruction::new(";;").with_param(InstructionParameter::Cell { cell: cell.clone(), collapsed: true })))
             } else {
                 Ok(code.clone())
             }
         } else {
             let code = self.load(&mut SliceData::load_cell_ref(cell)?, false).unwrap_or_else(|_| {
                 // failed to load the cell - emit it as-is
-                vec!(Instruction::new(".cell").with_param(InstructionParameter::Cell { cell: cell.clone(), collapsed: false }))
+                Code::single(Instruction::new(".cell").with_param(InstructionParameter::Cell { cell: cell.clone(), collapsed: false }))
             });
             self.history.insert(cell.repr_hash(), code.clone());
             Ok(code)
@@ -1742,34 +1742,6 @@ fn match_dictpushconst_dictugetjmp(pair: &mut [Instruction]) -> Option<&mut Vec<
     Some(insn1.params_mut())
 }
 
-fn process_dictpushconst_dictugetjmp(code: &mut Code) {
-    for pair in code.chunks_mut(2) {
-        if let Some(params) = match_dictpushconst_dictugetjmp(pair) {
-            // TODO transform cell to code right here (for nested dicts)
-            params.push(InstructionParameter::CodeDictMarker)
-        }
-    }
-}
-
-fn traverse_code_tree(code: &mut Code, process: fn(&mut Code)) {
-    let mut stack = vec!(code);
-    while let Some(code) = stack.pop() {
-        process(code);
-        for insn in code {
-            for param in insn.params_mut() {
-                match param {
-                    InstructionParameter::Code { code: ref mut inner, cell: _ } => stack.push(inner),
-                    _ => ()
-                }
-            }
-        }
-    }
-}
-
-pub fn elaborate_dictpushconst_dictugetjmp(code: &mut Code) {
-    traverse_code_tree(code, process_dictpushconst_dictugetjmp)
-}
-
 struct DelimitedHashmapE {
     dict: HashmapE,
     map: HashMap<Vec<u8>, (u64, usize, Code)>,
@@ -1858,7 +1830,7 @@ impl DelimitedHashmapE {
             let aux = slice.get_next_slice(*offset).unwrap();
             text += &format!("{}.blob x{}\n", inner_indent, aux.to_hex_string());
             text += &format!("{};; method {}\n", inner_indent, id);
-            text += &print_code(code, &inner_indent);
+            text += &code.print(&inner_indent, true);
         } else {
             if slice.remaining_bits() > 0 {
                 text += &format!("{}.blob x{}\n", inner_indent, slice.to_hex_string());
@@ -1925,123 +1897,146 @@ fn print_dictpushconst(insn: &Instruction, indent: &str) -> String {
     format!("{} {}\n{}", insn.name(), key_length, text)
 }
 
-pub fn print_code(code: &Code, indent: &str) -> String {
-    print_code_ex(code, indent, true)
-}
-
-pub fn print_code_ex(code: &Code, indent: &str, full: bool) -> String {
-    let mut disasm = String::new();
-    for insn in code {
-        disasm += indent;
-        if full {
-            match insn.name() {
-                "DICTPUSHCONST" | "PFXDICTSWITCH" => {
-                    // TODO better improve assembler for these two insns
-                    disasm += &print_dictpushconst(insn, indent);
-                    continue
+impl Code {
+    fn process_dictpushconst_dictugetjmp(code: &mut Code) {
+        for pair in code.chunks_mut(2) {
+            if let Some(params) = match_dictpushconst_dictugetjmp(pair) {
+                // TODO transform cell to code right here (for nested dicts)
+                params.push(InstructionParameter::CodeDictMarker)
+            }
+        }
+    }
+    fn traverse_code_tree(&mut self, process: fn(&mut Code)) {
+        let mut stack = vec!(self);
+        while let Some(code) = stack.pop() {
+            process(code);
+            for insn in code.iter_mut() {
+                for param in insn.params_mut() {
+                    match param {
+                        InstructionParameter::Code { code: ref mut inner, cell: _ } => stack.push(inner),
+                        _ => ()
+                    }
                 }
-                "IMPLICIT-JMP" => {
-                    if let Some(InstructionParameter::Code { code, cell }) = insn.params().get(0) {
-                        let hash = cell.as_ref().unwrap().repr_hash().to_hex_string();
-                        disasm += &format!(".cell {{ ;; #{}\n", hash);
-                        let inner_indent = String::from("  ") + indent;
-                        disasm += &print_code(code, inner_indent.as_str());
-                        disasm += indent;
-                        disasm += "}\n";
-                    } else {
+            }
+        }
+    }
+    pub fn elaborate_dictpushconst_dictugetjmp(&mut self) {
+        self.traverse_code_tree(Self::process_dictpushconst_dictugetjmp)
+    }
+    pub fn print(&self, indent: &str, full: bool) -> String {
+        let mut disasm = String::new();
+        for insn in self.iter() {
+            disasm += indent;
+            if full {
+                match insn.name() {
+                    "DICTPUSHCONST" | "PFXDICTSWITCH" => {
+                        // TODO better improve assembler for these two insns
+                        disasm += &print_dictpushconst(insn, indent);
+                        continue
+                    }
+                    "IMPLICIT-JMP" => {
+                        if let Some(InstructionParameter::Code { code, cell }) = insn.params().get(0) {
+                            let hash = cell.as_ref().unwrap().repr_hash().to_hex_string();
+                            disasm += &format!(".cell {{ ;; #{}\n", hash);
+                            let inner_indent = String::from("  ") + indent;
+                            disasm += &code.print(inner_indent.as_str(), full);
+                            disasm += indent;
+                            disasm += "}\n";
+                        } else {
+                            unreachable!()
+                        }
+                        continue
+                    }
+                    _ => ()
+                }
+            }
+            disasm += insn.name();
+            if insn.is_quiet() {
+                disasm += "Q";
+            }
+            let len = insn.params().len();
+            if len > 0 {
+                disasm += " ";
+            }
+            for (index, param) in insn.params().iter().enumerate() {
+                let last = len == (index + 1);
+                let mut curr_is_block = false;
+                match param {
+                    InstructionParameter::BigInteger(i) => {
+                        disasm += format!("{}", i).as_str();
+                    }
+                    InstructionParameter::ControlRegister(c) => {
+                        disasm += format!("c{}", c).as_str();
+                    }
+                    //InstructionParameter::DivisionMode(_) => {
+                    //    todo!()
+                    //}
+                    InstructionParameter::Integer(i) => {
+                        disasm += format!("{}", i).as_str();
+                    }
+                    InstructionParameter::Length(l) => {
+                        disasm += format!("{}", l).as_str();
+                    }
+                    InstructionParameter::LengthAndIndex(l, i) => {
+                        disasm += format!("{}, {}", l, i).as_str();
+                    }
+                    InstructionParameter::Nargs(n) => {
+                        disasm += format!("{}", n).as_str();
+                    }
+                    InstructionParameter::Pargs(p) => {
+                        disasm += format!("{}", p).as_str();
+                    }
+                    InstructionParameter::Rargs(r) => {
+                        disasm += format!("{}", r).as_str();
+                    }
+                    InstructionParameter::Slice(s) => {
+                        disasm += format!("x{}", s.to_hex_string()).as_str();
+                    }
+                    InstructionParameter::StackRegister(r) => {
+                        disasm += format!("s{}", r).as_str();
+                    }
+                    InstructionParameter::StackRegisterPair(ra, rb) => {
+                        disasm += format!("s{}, s{}", ra, rb).as_str();
+                    }
+                    InstructionParameter::StackRegisterTriple(ra, rb, rc) => {
+                        disasm += format!("s{}, s{}, s{}", ra, rb, rc).as_str();
+                    }
+                    InstructionParameter::Code { code, cell } => {
+                        if full {
+                            if let Some(cell) = cell {
+                                disasm += &format!("{{ ;; #{}\n", cell.repr_hash().to_hex_string());
+                            } else {
+                                disasm += "{\n";
+                            }
+                            let inner_indent = String::from("  ") + indent;
+                            disasm += &code.print(inner_indent.as_str(), full);
+                            disasm += indent;
+                            disasm += "}";
+                            curr_is_block = true;
+                        }
+                    }
+                    InstructionParameter::Cell { cell, collapsed } => {
+                        if full {
+                            if *collapsed {
+                                assert!(insn.name() == ";;");
+                                disasm += "<collapsed>";
+                            } else {
+                                disasm += &print_cell(cell, indent, false);
+                            }
+                            curr_is_block = true;
+                        }
+                    }
+                    InstructionParameter::CodeDictMarker => {
+                        // handled above for DICTPUSHCONST
                         unreachable!()
                     }
-                    continue
                 }
-                _ => ()
-            }
-        }
-        disasm += insn.name();
-        if insn.is_quiet() {
-            disasm += "Q";
-        }
-        let len = insn.params().len();
-        if len > 0 {
-            disasm += " ";
-        }
-        for (index, param) in insn.params().iter().enumerate() {
-            let last = len == (index + 1);
-            let mut curr_is_block = false;
-            match param {
-                InstructionParameter::BigInteger(i) => {
-                    disasm += format!("{}", i).as_str();
-                }
-                InstructionParameter::ControlRegister(c) => {
-                    disasm += format!("c{}", c).as_str();
-                }
-                //InstructionParameter::DivisionMode(_) => {
-                //    todo!()
-                //}
-                InstructionParameter::Integer(i) => {
-                    disasm += format!("{}", i).as_str();
-                }
-                InstructionParameter::Length(l) => {
-                    disasm += format!("{}", l).as_str();
-                }
-                InstructionParameter::LengthAndIndex(l, i) => {
-                    disasm += format!("{}, {}", l, i).as_str();
-                }
-                InstructionParameter::Nargs(n) => {
-                    disasm += format!("{}", n).as_str();
-                }
-                InstructionParameter::Pargs(p) => {
-                    disasm += format!("{}", p).as_str();
-                }
-                InstructionParameter::Rargs(r) => {
-                    disasm += format!("{}", r).as_str();
-                }
-                InstructionParameter::Slice(s) => {
-                    disasm += format!("x{}", s.to_hex_string()).as_str();
-                }
-                InstructionParameter::StackRegister(r) => {
-                    disasm += format!("s{}", r).as_str();
-                }
-                InstructionParameter::StackRegisterPair(ra, rb) => {
-                    disasm += format!("s{}, s{}", ra, rb).as_str();
-                }
-                InstructionParameter::StackRegisterTriple(ra, rb, rc) => {
-                    disasm += format!("s{}, s{}, s{}", ra, rb, rc).as_str();
-                }
-                InstructionParameter::Code { code, cell } => {
-                    if full {
-                        if let Some(cell) = cell {
-                            disasm += &format!("{{ ;; #{}\n", cell.repr_hash().to_hex_string());
-                        } else {
-                            disasm += "{\n";
-                        }
-                        let inner_indent = String::from("  ") + indent;
-                        disasm += &print_code(code, inner_indent.as_str());
-                        disasm += indent;
-                        disasm += "}";
-                        curr_is_block = true;
-                    }
-                }
-                InstructionParameter::Cell { cell, collapsed } => {
-                    if full {
-                        if *collapsed {
-                            assert!(insn.name() == ";;");
-                            disasm += "<collapsed>";
-                        } else {
-                            disasm += &print_cell(cell, indent, false);
-                        }
-                        curr_is_block = true;
-                    }
-                }
-                InstructionParameter::CodeDictMarker => {
-                    // handled above for DICTPUSHCONST
-                    unreachable!()
+                if !last && !curr_is_block {
+                    disasm += ", ";
                 }
             }
-            if !last && !curr_is_block {
-                disasm += ", ";
-            }
+            disasm += "\n";
         }
-        disasm += "\n";
+        disasm
     }
-    disasm
 }
