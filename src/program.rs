@@ -320,7 +320,7 @@ pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8, silent: bool) 
         format!("{:x}.tvc", address)
     };
 
-    let mut file = File::create(&file_name).unwrap();
+    let mut file = File::create(&file_name)?;
     file.write_all(&buffer)?;
 
     if print_filename {
