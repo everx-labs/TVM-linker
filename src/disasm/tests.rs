@@ -93,3 +93,25 @@ fn round_trip_tonix() {
         round_trip_test(&filename, true);
     })
 }
+
+fn check(code: &str, text: &str) {
+    let mut slice = SliceData::from_string(code).unwrap();
+    let text_disasm = disasm(&mut slice);
+    assert_eq!(text, &text_disasm);
+}
+
+#[test]
+fn disasm_fragment() {
+    check("70", "PUSHINT 0\n");
+    check("88", "PUSHREF {\n  ;; missing cell\n}\n");
+    check("8b04", "PUSHSLICE x4_\n");
+    check("8c0800000000", "PUSHSLICE x000000004_\n");
+    check("8c40", "PUSHSLICE x4_ ;; missing 1 ref\n");
+    check("8c80", "PUSHSLICE x4_ ;; missing 2 refs\n");
+    check("8e80", "PUSHCONT {\n} ;; missing 1 ref\n");
+    check("8e81", "PUSHCONT {\n} ;; missing 8 bits and 1 ref\n");
+    check("920000", "PUSHCONT {\n  NOP\n  NOP\n}\n");
+    check("e300", "IFREF {\n  ;; missing cell\n}\n");
+    check("e30f", "IFREFELSEREF {\n  ;; missing cell\n}{\n  ;; missing cell\n}\n");
+    check("f4a420", "DICTPUSHCONST 32 ;; missing dict ref\n");
+}

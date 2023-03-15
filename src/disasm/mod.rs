@@ -11,9 +11,11 @@
  * limitations under the License.
  */
 
+pub mod codedict;
 pub mod commands;
 mod handlers;
 pub mod loader;
+pub mod fmt;
 #[cfg(test)]
 mod tests;
 pub mod types;

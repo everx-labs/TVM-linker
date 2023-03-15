@@ -20,8 +20,12 @@ use ton_types::cells_serialization::deserialize_cells_tree;
 use ton_types::{Cell, HashmapE, HashmapType, SliceData, UInt256, Status};
 use std::io::Cursor;
 
-use super::types::Shape;
-use super::loader::{Loader, print_code, elaborate_dictpushconst_dictugetjmp};
+use super::{
+    codedict::elaborate_dictpushconst_dictugetjmp,
+    fmt::print_code,
+    loader::Loader,
+    types::Shape,
+};
 
 pub fn disasm_command(m: &ArgMatches) -> Status {
     if let Some(m) = m.subcommand_matches("dump") {
@@ -30,6 +34,8 @@ pub fn disasm_command(m: &ArgMatches) -> Status {
         return disasm_graphviz_command(m);
     } else if let Some(m) = m.subcommand_matches("text") {
         return disasm_text_command(m);
+    } else if let Some(m) = m.subcommand_matches("fragment") {
+        return disasm_fragment_command(m);
     }
     bail!("unknown command")
 }
@@ -305,6 +311,18 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
     Ok(())
 }
 
+fn disasm_fragment_command(m: &ArgMatches) -> Status {
+    let fragment = m.value_of("FRAGMENT").unwrap();
+    let mut slice = SliceData::from_string(fragment)?;
+
+    let mut loader = Loader::new(false);
+    let code = loader.load(&mut slice, false).unwrap();
+    let text = print_code(&code, "", true, 12);
+
+    print!("{}", text);
+    Ok(())
+}
+
 pub(super) fn disasm(slice: &mut SliceData) -> String {
     disasm_ex(slice, false)
 }
@@ -313,5 +331,5 @@ pub(super) fn disasm_ex(slice: &mut SliceData, collapsed: bool) -> String {
     let mut loader = Loader::new(collapsed);
     let mut code = loader.load(slice, false).unwrap();
     elaborate_dictpushconst_dictugetjmp(&mut code);
-    print_code(&code, "")
+    print_code(&code, "", true, 0)
 }
