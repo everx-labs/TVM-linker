@@ -588,12 +588,12 @@ mod tests {
     #[test]
     fn test_get_version() {
         assert_eq!(
-            "0.43.0+commit.e8c3d877.mod.Linux.g++".to_string(),
+            "0.66.0".to_string(),
             get_version("tests/get-version1.code").unwrap_or("".to_string())
         );
 
         assert_eq!(
-            "0.43.0+commit.e8c3d877.mod.Linux.g++".to_string(),
+            "0.65.0".to_string(),
             get_version("tests/get-version2.code").unwrap_or("".to_string())
         );
 

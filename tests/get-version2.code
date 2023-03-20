@@ -1,4 +1,7 @@
-.version 0.43.0+commit.e8c3d877.mod.Linux.g++
+.version sold 0.65.0
+.commith sold 4e97449a48c05600af00027d652519de61190b53
+.name WalletV20
+.desc Not a simple wallet contract
 
 .internal-alias :main_internal, -1
 .internal       :main_internal

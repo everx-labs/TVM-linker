@@ -15,3 +15,4 @@ Main.abi.json
 
 trash/*
 !trash/.gitkeep
+.DS_Store

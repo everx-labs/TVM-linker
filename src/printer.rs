@@ -27,13 +27,17 @@ fn get_version(root: &Cell) -> Result<String> {
 
 pub fn get_version_mycode_aware(root: Option<&Cell>) -> Result<String> {
     let root = root.ok_or_else(|| format_err!("not found (empty root)"))?;
-    match get_version(root) {
+    let v = match get_version(root) {
         Ok(res) => Ok(res),
         Err(_) => {
             let root = root.reference(1)?;
             get_version(&root)
         }
-    }
+    };
+
+    dbg!(&v);
+
+    v
 }
 
 pub fn state_init_printer(state: &StateInit) -> String {
