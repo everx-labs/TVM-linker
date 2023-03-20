@@ -14,19 +14,23 @@
 use crate::abi::{gen_abi_id, load_abi_contract};
 use crate::resolver::resolve_name;
 
-use ton_types::{BuilderData, IBitstring, SliceData, Cell, Result, Status};
+use ton_labs_assembler::{lines_to_string, DbgPos, Line, Lines};
 use ton_types::dictionary::{HashmapE, HashmapType};
-use ton_vm::stack::integer::{IntegerData, serialization::{Encoding, SignedIntegerBigEndianEncoding}};
+use ton_types::{BuilderData, Cell, IBitstring, Result, SliceData, Status};
+use ton_vm::stack::integer::{
+    serialization::{Encoding, SignedIntegerBigEndianEncoding},
+    IntegerData,
+};
 use ton_vm::stack::serialization::Serializer;
-use ton_labs_assembler::{DbgPos, Line, Lines, lines_to_string};
 
 use abi_json::Contract;
-use failure::{format_err, bail};
+use failure::{bail, format_err};
 use regex::Regex;
+use std::convert::TryInto;
 
-use std::collections::{HashSet, HashMap};
-use std::io::{BufRead, BufReader, Read};
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
+use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 
 pub type Ptr = i64;
@@ -71,6 +75,9 @@ impl ParseEngineResults {
     pub fn version(&self) -> Option<String> {
         self.engine.version()
     }
+    pub fn commith(&self) -> Option<&[u8; 20]> { self.engine.commith() }
+    pub fn name(&self) -> &str { self.engine.name() }
+    pub fn desc(&self) -> &str { self.engine.desc() }
     pub fn func_upgrade(&self) -> SelectorVariant {
         self.engine.func_upgrade()
     }
@@ -222,8 +229,7 @@ impl Default for GloblFuncOrData {
     }
 }
 
-#[derive(PartialEq)]
-#[derive(Copy, Clone)]
+#[derive(PartialEq, Copy, Clone)]
 pub enum SelectorVariant {
     Default,
     UpdateFunc,
@@ -261,8 +267,14 @@ pub struct ParseEngine {
     func_upgrade: SelectorVariant,
     ///
     save_all_private_functions: bool,
-    /// Contract version
+
     version: Option<String>,
+    // sold version
+    commith: Option<[u8; 20]>, // sold commit hash
+
+    name: String,
+    // contract name
+    desc: String, // contract desc
 
     /// starting key for objects in global memory dictionary
     globl_base: Ptr,
@@ -289,11 +301,15 @@ lazy_static! {
     static ref PUBLIC_REGEX: Regex = Regex::new(r"^\s*\.public\s+([\w.]+)").unwrap();
     static ref MACRO_REGEX: Regex = Regex::new(r"^\s*\.macro\s+([\w.:]+)").unwrap();
     static ref LOC_REGEX: Regex = Regex::new(r"^\s*\.loc\s+(.+),\s+(\d+)\n$").unwrap();
-    static ref VERSION_REGEX: Regex = Regex::new(r"^\s*\.version\s+(.+)").unwrap();
     static ref PRAGMA_REGEX: Regex = Regex::new(r"^\s*\.pragma\s+(.+)").unwrap();
-
     static ref COMPUTE_REGEX: Regex = Regex::new(r"^\s*\.compute\s+\$([\w\.:]+)\$").unwrap();
     static ref CALL_REGEX: Regex = Regex::new(r"^\s*CALL\s+\$([\w\.:]+)\$").unwrap();
+
+    static ref VERSION_REGEX: Regex = Regex::new(r"^\s*\.version sold\s+(.+)").unwrap();
+    static ref COMMITH_REGEX: Regex = Regex::new(r"^\s*\.commith sold\s+(.+)").unwrap();
+
+    static ref NAME_REGEX: Regex = Regex::new(r"^\s*\.name\s+(.+)").unwrap();
+    static ref DESC_REGEX: Regex = Regex::new(r"^\s*\.desc\s+(.+)").unwrap();
 }
 
 const GLOBL:            &str = ".globl";
@@ -324,7 +340,6 @@ pub struct ParseEngineInput<'a> {
 }
 
 impl ParseEngine {
-
     pub fn new(sources: Vec<&Path>, abi_json: Option<String>) -> Result<Self> {
         let mut inputs = vec!();
         for path in sources {
@@ -352,9 +367,12 @@ impl ParseEngine {
             persistent_ptr: 0,
             abi: None,
             version: None,
+            commith: None,
+            name: "".to_string(),
+            desc: "".to_string(),
             func_upgrade: SelectorVariant::Default,
             computed: HashMap::new(),
-            save_all_private_functions: false
+            save_all_private_functions: false,
         };
         engine.parse(inputs, abi_json)?;
         Ok(engine)
@@ -491,13 +509,12 @@ impl ParseEngine {
         data.addr = self.persistent_base;
     }
 
-    fn version(&self) -> Option<String> {
-        self.version.clone()
-    }
+    fn version(&self) -> Option<String> { self.version.clone() }
+    fn commith(&self) -> Option<&[u8; 20]> { self.commith.as_ref() }
+    fn name(&self) -> &str { self.name.as_str() }
+    fn desc(&self) -> &str { self.desc.as_str() }
 
-    fn func_upgrade(&self) -> SelectorVariant {
-        self.func_upgrade
-    }
+    fn func_upgrade(&self) -> SelectorVariant { self.func_upgrade }
 
     fn parse_code(&mut self, mut input: ParseEngineInput) -> Status {
         let mut section_name = String::new();
@@ -535,9 +552,19 @@ impl ParseEngine {
                start_with(&l, ".section") {
                 //ignore unused parameters
                 debug!("ignored: {}", l);
-            } else if start_with(&l, ".version") {
+            } else if start_with(&l, ".version sold") {
                 let cap = VERSION_REGEX.captures(&l).unwrap();
                 self.version = Some(cap.get(1).unwrap().as_str().to_owned());
+            } else if start_with(&l, ".commith sold") {
+                let cap = COMMITH_REGEX.captures(&l).unwrap();
+                let commit = hex::decode(cap.get(1).unwrap().as_str().to_owned())?;
+                self.commith = commit.try_into().ok();
+            } else if start_with(&l, ".name") {
+                let cap = NAME_REGEX.captures(&l).unwrap();
+                self.name = cap.get(1).unwrap().as_str().to_owned();
+            } else if start_with(&l, ".desc") {
+                let cap = DESC_REGEX.captures(&l).unwrap();
+                self.desc = cap.get(1).unwrap().as_str().to_owned();
             } else if start_with(&l, ".pragma") {
                 let cap = PRAGMA_REGEX.captures(&l).unwrap();
                 if let Some(m) = cap.get(1) {

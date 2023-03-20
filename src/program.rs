@@ -10,26 +10,24 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
-use base64::encode;
+use crate::methdict::*;
+use crate::parser::{ptr_to_builder, ParseEngine, ParseEngineResults, SelectorVariant};
+use crate::printer::tree_of_cells_into_base64;
 use ed25519_dalek::*;
+use ever_struct::scheme;
 use failure::format_err;
+use serde_json::json;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Cursor;
 use std::io::Read;
-use std::io::Write;
-use std::collections::HashMap;
 use std::time::SystemTime;
-use crate::methdict::*;
 use ton_block::*;
-use ton_labs_assembler::{Line, Lines, compile_code_debuggable, DbgInfo};
-use ton_types::deserialize_cells_tree_ex;
+use ton_labs_assembler::{compile_code_debuggable, DbgInfo, Line, Lines};
 use ton_types::deserialize_cells_tree;
-use ton_types::{Cell, SliceData, BuilderData, IBitstring, Result};
+use ton_types::deserialize_cells_tree_ex;
 use ton_types::dictionary::{HashmapE, HashmapType};
-use crate::parser::{ptr_to_builder, ParseEngine, ParseEngineResults, SelectorVariant};
-use crate::printer::tree_of_cells_into_base64;
-
-const XMODEM: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
+use ton_types::{BuilderData, Cell, IBitstring, Result, SliceData};
 
 pub struct Program {
     language: Option<String>,
@@ -122,41 +120,63 @@ impl Program {
         Ok(dict.0.data().cloned())
     }
 
-    pub fn compile_to_file_ex(
-        &mut self,
-        wc: i8,
-        out_file: Option<&str>,
-        data_filename: Option<&str>,
-    ) -> Result<String> {
-        let mut state_init = self.compile_to_state(self.print_code)?;
-        if self.print_code {
-            return Ok("".to_string());
-        }
-        if let Some(data_filename) = data_filename {
-            let mut data_cursor = Cursor::new(std::fs::read(data_filename).unwrap());
-            let data_cell = deserialize_cells_tree(&mut data_cursor).unwrap().remove(0);
-            state_init.set_data(data_cell);
-        }
-        let ret = save_to_file(state_init.clone(), out_file, wc, self.silent);
-        if out_file.is_some() && ret.is_ok() && !self.silent {
-            println!("Contract successfully compiled. Saved to file {}.", out_file.unwrap());
-            println!("Contract initial hash: {:x}", state_init.hash().unwrap());
-        }
-        ret
+    fn wrap_into_tvc(&mut self, code: Cell, no_meta: bool) -> scheme::TVC {
+        let meta = if !no_meta {
+            let sold = scheme::Version::new(
+                self.engine.commith().unwrap_or(&[0u8; 20]).clone(),
+                self.engine.version().unwrap_or_default(),
+            );
+
+            let linker: [u8; 20] = hex::decode(env!("BUILD_GIT_COMMIT"))
+                .unwrap()
+                .try_into()
+                .unwrap();
+
+            let linker = scheme::Version::new(
+                linker,
+                env!("CARGO_PKG_VERSION").to_string()
+            );
+
+            let compiled_at = get_now() as u64;
+            let name = scheme::SmallStr::new(self.engine.name().to_string());
+            let desc = self.engine.desc();
+
+            Some(scheme::Metadata::new(sold, linker, compiled_at, name, desc.to_owned()))
+        } else {
+            None
+        };
+
+        scheme::TVC::new(scheme::TvmSmc::TvcFrst(scheme::TvcFrst::new(code, meta)))
     }
 
-    fn compile_to_state(&mut self, only_print_code: bool) -> Result<StateInit> {
-        let mut state = StateInit::default();
+    pub fn compile_to_file_ex(
+        &mut self,
+        prefix: &str,
+        out_file: Option<&str>,
+        no_meta: bool,
+        raw: bool,
+    ) -> Result<String> {
         let code = self.compile_asm(false)?;
+        let cell = if !raw { self.wrap_into_tvc(code, no_meta).serialize()? } else { code };
 
-        if only_print_code {
-            println!("{{\n  \"code\":\"{}\"\n}}", tree_of_cells_into_base64(Some(&code)));
-            return Ok(state);
-        } else {
-            state.set_code(code);
+        if self.print_code {
+            let json = serde_json::to_string_pretty(&json!({
+                "base64_boc": tree_of_cells_into_base64(Some(&cell)),
+                "raw": raw,
+            }))?;
+
+            println!("{}", json);
+            return Ok("".to_string());
         }
-        state.set_data(self.data()?);
-        Ok(state)
+
+        let ext = if raw { ".code.boc" } else { ".tvc.boc" };
+        let filename = format!("{}{}", prefix, ext);
+        let filename = out_file.unwrap_or(&filename);
+
+        cell.write_to_file(filename);
+        println!("Contract compiled and saved to: \"{}\"", filename);
+
+        Ok(filename.to_string())
     }
 
     fn compile_asm_old(&mut self, remove_ctor: bool) -> Result<Cell> {
@@ -197,8 +217,8 @@ impl Program {
         let internal_selector_text = vec![
             // indirect jump
             Line::new("DICTPUSHCONST 32\n", "<internal-selector>", 1),
-            Line::new("DICTUGETJMPZ\n",      "<internal-selector>", 2),
-            Line::new("THROW 78\n",      "<internal-selector>", 3),
+            Line::new("DICTUGETJMPZ\n",     "<internal-selector>", 2),
+            Line::new("THROW 78\n",         "<internal-selector>", 3),
         ];
 
         let mut internal_selector = compile_code_debuggable(internal_selector_text)
@@ -308,47 +328,6 @@ impl Program {
     }
 }
 
-pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8, silent: bool) -> Result<String> {
-    let buffer = state.write_to_bytes()?;
-
-    let mut print_filename = false;
-    let address = state.hash().unwrap();
-    let file_name = if let Some(name) = name {
-        name.to_string()
-    } else {
-        print_filename = true;
-        format!("{:x}.tvc", address)
-    };
-
-    let mut file = File::create(&file_name).unwrap();
-    file.write_all(&buffer)?;
-
-    if print_filename {
-        if silent {
-            println!("{{\n  \"output_path\":\"{}\"\n}}", &file_name);
-        } else {
-            println!("Saved contract to file {}", &file_name);
-            println!("testnet:");
-            println!("Non-bounceable address (for init): {}", &calc_userfriendly_address(wc, address.as_slice(), false, true));
-            println!("Bounceable address (for later access): {}", &calc_userfriendly_address(wc, address.as_slice(), true, true));
-            println!("mainnet:");
-            println!("Non-bounceable address (for init): {}", &calc_userfriendly_address(wc, address.as_slice(), false, false));
-            println!("Bounceable address (for later access): {}", &calc_userfriendly_address(wc, address.as_slice(), true, false));
-        }
-    }
-    Ok(file_name)
-}
-
-fn calc_userfriendly_address(wc: i8, addr: &[u8], bounce: bool, testnet: bool) -> String {
-    let mut bytes: Vec<u8> = vec![];
-    bytes.push(if bounce { 0x11 } else { 0x51 } + if testnet { 0x80 } else { 0 });
-    bytes.push(wc as u8);
-    bytes.extend_from_slice(addr);
-    let crc = XMODEM.checksum(&bytes);
-    bytes.extend_from_slice(&crc.to_be_bytes());
-    encode(&bytes)
-}
-
 pub fn load_from_file(contract_file: &str) -> Result<StateInit> {
     let mut csor = Cursor::new(std::fs::read(contract_file)?);
     let mut cell = deserialize_cells_tree(&mut csor)?.remove(0);
@@ -384,16 +363,16 @@ pub fn get_now() -> u32 {
 #[cfg(test)]
 mod tests {
     use crate::abi;
-    use crate::testcall::{load_config, load_debug_info, call_contract, MsgInfo, TestCallParams};
-    use crate::{printer::get_version_mycode_aware, program::load_stateinit};
-    use crate::testcall::TraceLevel;
+    use crate::printer::get_version_mycode_aware;
+    use crate::testcall::{TraceLevel, load_debug_info, load_config, call_contract, TestCallParams, MsgInfo};
     use super::*;
 
     use std::{fs::File, str::FromStr};
     use std::path::Path;
 
-    fn compile_to_file(prog: &mut Program, wc: i8) -> Result<String> {
-        prog.compile_to_file_ex(wc, None, None)
+    fn compile_into_trash(prog: &mut Program, base: &str) -> Result<String> {
+        let prefix = format!("./trash/{}", base);
+        prog.compile_to_file_ex(&prefix, None, true, false)
     }
 
     fn call_contract_1<F>(
@@ -427,7 +406,9 @@ mod tests {
         let debug_info = load_debug_info(debug_map_filename);
         let config_cell = config_file.and_then(load_config);
         let (exit_code, state_init, is_vm_success) = call_contract(
-            addr, state_init, TestCallParams {
+            addr,
+            state_init,
+            TestCallParams {
                 balance: smc_balance,
                 msg_info,
                 config: config_cell,
@@ -440,10 +421,13 @@ mod tests {
                 capabilities: 0x42E, // default
             }
         )?;
+
         if is_vm_success {
-            save_to_file(state_init, Some(smc_file), 0, false)?;
+            // save_to_file(state_init, Some(smc_file), 0, false)?;
+            // TODO: save to file
             println!("Contract persistent data updated");
         }
+
         Ok(exit_code)
     }
 
@@ -462,10 +446,10 @@ mod tests {
     ) -> i32
         where F: Fn(SliceData, bool)
     {
-        let file = format!("{}.tvc", contract_file);
+        // let file = format!("{}.tvc", contract_file);
         call_contract_1(
-            &file,
-            contract_file,
+            &contract_file,
+            "0000000000000000000000000000000000000000000000000000000000000000",
             balance,
             MsgInfo{
                 balance: msg_balance,
@@ -481,14 +465,7 @@ mod tests {
             if decode_c5 { Some(action_decoder) } else { None },
             trace_level,
             ""
-        ).unwrap_or(-1)
-    }
-
-    #[test]
-    fn test_bouncable_address() {
-        let addr = hex::decode("fcb91a3a3816d0f7b8c2c76108b8a9bc5a6b7a55bd79f8ab101c52db29232260").unwrap();
-        let addr = calc_userfriendly_address(-1, &addr, true, true);
-        assert_eq!(addr, "kf/8uRo6OBbQ97jCx2EIuKm8Wmt6Vb15+KsQHFLbKSMiYIny");
+        ).unwrap()
     }
 
     #[test]
@@ -498,29 +475,32 @@ mod tests {
         let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
-        let contract_file = compile_to_file(&mut prog, -1).unwrap();
-        let name = contract_file.split('.').next().unwrap();
 
-        assert_eq!(call_contract_2(name, None, None, TraceLevel::None, false, None, Some(-1), None, None, 0, |_b,_i| {}), 0);
+        let name = compile_into_trash(&mut prog, "test_ticktock").unwrap();
+        assert_eq!(call_contract_2(name.as_str(), None, None, TraceLevel::None, false, None, Some(-1), None, None, 0, |_b,_i| {}), 0);
     }
 
     #[test]
     fn test_call_with_gas_limit() {
-        let sources = vec![Path::new("./tests/test_stdlib_sol.tvm"),
-                                     Path::new("./tests/Wallet.code")];
+        let sources = vec![
+            Path::new("./tests/test_stdlib_sol.tvm"),
+            Path::new("./tests/Wallet.code")
+        ];
+
         let abi = abi::load_abi_json_string("./tests/Wallet.abi.json").unwrap();
 
         let parser = ParseEngine::new(sources, Some(abi));
         assert_eq!(parser.is_ok(), true);
+
         let mut prog = Program::new(parser.unwrap());
 
-        let contract_file = compile_to_file(&mut prog, 0).unwrap();
-        let name = contract_file.split('.').next().unwrap();
+        let name = compile_into_trash(&mut prog, "test_call_with_gas_limit").unwrap();
         let body = abi::build_abi_body("./tests/Wallet.abi.json", "constructor", "{}", None, None, false, None)
             .unwrap();
+
         let exit_code = call_contract_1(
-            &contract_file,
-            &name,
+            name.as_str(),
+            "0000000000000000000000000000000000000000000000000000000000000000",
             Some("10000000000"), //account balance 10T
             MsgInfo {
                 balance: Some("1000000000"), // msg balance = 1T
@@ -555,7 +535,8 @@ mod tests {
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
 
-        let contract_file = compile_to_file(&mut prog, 0).unwrap();
+        let contract_file = compile_into_trash(&mut prog, "test_debug_map").unwrap();
+
         let debug_map_filename = String::from("tests/Wallet2.map.json");
         let debug_map_file = File::create(&debug_map_filename).unwrap();
         serde_json::to_writer_pretty(debug_map_file, &prog.dbgmap).unwrap();
@@ -591,23 +572,35 @@ mod tests {
         let parser = ParseEngine::new(vec![Path::new(filename)], None);
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
-        let file_name = compile_to_file(&mut prog, -1).unwrap();
-        let (mut root_slice, _) = load_stateinit(file_name.as_str())?;
-        let state = StateInit::construct_from(&mut root_slice)?;
-        get_version_mycode_aware(state.code.as_ref())
+
+        let file_name = compile_into_trash(&mut prog, "get_version").unwrap();
+
+        let dec = scheme::TVC::construct_from_file(&file_name).unwrap();
+        let tvc = if let scheme::TvmSmc::TvcFrst(t) = dec.tvc {
+            t
+        } else {
+            panic!("tvc must be not none in tests")
+        };
+
+        get_version_mycode_aware(Some(&tvc.code))
     }
 
     #[test]
     fn test_get_version() {
         assert_eq!(
             "0.43.0+commit.e8c3d877.mod.Linux.g++".to_string(),
-            get_version("tests/get-version1.code").unwrap_or("".to_string()));
+            get_version("tests/get-version1.code").unwrap_or("".to_string())
+        );
+
         assert_eq!(
             "0.43.0+commit.e8c3d877.mod.Linux.g++".to_string(),
-            get_version("tests/get-version2.code").unwrap_or("".to_string()));
+            get_version("tests/get-version2.code").unwrap_or("".to_string())
+        );
+
         assert_eq!(
             "not found (cell underflow)".to_string(),
-            get_version("tests/get-version3.code").unwrap_err().to_string());
+            get_version("tests/get-version3.code").unwrap_err().to_string()
+        );
     }
 
     #[test]
@@ -619,7 +612,8 @@ mod tests {
         assert_eq!(parser.is_ok(), true);
         let mut prog = Program::new(parser.unwrap());
 
-        let contract_file = compile_to_file(&mut prog, 0).unwrap();
+        let contract_file = compile_into_trash(&mut prog, "test_mycode").unwrap();
+
         let name = contract_file.split('.').next().unwrap();
         let body = abi::build_abi_body("tests/mycode.abi.json", "constructor", "{}", None, None, false, None)
             .unwrap();
