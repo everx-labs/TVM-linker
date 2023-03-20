@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use ton_types::{Cell, HashmapE, HashmapType, Result, SliceData, fail};
 use super::{
     types::{Instruction, InstructionParameter, Code},
-    loader::Loader, fmt::print_code
+    loader::Loader
 };
 
 fn match_dictpushconst_dictugetjmp(pair: &mut [Instruction]) -> Option<&mut Vec<InstructionParameter>> {
@@ -30,32 +30,34 @@ fn match_dictpushconst_dictugetjmp(pair: &mut [Instruction]) -> Option<&mut Vec<
     Some(insn1.params_mut())
 }
 
-fn process_dictpushconst_dictugetjmp(code: &mut Code) {
-    for pair in code.chunks_mut(2) {
-        if let Some(params) = match_dictpushconst_dictugetjmp(pair) {
-            // TODO transform cell to code right here (for nested dicts)
-            params.push(InstructionParameter::CodeDictMarker)
+impl Code {
+    fn process_dictpushconst_dictugetjmp(code: &mut Code) {
+        for pair in code.chunks_mut(2) {
+            if let Some(params) = match_dictpushconst_dictugetjmp(pair) {
+                // TODO transform cell to code right here (for nested dicts)
+                params.push(InstructionParameter::CodeDictMarker)
+            }
         }
     }
-}
 
-fn traverse_code_tree(code: &mut Code, process: fn(&mut Code)) {
-    let mut stack = vec!(code);
-    while let Some(code) = stack.pop() {
-        process(code);
-        for insn in code {
-            for param in insn.params_mut() {
-                match param {
-                    InstructionParameter::Code { code: ref mut inner, cell: _ } => stack.push(inner),
-                    _ => ()
+    fn traverse_code_tree(&mut self, process: fn(&mut Code)) {
+        let mut stack = vec!(self);
+        while let Some(code) = stack.pop() {
+            process(code);
+            for insn in code.iter_mut() {
+                for param in insn.params_mut() {
+                    match param {
+                        InstructionParameter::Code { code: ref mut inner, cell: _ } => stack.push(inner),
+                        _ => ()
+                    }
                 }
             }
         }
     }
-}
 
-pub fn elaborate_dictpushconst_dictugetjmp(code: &mut Code) {
-    traverse_code_tree(code, process_dictpushconst_dictugetjmp)
+    pub fn elaborate_dictpushconst_dictugetjmp(&mut self) {
+        self.traverse_code_tree(Self::process_dictpushconst_dictugetjmp)
+    }
 }
 
 pub(super) struct DelimitedHashmapE {
@@ -146,7 +148,7 @@ impl DelimitedHashmapE {
             let aux = slice.get_next_slice(*offset).unwrap();
             text += &format!("{}.blob x{}\n", inner_indent, aux.to_hex_string());
             text += &format!("{};; method {}\n", inner_indent, id);
-            text += &print_code(code, &inner_indent, true, 0);
+            text += &code.print(&inner_indent, true, 0);
         } else {
             if slice.remaining_bits() > 0 {
                 text += &format!("{}.blob x{}\n", inner_indent, slice.to_hex_string());

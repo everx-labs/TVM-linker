@@ -20,12 +20,7 @@ use ton_types::cells_serialization::deserialize_cells_tree;
 use ton_types::{Cell, HashmapE, HashmapType, SliceData, UInt256, Status};
 use std::io::Cursor;
 
-use super::{
-    codedict::elaborate_dictpushconst_dictugetjmp,
-    fmt::print_code,
-    loader::Loader,
-    types::Shape,
-};
+use super::{loader::Loader, types::Shape};
 
 pub fn disasm_command(m: &ArgMatches) -> Status {
     if let Some(m) = m.subcommand_matches("dump") {
@@ -317,7 +312,7 @@ fn disasm_fragment_command(m: &ArgMatches) -> Status {
 
     let mut loader = Loader::new(false);
     let code = loader.load(&mut slice, false).unwrap();
-    let text = print_code(&code, "", true, 12);
+    let text = code.print("", true, 12);
 
     print!("{}", text);
     Ok(())
@@ -330,6 +325,6 @@ pub(super) fn disasm(slice: &mut SliceData) -> String {
 pub(super) fn disasm_ex(slice: &mut SliceData, collapsed: bool) -> String {
     let mut loader = Loader::new(collapsed);
     let mut code = loader.load(slice, false).unwrap();
-    elaborate_dictpushconst_dictugetjmp(&mut code);
-    print_code(&code, "", true, 0)
+    code.elaborate_dictpushconst_dictugetjmp();
+    code.print("", true, 0)
 }

@@ -92,45 +92,47 @@ fn print_bytecode(slice: Option<(&SliceData, usize)>, bytecode_width: usize) -> 
     text
 }
 
-pub fn print_code(code: &Code, indent: &str, full: bool, bytecode_width: usize) -> String {
-    let mut text = String::new();
-    for insn in code {
-        text += &print_bytecode(insn.bytecode().map(|v| (v, insn.refs())), bytecode_width);
-        text += indent;
-        if full {
-            match insn.name() {
-                "DICTPUSHCONST" | "PFXDICTSWITCH" => {
-                    // TODO better improve assembler for these two insns
-                    text += &print_dictpushconst(insn, indent);
-                    continue
-                }
-                "IMPLICIT-JMP" => {
-                    if let Some(InstructionParameter::Code { code, cell }) = insn.params().get(0) {
-                        let hash = cell.as_ref().unwrap().repr_hash().to_hex_string();
-                        text += &format!(".cell {{ ;; #{}\n", hash);
-                        let inner_indent = String::from("  ") + indent;
-                        text += &print_code(code, &inner_indent, full, bytecode_width);
-                        text += indent;
-                        text += "}\n";
-                    } else {
-                        unreachable!()
+impl Code {
+    pub fn print(&self, indent: &str, full: bool, bytecode_width: usize) -> String {
+        let mut text = String::new();
+        for insn in self.iter() {
+            text += &print_bytecode(insn.bytecode().map(|v| (v, insn.refs())), bytecode_width);
+            text += indent;
+            if full {
+                match insn.name() {
+                    "DICTPUSHCONST" | "PFXDICTSWITCH" => {
+                        // TODO better improve assembler for these two insns
+                        text += &print_dictpushconst(insn, indent);
+                        continue
                     }
-                    continue
+                    "IMPLICIT-JMP" => {
+                        if let Some(InstructionParameter::Code { code, cell }) = insn.params().get(0) {
+                            let hash = cell.as_ref().unwrap().repr_hash().to_hex_string();
+                            text += &format!(".cell {{ ;; #{}\n", hash);
+                            let inner_indent = String::from("  ") + indent;
+                            text += &code.print(&inner_indent, full, bytecode_width);
+                            text += indent;
+                            text += "}\n";
+                        } else {
+                            unreachable!()
+                        }
+                        continue
+                    }
+                    _ => ()
                 }
-                _ => ()
             }
+            text += insn.name();
+            if insn.is_quiet() {
+                text += "Q";
+            }
+            text += &print_insn_params(insn.params(), indent, full, bytecode_width);
+            if let Some(comment) = insn.comment() {
+                text += &format!(" ;; {}", comment);
+            }
+            text += "\n";
         }
-        text += insn.name();
-        if insn.is_quiet() {
-            text += "Q";
-        }
-        text += &print_insn_params(insn.params(), indent, full, bytecode_width);
-        if let Some(comment) = insn.comment() {
-            text += &format!(" ;; {}", comment);
-        }
-        text += "\n";
+        text
     }
-    text
 }
 
 fn print_insn_params(params: &Vec<InstructionParameter>, indent: &str, full: bool, bytecode_width: usize) -> String {
@@ -191,7 +193,7 @@ fn print_insn_params(params: &Vec<InstructionParameter>, indent: &str, full: boo
                         text += "{\n";
                     }
                     let inner_indent = String::from("  ") + indent;
-                    text += &print_code(code, &inner_indent, full, bytecode_width);
+                    text += &code.print(&inner_indent, full, bytecode_width);
                     text += &print_bytecode(None, bytecode_width);
                     text += indent;
                     text += "}";

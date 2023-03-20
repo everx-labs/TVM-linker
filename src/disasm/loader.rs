@@ -157,7 +157,7 @@ impl Loader {
             Ok(code) => code,
             Err(_) => {
                 // failed to load the slice - emit it as-is
-                let mut insns = vec!(
+                let mut insns = Code::single(
                     Instruction::new(".blob").with_param(InstructionParameter::Slice(orig_slice.clone()))
                 );
                 for i in 0..orig_slice.remaining_references() {
@@ -210,20 +210,20 @@ impl Loader {
         if let Some(cell) = cell {
             self.load_cell_impl(cell)
         } else {
-            Ok(vec!(Instruction::new(";; missing cell")))
+            Ok(Code::single(Instruction::new(";; missing cell")))
         }
     }
     fn load_cell_impl(&mut self, cell: &Cell) -> Result<Code> {
         if let Some(code) = self.history.get(&cell.repr_hash()) {
             if self.collapse {
-                Ok(vec!(Instruction::new(";;").with_param(InstructionParameter::Cell { cell: Some(cell.clone()), collapsed: true })))
+                Ok(Code::single(Instruction::new(";;").with_param(InstructionParameter::Cell { cell: Some(cell.clone()), collapsed: true })))
             } else {
                 Ok(code.clone())
             }
         } else {
             let code = self.load(&mut SliceData::load_cell_ref(cell)?, false).unwrap_or_else(|_| {
                 // failed to load the cell - emit it as-is
-                vec!(Instruction::new(".cell").with_param(InstructionParameter::Cell { cell: Some(cell.clone()), collapsed: false }))
+                Code::single(Instruction::new(".cell").with_param(InstructionParameter::Cell { cell: Some(cell.clone()), collapsed: false }))
             });
             self.history.insert(cell.repr_hash(), code.clone());
             Ok(code)
