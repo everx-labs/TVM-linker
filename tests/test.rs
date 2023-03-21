@@ -16,10 +16,9 @@ fn test_compile_lib() -> Result<(), Box<dyn std::error::Error>> {
     let contract = "tests/test_arrays.code";
     let abi = "tests/test_arrays.abi.json";
     let lib_path = "tests/test_stdlib_sol.tvm";
-
     let lib_var = "TVM_LINKER_LIB_PATH";
     let prev_var =  env::var_os(lib_var);
-    sleep(Duration::new(1, 0));
+
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
     cmd.arg("compile")
         .arg(contract)
@@ -29,30 +28,30 @@ fn test_compile_lib() -> Result<(), Box<dyn std::error::Error>> {
         .stdout(predicate::str::contains("Error"));
 
     env::set_var(lib_var, lib_path);
-    sleep(Duration::new(1, 0));
-    let mut cmd = Command::cargo_bin(BIN_NAME)?;
-    cmd.arg("compile")
-        .arg(contract)
-        .arg("-a")
-        .arg(abi)
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Saved contract to file"));
 
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
     cmd.arg("compile")
         .arg(contract)
         .arg("-a")
         .arg(abi)
-        .arg("--print_code")
         .assert()
         .success()
-        .stdout(predicate::str::contains("code\":\"te6ccgEC"));
-    
+        .stdout(predicate::str::contains("Contract compiled and saved to:"));
+
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+    cmd.arg("compile")
+        .arg(contract)
+        .arg("-a")
+        .arg(abi)
+        .arg("--print-code")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("base64_boc"));
+
     if prev_var.is_some() {
         env::set_var(lib_var, prev_var.unwrap());
     }
-    
+
     Ok(())
 }
 

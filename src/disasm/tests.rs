@@ -80,6 +80,7 @@ fn round_trip() {
     }
 }
 
+#[cfg_attr(not(feature = "long_running_tests"), ignore)]
 #[test]
 fn round_trip_tonix() {
     let paths = std::fs::read_dir("tests/disasm/tonix-ea2f96c/").unwrap();
