@@ -11,21 +11,60 @@
  * limitations under the License.
  */
 
-use std::collections::HashMap;
+use std::{collections::HashMap, slice::ChunksMut};
 use ton_types::{Cell, Result, /*Bitmask,*/ SliceData, fail};
 
-pub type Code = Vec<Instruction>;
+#[derive(Debug, Clone)]
+pub struct Code {
+    storage: Vec<Instruction>
+}
+
+impl Code {
+    pub fn new() -> Self {
+        Self {
+            storage: Vec::new()
+        }
+    }
+    pub fn single(insn: Instruction) -> Self {
+        Self {
+            storage: vec!(insn)
+        }
+    }
+    pub fn append(&mut self, other: &mut Self) {
+        self.storage.append(&mut other.storage)
+    }
+    pub fn push(&mut self, insn: Instruction) {
+        self.storage.push(insn)
+    }
+    pub fn chunks_mut(&mut self, chunk_size: usize) -> ChunksMut<Instruction> {
+        self.storage.chunks_mut(chunk_size)
+    }
+    pub fn iter(&self) -> impl Iterator<Item = &Instruction>{
+        self.storage.iter()
+    }
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Instruction>{
+        self.storage.iter_mut()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Instruction {
     name: &'static str,
     params: Vec<InstructionParameter>,
     quiet: bool,
+    comment: Option<String>,
+    bytecode: Option<SliceData>,
+    refs: usize,
 }
 
 impl Instruction {
     pub fn new(name: &'static str) -> Self {
-        Self { name, params: vec!(), quiet: false }
+        Self { name, params: vec!(), quiet: false, comment: None, bytecode: None, refs: 0 }
+    }
+    pub fn with_refs(self, refs: usize) -> Self {
+        let mut clone = self;
+        clone.refs = refs;
+        clone
     }
     pub fn with_param(self, param: InstructionParameter) -> Self {
         let mut clone = self;
@@ -49,6 +88,21 @@ impl Instruction {
     pub fn is_quiet(&self) -> bool {
         self.quiet
     }
+    pub fn comment(&self) -> Option<&String> {
+        self.comment.as_ref()
+    }
+    pub fn set_comment(&mut self, comment: String) {
+        self.comment = Some(comment)
+    }
+    pub fn bytecode(&self) -> Option<&SliceData> {
+        self.bytecode.as_ref()
+    }
+    pub fn set_bytecode(&mut self, bytecode: SliceData) {
+        self.bytecode = Some(bytecode);
+    }
+    pub fn refs(&self) -> usize {
+        self.refs
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -67,7 +121,7 @@ pub enum InstructionParameter {
     StackRegisterPair(isize, isize),
     StackRegisterTriple(isize, isize, isize),
     Code { code: Code, cell: Option<Cell> },
-    Cell { cell: Cell, collapsed: bool },
+    Cell { cell: Option<Cell>, collapsed: bool },
     CodeDictMarker,
 }
 

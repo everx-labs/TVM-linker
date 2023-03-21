@@ -189,6 +189,11 @@ fn linker_main() -> Status {
                 (@arg TVC: +required +takes_value "Path to tvc file")
                 (@arg RAW: --raw "Interpret the input as a raw TOC of code")
             )
+            (@subcommand fragment =>
+                (about: "disassembles bytestring fragment")
+                (version: build_info.as_str())
+                (@arg FRAGMENT: +required +takes_value "Bytestring")
+            )
         )
         (@setting SubcommandRequired)
     ).get_matches();
