@@ -43,7 +43,7 @@ ton_block = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ton-labs-
 ton_vm = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ton-labs-vm.git', tag = '1.8.108' }
 ton_types = { git = 'https://github.com/tonlabs/ton-labs-types.git', tag = '1.12.6' }
 ton_abi = { git = 'https://github.com/tonlabs/ton-labs-abi.git', tag = '2.3.60' }
-ever-struct = { git = 'https://github.com/tonlabs/ever-struct.git', version = '0.1.0' }
+ever-struct = { git = 'https://github.com/tonlabs/ever-struct.git' }
 
 
 [dev-dependencies]
