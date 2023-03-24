@@ -6,3 +6,4 @@ tests/Wallet2.code
 tests/Wallet2.map.json
 *.tvc
 *.tmp
+release/
