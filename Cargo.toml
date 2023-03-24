@@ -49,3 +49,6 @@ similar = '2.2.0'
 name = 'ton_utils'
 path = 'src/lib.rs'
 test = false
+
+[profile.release]
+strip = true  # Automatically strip symbols from the binary.
