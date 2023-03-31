@@ -19,9 +19,8 @@ use std::io::Read;
 use std::io::Write;
 use std::collections::HashMap;
 use std::time::SystemTime;
-use crate::methdict::*;
 use ton_block::*;
-use ton_labs_assembler::{Line, Lines, compile_code_debuggable, DbgInfo};
+use ton_labs_assembler::{Line, Lines, DbgInfo, Engine};
 use ton_types::deserialize_cells_tree_ex;
 use ton_types::deserialize_cells_tree;
 use ton_types::{Cell, SliceData, BuilderData, IBitstring, Result};
@@ -38,18 +37,27 @@ pub struct Program {
     pub dbgmap: DbgInfo,
     print_code: bool,
     silent: bool,
+    assembler: Engine,
 }
 
 impl Program {
-    pub fn new(parser: ParseEngine) -> Self {
-        Program {
+    pub fn new(parser: ParseEngine) -> Result<Self> {
+        let engine = ParseEngineResults::new(parser);
+        let mut assembler = Engine::new(Vec::new());
+        for name in engine.postorder_fragments() {
+            let lines = engine.fragments().get(name).unwrap();
+            assembler.build(Some(format!("__{}", name)), lines.clone())
+                .map_err(|e| format_err!("Failed to assemble {}: {}", name, e))?;
+        }
+        Ok(Program {
             language: None,
-            engine: ParseEngineResults::new(parser),
+            engine,
             keypair: None,
             dbgmap: DbgInfo::default(),
             print_code: false,
             silent: false,
-        }
+            assembler,
+        })
     }
 
     pub fn set_print_code(&mut self, print_code: bool) {
@@ -97,7 +105,7 @@ impl Program {
     }
 
     pub fn internal_method_dict(&mut self) -> Result<Option<Cell>> {
-        let mut dict = prepare_methods(&self.engine.privates(), true)
+        let mut dict = self.prepare_methods(&self.engine.privates(), true)
             .map_err(|(i, s)| format_err!("{}", s.replace("_name_", &self.engine.global_name(i).unwrap())))?;
         self.dbgmap.append(&mut dict.1);
         Ok(dict.0.data().cloned())
@@ -111,10 +119,10 @@ impl Program {
     }
 
     pub fn public_method_dict(&mut self, remove_ctor: bool) -> Result<Option<Cell>> {
-        let mut dict = prepare_methods(&self.engine.internals(), true)
+        let mut dict = self.prepare_methods(&self.engine.internals(), true)
             .map_err(|(i, s)| format_err!("{}", s.replace("_name_", &self.engine.internal_name(i).unwrap())))?;
 
-        insert_methods(&mut dict.0, &mut dict.1, &self.publics_filtered(remove_ctor), true)
+            self.insert_methods(&mut dict.0, &mut dict.1, &self.publics_filtered(remove_ctor), true)
             .map_err(|(i, s)| format_err!("{}", s.replace("_name_", &self.engine.global_name(i).unwrap())))?;
 
         self.dbgmap.append(&mut dict.1);
@@ -164,8 +172,7 @@ impl Program {
             Line::new("DICTPUSHCONST 32\n", "<internal-selector>", 1),
             Line::new("DICTUGETJMP\n",      "<internal-selector>", 2),
         ];
-        let mut internal_selector = compile_code_debuggable(internal_selector_text)
-            .map_err(|e| format_err!("unexpected error while compiling internal selector: {}", e))?;
+        let mut internal_selector = self.assemble(internal_selector_text)?;
         internal_selector.0.append_reference(SliceData::load_cell(self.internal_method_dict()?.unwrap_or_default())?);
 
         // adjust hash of internal_selector cell
@@ -174,8 +181,7 @@ impl Program {
         let entry = internal_selector.1.first_entry().unwrap();
         self.dbgmap.insert(hash, entry.clone());
 
-        let (mut main_selector, main_selector_dbg) = compile_code_debuggable(self.entry())
-            .map_err(|e| format_err!("unexpected error while compiling main selector: {}", e))?;
+        let (mut main_selector, main_selector_dbg) = self.assemble(self.entry())?;
         main_selector.append_reference(SliceData::load_cell(self.public_method_dict(remove_ctor)?.unwrap_or_default())?);
         main_selector.append_reference(internal_selector.0);
 
@@ -201,16 +207,15 @@ impl Program {
             Line::new("THROW 78\n",      "<internal-selector>", 3),
         ];
 
-        let mut internal_selector = compile_code_debuggable(internal_selector_text)
-            .map_err(|e| format_err!("unexpected error while compiling internal selector: {}", e))?;
+        let mut internal_selector = self.assemble(internal_selector_text)?;
 
-        let mut dict = prepare_methods(&self.engine.privates(), false)
+        let mut dict = self.prepare_methods(&self.engine.privates(), false)
             .map_err(|(i, s)| format_err!("{}", s.replace("_name_", &self.engine.global_name(i).unwrap())))?;
 
-        insert_methods(&mut dict.0, &mut dict.1, &self.engine.internals(), false)
+        self.insert_methods(&mut dict.0, &mut dict.1, &self.engine.internals(), false)
             .map_err(|(i, s)| format_err!("{}", s.replace("_name_", &self.engine.internal_name(i).unwrap())))?;
 
-        insert_methods(&mut dict.0, &mut dict.1, &self.publics_filtered(remove_ctor), false)
+        self.insert_methods(&mut dict.0, &mut dict.1, &self.publics_filtered(remove_ctor), false)
             .map_err(|(i, s)| format_err!("{}", s.replace("_name_", &self.engine.global_name(i).unwrap())))?;
 
         let mut entry_points = vec![];
@@ -249,8 +254,7 @@ impl Program {
             Line::new("THROW 11\n",    "<entry-selector>", 11),
         ];
 
-        let mut entry_selector = compile_code_debuggable(entry_selector_text)
-            .map_err(|e| format_err!("compilation failed: {}", e))?;
+        let mut entry_selector = self.assemble(entry_selector_text)?;
 
         entry_selector.0.append_reference(internal_selector.0);
         entry_points.reverse();
@@ -290,8 +294,7 @@ impl Program {
             Line::new("POP C3\n",          "<func-upgrade-code>", 12),
             Line::new("CALL 2\n",          "<func-upgrade-code>", 13),
         ];
-        let mut func_upgrade_code = compile_code_debuggable(func_upgrade_text)
-            .map_err(|e| format_err!("compilation failed: {}", e))?;
+        let mut func_upgrade_code = self.assemble(func_upgrade_text)?;
         assert_eq!(func_upgrade_code.1.len(), 1);
         let old_hash = func_upgrade_code.0.cell().repr_hash();
         let entry = func_upgrade_code.1.get(&old_hash).unwrap();
@@ -305,6 +308,12 @@ impl Program {
 
     pub fn debug_print(&self) {
         self.engine.debug_print();
+    }
+
+    pub fn assemble(&mut self, lines: Lines) -> Result<(SliceData, DbgInfo)> {
+        let unit = self.assembler.build(None, lines)
+            .map_err(|e| format_err!("compilation failed: {}", e))?;
+        Ok(unit.finalize())
     }
 }
 
@@ -497,7 +506,7 @@ mod tests {
                                      Path::new("./tests/ticktock.code")];
         let parser = ParseEngine::new(sources, None);
         assert_eq!(parser.is_ok(), true);
-        let mut prog = Program::new(parser.unwrap());
+        let mut prog = Program::new(parser.unwrap()).unwrap();
         let contract_file = compile_to_file(&mut prog, -1).unwrap();
         let name = contract_file.split('.').next().unwrap();
 
@@ -512,7 +521,7 @@ mod tests {
 
         let parser = ParseEngine::new(sources, Some(abi));
         assert_eq!(parser.is_ok(), true);
-        let mut prog = Program::new(parser.unwrap());
+        let mut prog = Program::new(parser.unwrap()).unwrap();
 
         let contract_file = compile_to_file(&mut prog, 0).unwrap();
         let name = contract_file.split('.').next().unwrap();
@@ -553,7 +562,7 @@ mod tests {
 
         let parser = ParseEngine::new(sources, Some(abi));
         assert_eq!(parser.is_ok(), true);
-        let mut prog = Program::new(parser.unwrap());
+        let mut prog = Program::new(parser.unwrap()).unwrap();
 
         let contract_file = compile_to_file(&mut prog, 0).unwrap();
         let debug_map_filename = String::from("tests/Wallet2.map.json");
@@ -590,7 +599,7 @@ mod tests {
     fn get_version(filename: &str) -> Result<String> {
         let parser = ParseEngine::new(vec![Path::new(filename)], None);
         assert_eq!(parser.is_ok(), true);
-        let mut prog = Program::new(parser.unwrap());
+        let mut prog = Program::new(parser.unwrap()).unwrap();
         let file_name = compile_to_file(&mut prog, -1).unwrap();
         let (mut root_slice, _) = load_stateinit(file_name.as_str())?;
         let state = StateInit::construct_from(&mut root_slice)?;
@@ -617,7 +626,7 @@ mod tests {
 
         let parser = ParseEngine::new(sources, Some(abi));
         assert_eq!(parser.is_ok(), true);
-        let mut prog = Program::new(parser.unwrap());
+        let mut prog = Program::new(parser.unwrap()).unwrap();
 
         let contract_file = compile_to_file(&mut prog, 0).unwrap();
         let name = contract_file.split('.').next().unwrap();

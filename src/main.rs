@@ -301,7 +301,7 @@ fn linker_main() -> Status {
         sources.push(path);
         let mut prog = Program::new(
             ParseEngine::new(sources, abi_json)?
-        );
+        )?;
 
         let debug = compile_matches.is_present("DEBUG");
         prog.set_language(compile_matches.value_of("LANGUAGE"));
@@ -383,7 +383,7 @@ fn replace_command(matches: &ArgMatches) -> Status {
     let mut prog_opt = None;
     let code = match ParseEngine::new(sources, abi_json) {
         Ok(engine) => {
-            let mut prog = Program::new(engine);
+            let mut prog = Program::new(engine)?;
             let code = prog.compile_asm(false)?;
             prog_opt = Some(prog);
             code
