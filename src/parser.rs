@@ -24,7 +24,7 @@ use abi_json::Contract;
 use failure::{format_err, bail};
 use regex::Regex;
 
-use std::collections::{HashSet, HashMap};
+use std::collections::{BTreeMap, HashSet, HashMap};
 use std::io::{BufRead, BufReader, Read};
 use std::fs::File;
 use std::path::Path;
@@ -73,6 +73,12 @@ impl ParseEngineResults {
     }
     pub fn func_upgrade(&self) -> SelectorVariant {
         self.engine.func_upgrade()
+    }
+    pub fn fragments(&self) -> &BTreeMap<String, Lines> {
+        &self.engine.macro_name_to_lines
+    }
+    pub fn postorder_fragments(&self) -> &Vec<String> {
+        &self.engine.postorder_fragments
     }
 }
 
@@ -238,7 +244,7 @@ pub struct ParseEngine {
     /// name -> id, e.g. main_internal -> 0, main_external -> -1,
     internal_name_to_id: HashMap<String, i32>,
     /// id -> code
-    internal_id_to_code: HashMap<i32, InternalFunc>,
+    internal_id_to_code: BTreeMap<i32, InternalFunc>,
     /// aliases for function names, e.g. main_internal -> 0, main_internal -> 0,
     internal_alias_name_to_id_: HashMap<String, i32>, // TODO delete this or internal_name_to_id
 
@@ -249,11 +255,11 @@ pub struct ParseEngine {
     /// name -> id
     globl_name_to_id: HashMap<String, u32>,
     /// name -> object
-    globl_name_to_object: HashMap<String, GloblFuncOrData>,
+    globl_name_to_object: BTreeMap<String, GloblFuncOrData>,
 
     /// name -> code
-    macro_name_to_lines: HashMap<String, Lines>,
-    is_computed_macros: HashMap<String, bool>,
+    macro_name_to_lines: BTreeMap<String, Lines>,
+    postorder_fragments: Vec<String>,
 
     /// selector code
     entry_point: Lines,
@@ -294,6 +300,7 @@ lazy_static! {
 
     static ref COMPUTE_REGEX: Regex = Regex::new(r"^\s*\.compute\s+\$([\w\.:]+)\$").unwrap();
     static ref CALL_REGEX: Regex = Regex::new(r"^\s*CALL\s+\$([\w\.:]+)\$").unwrap();
+    static ref INLINE_REGEX: Regex = Regex::new(r"^\s*.inline\s+__([\w\.:]+)").unwrap();
 }
 
 const GLOBL:            &str = ".globl";
@@ -308,14 +315,8 @@ const PERSISTENT_DATA_SUFFIX: &str = "_persistent";
 const PUBKEY_NAME:      &str = "tvm_public_key";
 const SCI_NAME:         &str = "tvm_contract_info";
 
-fn start_with(sample: &str, pattern: &str) -> bool {
-    let s = sample.as_bytes();
-    let mut i = 0;
-    while i < s.len() && (s[i] == b'\t' || s[i] == b' ') {
-        i += 1;
-    }
-    let p = pattern.as_bytes();
-    s.get(i..).unwrap().starts_with(p)
+fn starts_with(sample: &str, pattern: &str) -> bool {
+    sample.trim_start_matches(char::is_whitespace).starts_with(pattern)
 }
 
 pub struct ParseEngineInput<'a> {
@@ -341,10 +342,10 @@ impl ParseEngine {
             globl_name_to_id: HashMap::new(),
             internal_name_to_id: HashMap::new(),
             internal_alias_name_to_id_: HashMap::new(),
-            globl_name_to_object: HashMap::new(),
-            internal_id_to_code: HashMap::new(),
-            macro_name_to_lines: HashMap::new(),
-            is_computed_macros: HashMap::new(),
+            globl_name_to_object: BTreeMap::new(),
+            internal_id_to_code: BTreeMap::new(),
+            macro_name_to_lines: BTreeMap::new(),
+            postorder_fragments: Vec::new(),
             entry_point: vec![],
             globl_base: 0,
             globl_ptr: 0,
@@ -371,7 +372,8 @@ impl ParseEngine {
             self.parse_code(source)?;
         }
 
-        self.resolve_nested_macros()?;
+        self.compat_rename_all_macro_calls()?;
+        self.resolve_fragments()?;
         self.replace_all_labels()?;
 
         if !self.save_all_private_functions {
@@ -389,15 +391,17 @@ impl ParseEngine {
     }
 
     fn internals(&self) -> HashMap<i32, Lines> {
-        let mut funcs = HashMap::new();
-        self.internal_id_to_code.iter().for_each(|x| {
-            funcs.insert(*x.0, x.1.body.clone());
-        });
-        funcs
+        self.internal_id_to_code
+            .iter()
+            .map(|(&id, func)| (id, func.body.clone()))
+            .collect()
     }
 
     fn internal_name(&self, id: i32) -> Option<String> {
-        self.internal_name_to_id.iter().find(|i| *i.1 == id).map(|i| i.0.clone())
+        self.internal_name_to_id
+            .iter()
+            .find(|(_, &i)| i == id)
+            .map(|(name, _)| name.clone())
     }
 
     fn publics(&self) -> HashMap<u32, Lines> {
@@ -409,36 +413,28 @@ impl ParseEngine {
     }
 
     fn globals(&self, public: bool) -> HashMap<u32, Lines> {
-        let mut funcs = HashMap::new();
-        let iter = self.globl_name_to_object.iter().filter_map(|item| {
-            item.1.dtype.func().and_then(|i| {
-                if public == item.1.public {
-                    Some(i)
-                } else {
-                    None
-                }
+        self.globl_name_to_object
+            .iter()
+            .filter_map(|(_, global)| {
+                global.dtype.func().and_then(|func| {
+                    (public == global.public).then_some((func.id, func.body.clone()))
+                })
             })
-        });
-        for i in iter {
-            funcs.insert(i.id, i.body.clone());
-        }
-        funcs
+            .collect()
     }
 
     fn global_name(&self, id: u32) -> Option<String> {
-        self.globl_name_to_object.iter().find(|item| {
-            if let Some(func) = item.1.dtype.func() {
-                func.id == id
-            } else {
-                false
-            }
-        })
-        .map(|i| i.0.clone())
+        self.globl_name_to_object
+            .iter()
+            .find(|(_, global)| {
+                global.dtype.func().map_or(false, |func| func.id == id)
+            })
+            .map(|(name, _)| name.clone())
     }
 
     fn global_by_name(&self, name: &str) -> Option<(u32, Lines)> {
-        self.globl_name_to_object.get(name).and_then(|v| {
-            v.dtype.func().map(|func| (func.id, func.body.clone()))
+        self.globl_name_to_object.get(name).and_then(|global| {
+            global.dtype.func().map(|func| (func.id, func.body.clone()))
         })
     }
 
@@ -527,18 +523,18 @@ impl ParseEngine {
                 Some(pos) => pos
             };
 
-            if start_with(&l, ".p2align") ||
-               start_with(&l, ".align") ||
-               start_with(&l, ".text") ||
-               start_with(&l, ".file") ||
-               start_with(&l, ".ident") ||
-               start_with(&l, ".section") {
+            if starts_with(&l, ".p2align") ||
+               starts_with(&l, ".align") ||
+               starts_with(&l, ".text") ||
+               starts_with(&l, ".file") ||
+               starts_with(&l, ".ident") ||
+               starts_with(&l, ".section") {
                 //ignore unused parameters
                 debug!("ignored: {}", l);
-            } else if start_with(&l, ".version") {
+            } else if starts_with(&l, ".version") {
                 let cap = VERSION_REGEX.captures(&l).unwrap();
                 self.version = Some(cap.get(1).unwrap().as_str().to_owned());
-            } else if start_with(&l, ".pragma") {
+            } else if starts_with(&l, ".pragma") {
                 let cap = PRAGMA_REGEX.captures(&l).unwrap();
                 if let Some(m) = cap.get(1) {
                     if m.as_str() == "selector-func-solidity" {
@@ -551,7 +547,7 @@ impl ParseEngine {
                         bail!(format!("Unknown pragma: {}", m.as_str()));
                     }
                 }
-            } else if start_with(&l, ".global-base") {
+            } else if starts_with(&l, ".global-base") {
                 // .global-base
                 let cap = BASE_GLBL_REGEX.captures(&l).unwrap();
                 let base = cap.get(1).map(|m| m.as_str())
@@ -560,7 +556,7 @@ impl ParseEngine {
                     .map_err(|_| format_err!("line {}: invalid global base address", lnum))?;
                 self.globl_ptr = self.globl_base + OFFSET_GLOBL_DATA;
                 self.update_predefined();
-            } else if start_with(&l, ".persistent-base") {
+            } else if starts_with(&l, ".persistent-base") {
                 // .persistent-base
                 let cap = BASE_PERS_REGEX.captures(&l).unwrap();
                 let base = cap.get(1).map(|m| m.as_str())
@@ -569,7 +565,7 @@ impl ParseEngine {
                     .map_err(|_| format_err!("line {}: invalid persistent base address", lnum))?;
                 self.persistent_ptr = self.persistent_base + OFFSET_PERS_DATA;
                 self.update_predefined();
-            } else if start_with(&l, ".type") {
+            } else if starts_with(&l, ".type") {
                 // .type x, @...
                 //it's a mark for beginning of a new object (func or data)
                 self.update(&section_name, &obj_name, &obj_body)
@@ -581,40 +577,40 @@ impl ParseEngine {
                 let type_name = cap.get(2).ok_or_else(|| format_err!("line {}: .type option is invalid", lnum))?.as_str();
                 let obj = self.globl_name_to_object.entry(obj_name.clone()).or_insert_with(|| GloblFuncOrData::new(obj_name.clone(), type_name));
                 obj.dtype = GloblFuncOrDataType::from(type_name);
-            } else if start_with(&l, ".size") {
+            } else if starts_with(&l, ".size") {
                 // .size x, val
                 let cap = SIZE_REGEX.captures(&l).unwrap();
                 let name = cap.get(1).unwrap().as_str().to_owned();
                 let size_str = cap.get(2).ok_or_else(|| format_err!("line {}: .size option is invalid", lnum))?.as_str();
                 let item_ref = self.globl_name_to_object.entry(name.clone()).or_insert_with(|| GloblFuncOrData::new(name, ""));
                 item_ref.size = size_str.parse::<usize>().unwrap_or(0);
-            } else if start_with(&l, ".public") {
+            } else if starts_with(&l, ".public") {
                 // .public x
                 let cap = PUBLIC_REGEX.captures(&l).unwrap();
                 let name = cap.get(1).unwrap().as_str();
                 self.globl_name_to_object.get_mut(name).map(|obj| { obj.public = true; Some(obj) });
-            } else if start_with(&l, ".globl") {
+            } else if starts_with(&l, ".globl") {
                 // .globl x
                 let cap = GLOBL_REGEX.captures(&l).unwrap();
                 let name = cap.get(1).unwrap().as_str().to_owned();
                 self.globl_name_to_object.entry(name.clone()).or_insert_with(|| GloblFuncOrData::new(name.clone(), ""));
-            } else if start_with(&l, ".macro") {
+            } else if starts_with(&l, ".macro") {
                 // .macro x
                 self.update(&section_name, &obj_name, &obj_body)
                     .map_err(|e| format_err!("line {}: {}", lnum, e))?;
                 section_name = MACROS.to_owned();
                 obj_body = vec![];
                 obj_name = MACRO_REGEX.captures(&l).unwrap().get(1).unwrap().as_str().to_owned();
-            } else if start_with(&l, ".data") {
+            } else if starts_with(&l, ".data") {
                 // .data
                 //ignore, not used
-            } else if start_with(&l, ".selector") {
+            } else if starts_with(&l, ".selector") {
                 // .selector
                 self.update(&section_name, &obj_name, &obj_body)?;
                 section_name = SELECTOR.to_owned();
                 obj_name = "".to_owned();
                 obj_body = vec![];
-            } else if start_with(&l, ".internal-alias") {
+            } else if starts_with(&l, ".internal-alias") {
                 // .internal-alias
                 let cap = ALIAS_REGEX.captures(&l).unwrap();
                 self.internal_alias_name_to_id_.insert(
@@ -622,7 +618,7 @@ impl ParseEngine {
                     cap.get(2).unwrap().as_str().parse::<i32>()
                         .map_err(|_| format_err!("line: '{}': failed to parse id", lnum))?,
                 );
-            } else if start_with(&l, ".internal") {
+            } else if starts_with(&l, ".internal") {
                 // .internal
                 self.update(&section_name, &obj_name, &obj_body)
                     .map_err(|e| format_err!("line {}: {}", lnum, e))?;
@@ -632,7 +628,7 @@ impl ParseEngine {
             } else if LABEL_REGEX.is_match(&l) {
                 // TODO
                 // ignore labels
-            } else if start_with(&l, ".loc") {
+            } else if starts_with(&l, ".loc") {
                 let cap = LOC_REGEX.captures(&l).unwrap();
                 let filename = String::from(cap.get(1).unwrap().as_str());
                 let line = cap.get(2).unwrap().as_str().parse::<usize>().unwrap();
@@ -642,16 +638,16 @@ impl ParseEngine {
                     source_pos = Some(DbgPos { filename, line, line_code: lnum });
                 }
             } else if
-                start_with(&l, ".blob") ||
-                start_with(&l, ".cell") ||
-                start_with(&l, ".byte") ||
-                start_with(&l, ".long") ||
-                start_with(&l, ".short") ||
-                start_with(&l, ".quad") ||
-                start_with(&l, ".comm") ||
-                start_with(&l, ".bss") ||
-                start_with(&l, ".asciz") ||
-                start_with(&l, ".compute") {
+                starts_with(&l, ".blob") ||
+                starts_with(&l, ".cell") ||
+                starts_with(&l, ".byte") ||
+                starts_with(&l, ".long") ||
+                starts_with(&l, ".short") ||
+                starts_with(&l, ".quad") ||
+                starts_with(&l, ".comm") ||
+                starts_with(&l, ".bss") ||
+                starts_with(&l, ".asciz") ||
+                starts_with(&l, ".compute") {
                 // .param [value]
                 obj_body.push(Line { text: l.clone(), pos })
             } else {
@@ -669,63 +665,80 @@ impl ParseEngine {
         Ok(())
     }
 
-    fn resolve_nested_macros_in_lines(&mut self, lines: Lines) -> Result<Lines> {
-        let mut new_lines: Lines = vec![];
+    fn compat_rename_macro_calls(lines: &mut Lines) {
         for line in lines {
-            if start_with(&line.text, "CALL $") {
-                let next_name = CALL_REGEX.captures(&line.text).unwrap().get(1).unwrap().as_str().to_string();
-                if self.macro_name_to_lines.get(&next_name).is_some() {
-                    self.resolve_nested_macro(&next_name)?;
-                    let mut resolved_lines = self.macro_name_to_lines.get(&next_name).unwrap().clone();
-                    new_lines.append(&mut resolved_lines);
-                    continue
-                }
+            if starts_with(&line.text, "CALL $") {
+                let name = CALL_REGEX.captures(&line.text).unwrap().get(1).unwrap().as_str().to_string();
+                line.text = format!(".inline __{}\n", name);
             }
-            new_lines.push(line);
         }
-        Ok(new_lines)
     }
 
-    fn resolve_nested_macros(&mut self) -> Status {
+    fn compat_rename_all_macro_calls(&mut self) -> Status {
+        for (_, glob) in self.globl_name_to_object.iter_mut() {
+            if let Some(func) = glob.dtype.func_mut() {
+                Self::compat_rename_macro_calls(&mut func.body);
+            }
+        }
+        for (_, func) in self.internal_id_to_code.iter_mut() {
+            Self::compat_rename_macro_calls(&mut func.body);
+        }
+        for (_, lines) in &mut self.macro_name_to_lines {
+            Self::compat_rename_macro_calls(lines);
+        }
+        Ok(())
+    }
+
+    fn resolve_fragment_lines(&mut self, lines: Lines, visited: &mut HashMap<String, bool>) -> Status {
+        for line in lines {
+            if starts_with(&line.text, ".inline ") {
+                let next_name = INLINE_REGEX.captures(&line.text).unwrap().get(1).unwrap().as_str().to_string();
+                if self.macro_name_to_lines.get(&next_name).is_some() {
+                    self.resolve_fragment(&next_name, visited)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn resolve_fragments(&mut self) -> Status {
+        let mut visited = HashMap::new();
         let names = self.globl_name_to_object.keys().cloned().collect::<Vec<_>>();
         for name in &names {
             if let GloblFuncOrDataType::Function(f) = &self.globl_name_to_object.get_mut(name).unwrap().dtype {
                 let lines = f.body.clone();
-                let new_lines = self.resolve_nested_macros_in_lines(lines)?;
-                self.globl_name_to_object.get_mut(name).unwrap().dtype.func_mut().unwrap().body = new_lines;
+                self.resolve_fragment_lines(lines, &mut visited)?;
             }
         }
 
         let ids = self.internal_id_to_code.keys().copied().collect::<Vec<_>>();
         for id in &ids {
             let lines = self.internal_id_to_code.get(id).unwrap().body.clone();
-            let new_lines = self.resolve_nested_macros_in_lines(lines)?;
-            self.internal_id_to_code.get_mut(id).unwrap().body = new_lines;
+            self.resolve_fragment_lines(lines, &mut visited)?;
         }
 
         Ok(())
     }
 
-    fn resolve_nested_macro(&mut self, name: &str) -> Status {
-        if let Some(is_computed) = self.is_computed_macros.get(name) {
-            return if *is_computed {
+    fn resolve_fragment(&mut self, name: &str, visited: &mut HashMap<String, bool>) -> Status {
+        match visited.get(name) {
+            Some(true) => Ok(()),
+            Some(false) => bail!("Internal error. Macros have a cycle. See {}", name),
+            None => {
+                visited.insert(name.to_string(), false);
+                let lines = self.macro_name_to_lines.get(name).unwrap().clone();
+                self.resolve_fragment_lines(lines, visited)?;
+                visited.insert(name.to_string(), true);
+                self.postorder_fragments.push(name.to_string());
                 Ok(())
-            } else {
-                Err(format_err!("Internal error. Macros have a cycle. See {}", name))
             }
         }
-        self.is_computed_macros.insert(name.to_string(), false);
-        let lines = self.macro_name_to_lines.get(name).unwrap().clone();
-        let new_lines = self.resolve_nested_macros_in_lines(lines)?;
-        self.macro_name_to_lines.insert(name.to_string(), new_lines);
-        self.is_computed_macros.insert(name.to_string(), true);
-        Ok(())
     }
 
     fn replace_labels_in_body(&mut self, lines: Lines, obj_name: FunctionId) -> Result<Lines> {
         let mut new_lines = vec![];
         for line in lines {
-            if start_with(&line.text, ".compute") {
+            if starts_with(&line.text, ".compute") {
                 let name = COMPUTE_REGEX.captures(&line.text).unwrap().get(1).unwrap().as_str();
                 let mut resolved = self.compute_cell(name)?;
                 new_lines.append(&mut resolved);
@@ -760,6 +773,14 @@ impl ParseEngine {
 
             let body = &mut self.internal_id_to_code.get_mut(id).unwrap().body;
             *body = new_lines;
+
+            for name in self.postorder_fragments.clone() {
+                let lines = self.macro_name_to_lines.get(&name).unwrap().clone();
+                let new_lines = self.replace_labels_in_body(lines, FunctionId::Id(*id))?;
+
+                let body = self.macro_name_to_lines.get_mut(&name).unwrap();
+                *body = new_lines;
+            }
         }
 
         Ok(())
@@ -1021,6 +1042,14 @@ impl ParseEngine {
     }
 
     fn replace_labels(&mut self, line: &Line, cur_obj_name: &FunctionId) -> Result<Line> {
+        if starts_with(&line.text, ".inline") {
+            let name = INLINE_REGEX.captures(&line.text).unwrap().get(1).unwrap().as_str().to_string();
+            self.globl_name_to_id.get(&name).copied().map(|id| {
+                self.insert_called_func(cur_obj_name, id);
+                id
+            });
+            return Ok(line.clone())
+        }
         resolve_name(line, |name| {
             self.internal_name_to_id.get(name).copied()
         })
@@ -1303,13 +1332,11 @@ mod tests {
 
         assert_eq!(
             *body,
-            vec![Line::new("PUSHINT 10\n", "test_macros.code", 4),
-                 Line::new("DROP\n",       "test_macros.code", 5),
-                 Line::new("PUSHINT 1\n",  "test_macros.code", 10),
-                 Line::new("PUSHINT 2\n",  "test_macros.code", 11),
-                 Line::new("ADD\n",        "test_macros.code", 12),
-                 Line::new("PUSHINT 3\n",  "test_macros.code", 7),
-                 Line::new("\n",           "test_macros.code", 8)]
+            vec![Line::new("PUSHINT 10\n",    "test_macros.code", 4),
+                 Line::new("DROP\n",          "test_macros.code", 5),
+                 Line::new(".inline __sum\n", "test_macros.code", 6),
+                 Line::new("PUSHINT 3\n",     "test_macros.code", 7),
+                 Line::new("\n",              "test_macros.code", 8)]
         );
     }
 
@@ -1328,24 +1355,16 @@ mod tests {
 
         assert_eq!(
             *body,
-            vec![Line::new("PUSHINT 10\n", "test_macros_02.code", 4),
-                 Line::new("DROP\n",       "test_macros_02.code", 5),
-                 Line::new("PUSHINT 1\n",  "test_macros_02.code", 16),
-                 Line::new("\n",           "test_macros_02.code", 17),
-                 Line::new("PUSHINT 2\n",  "test_macros_02.code", 12),
-                 Line::new("ADD\n",        "test_macros_02.code", 13),
-                 Line::new("\n",           "test_macros_02.code", 14),
-                 Line::new("PUSHINT 3\n",  "test_macros_02.code", 7),
-                 Line::new(format!("CALL {}\n", fun_id).as_str(),      "test_macros_02.code", 8),
-                 Line::new("\n",           "test_macros_02.code", 9)]
+            vec![Line::new("PUSHINT 10\n",                   "test_macros_02.code", 4),
+                 Line::new("DROP\n",                         "test_macros_02.code", 5),
+                 Line::new(".inline __sum\n",                "test_macros_02.code", 6),
+                 Line::new("PUSHINT 3\n",                    "test_macros_02.code", 7),
+                 Line::new(".inline __getCredit_internal\n", "test_macros_02.code", 8),
+                 Line::new("\n",                             "test_macros_02.code", 9)]
         );
         assert_eq!(
             *internal,
-            vec![Line::new("PUSHINT 1\n",  "test_macros_02.code", 16),
-                 Line::new("\n",           "test_macros_02.code", 17),
-                 Line::new("PUSHINT 2\n",  "test_macros_02.code", 12),
-                 Line::new("ADD\n",        "test_macros_02.code", 13),
-                 Line::new("\n",           "test_macros_02.code", 14)]
+            vec![Line::new(".inline __sum\n", "test_macros_02.code", 20)]
         );
     }
 

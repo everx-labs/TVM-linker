@@ -12,60 +12,66 @@
  */
 use std::collections::{BTreeMap, HashMap};
 use ton_block::Serializable;
-use ton_labs_assembler::{compile_code_debuggable, Lines, DbgInfo};
+use ton_labs_assembler::{Lines, DbgInfo};
 use ton_types::{SliceData, dictionary::HashmapE};
 
-pub fn prepare_methods<T>(
-    methods: &HashMap<T, Lines>,
-    adjust_entry_points: bool,
-) -> Result<(HashmapE, DbgInfo), (T, String)>
-where
-    T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash,
-{
-    let bit_len = SliceData::load_cell(T::default().serialize().unwrap()).unwrap().remaining_bits();
-    let mut map = HashmapE::with_bit_len(bit_len);
-    let mut dbg = DbgInfo::default();
-    insert_methods(&mut map, &mut dbg, methods, adjust_entry_points)?;
-    Ok((map, dbg))
-}
+use crate::program::Program;
 
-pub fn insert_methods<T>(
-    map: &mut HashmapE,
-    dbg: &mut DbgInfo,
-    methods: &HashMap<T, Lines>,
-    adjust_entry_points: bool,
-) -> Result<(), (T, String)>
-where
-    T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash,
-{
-    for pair in methods.iter() {
-        let key: SliceData = SliceData::load_cell(pair.0.clone().serialize()
-            .map_err(|e| (pair.0.clone(), format!("Failed to serialize data: {}", e)))?).unwrap();
-        let mut val = compile_code_debuggable(pair.1.clone()).map_err(|e| {
-            (pair.0.clone(), e.to_string())
-        })?;
-        if val.0.remaining_bits() <= (1023 - (32 + 10)) { // key_length + hashmap overheads
-            map.set(key.clone(), &val.0).map_err(|e| {
-                (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
-            })?;
-        } else {
-            map.setref(key.clone(), &val.0.clone().into_cell()).map_err(|e| {
-                (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
-            })?;
-        }
-        let id = key.clone().get_next_i32()
-            .map_err(|e| (pair.0.clone(), format!("Failed to decode data: {}", e)))?;
-        if adjust_entry_points || id < -2 || id > 0 {
-            let before = val.0;
-            let after = map.get(key)
-                .map_err(|e| (pair.0.clone(), format!("Failed to find key: {}", e)))?
-                .ok_or((pair.0.clone(), "Data is empty".to_string()))?;
-            adjust_debug_map(&mut val.1, before, after)
-                .map_err(|e| (pair.0.clone(), e))?;
-        }
-        dbg.append(&mut val.1)
+impl Program {
+    pub fn prepare_methods<T>(
+        &mut self,
+        methods: &HashMap<T, Lines>,
+        adjust_entry_points: bool,
+    ) -> Result<(HashmapE, DbgInfo), (T, String)>
+    where
+        T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash,
+    {
+        let bit_len = SliceData::load_cell(T::default().serialize().unwrap()).unwrap().remaining_bits();
+        let mut map = HashmapE::with_bit_len(bit_len);
+        let mut dbg = DbgInfo::default();
+        self.insert_methods(&mut map, &mut dbg, methods, adjust_entry_points)?;
+        Ok((map, dbg))
     }
-    Ok(())
+
+    pub fn insert_methods<T>(
+        &mut self,
+        map: &mut HashmapE,
+        dbg: &mut DbgInfo,
+        methods: &HashMap<T, Lines>,
+        adjust_entry_points: bool,
+    ) -> Result<(), (T, String)>
+    where
+        T: Clone + Default + Eq + std::fmt::Display + Serializable + std::hash::Hash,
+    {
+        for pair in methods.iter() {
+            let key: SliceData = SliceData::load_cell(pair.0.clone().serialize()
+                .map_err(|e| (pair.0.clone(), format!("Failed to serialize data: {}", e)))?).unwrap();
+            let mut val = self.assemble(pair.1.clone()).map_err(|e| {
+                (pair.0.clone(), e.to_string())
+            })?;
+            if val.0.remaining_bits() <= (1023 - (32 + 10)) { // key_length + hashmap overheads
+                map.set(key.clone(), &val.0).map_err(|e| {
+                    (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
+                })?;
+            } else {
+                map.setref(key.clone(), &val.0.clone().into_cell()).map_err(|e| {
+                    (pair.0.clone(), format!("failed to set method _name_ to dictionary: {}", e))
+                })?;
+            }
+            let id = key.clone().get_next_i32()
+                .map_err(|e| (pair.0.clone(), format!("Failed to decode data: {}", e)))?;
+            if adjust_entry_points || id < -2 || id > 0 {
+                let before = val.0;
+                let after = map.get(key)
+                    .map_err(|e| (pair.0.clone(), format!("Failed to find key: {}", e)))?
+                    .ok_or((pair.0.clone(), "Data is empty".to_string()))?;
+                adjust_debug_map(&mut val.1, before, after)
+                    .map_err(|e| (pair.0.clone(), e))?;
+            }
+            dbg.append(&mut val.1)
+        }
+        Ok(())
+    }
 }
 
 fn adjust_debug_map(map: &mut DbgInfo, before: SliceData, after: SliceData) -> Result<(), String> {

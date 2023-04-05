@@ -119,7 +119,7 @@ fn initialize_registers(
 fn init_logger(debug: bool) -> Status {
     SimpleLogger::init(
         if debug {LevelFilter::Trace } else { LevelFilter::Info },
-        Config { time: None, level: None, target: None, location: None, time_format: None },
+        Config { time: None, level: None, target: None, location: None, time_format: None, ..Default::default() },
     )?;
     Ok(())
 }

@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 
-use ton_types::SliceData;
+use ton_types::{read_boc, write_boc, SliceData};
 use super::commands::{disasm, print_tree_of_cells};
 
 use rayon::prelude::*;
@@ -32,7 +32,7 @@ fn cut_asm_hashes(asm: String) -> String {
 fn round_trip_test(filename: &str, check_bin: bool) {
     let raw0 = &std::fs::read_to_string(filename).unwrap();
     let bin0 = base64::decode(raw0).unwrap();
-    let toc0 = ton_types::deserialize_tree_of_cells(&mut std::io::Cursor::new(bin0)).unwrap();
+    let toc0 = read_boc(bin0).unwrap().withdraw_single_root().unwrap();
     let mut asm0 = disasm(&mut SliceData::load_cell(toc0.clone()).unwrap());
     let toc1 = ton_labs_assembler::compile_code_to_cell(&asm0.clone()).unwrap();
     let mut asm1 = disasm(&mut SliceData::load_cell(toc1.clone()).unwrap());
@@ -60,7 +60,7 @@ fn round_trip_test(filename: &str, check_bin: bool) {
     assert!(!differ, "roundtrip difference was detected for {}", filename);
 
     if check_bin {
-        let bin1 = ton_types::serialize_toc(&toc1).unwrap();
+        let bin1 = write_boc(&toc1).unwrap();
         let raw1 = base64::encode(&bin1);
         if raw0 != &raw1 {
             println!("{}", asm0);
