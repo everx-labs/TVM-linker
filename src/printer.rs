@@ -12,7 +12,7 @@
  */
 use failure::format_err;
 use ton_block::*;
-use ton_types::{cells_serialization::serialize_tree_of_cells};
+use ton_types::write_boc;
 use ton_types::{BuilderData, Cell, Result};
 
 fn get_version(root: &Cell) -> Result<String> {
@@ -54,9 +54,8 @@ pub fn state_init_printer(state: &StateInit) -> String {
 pub fn tree_of_cells_into_base64(root_cell: Option<&Cell>) -> String {
     match root_cell {
         Some(cell) => {
-            let mut bytes = Vec::new();
-            match serialize_tree_of_cells(cell, &mut bytes) {
-                Ok(()) => base64::encode(&bytes),
+            match write_boc(cell) {
+                Ok(bytes) => base64::encode(&bytes),
                 Err(_) => "None".to_string()
             }
         }
@@ -67,8 +66,7 @@ pub fn tree_of_cells_into_base64(root_cell: Option<&Cell>) -> String {
 pub fn msg_printer(msg: &Message) -> Result<String> {
     let mut b = BuilderData::new();
     msg.write_to(&mut b)?;
-    let mut bytes = Vec::new();
-    serialize_tree_of_cells(&b.into_cell()?, &mut bytes)?;
+    let bytes = write_boc(&b.into_cell()?)?;
     Ok(format!("message header\n{}init  : {}\nbody  : {}\nbody_hex: {}\nbody_base64: {}\nboc_base64: {}\n",
         print_msg_header(msg.header()),
         msg.state_init().as_ref().map(|x| {

@@ -14,17 +14,15 @@ use base64::encode;
 use ed25519_dalek::*;
 use failure::format_err;
 use std::fs::File;
-use std::io::Cursor;
-use std::io::Read;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::collections::HashMap;
 use std::time::SystemTime;
 use ton_block::*;
 use ton_labs_assembler::{Line, Lines, DbgInfo, Engine};
-use ton_types::deserialize_cells_tree_ex;
-use ton_types::deserialize_cells_tree;
-use ton_types::{Cell, SliceData, BuilderData, IBitstring, Result};
-use ton_types::dictionary::{HashmapE, HashmapType};
+use ton_types::{
+    read_boc, Cell, SliceData, BuilderData, IBitstring, Result,
+    dictionary::{HashmapE, HashmapType},
+};
 use crate::parser::{ptr_to_builder, ParseEngine, ParseEngineResults, SelectorVariant};
 use crate::printer::tree_of_cells_into_base64;
 
@@ -141,8 +139,7 @@ impl Program {
             return Ok("".to_string());
         }
         if let Some(data_filename) = data_filename {
-            let mut data_cursor = Cursor::new(std::fs::read(data_filename).unwrap());
-            let data_cell = deserialize_cells_tree(&mut data_cursor).unwrap().remove(0);
+            let data_cell = read_boc(std::fs::read(data_filename).unwrap()).unwrap().roots.remove(0);
             state_init.set_data(data_cell);
         }
         let ret = save_to_file(state_init.clone(), out_file, wc, self.silent);
@@ -311,9 +308,10 @@ impl Program {
     }
 
     pub fn assemble(&mut self, lines: Lines) -> Result<(SliceData, DbgInfo)> {
-        let unit = self.assembler.build(None, lines)
-            .map_err(|e| format_err!("compilation failed: {}", e))?;
-        Ok(unit.finalize())
+        let res = self.assembler.build(None, lines)
+            .map_err(|e| format_err!("compilation failed: {}", e))?
+            .finalize();
+        Ok(res)
     }
 }
 
@@ -359,11 +357,10 @@ fn calc_userfriendly_address(wc: i8, addr: &[u8], bounce: bool, testnet: bool) -
 }
 
 pub fn load_from_file(contract_file: &str) -> Result<StateInit> {
-    let mut csor = Cursor::new(std::fs::read(contract_file)?);
-    let mut cell = deserialize_cells_tree(&mut csor)?.remove(0);
+    let mut cell = read_boc(std::fs::read(contract_file)?)?.roots.remove(0);
     // try appending a dummy library cell if there is no such cell in the tvc file
     if cell.references_count() == 2 {
-        let mut adjusted_cell = BuilderData::from(cell);
+        let mut adjusted_cell = BuilderData::from_cell(&cell)?;
         adjusted_cell.checked_append_reference(Cell::default())?;
         cell = adjusted_cell.into_cell()?;
     }
@@ -375,11 +372,9 @@ pub fn load_stateinit(file_name: &str) -> Result<(SliceData, Vec<u8>)> {
     let mut f = File::open(file_name)?;
     f.read_to_end(&mut orig_bytes)?;
 
-    let mut cur = Cursor::new(orig_bytes.clone());
-    let (root_cells, _mode, _x, _y) = deserialize_cells_tree_ex(&mut cur)?;
-    let mut root = root_cells[0].clone();
+    let mut root = read_boc(orig_bytes.clone())?.roots.remove(0);
     if root.references_count() == 2 { // append empty library cell
-        let mut adjusted_cell = BuilderData::from(root);
+        let mut adjusted_cell = BuilderData::from_cell(&root)?;
         adjusted_cell.checked_append_reference(Cell::default())?;
         root = adjusted_cell.into_cell()?;
     }

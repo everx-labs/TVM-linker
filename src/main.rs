@@ -57,7 +57,7 @@ use ton_block::{Deserializable, Message, StateInit, Serializable, Account, MsgAd
 use std::io::Write;
 use std::{path::Path};
 use testcall::{call_contract, MsgInfo, TestCallParams, TraceLevel};
-use ton_types::{SliceData, Result, Status, AccountId, BagOfCells, BocSerialiseMode, UInt256};
+use ton_types::{SliceData, Result, Status, AccountId, UInt256, BocWriter};
 use std::env;
 use disasm::commands::disasm_command;
 use ton_labs_assembler::{Line, compile_code_to_cell};
@@ -256,8 +256,7 @@ fn linker_main() -> Status {
                 .map_err(|e| format_err!("failed to read input file: {}", e))?;
             let cell = compile_code_to_cell(code.as_str())
                 .map_err(|e| format_err!("failed to assemble: {}", e))?;
-            let mut bytes = Vec::new();
-            BagOfCells::with_root(&cell).write_to(&mut bytes, false)?;
+            let bytes = ton_types::write_boc(&cell)?;
             let mut file = File::create(&output).unwrap();
             file.write_all(&bytes)?;
             return Ok(())
@@ -388,9 +387,9 @@ fn replace_command(matches: &ArgMatches) -> Status {
             prog_opt = Some(prog);
             code
         }
-        Err(err) => {
+        Err(_) => {
             let data = std::fs::read(path)?;
-            ton_types::deserialize_tree_of_cells(&mut std::io::Cursor::new(&data)).map_err(|_| err)?
+            ton_types::read_boc(&data)?.withdraw_single_root()?
         }
     };
 
@@ -712,10 +711,8 @@ fn build_message(
     }
 
     let root_cell = msg.serialize()?;
-    let boc = BagOfCells::with_root(&root_cell);
     let mut bytes = Vec::new();
-    let mode = BocSerialiseMode::Generic { index: false, crc: true, cache_bits: false, flags: 0 };
-    boc.write_to_ex(&mut bytes, mode, None, Some(4))?;
+    BocWriter::with_root(&root_cell)?.write_ex(&mut bytes, false, true, None, Some(4))?;
 
     println!("Encoded msg: {}", hex::encode(&bytes));
 

@@ -16,9 +16,8 @@ use std::str::FromStr;
 use failure::{bail, format_err};
 use ton_block::Serializable;
 use clap::ArgMatches;
-use ton_types::cells_serialization::deserialize_cells_tree;
+use ton_types::read_boc;
 use ton_types::{Cell, HashmapE, HashmapType, SliceData, UInt256, Status};
-use std::io::Cursor;
 
 use super::{loader::Loader, types::Shape};
 
@@ -41,8 +40,7 @@ fn disasm_graphviz_command(m: &ArgMatches) -> Status {
         .transpose()
         .map_err(|e| format_err!(" failed to read tvc file: {}", e))?
         .unwrap();
-    let mut csor = Cursor::new(tvc);
-    let mut roots = deserialize_cells_tree(&mut csor).unwrap();
+    let mut roots = read_boc(tvc).unwrap().roots;
     let root = roots.remove(0).reference(0).unwrap();
     match m.value_of("METHOD") {
         Some(string) => {
@@ -137,8 +135,7 @@ fn disasm_dump_command(m: &ArgMatches) -> Status {
         .transpose()
         .map_err(|e| format_err!(" failed to read tvc file: {}", e))?
         .unwrap();
-    let mut csor = Cursor::new(tvc);
-    let roots = deserialize_cells_tree(&mut csor).map_err(|e| format_err!("{}", e))?;
+    let roots = read_boc(tvc).map_err(|e| format_err!("{}", e))?.roots;
     if roots.is_empty() {
         println!("empty");
     } else {
@@ -220,8 +217,7 @@ fn disasm_text_command(m: &ArgMatches) -> Status {
         .transpose()
         .map_err(|e| format_err!(" failed to read input file: {}", e))?
         .unwrap();
-    let mut csor = Cursor::new(tvc);
-    let mut roots = deserialize_cells_tree(&mut csor).map_err(|e| format_err!("{}", e))?;
+    let mut roots = read_boc(tvc).map_err(|e| format_err!("{}", e))?.roots;
 
     if m.is_present("RAW") {
         print!("{}", disasm_ex(&mut SliceData::load_cell_ref(roots.get(0).unwrap())?, true));

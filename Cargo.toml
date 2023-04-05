@@ -9,7 +9,7 @@ license-file = 'LICENSE.md'
 name = 'tvm_linker'
 readme = 'README.md'
 repository = 'https://github.com/tonlabs/TVM-linker'
-version = '0.19.7'
+version = '0.20.0'
 
 [[bin]]
 name = 'tvm_linker'
@@ -17,29 +17,27 @@ path = 'src/main.rs'
 
 [dependencies]
 base64 = '0.13'
-clap = '2.32'
+clap = '2.33'
 crc = '3.0'
-ed25519 = '1.0.1'
-ed25519-dalek = '1.0.1'
-failure = '0.1.0'
+ed25519 = '1.5'
+ed25519-dalek = '1.0'
+failure = '0.1'
 hex = '0.4'
 lazy_static = '1.4'
-log = '0.4.6'
+log = '0.4'
 num = '0.4'
 num-traits = '0.2'
-rand = '0.8.5'
+rand = '0.8'
 regex = '1'
-serde_json = '1.0.41'
+serde_json = '1.0'
 sha2 = '0.10'
-simplelog = '0.5.3'
-serde = { features = [ 'derive' ], version = '1.0.100' }
-ton_abi = { git = 'https://github.com/tonlabs/ever-abi.git', tag = '2.3.75' }
-ton_block = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ever-block.git', tag = '1.9.39' }
-#ton_labs_assembler = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ever-assembler.git', tag = '1.2.89' }
-ton_types = { git = 'https://github.com/tonlabs/ever-types.git', tag = '1.12.7' }
-ton_vm = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ever-vm.git', tag = '1.8.127' }
-
-ton_labs_assembler = { features = [ 'gosh' ], path = '/tonlabs/ever-assembler' }
+simplelog = '0.6'
+serde = { features = [ 'derive' ], version = '1.0' }
+ton_abi = { git = 'https://github.com/tonlabs/ever-abi.git', tag = '2.3.78' }
+ton_block = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ever-block.git', tag = '1.9.41' }
+ton_labs_assembler = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ever-assembler.git', tag = '1.2.92' }
+ton_types = { git = 'https://github.com/tonlabs/ever-types.git', tag = '2.0.0' }
+ton_vm = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ever-vm.git', tag = '1.8.129' }
 
 [dev-dependencies]
 assert_cmd = '2.0.5'
