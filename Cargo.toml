@@ -19,7 +19,7 @@ path = 'src/main.rs'
 base64 = '0.13'
 clap = '2.33'
 crc = '3.0'
-ed25519 = "2.2"
+ed25519 = '2.2'
 ed25519-dalek = '1.0'
 failure = '0.1'
 hex = '0.4'
@@ -41,7 +41,7 @@ ton_vm = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ever-vm.git'
 
 [dev-dependencies]
 assert_cmd = '2.0.5'
-predicates = "3.0.3"
+predicates = '3.0.3'
 rayon = '1.5.3'
 similar = '2.2.0'
 
