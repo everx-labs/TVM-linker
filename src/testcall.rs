@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 
-use ed25519::signature::Signer;
+use ed25519_dalek::Signer;
 use failure::format_err;
 use crate::keyman::KeypairManager;
 use log::Level::Error;
