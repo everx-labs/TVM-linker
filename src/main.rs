@@ -64,7 +64,7 @@ use ton_labs_assembler::{Line, compile_code_to_cell};
 use std::fs::File;
 use std::str::FromStr;
 
-const DEFAULT_CAPABILITIES:u64 = 0x42E;   // Default capabilities in the main network
+const DEFAULT_CAPABILITIES:u64 = 0x0020_042E;   // Default capabilities in the main network
 
 fn main() -> std::result::Result<(), i32> {
     linker_main().map_err(|err_str| {
