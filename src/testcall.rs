@@ -77,7 +77,7 @@ fn create_internal_msg(
 }
 
 fn sign_body(body: &mut SliceData, key_file: Option<&str>) -> Status {
-    let mut signed_body = BuilderData::from_slice(body);
+    let mut signed_body = body.as_builder();
     let mut sign_builder = BuilderData::new();
     if let Some(f) = key_file {
         let pair = KeypairManager::from_file(f)?.drain();
