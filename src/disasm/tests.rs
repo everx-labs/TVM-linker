@@ -95,7 +95,8 @@ fn round_trip_tonix() {
 }
 
 fn check(code: &str, text: &str) {
-    let mut slice = SliceData::from_string(code).unwrap();
+    let builder = SliceData::from_string(code).unwrap().as_builder();
+    let mut slice = SliceData::load_builder(builder).unwrap();
     let text_disasm = disasm(&mut slice);
     assert_eq!(text, &text_disasm);
 }
