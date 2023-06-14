@@ -1304,7 +1304,7 @@ dependencies = [
 [[package]]
 name = "ton_vm"
 version = "1.8.162"
-source = "git+https://github.com/tonlabs/ever-vm.git?tag=1.8.162#448722b486f9fdfe99cac2befb01184592bf8dad"
+source = "git+https://github.com/tonlabs/ever-vm.git?branch=gas-remaining-insn#4953a466a6cdb139d4132d374f7e7b127caa5570"
 dependencies = [
  "diffy",
  "ed25519 1.5.3",
