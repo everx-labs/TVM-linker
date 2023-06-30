@@ -57,7 +57,7 @@ use ton_block::{Deserializable, Message, StateInit, Serializable, Account, MsgAd
 use std::io::Write;
 use std::{path::Path};
 use testcall::{call_contract, MsgInfo, TestCallParams, TraceLevel};
-use ton_types::{SliceData, Result, Status, AccountId, UInt256, BocWriter};
+use ton_types::{SliceData, Result, Status, AccountId, UInt256, BocWriter, Cell};
 use std::env;
 use disasm::commands::disasm_command;
 use ton_labs_assembler::{Line, compile_code_to_cell};
@@ -91,6 +91,15 @@ fn linker_main() -> Status {
             (author: "TON Labs")
             (@arg INPUT: +required +takes_value "BOC file")
             (@arg TVC: --tvc "BOC file is tvc file")
+        )
+        (@subcommand decode_response =>
+            (about: "take apart a message boc file")
+            (version: build_info.as_str())
+            (author: "TON Labs")
+            (@arg ABI_JSON: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids.")
+            (@arg ABI_METHOD: -m --("abi-method") +takes_value "Supplies the name of the calling contract method")
+            (@arg INTERNAL: --internal "Is it internal message to decode")
+            (@arg INPUT: +required +takes_value "BOC file")
         )
         (@subcommand replace_code =>
             (@setting AllowNegativeNumbers)
@@ -210,6 +219,12 @@ fn linker_main() -> Status {
             decode_matches.value_of("INPUT").unwrap(),
             decode_matches.is_present("TVC"),
         );
+    }
+
+    //SUBCOMMAND DECODE RESPONSE
+    if let Some(decode_matches) = matches.subcommand_matches("decode_response") {
+        println!("Decode response");
+        return run_decode_response(decode_matches);
     }
 
     //SUBCOMMAND MESSAGE
@@ -472,6 +487,41 @@ fn decode_boc(filename: &str, is_tvc: bool) -> Status {
     Ok(())
 }
 
+fn run_decode_response(matches: &ArgMatches) -> Status {
+    let abi_file = matches.value_of("ABI_JSON");
+    let method = matches.value_of("ABI_METHOD");
+    let is_internal = matches.is_present("INTERNAL");
+    
+
+    // read from file
+    let file_path = matches.value_of("INPUT").unwrap();
+
+    let boc_base64 = std::fs::read_to_string(file_path)
+        .map_err(|e| format_err!("failed to read params file: {}", e))?;
+
+    println!("boc_base64: {}", boc_base64);
+
+    let cell = Cell::construct_from_base64(boc_base64.as_str()).expect("failed to construct cell from base64");
+
+    let body = SliceData::load_cell(cell).expect("failed to load cell");
+
+    // let body = SliceData::from_raw(boc_bytes, len * 8);
+    // let body = SliceData::load_cell(body.reference(0).unwrap()).unwrap();
+
+    println!("body_hex: {:?}", body);
+
+
+    if let Some(abi_file) = abi_file {
+        if let Some(method) = method {
+            let result = decode_body(abi_file, method, body, is_internal)
+                .unwrap_or_default();
+
+            println!("{}", result);
+        }
+    }
+    Ok(())
+}
+
 fn run_test_subcmd(matches: &ArgMatches) -> Status {
     let input = matches.value_of("INPUT").unwrap();
     let addr_from_input = if hex::decode(input).is_ok() {
@@ -515,7 +565,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
     let ticktock = parse_ticktock(matches.value_of("TICKTOCK"))?;
     let now = parse_now(matches.value_of("NOW"))?;
 
-    let action_decoder = |body, is_internal| {
+    let action_decoder = |body: SliceData, is_internal| {
         let abi_file = matches.value_of("ABI_JSON");
         let method = matches.value_of("ABI_METHOD");
         if let Some(abi_file) = abi_file {
