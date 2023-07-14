@@ -11,21 +11,19 @@
  * limitations under the License.
  */
 
+use std::{fs::File, str::FromStr, sync::Arc};
+
 use ed25519_dalek::Signer;
 use failure::format_err;
-use crate::keyman::KeypairManager;
 use log::Level::Error;
-use crate::printer::msg_printer;
-use crate::program::{load_from_file, get_now};
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use serde_json::Value;
-use std::fs::File;
-use std::str::FromStr;
-use std::sync::Arc;
-use ton_vm::executor::{Engine, EngineTraceInfo, EngineTraceInfoType, gas::gas_state::Gas};
-use ton_vm::error::tvm_exception;
-use ton_vm::stack::{StackItem, Stack, savelist::SaveList, integer::IntegerData};
-use ton_vm::SmartContractInfo;
+use ton_vm::{
+    executor::{Engine, EngineTraceInfo, EngineTraceInfoType, gas::gas_state::Gas},
+    error::tvm_exception,
+    stack::{StackItem, Stack, savelist::SaveList, integer::IntegerData},
+    SmartContractInfo,
+};
 use ton_types::{AccountId, BuilderData, Cell, SliceData, Result, Status};
 use ton_block::{
     CurrencyCollection, Deserializable, ExternalInboundMessageHeader, Grams,
@@ -33,6 +31,10 @@ use ton_block::{
     OutActions, Serializable, StateInit,
 };
 use ton_labs_assembler::DbgInfo;
+
+use crate::keyman::KeypairManager;
+use crate::printer::msg_printer;
+use crate::program::{load_from_file, get_now};
 
 const DEFAULT_ACCOUNT_BALANCE: &str = "100000000000";
 
