@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 use failure::format_err;
-use ton_types::{Result};
+use ton_types::Result;
 use serde::Deserialize;
 
 pub struct KeypairManager(ed25519_dalek::Keypair);

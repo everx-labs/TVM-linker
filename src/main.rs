@@ -45,24 +45,24 @@ mod methdict;
 mod testcall;
 mod disasm;
 
-use abi::{build_abi_body, decode_body, load_abi_json_string, load_abi_contract};
+use std::{env, io::Write, path::Path, fs::File, str::FromStr};
 use clap::ArgMatches;
 use failure::{format_err, bail};
+
+use ton_block::{
+    Deserializable, Message, StateInit, Serializable, Account, MsgAddressInt,
+    ExternalInboundMessageHeader, InternalMessageHeader, MsgAddressIntOrNone, ConfigParams
+};
+use ton_types::{SliceData, Result, Status, AccountId, UInt256, BocWriter};
+use ton_labs_assembler::{Line, compile_code_to_cell};
+
+use abi::{build_abi_body, decode_body, load_abi_json_string, load_abi_contract};
 use keyman::KeypairManager;
 use parser::{ParseEngine, ParseEngineResults};
 use program::{Program, get_now, save_to_file, load_from_file};
 use resolver::resolve_name;
-use ton_block::{Deserializable, Message, StateInit, Serializable, Account, MsgAddressInt, ExternalInboundMessageHeader, InternalMessageHeader,
-                MsgAddressIntOrNone, ConfigParams};
-use std::io::Write;
-use std::{path::Path};
 use testcall::{call_contract, MsgInfo, TestCallParams, TraceLevel};
-use ton_types::{SliceData, Result, Status, AccountId, UInt256, BocWriter};
-use std::env;
 use disasm::commands::disasm_command;
-use ton_labs_assembler::{Line, compile_code_to_cell};
-use std::fs::File;
-use std::str::FromStr;
 
 const DEFAULT_CAPABILITIES:u64 = 0x42E;   // Default capabilities in the main network
 
