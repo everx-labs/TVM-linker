@@ -497,8 +497,8 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
 name = "ever-struct"
-version = "1.0.0"
-source = "git+https://github.com/tonlabs/ever-struct.git?tag=1.0.0#cb02197e0691c5f0ae3c7610d434f69406c237d0"
+version = "1.0.1"
+source = "git+https://github.com/tonlabs/ever-struct.git?tag=1.0.1#ed0bac67360196779fc46905de12f95171902788"
 dependencies = [
  "anyhow",
  "failure",

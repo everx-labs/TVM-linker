@@ -44,7 +44,7 @@ ton_labs_assembler = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/
 ton_types = { git = 'https://github.com/tonlabs/ever-types.git', tag = '2.0.18' }
 ton_vm = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ever-vm.git', tag = '1.8.189' }
 
-ever-struct = { git = 'https://github.com/tonlabs/ever-struct.git', tag = '1.0.0' }
+ever-struct = { git = 'https://github.com/tonlabs/ever-struct.git', tag = '1.0.1' }
 
 [dev-dependencies]
 assert_cmd = '2.0.5'
