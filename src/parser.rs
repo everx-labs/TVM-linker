@@ -71,6 +71,12 @@ impl ParseEngineResults {
     pub fn version(&self) -> Option<String> {
         self.engine.version()
     }
+    pub fn commit_hash(&self) -> Option<&[u8; 20]> { 
+        self.engine.commit_hash() 
+    }
+    pub fn contract_name(&self) -> &str { 
+        self.engine.contract_name() 
+    }
     pub fn func_upgrade(&self) -> SelectorVariant {
         self.engine.func_upgrade()
     }
@@ -228,8 +234,7 @@ impl Default for GloblFuncOrData {
     }
 }
 
-#[derive(PartialEq)]
-#[derive(Copy, Clone)]
+#[derive(PartialEq, Copy, Clone)]
 pub enum SelectorVariant {
     Default,
     UpdateFunc,
@@ -267,8 +272,15 @@ pub struct ParseEngine {
     func_upgrade: SelectorVariant,
     ///
     save_all_private_functions: bool,
+
     /// Contract version
     version: Option<String>,
+
+    /// compiler commit hash
+    commit_hash: Option<[u8; 20]>, 
+
+    /// Contract name
+    contract_name: String,
 
     /// starting key for objects in global memory dictionary
     globl_base: Ptr,
@@ -295,7 +307,9 @@ lazy_static! {
     static ref PUBLIC_REGEX: Regex = Regex::new(r"^\s*\.public\s+([\w.]+)").unwrap();
     static ref MACRO_REGEX: Regex = Regex::new(r"^\s*\.macro\s+([\w.:]+)").unwrap();
     static ref LOC_REGEX: Regex = Regex::new(r"^\s*\.loc\s+(.+),\s+(\d+)\n$").unwrap();
-    static ref VERSION_REGEX: Regex = Regex::new(r"^\s*\.version\s+(.+)").unwrap();
+    static ref VERSION_REGEX: Regex = Regex::new(r"^\s*\.version solc\s+(.+)").unwrap();
+    static ref COMMIT_HASH_REGEX: Regex = Regex::new(r"^\s*\.commit_hash solc\s+(.+)").unwrap();
+    static ref CONTRACT_NAME_REGEX: Regex = Regex::new(r"^\s*\.contract_name\s+(.+)").unwrap();
     static ref PRAGMA_REGEX: Regex = Regex::new(r"^\s*\.pragma\s+(.+)").unwrap();
 
     static ref COMPUTE_REGEX: Regex = Regex::new(r"^\s*\.compute\s+\$([\w\.:]+)\$").unwrap();
@@ -353,6 +367,8 @@ impl ParseEngine {
             persistent_ptr: 0,
             abi: None,
             version: None,
+            commit_hash: None,
+            contract_name: String::new(),
             func_upgrade: SelectorVariant::Default,
             computed: HashMap::new(),
             save_all_private_functions: false
@@ -491,6 +507,14 @@ impl ParseEngine {
         self.version.clone()
     }
 
+    fn commit_hash(&self) -> Option<&[u8; 20]> { 
+        self.commit_hash.as_ref()
+    }
+    
+    fn contract_name(&self) -> &str { 
+        &self.contract_name.as_str() 
+    }
+
     fn func_upgrade(&self) -> SelectorVariant {
         self.func_upgrade
     }
@@ -531,9 +555,16 @@ impl ParseEngine {
                starts_with(&l, ".section") {
                 //ignore unused parameters
                 debug!("ignored: {}", l);
-            } else if starts_with(&l, ".version") {
+            } else if starts_with(&l, ".version solc") {
                 let cap = VERSION_REGEX.captures(&l).unwrap();
                 self.version = Some(cap.get(1).unwrap().as_str().to_owned());
+            } else if starts_with(&l, ".commit_hash solc") {
+                let cap = COMMIT_HASH_REGEX.captures(&l).unwrap();
+                let commit = hex::decode(cap.get(1).unwrap().as_str().to_owned())?;
+                self.commit_hash = commit.try_into().ok();
+            } else if starts_with(&l, ".contract_name") {
+                let cap = CONTRACT_NAME_REGEX.captures(&l).unwrap();
+                self.contract_name = cap.get(1).unwrap().as_str().to_owned();
             } else if starts_with(&l, ".pragma") {
                 let cap = PRAGMA_REGEX.captures(&l).unwrap();
                 if let Some(m) = cap.get(1) {

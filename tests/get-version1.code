@@ -1,4 +1,6 @@
-.version 0.43.0+commit.e8c3d877.mod.Linux.g++
+.version solc 0.43.0
+.commit_hash solc 4e97449a48c05600af00027d652519de61190b53
+.contract_name WalletV20
 
 .internal-alias :main_internal, -1
 .internal       :main_internal

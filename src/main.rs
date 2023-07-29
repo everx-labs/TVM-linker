@@ -47,8 +47,10 @@ mod disasm;
 
 use std::{env, io::Write, path::Path, fs::File, str::FromStr};
 use clap::ArgMatches;
+use ever_struct::scheme;
 use failure::{format_err, bail};
 
+use serde_json::json;
 use ton_block::{
     Deserializable, Message, StateInit, Serializable, Account, MsgAddressInt,
     ExternalInboundMessageHeader, InternalMessageHeader, MsgAddressIntOrNone, ConfigParams
@@ -59,10 +61,12 @@ use ton_labs_assembler::{Line, compile_code_to_cell};
 use abi::{build_abi_body, decode_body, load_abi_json_string, load_abi_contract};
 use keyman::KeypairManager;
 use parser::{ParseEngine, ParseEngineResults};
-use program::{Program, get_now, save_to_file, load_from_file};
+use program::{Program, get_now, load_from_file};
 use resolver::resolve_name;
 use testcall::{call_contract, MsgInfo, TestCallParams, TraceLevel};
 use disasm::commands::disasm_command;
+use ton_utils::printer::tree_of_cells_into_base64;
+use serde::ser::{Serialize, Serializer, SerializeStruct};
 
 const DEFAULT_CAPABILITIES:u64 = 0x42E;   // Default capabilities in the main network
 
@@ -86,7 +90,7 @@ fn linker_main() -> Status {
         (author: "TON Labs")
         (about: "Tool for assembling, disassembling and executing TVM code")
         (@subcommand decode =>
-            (about: "take apart a message boc or a tvc file")
+            (about: "Parses metadata from the serialized tvc and show it in json")
             (version: build_info.as_str())
             (author: "TON Labs")
             (@arg INPUT: +required +takes_value "BOC file")
@@ -107,21 +111,20 @@ fn linker_main() -> Status {
         )
         (@subcommand compile =>
             (@setting AllowNegativeNumbers)
-            (about: "compile contract")
+            (about: "Compiles the contract assembly code and serialize it into boc")
             (version: build_info.as_str())
             (author: "TON Labs")
             (@arg INPUT: +required +takes_value "TVM assembler source file")
             (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids. If not specified abi can be loaded from file path obtained from <INPUT> path if it exists.")
-            (@arg WC: -w +takes_value "Workchain id used to print contract address, -1 by default.")
             (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
             (@arg DEBUG_MAP: --("debug-map") +takes_value "Generates debug map file")
-            (@arg DATA: --("data") +takes_value "Overwrites data with a cell from a file")
             (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file. If not specified lib is loaded from environment variable TVM_LINKER_LIB_PATH if it exists.")
             (@arg OUT_FILE: -o +takes_value "Output file name")
             (@arg LANGUAGE: --language +takes_value "Enable language-specific features in linkage")
-            (@arg PRINT_CODE: --print_code "Command will only print the code cell without generating the TVC file")
+            (@arg PRINT_CODE: --("print-code") "Command will only print the cell saving into the file")
             (@arg SILENT: --silent "Command will print necessary output")
-            (@arg RAW: --raw "Assemble code as-is into a BOC")
+            (@arg RAW: --raw "Compile contract, but save code directly without wrapping in tvc")
+            (@arg NO_META: --("no-meta") "Build tvc without metadata (work if --raw is not specified)")
         )
         (@subcommand test =>
             (@setting AllowLeadingHyphen)
@@ -198,21 +201,17 @@ fn linker_main() -> Status {
         (@setting SubcommandRequired)
     ).get_matches();
 
-
-    //SUBCOMMAND TEST
+    // SUBCOMMAND TEST
     if let Some(test_matches) = matches.subcommand_matches("test") {
         return run_test_subcmd(test_matches);
     }
 
-    //SUBCOMMAND DECODE
+    // SUBCOMMAND DECODE
     if let Some(decode_matches) = matches.subcommand_matches("decode") {
-        return decode_boc(
-            decode_matches.value_of("INPUT").unwrap(),
-            decode_matches.is_present("TVC"),
-        );
+        return decode_tvc(decode_matches.value_of("INPUT").unwrap());
     }
 
-    //SUBCOMMAND MESSAGE
+    // SUBCOMMAND MESSAGE
     if let Some(msg_matches) = matches.subcommand_matches("message") {
         let mut suffix = String::new();
         suffix += "-msg";
@@ -246,21 +245,11 @@ fn linker_main() -> Status {
         )
     }
 
-    //SUBCOMMAND COMPILE
+    // SUBCOMMAND COMPILE
     if let Some(compile_matches) = matches.subcommand_matches("compile") {
         let input = compile_matches.value_of("INPUT").unwrap();
         let out_file = compile_matches.value_of("OUT_FILE");
-        if compile_matches.is_present("RAW") {
-            let output = out_file.unwrap();
-            let code = std::fs::read_to_string(input)
-                .map_err(|e| format_err!("failed to read input file: {}", e))?;
-            let cell = compile_code_to_cell(code.as_str())
-                .map_err(|e| format_err!("failed to assemble: {}", e))?;
-            let bytes = ton_types::write_boc(&cell)?;
-            let mut file = File::create(&output).unwrap();
-            file.write_all(&bytes)?;
-            return Ok(())
-        }
+
         let abi_from_input = format!("{}{}", input.trim_end_matches("code"), "abi.json");
         let silent = compile_matches.is_present("SILENT");
         let abi_file = compile_matches.value_of("ABI").or_else(|| {
@@ -269,11 +258,14 @@ fn linker_main() -> Status {
             }
             Some(abi_from_input.as_ref())
         });
+
         let abi_json = match abi_file {
             Some(abi_file_name) => Some(load_abi_json_string(abi_file_name)?),
-            None => None
+            None => None,
         };
+
         let mut sources = Vec::new();
+
         for lib in compile_matches.values_of("LIB").unwrap_or_default() {
             let path = Path::new(lib);
             if !path.exists() {
@@ -281,15 +273,18 @@ fn linker_main() -> Status {
             }
             sources.push(path);
         }
+
         let env_lib = env::var("TVM_LINKER_LIB_PATH").unwrap_or_default();
         if sources.is_empty() && !env_lib.is_empty() {
             if !silent {
                 println!("TVM_LINKER_LIB_PATH: {:?}", &env_lib);
             }
+
             let path = Path::new(&env_lib);
             if !path.exists() {
                 bail!("File {} doesn't exist", &env_lib);
             }
+            
             sources.push(path);
         }
 
@@ -298,29 +293,25 @@ fn linker_main() -> Status {
             bail!("File {} doesn't exist", input);
         }
         sources.push(path);
-        let mut prog = Program::new(
-            ParseEngine::new(sources, abi_json)?
-        )?;
+        let mut prog = Program::new(ParseEngine::new(sources, abi_json)?)?;
 
         let debug = compile_matches.is_present("DEBUG");
         prog.set_language(compile_matches.value_of("LANGUAGE"));
 
         if debug {
-           prog.debug_print();
+            prog.debug_print();
         }
 
-        let wc = compile_matches.value_of("WC")
-            .map(|wc| wc.parse::<i8>().unwrap_or(-1))
-            .unwrap_or(-1);
-
-        let data_filename = compile_matches.value_of("DATA");
-
-        let print_code = compile_matches.is_present("PRINT_CODE");
-        prog.set_print_code(print_code);
-
+        prog.set_print_code(compile_matches.is_present("PRINT_CODE"));
         prog.set_silent(silent);
 
-        prog.compile_to_file_ex(wc, out_file, data_filename)?;
+        let prefix = input.split(".").collect::<Vec<&str>>()[0];
+        prog.compile_to_file_ex(
+            prefix,
+            out_file,
+            compile_matches.is_present("NO_META"),
+            compile_matches.is_present("RAW"),
+        )?;
 
         if compile_matches.is_present("DEBUG_MAP") {
             let filename = compile_matches.value_of("DEBUG_MAP").unwrap();
@@ -458,17 +449,33 @@ fn decode_hex_string(hex_str: String) -> Result<(Vec<u8>, usize)> {
     }
 }
 
-fn decode_boc(filename: &str, is_tvc: bool) -> Status {
-    let (mut root_slice, orig_bytes) = program::load_stateinit(filename)?;
+struct SerdeTVC(scheme::TVC);
 
-    println!("Encoded: {}\n", hex::encode(orig_bytes));
-    if is_tvc {
-        let state = StateInit::construct_from(&mut root_slice)?;
-        println!("Decoded:\n{}", printer::state_init_printer(&state));
-    } else {
-        let msg = Message::construct_from(&mut root_slice)?;
-        println!("Decoded:\n{}", printer::msg_printer(&msg)?);
+impl serde::Serialize for SerdeTVC {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct(
+            "SerdeTVC", 
+            3
+        )?;
+
+        let code = if let Some(code) = &self.0.code {
+            Some(tree_of_cells_into_base64(Some(&code)))
+        } else {
+            None
+        };
+
+        state.serialize_field("code", &code)?;
+        state.serialize_field("desc", &self.0.desc)?;
+        state.end()
     }
+}
+
+fn decode_tvc(filename: &str) -> Status {
+    let decoded = scheme::TVC::construct_from_file(filename)?;
+    println!("{}", serde_json::to_string_pretty(&SerdeTVC(decoded))?);
     Ok(())
 }
 
@@ -479,6 +486,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
     } else {
         "0".repeat(64)
     };
+
     let address = matches.value_of("ADDRESS").unwrap_or(&addr_from_input);
     let (body, sign) = match matches.value_of("BODY") {
         Some(hex_str) => {
@@ -553,6 +561,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
     if let Some(map) = debug_map_filename.clone() {
         println!("DEBUG_MAP: {map}");
     }
+    
     println!("TEST STARTED");
     println!("body = {:?}", body);
 
@@ -587,22 +596,23 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
     } else {
         format!("{}.tvc", input)
     };
+
     let addr = MsgAddressInt::from_str(&address)?;
     let state_init = load_from_file(&input)?;
     let config_cell_opt = matches.value_of("CONFIG").and_then(testcall::load_config);
 
-    let capabilities =
-        match config_cell_opt {
-            Some(ref config_cell) => {
-                let config_params = ConfigParams::with_address_and_root(
-                    UInt256::from_str(&"5".repeat(64)).unwrap(), // -1:5555...
-                    config_cell.clone());
-                config_params.capabilities()
-            }
-            None => {
-                DEFAULT_CAPABILITIES
-            }
-        };
+    let capabilities = match config_cell_opt {
+        Some(ref config_cell) => {
+            let config_params = ConfigParams::with_address_and_root(
+                UInt256::from_str(&"5".repeat(64)).unwrap(), // -1:5555...
+                config_cell.clone());
+            config_params.capabilities()
+        }
+        None => {
+            DEFAULT_CAPABILITIES
+        }
+    };
+
     let (_, state_init, is_success) = call_contract(addr, state_init, TestCallParams {
         balance: matches.value_of("BALANCE"),
         msg_info,
@@ -615,8 +625,10 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
         debug_info: testcall::load_debug_info(&debug_map_filename.unwrap_or("".to_string())),
         capabilities
     })?;
+
     if is_success {
-        save_to_file(state_init, Some(&input), 0, false)?;
+        // TODO: SAVE TO FILE
+        // save_to_file(state_init, Some(&input), 0, false)?;
         println!("Contract persistent data updated");
     }
 

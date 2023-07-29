@@ -73,13 +73,18 @@ fn round_trip_test(filename: &str, check_bin: bool) {
 
 #[test]
 fn round_trip() {
+    #![allow(unused_mut)]
     let mut indices = (0..130).collect::<Vec<i32>>();
+
+    #[cfg(feature = "long_running_tests")]
     indices.append(&mut (200..331).collect());
+    
     for n in indices {
         round_trip_test(&format!("tests/disasm/{:03}.b64", n), true);
     }
 }
 
+#[cfg_attr(not(feature = "long_running_tests"), ignore)]
 #[test]
 fn round_trip_tonix() {
     let paths = std::fs::read_dir("tests/disasm/tonix-ea2f96c/").unwrap();

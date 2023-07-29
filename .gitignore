@@ -4,5 +4,17 @@ target
 
 tests/Wallet2.code
 tests/Wallet2.map.json
+tests/test_arrays.tvc.boc
+
+stdlib_sol.tvm
 *.tvc
 *.tmp
+
+Main.code
+Main.tvc.boc
+Main.code.boc
+Main.abi.json
+
+trash/*
+!trash/.gitkeep
+.DS_Store

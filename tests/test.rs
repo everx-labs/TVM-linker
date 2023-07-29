@@ -37,17 +37,17 @@ fn test_compile_lib() -> Result<(), Box<dyn std::error::Error>> {
         .arg(abi)
         .assert()
         .success()
-        .stdout(predicate::str::contains("Saved contract to file"));
+        .stdout(predicate::str::contains("Contract compiled and saved to:"));
 
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
     cmd.arg("compile")
         .arg(contract)
         .arg("-a")
         .arg(abi)
-        .arg("--print_code")
+        .arg("--print-code")
         .assert()
         .success()
-        .stdout(predicate::str::contains("code\":\"te6ccgEC"));
+        .stdout(predicate::str::contains("base64_boc"));
     
     if prev_var.is_some() {
         env::set_var(lib_var, prev_var.unwrap());

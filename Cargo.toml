@@ -11,11 +11,16 @@ readme = 'README.md'
 repository = 'https://github.com/tonlabs/TVM-linker'
 version = '0.20.4'
 
+[features]
+default = [ "long_running_tests" ]
+long_running_tests = []
+
 [[bin]]
 name = 'tvm_linker'
 path = 'src/main.rs'
 
 [dependencies]
+chrono = "0.4"
 base64 = '0.13'
 clap = '2.33'
 crc = '3.0'
@@ -29,15 +34,17 @@ num = '0.4'
 num-traits = '0.2'
 rand = '0.8'
 regex = '1'
-serde_json = '1.0'
 sha2 = '0.10'
 simplelog = '0.6'
 serde = { features = [ 'derive' ], version = '1.0' }
+serde_json = { features = ["preserve_order"], version = '1.0'}
 ton_abi = { git = 'https://github.com/tonlabs/ever-abi.git', tag = '2.3.129' }
 ton_block = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ever-block.git', tag = '1.9.88' }
 ton_labs_assembler = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ever-assembler.git', tag = '1.2.130' }
 ton_types = { git = 'https://github.com/tonlabs/ever-types.git', tag = '2.0.18' }
 ton_vm = { features = [ 'gosh' ], git = 'https://github.com/tonlabs/ever-vm.git', tag = '1.8.189' }
+
+ever-struct = { git = 'https://github.com/tonlabs/ever-struct.git', tag = '1.0.0' }
 
 [dev-dependencies]
 assert_cmd = '2.0.5'
