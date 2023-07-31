@@ -1,11 +1,24 @@
+from dataclasses import dataclass
 import subprocess
+import argparse
 from enum import Enum
 import inspect
 
-TVM_LINKER_PATH = "./target/release/tvm_linker"
-STDLIB_SOL = "./tests/test_stdlib_sol.tvm"
-TRASH = "trash"
-TESTS = "tests"
+
+@dataclass
+class Config:
+    TVM_LINKER_PATH: str
+    STDLIB_SOL: str
+    TRASH: str
+    TESTS: str
+
+
+CFG = Config(
+    TVM_LINKER_PATH="./target/release/tvm_linker",
+    STDLIB_SOL="./tests/test_stdlib_sol.tvm",
+    TRASH="trash",
+    TESTS="tests"
+)
 
 
 class CMD(Enum):
@@ -18,7 +31,8 @@ def runcmd(cmd: str) -> str:
 
 
 def runlnk(op: CMD, input: str = "") -> str:
-    return runcmd(f"{TVM_LINKER_PATH} {op.value} {input}")
+    print("CFG.TVM_LINKER_PATH: ", CFG.TVM_LINKER_PATH)
+    return runcmd(f"{CFG.TVM_LINKER_PATH} {op.value} {input}")
 
 
 def prntme():
@@ -29,13 +43,20 @@ def test_compile():
     prntme()
 
     smc = "mycode"
-    cmd = f"--lib {STDLIB_SOL} ./{TESTS}/{smc}.code -o ./{TRASH}/{smc}.tvc.boc"
+    cmd = f"--lib {CFG.STDLIB_SOL} ./{CFG.TESTS}/{smc}.code -o ./{CFG.TRASH}/{smc}.tvc.boc"
     res = runlnk(CMD.COMPILE, cmd)
 
     print(f"\n{res}")
 
 
 def main():
+    args_parser = argparse.ArgumentParser()
+    args_parser.add_argument("--linker-path")
+    args = args_parser.parse_args()
+
+    if args.linker_path:
+        CFG.TVM_LINKER_PATH = args.linker_path
+
     test_compile()
 
 
