@@ -50,13 +50,12 @@ use clap::ArgMatches;
 use ever_struct::scheme;
 use failure::{format_err, bail};
 
-use serde_json::json;
 use ton_block::{
     Deserializable, Message, StateInit, Serializable, Account, MsgAddressInt,
     ExternalInboundMessageHeader, InternalMessageHeader, MsgAddressIntOrNone, ConfigParams
 };
 use ton_types::{SliceData, Result, Status, AccountId, UInt256, BocWriter};
-use ton_labs_assembler::{Line, compile_code_to_cell};
+use ton_labs_assembler::Line;
 
 use abi::{build_abi_body, decode_body, load_abi_json_string, load_abi_contract};
 use keyman::KeypairManager;
@@ -66,7 +65,7 @@ use resolver::resolve_name;
 use testcall::{call_contract, MsgInfo, TestCallParams, TraceLevel};
 use disasm::commands::disasm_command;
 use ton_utils::printer::tree_of_cells_into_base64;
-use serde::ser::{Serialize, Serializer, SerializeStruct};
+use serde::ser::SerializeStruct;
 
 const DEFAULT_CAPABILITIES:u64 = 0x42E;   // Default capabilities in the main network
 
@@ -627,9 +626,9 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
     })?;
 
     if is_success {
-        // TODO: SAVE TO FILE
-        // save_to_file(state_init, Some(&input), 0, false)?;
+        state_init.write_to_file(&input)?;
         println!("Contract persistent data updated");
+        println!("(persistent data updated in {})", input);
     }
 
     println!("TEST COMPLETED");

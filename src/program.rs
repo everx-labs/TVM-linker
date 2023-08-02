@@ -19,7 +19,6 @@ use ton_types::write_boc;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::collections::HashMap;
-use std::process::exit;
 use std::time::SystemTime;
 use ton_block::*;
 use ton_labs_assembler::{Line, Lines, DbgInfo, Engine};
@@ -354,21 +353,14 @@ impl Program {
 }
 
 pub fn load_from_file(contract_file: &str) -> Result<StateInit> {
-    dbg!(contract_file);
-    let cell = read_boc(std::fs::read(contract_file)?)?.roots.remove(0);
-    let mut cs = SliceData::load_cell(cell)?;
-    let code = Cell::construct_from(&mut cs)?;
-
-    let mut data = BuilderData::new();
-    data.append_u128(0)?;
-    data.append_u128(0)?;
-
-    let mut state_init = StateInit::default();
-    state_init.code = Some(code);
-    state_init.data = Some(data.into_cell()?);
-    state_init.library = StateInitLib::default();
-
-    Ok(state_init)
+    let mut cell = read_boc(std::fs::read(contract_file)?)?.roots.remove(0);
+    // try appending a dummy library cell if there is no such cell in the tvc file
+    if cell.references_count() == 2 {
+        let mut adjusted_cell = BuilderData::from_cell(&cell)?;
+        adjusted_cell.checked_append_reference(Cell::default())?;
+        cell = adjusted_cell.into_cell()?;
+    }
+    StateInit::construct_from_cell(cell)
 }
 
 pub fn load_stateinit(file_name: &str) -> Result<(SliceData, Vec<u8>)> {
@@ -395,11 +387,28 @@ mod tests {
     use crate::testcall::{TraceLevel, load_debug_info, load_config, call_contract, TestCallParams, MsgInfo};
     use super::*;
 
-    use std::process::exit;
-    use std::{fs::File, str::FromStr};
+    use std::str::FromStr;
     use std::path::Path;
 
     const ZERO_ADDRESS: &'static str = "0:0000000000000000000000000000000000000000000000000000000000000000";
+
+    fn load_state_init_from_first_ref(contract_file: &str) -> Result<StateInit> {
+        dbg!(contract_file);
+        let cell = read_boc(std::fs::read(contract_file)?)?.roots.remove(0);
+        let mut cs = SliceData::load_cell(cell)?;
+        let code = Cell::construct_from(&mut cs)?;
+
+        let mut data = BuilderData::new();
+        data.append_u128(0)?;
+        data.append_u128(0)?;
+
+        let mut state_init = StateInit::default();
+        state_init.code = Some(code);
+        state_init.data = Some(data.into_cell()?);
+        state_init.library = StateInitLib::default();
+
+        Ok(state_init)
+    }
 
     fn compile_into_trash(prog: &mut Program, base: &str) -> Result<String> {
         let prefix = format!("./trash/{}", base);
@@ -435,7 +444,7 @@ mod tests {
 
         let addr = MsgAddressInt::from_str(&addr)?;
         
-        let mut state_init = load_from_file(smc_file)?;
+        let mut state_init = load_state_init_from_first_ref(smc_file)?;
         let debug_info = load_debug_info(debug_map_filename);
         let config_cell = config_file.and_then(load_config);
 
@@ -461,9 +470,9 @@ mod tests {
         )?;
 
         if is_vm_success {
-            // save_to_file(state_init, Some(smc_file), 0, false)?;
-            // TODO: save to file
+            state_init.write_to_file(smc_file)?;
             println!("Contract persistent data updated");
+            println!("(persistent data updated in {})", smc_file);
         }
 
         Ok(exit_code)
