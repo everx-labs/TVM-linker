@@ -64,7 +64,7 @@ use resolver::resolve_name;
 use testcall::{call_contract, MsgInfo, TestCallParams, TraceLevel};
 use disasm::commands::disasm_command;
 
-const DEFAULT_CAPABILITIES:u64 = 0x42E;   // Default capabilities in the main network
+ const DEFAULT_CAPABILITIES:u64 = 0x880116ae; // Default capabilities on the main network
 
 fn main() -> std::result::Result<(), i32> {
     linker_main().map_err(|err_str| {
