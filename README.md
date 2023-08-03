@@ -114,7 +114,7 @@ Use `--decode-c6` to see output actions in user-friendly format.
 Use `--balance <value>` to define account balance in nanograms. It will be available  at the bottom of initial stake and in SmartContractInfo tuple from c7 register .
 
 Use `--config <tvc_file>` to define the config parameters to run VM with. The TVC file is a state of the config smart-contract. 
-The capabilities field of the config defines the VM mode of operation. If the config parameter is omitted, the capabilities default value of 0x42E is used. 
+The capabilities field of the config defines the VM mode of operation. If the config parameter is omitted, the capabilities default value of 0x880116ae is used. 
 For the available capability codes consult [here](https://github.com/tonlabs/ton-labs-block/blob/master/src/config_params.rs#L336)
 
 Note: configuration smart-contract resides at the address: -1:5555555555555555555555555555555555555555555555555555555555555555

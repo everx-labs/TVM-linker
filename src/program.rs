@@ -387,7 +387,7 @@ pub fn get_now() -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use crate::abi;
+    use crate::{abi, DEFAULT_CAPABILITIES};
     use crate::testcall::{load_config, load_debug_info, call_contract, MsgInfo, TestCallParams};
     use crate::{printer::get_version_mycode_aware, program::load_stateinit};
     use crate::testcall::TraceLevel;
@@ -441,7 +441,7 @@ mod tests {
                 action_decoder,
                 trace_level,
                 debug_info,
-                capabilities: 0x42E, // default
+                capabilities: DEFAULT_CAPABILITIES,
             }
         )?;
         if is_vm_success {

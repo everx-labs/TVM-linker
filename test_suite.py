@@ -108,7 +108,7 @@ def compile2(source_name, directory = "tests_sol", lib_file = STDLIB_SOL):
 SIGN = None
 
 def error(msg):
-	print "ERROR!", msg
+	print("ERROR!", msg)
 	quit(1)
 
 def exec_and_parse(cmd, expected_ec):
@@ -123,7 +123,7 @@ def exec_and_parse(cmd, expected_ec):
 	ec = getExitCode()
 
 	if ec != expected_ec:
-		print cmd
+		print(cmd)
 		with open('exec_log.tmp', 'r') as f:
 			print(f.read())
 
@@ -184,7 +184,7 @@ def expect_output(regex):
 	for l in lines:
 		match = re.search(regex, l)
 		if match:
-			print "> ", match.group(0)
+			print( "> ", match.group(0))
 			return
 
 	with open('exec_log.tmp', 'r') as f:
