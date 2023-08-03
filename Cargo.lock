@@ -1224,8 +1224,8 @@ dependencies = [
 
 [[package]]
 name = "ton_abi"
-version = "2.3.129"
-source = "git+https://github.com/tonlabs/ever-abi.git?tag=2.3.129#6445189dbf5aa9b7ecac93c06421eacc09461a0b"
+version = "2.3.130"
+source = "git+https://github.com/tonlabs/ever-abi.git?tag=2.3.130#1aa427ee0a5d4d61cc8f7acd169ae5c35621dc66"
 dependencies = [
  "base64 0.10.1",
  "byteorder",
@@ -1306,8 +1306,8 @@ dependencies = [
 
 [[package]]
 name = "ton_vm"
-version = "1.8.189"
-source = "git+https://github.com/tonlabs/ever-vm.git?tag=1.8.189#5bc2dece1944b22a9cfafee3d7ad7f577f5fb10f"
+version = "1.8.190"
+source = "git+https://github.com/tonlabs/ever-vm.git?tag=1.8.190#0bc10254a621ae10062acca70da353d3e405e8ae"
 dependencies = [
  "diffy",
  "ed25519 1.5.3",
