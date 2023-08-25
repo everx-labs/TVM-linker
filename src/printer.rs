@@ -55,7 +55,7 @@ pub fn tree_of_cells_into_base64(root_cell: Option<&Cell>) -> String {
     match root_cell {
         Some(cell) => {
             match write_boc(cell) {
-                Ok(bytes) => base64::encode(&bytes),
+                Ok(bytes) => base64::encode(bytes),
                 Err(_) => "None".to_string()
             }
         }
@@ -84,7 +84,7 @@ pub fn msg_printer(msg: &Message) -> Result<String> {
                 .map(|slice| slice.into_cell())
                 .as_ref(),
         ),
-        base64::encode(&bytes),
+        base64::encode(bytes),
     ))
 }
 

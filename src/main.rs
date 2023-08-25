@@ -64,7 +64,7 @@ use resolver::resolve_name;
 use testcall::{call_contract, MsgInfo, TestCallParams, TraceLevel};
 use disasm::commands::disasm_command;
 
- const DEFAULT_CAPABILITIES:u64 = 0x880116ae; // Default capabilities on the main network
+const DEFAULT_CAPABILITIES: u64 = 0x880116ae; // Default capabilities on the main network
 
 fn main() -> std::result::Result<(), i32> {
     linker_main().map_err(|err_str| {
@@ -257,7 +257,7 @@ fn linker_main() -> Status {
             let cell = compile_code_to_cell(code.as_str())
                 .map_err(|e| format_err!("failed to assemble: {}", e))?;
             let bytes = ton_types::write_boc(&cell)?;
-            let mut file = File::create(&output).unwrap();
+            let mut file = File::create(output).unwrap();
             file.write_all(&bytes)?;
             return Ok(())
         }
@@ -389,7 +389,7 @@ fn replace_command(matches: &ArgMatches) -> Status {
         }
         Err(_) => {
             let data = std::fs::read(path)?;
-            ton_types::read_boc(&data)?.withdraw_single_root()?
+            ton_types::read_boc(data)?.withdraw_single_root()?
         }
     };
 
@@ -587,7 +587,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
     } else {
         format!("{}.tvc", input)
     };
-    let addr = MsgAddressInt::from_str(&address)?;
+    let addr = MsgAddressInt::from_str(address)?;
     let state_init = load_from_file(&input)?;
     let config_cell_opt = matches.value_of("CONFIG").and_then(testcall::load_config);
 
