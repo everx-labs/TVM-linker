@@ -46,9 +46,8 @@ impl Code {
             process(code);
             for insn in code.iter_mut() {
                 for param in insn.params_mut() {
-                    match param {
-                        InstructionParameter::Code { code: ref mut inner, cell: _ } => stack.push(inner),
-                        _ => ()
+                    if let InstructionParameter::Code { code: ref mut inner, cell: _ } = param {
+                        stack.push(inner)
                     }
                 }
             }

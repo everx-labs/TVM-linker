@@ -683,7 +683,7 @@ impl ParseEngine {
         for (_, func) in self.internal_id_to_code.iter_mut() {
             Self::compat_rename_macro_calls(&mut func.body);
         }
-        for (_, lines) in &mut self.macro_name_to_lines {
+        for lines in &mut self.macro_name_to_lines.values_mut() {
             Self::compat_rename_macro_calls(lines);
         }
         Ok(())
@@ -985,7 +985,7 @@ impl ParseEngine {
         pers_dict.data().cloned()
     }
 
-    fn encode_computed_cell(&self, cell: &Cell, toplevel: bool) -> Lines {
+    fn encode_computed_cell(cell: &Cell, toplevel: bool) -> Lines {
         let slice = SliceData::load_cell(cell.clone()).unwrap();
         let mut lines = vec!();
         let opening = if toplevel { "{\n" } else { ".cell {\n" };
@@ -993,7 +993,7 @@ impl ParseEngine {
         lines.push(Line::new(format!(".blob x{}\n", slice.to_hex_string()).as_str(), "", 0));
         for i in slice.get_references() {
             let child = cell.reference(i).unwrap();
-            let mut child_lines = self.encode_computed_cell(&child, false);
+            let mut child_lines = Self::encode_computed_cell(&child, false);
             lines.append(&mut child_lines);
         }
         lines.push(Line::new("}\n", "", 0));
@@ -1036,7 +1036,7 @@ impl ParseEngine {
         };
 
         let cell = engine.stack().get(0).as_cell().map_err(|e| format_err!("{}: {}", name, e))?;
-        let res = self.encode_computed_cell(cell, true);
+        let res = Self::encode_computed_cell(cell, true);
         self.computed.insert(String::from(name), res.clone());
         Ok(res)
     }

@@ -14,7 +14,7 @@
 use std::{collections::HashMap, slice::ChunksMut};
 use ton_types::{Cell, Result, /*Bitmask,*/ SliceData, fail};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Code {
     storage: Vec<Instruction>
 }

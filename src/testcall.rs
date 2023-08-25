@@ -24,7 +24,7 @@ use ton_vm::{
     stack::{StackItem, Stack, savelist::SaveList, integer::IntegerData},
     SmartContractInfo,
 };
-use ton_types::{AccountId, BuilderData, Cell, SliceData, Result, Status};
+use ton_types::{AccountId, BuilderData, Cell, SliceData, Result, Status, HashmapE};
 use ton_block::{
     CurrencyCollection, Deserializable, ExternalInboundMessageHeader, Grams,
     InternalMessageHeader, Message, MsgAddressExt, MsgAddressInt, OutAction,
@@ -410,11 +410,13 @@ pub fn call_contract<F>(
         Gas::test()
     };
 
+    let library_map = HashmapE::with_hashmap(256, state_init.library.root().cloned());
+
     println!("Engine capabilities: {}", params.capabilities);
     let mut engine = Engine::with_capabilities(
         params.capabilities
     ).setup_with_libraries(
-        code, Some(registers), Some(stack), Some(gas), vec![]
+        code, Some(registers), Some(stack), Some(gas), vec!(library_map)
     );
     engine.set_trace(0);
     let debug_info = params.debug_info;

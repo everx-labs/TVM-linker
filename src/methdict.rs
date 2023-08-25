@@ -60,7 +60,7 @@ impl Program {
             }
             let id = key.clone().get_next_i32()
                 .map_err(|e| (pair.0.clone(), format!("Failed to decode data: {}", e)))?;
-            if adjust_entry_points || id < -2 || id > 0 {
+            if adjust_entry_points || !(-2..=0).contains(&id) {
                 let before = val.0;
                 let after = map.get(key)
                     .map_err(|e| (pair.0.clone(), format!("Failed to find key: {}", e)))?
