@@ -13,7 +13,7 @@
 use abi_json::json_abi::{encode_function_call, decode_function_response};
 use abi_json::Contract;
 use failure::format_err;
-use sha2::{Digest, Sha256};
+
 use ton_types::{BuilderData, Result, SliceData};
 
 pub fn build_abi_body(
@@ -61,21 +61,4 @@ pub fn decode_body(
     )
 }
 
-pub fn gen_abi_id(mut abi: Option<Contract>, func_name: &str) -> u32 {
-    if let Some(ref mut contract) = abi {
-        let functions = contract.functions();
-        let events = contract.events();
-        functions.get(func_name).map(|f| f.get_input_id())
-            .or_else(|| events.get(func_name).map(|e| e.get_function_id()))
-            .unwrap_or_else(|| calc_func_id(func_name))
-    } else {
-        calc_func_id(func_name)
-    }
-}
 
-fn calc_func_id(func_interface: &str) -> u32 {
-    let mut id_bytes = [0u8; 4];
-    let hash = Sha256::digest(func_interface.as_bytes());
-    id_bytes.copy_from_slice(&hash[..4]);
-    u32::from_be_bytes(id_bytes)
-}

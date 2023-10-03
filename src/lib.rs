@@ -17,7 +17,6 @@ extern crate crc;
 extern crate ed25519;
 extern crate ed25519_dalek;
 extern crate failure;
-#[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
@@ -36,11 +35,7 @@ extern crate ton_types;
 extern crate ton_vm;
 
 pub mod abi;
-pub mod disasm;
 pub mod keyman;
-pub mod parser;
 pub mod printer;
 pub mod program;
-pub mod resolver;
-pub mod methdict;
 pub mod testcall;
