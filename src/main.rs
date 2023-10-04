@@ -10,29 +10,6 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
-extern crate ton_abi as abi_json;
-extern crate base64;
-#[macro_use]
-extern crate clap;
-extern crate crc;
-extern crate ed25519;
-extern crate ed25519_dalek;
-extern crate failure;
-extern crate lazy_static;
-extern crate rand;
-extern crate regex;
-extern crate serde;
-extern crate serde_json;
-extern crate sha2;
-extern crate simplelog;
-extern crate ton_block;
-extern crate ton_types;
-#[macro_use]
-extern crate ton_vm;
-#[macro_use]
-extern crate log;
-extern crate ton_labs_assembler;
-extern crate num_traits;
 
 mod abi;
 mod keyman;
@@ -41,7 +18,7 @@ mod program;
 mod testcall;
 
 use std::{env, io::Write, fs::File, str::FromStr};
-use clap::ArgMatches;
+use clap::{clap_app, ArgMatches};
 use failure::{format_err, bail};
 
 use ton_block::{
@@ -51,7 +28,7 @@ use ton_block::{
 use ton_types::{SliceData, Result, Status, AccountId, UInt256, BocWriter};
 
 use abi::{build_abi_body, decode_body, load_abi_json_string, load_abi_contract};
-use keyman::KeypairManager;
+use keyman::Keypair;
 use program::{get_now, save_to_file, load_from_file};
 use testcall::{call_contract, MsgInfo, TestCallParams, TraceLevel};
 
@@ -369,13 +346,9 @@ fn build_body(matches: &ArgMatches, address: Option<String>) -> Result<Option<Sl
     let params = matches.value_of("ABI_PARAMS");
     let header = matches.value_of("ABI_HEADER");
     if mask == 0x3 {
-        let key_file = match matches.value_of("SIGN") {
-            Some(path) => {
-                let pair = KeypairManager::from_file(path)?;
-                Some(pair.drain())
-            },
-            _ => None
-        };
+        let key_file = matches.value_of("SIGN")
+            .map(Keypair::from_file)
+            .transpose()?;
         let params = params.map_or(Ok("{}".to_owned()), |params|
             if params.find('{').is_none() {
                 std::fs::read_to_string(params)

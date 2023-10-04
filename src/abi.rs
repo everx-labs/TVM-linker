@@ -10,29 +10,29 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
-use abi_json::json_abi::{encode_function_call, decode_function_response};
-use abi_json::Contract;
+use ton_abi::{Contract, json_abi::{encode_function_call, decode_function_response}};
 use failure::format_err;
 
 use ton_types::{BuilderData, Result, SliceData};
+use crate::keyman::Keypair;
 
 pub fn build_abi_body(
     abi_file: &str,
     method: &str,
     params: &str,
     header: Option<&str>,
-    keypair: Option<ed25519_dalek::Keypair>,
+    keypair: Option<Keypair>,
     internal: bool,
     address: Option<String>,
 ) -> Result<BuilderData> {
     encode_function_call(
-        load_abi_json_string(abi_file)?,
-        method.to_owned(),
-        header.map(|v| v.to_owned()),
-        params.to_owned(),
+        &load_abi_json_string(abi_file)?,
+        method,
+        header,
+        params,
         internal,
-        keypair.as_ref(),
-        address,
+        keypair.map(|p| p.private).as_ref(),
+        address.as_deref(),
     )
 }
 
@@ -53,8 +53,8 @@ pub fn decode_body(
     internal: bool,
 ) -> Result<String> {
     decode_function_response(
-        load_abi_json_string(abi_file)?,
-        method.to_owned(),
+        &load_abi_json_string(abi_file)?,
+        method,
         body,
         internal,
         false,
