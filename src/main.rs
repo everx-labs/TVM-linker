@@ -10,59 +10,27 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
-extern crate ton_abi as abi_json;
-extern crate base64;
-#[macro_use]
-extern crate clap;
-extern crate crc;
-extern crate ed25519;
-extern crate ed25519_dalek;
-extern crate failure;
-#[macro_use]
-extern crate lazy_static;
-extern crate rand;
-extern crate regex;
-extern crate serde;
-extern crate serde_json;
-extern crate sha2;
-extern crate simplelog;
-extern crate ton_block;
-extern crate ton_types;
-#[macro_use]
-extern crate ton_vm;
-#[macro_use]
-extern crate log;
-extern crate ton_labs_assembler;
-extern crate num_traits;
 
 mod abi;
 mod keyman;
-mod parser;
 mod printer;
 mod program;
-mod resolver;
-mod methdict;
 mod testcall;
-mod disasm;
 
-use std::{env, io::Write, path::Path, fs::File, str::FromStr};
-use clap::ArgMatches;
+use std::{env, io::Write, fs::File, str::FromStr};
+use clap::{clap_app, ArgMatches};
 use failure::{format_err, bail};
 
 use ton_block::{
-    Deserializable, Message, StateInit, Serializable, Account, MsgAddressInt,
+    Deserializable, Message, StateInit, Serializable, MsgAddressInt,
     ExternalInboundMessageHeader, InternalMessageHeader, MsgAddressIntOrNone, ConfigParams
 };
 use ton_types::{SliceData, Result, Status, AccountId, UInt256, BocWriter};
-use ton_labs_assembler::{Line, compile_code_to_cell};
 
 use abi::{build_abi_body, decode_body, load_abi_json_string, load_abi_contract};
-use keyman::KeypairManager;
-use parser::{ParseEngine, ParseEngineResults};
-use program::{Program, get_now, save_to_file, load_from_file};
-use resolver::resolve_name;
+use keyman::Keypair;
+use program::{get_now, save_to_file, load_from_file};
 use testcall::{call_contract, MsgInfo, TestCallParams, TraceLevel};
-use disasm::commands::disasm_command;
 
 const DEFAULT_CAPABILITIES: u64 = 0x880116ae; // Default capabilities on the main network
 
@@ -84,44 +52,13 @@ fn linker_main() -> Status {
     let matches = clap_app!(tvm_linker =>
         (version: build_info.as_str())
         (author: "TON Labs")
-        (about: "Tool for assembling, disassembling and executing TVM code")
+        (about: "Tool for executing TVM code")
         (@subcommand decode =>
             (about: "take apart a message boc or a tvc file")
             (version: build_info.as_str())
             (author: "TON Labs")
             (@arg INPUT: +required +takes_value "BOC file")
             (@arg TVC: --tvc "BOC file is tvc file")
-        )
-        (@subcommand replace_code =>
-            (@setting AllowNegativeNumbers)
-            (about: "Compile assembler code file and replace contract code with a new one.")
-            (version: build_info.as_str())
-            (author: "TON Labs")
-            (@arg INPUT: +required +takes_value "TVM assembler source file or boc with code cell")
-            (@arg CONTRACT_PATH: +required +takes_value "Path to the file with the BOC of contract account state whose code should be replaced.")
-            (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids. If not specified abi can be loaded from file path obtained from <INPUT> path if it exists.")
-            (@arg DEBUG_MAP: --("debug-map") +takes_value "Generates debug map file")
-            (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file. If not specified lib is loaded from environment variable TVM_LINKER_LIB_PATH if it exists.")
-            (@arg OUT_FILE: -o +takes_value "Output file name. If not specified the input file is rewritten.")
-            (@arg TVC: --tvc "Changes command behaviour to work with stateInit TVC instead of account BOC.")
-        )
-        (@subcommand compile =>
-            (@setting AllowNegativeNumbers)
-            (about: "compile contract")
-            (version: build_info.as_str())
-            (author: "TON Labs")
-            (@arg INPUT: +required +takes_value "TVM assembler source file")
-            (@arg ABI: -a --("abi-json") +takes_value "Supplies contract abi to calculate correct function ids. If not specified abi can be loaded from file path obtained from <INPUT> path if it exists.")
-            (@arg WC: -w +takes_value "Workchain id used to print contract address, -1 by default.")
-            (@arg DEBUG: --debug "Prints debug info: xref table and parsed assembler sources")
-            (@arg DEBUG_MAP: --("debug-map") +takes_value "Generates debug map file")
-            (@arg DATA: --("data") +takes_value "Overwrites data with a cell from a file")
-            (@arg LIB: --lib +takes_value ... number_of_values(1) "Standard library source file. If not specified lib is loaded from environment variable TVM_LINKER_LIB_PATH if it exists.")
-            (@arg OUT_FILE: -o +takes_value "Output file name")
-            (@arg LANGUAGE: --language +takes_value "Enable language-specific features in linkage")
-            (@arg PRINT_CODE: --print_code "Command will only print the code cell without generating the TVC file")
-            (@arg SILENT: --silent "Command will print necessary output")
-            (@arg RAW: --raw "Assemble code as-is into a BOC")
         )
         (@subcommand test =>
             (@setting AllowLeadingHyphen)
@@ -167,33 +104,6 @@ fn linker_main() -> Status {
             (@arg SIGN: --setkey +takes_value "Loads existing keypair from the file")
             (@arg ADDRESS: --addr +takes_value "Optional destination address to support ABI 2.3")
             (@arg INPUT: +required +takes_value "TVM assembler source file or contract name")
-        )
-        (@subcommand disasm =>
-            (about: "disassemble a tvc or dumps its tree of cells")
-            (version: build_info.as_str())
-            (author: "TON Labs")
-            (@subcommand dump =>
-                (about: "dumps tree of cells for the given tvc")
-                (version: build_info.as_str())
-                (@arg TVC: +required +takes_value "Path to tvc file")
-            )
-            (@subcommand graphviz =>
-                (about: "generates graphviz dot for the given tvc")
-                (version: build_info.as_str())
-                (@arg METHOD: --method +takes_value "Selects a particular method by ID or int|ext|ticktock")
-                (@arg TVC: +required +takes_value "Path to tvc file")
-            )
-            (@subcommand text =>
-                (about: "disassembles tvc's code into assembler text")
-                (version: build_info.as_str())
-                (@arg TVC: +required +takes_value "Path to tvc file")
-                (@arg RAW: --raw "Interpret the input as a raw TOC of code")
-            )
-            (@subcommand fragment =>
-                (about: "disassembles bytestring fragment")
-                (version: build_info.as_str())
-                (@arg FRAGMENT: +required +takes_value "Bytestring")
-            )
         )
         (@setting SubcommandRequired)
     ).get_matches();
@@ -246,179 +156,7 @@ fn linker_main() -> Status {
         )
     }
 
-    //SUBCOMMAND COMPILE
-    if let Some(compile_matches) = matches.subcommand_matches("compile") {
-        let input = compile_matches.value_of("INPUT").unwrap();
-        let out_file = compile_matches.value_of("OUT_FILE");
-        if compile_matches.is_present("RAW") {
-            let output = out_file.unwrap();
-            let code = std::fs::read_to_string(input)
-                .map_err(|e| format_err!("failed to read input file: {}", e))?;
-            let cell = compile_code_to_cell(code.as_str())
-                .map_err(|e| format_err!("failed to assemble: {}", e))?;
-            let bytes = ton_types::write_boc(&cell)?;
-            let mut file = File::create(output).unwrap();
-            file.write_all(&bytes)?;
-            return Ok(())
-        }
-        let abi_from_input = format!("{}{}", input.trim_end_matches("code"), "abi.json");
-        let silent = compile_matches.is_present("SILENT");
-        let abi_file = compile_matches.value_of("ABI").or_else(|| {
-            if !silent {
-                println!("ABI_PATH (obtained from INPUT): {}", abi_from_input);
-            }
-            Some(abi_from_input.as_ref())
-        });
-        let abi_json = match abi_file {
-            Some(abi_file_name) => Some(load_abi_json_string(abi_file_name)?),
-            None => None
-        };
-        let mut sources = Vec::new();
-        for lib in compile_matches.values_of("LIB").unwrap_or_default() {
-            let path = Path::new(lib);
-            if !path.exists() {
-                bail!("File {} doesn't exist", lib);
-            }
-            sources.push(path);
-        }
-        let env_lib = env::var("TVM_LINKER_LIB_PATH").unwrap_or_default();
-        if sources.is_empty() && !env_lib.is_empty() {
-            if !silent {
-                println!("TVM_LINKER_LIB_PATH: {:?}", &env_lib);
-            }
-            let path = Path::new(&env_lib);
-            if !path.exists() {
-                bail!("File {} doesn't exist", &env_lib);
-            }
-            sources.push(path);
-        }
-
-        let path = Path::new(input);
-        if !path.exists() {
-            bail!("File {} doesn't exist", input);
-        }
-        sources.push(path);
-        let mut prog = Program::new(
-            ParseEngine::new(sources, abi_json)?
-        )?;
-
-        let debug = compile_matches.is_present("DEBUG");
-        prog.set_language(compile_matches.value_of("LANGUAGE"));
-
-        if debug {
-           prog.debug_print();
-        }
-
-        let wc = compile_matches.value_of("WC")
-            .map(|wc| wc.parse::<i8>().unwrap_or(-1))
-            .unwrap_or(-1);
-
-        let data_filename = compile_matches.value_of("DATA");
-
-        let print_code = compile_matches.is_present("PRINT_CODE");
-        prog.set_print_code(print_code);
-
-        prog.set_silent(silent);
-
-        prog.compile_to_file_ex(wc, out_file, data_filename)?;
-
-        if compile_matches.is_present("DEBUG_MAP") {
-            let filename = compile_matches.value_of("DEBUG_MAP").unwrap();
-            let file = File::create(filename)?;
-            serde_json::to_writer_pretty(file, &prog.dbgmap)?;
-        }
-
-        return Ok(());
-    }
-
-    if let Some(m) = matches.subcommand_matches("disasm") {
-        return disasm_command(m);
-    }
-
-    if let Some(matches) = matches.subcommand_matches("replace_code") {
-        return replace_command(matches);
-    }
-
     unreachable!()
-}
-
-fn replace_command(matches: &ArgMatches) -> Status {
-    let input = matches.value_of("INPUT").unwrap();
-    let abi_from_input = format!("{}{}", input.trim_end_matches("code"), "abi.json");
-    let abi_file = matches.value_of("ABI").or_else(|| {
-        println!("ABI_PATH (obtained from INPUT): {}", abi_from_input);
-        Some(abi_from_input.as_ref())
-    });
-    let abi_json = match abi_file {
-        Some(abi_file_name) => Some(load_abi_json_string(abi_file_name)?),
-        None => None
-    };
-    let out_file = matches.value_of("OUT_FILE");
-
-    let mut sources = Vec::new();
-    for lib in matches.values_of("LIB").unwrap_or_default() {
-        let path = Path::new(lib);
-        if !path.exists() {
-            bail!("File {} doesn't exist", lib);
-        }
-        sources.push(path);
-    }
-    let env_lib = env::var("TVM_LINKER_LIB_PATH").unwrap_or_default();
-    if sources.is_empty() && !env_lib.is_empty() {
-        println!("TVM_LINKER_LIB_PATH: {:?}", &env_lib);
-        let path = Path::new(&env_lib);
-        if !path.exists() {
-            bail!("File {} doesn't exist", &env_lib);
-        }
-        sources.push(path);
-    }
-
-    let path = Path::new(input);
-    if !path.exists() {
-        bail!("File {} doesn't exist", input);
-    }
-    sources.push(path.clone());
-
-    let mut prog_opt = None;
-    let code = match ParseEngine::new(sources, abi_json) {
-        Ok(engine) => {
-            let mut prog = Program::new(engine)?;
-            let code = prog.compile_asm(false)?;
-            prog_opt = Some(prog);
-            code
-        }
-        Err(_) => {
-            let data = std::fs::read(path)?;
-            ton_types::read_boc(data)?.withdraw_single_root()?
-        }
-    };
-
-    let input_path = matches.value_of("CONTRACT_PATH").unwrap();
-    let out_file = out_file.unwrap_or(input_path);
-    if matches.is_present("TVC") {
-        let mut state_init = StateInit::construct_from_file(input_path)?;
-        state_init.set_code(code);
-        state_init.write_to_file(out_file)?;
-    } else {
-        let mut account = Account::construct_from_file(input_path)?;
-        match account.state_init() {
-            Some(_) => {
-                account.set_code(code);
-            }
-            None => {
-                bail!("Account doesn't contain stateInit.")
-            }
-        }
-        account.write_to_file(out_file)?;
-    }
-    println!("Result saved to file: {}", out_file);
-    if matches.is_present("DEBUG_MAP") && prog_opt.is_some() {
-        let filename = matches.value_of("DEBUG_MAP").unwrap();
-        let file = File::create(filename)?;
-        serde_json::to_writer_pretty(file, &prog_opt.unwrap().dbgmap)?;
-    }
-
-    Ok(())
 }
 
 fn parse_now(now: Option<&str>) -> Result<u32> {
@@ -482,30 +220,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
     let address = matches.value_of("ADDRESS").unwrap_or(&addr_from_input);
     let (body, sign) = match matches.value_of("BODY") {
         Some(hex_str) => {
-            let parse_results = match matches.value_of("SOURCE") {
-                Some(source) => {
-                    let path = Path::new(source);
-                    if !path.exists() {
-                        bail!("File {} doesn't exist", source);
-                    }
-                    Some(ParseEngineResults::new(
-                        ParseEngine::new(vec![path], None)?
-                    ))
-                },
-                None => None
-            };
-
-            let line = Line::new(hex_str, "", 0);
-            let resolved = resolve_name(&line, |name| {
-                let id = match &parse_results {
-                    Some(parse_results) => parse_results.global_by_name(name),
-                    None => None
-                };
-                id.map(|id| id.0)
-            })
-            .map_err(|e| format_err!("failed to resolve body {}: {}", hex_str, e))?;
-
-            let (buf, buf_bits) = decode_hex_string(resolved.text)?;
+            let (buf, buf_bits) = decode_hex_string(hex_str.to_string())?;
             let body = SliceData::from_raw(buf, buf_bits);
             (Some(body), Some(matches.value_of("SIGN")))
         },
@@ -631,13 +346,9 @@ fn build_body(matches: &ArgMatches, address: Option<String>) -> Result<Option<Sl
     let params = matches.value_of("ABI_PARAMS");
     let header = matches.value_of("ABI_HEADER");
     if mask == 0x3 {
-        let key_file = match matches.value_of("SIGN") {
-            Some(path) => {
-                let pair = KeypairManager::from_file(path)?;
-                Some(pair.drain())
-            },
-            _ => None
-        };
+        let key_file = matches.value_of("SIGN")
+            .map(Keypair::from_file)
+            .transpose()?;
         let params = params.map_or(Ok("{}".to_owned()), |params|
             if params.find('{').is_none() {
                 std::fs::read_to_string(params)

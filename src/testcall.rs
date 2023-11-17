@@ -13,18 +13,18 @@
 
 use std::{fs::File, str::FromStr, sync::Arc};
 
-use ed25519_dalek::Signer;
 use failure::format_err;
-use log::Level::Error;
+use log::{log_enabled, Level::Error};
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use serde_json::Value;
 use ton_vm::{
+    int,
     executor::{Engine, EngineTraceInfo, EngineTraceInfoType, gas::gas_state::Gas},
     error::tvm_exception,
     stack::{StackItem, Stack, savelist::SaveList, integer::IntegerData},
     SmartContractInfo,
 };
-use ton_types::{AccountId, BuilderData, Cell, SliceData, Result, Status, HashmapE};
+use ton_types::{AccountId, BuilderData, Cell, SliceData, Result, Status, HashmapE, ed25519_sign_with_secret};
 use ton_block::{
     CurrencyCollection, Deserializable, ExternalInboundMessageHeader, Grams,
     InternalMessageHeader, Message, MsgAddressExt, MsgAddressInt, OutAction,
@@ -32,7 +32,7 @@ use ton_block::{
 };
 use ton_labs_assembler::DbgInfo;
 
-use crate::keyman::KeypairManager;
+use crate::keyman::Keypair;
 use crate::printer::msg_printer;
 use crate::program::{load_from_file, get_now};
 
@@ -82,9 +82,9 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) -> Status {
     let mut signed_body = body.as_builder();
     let mut sign_builder = BuilderData::new();
     if let Some(f) = key_file {
-        let pair = KeypairManager::from_file(f)?.drain();
+        let pair = Keypair::from_file(f)?;
         let pub_key = pair.public.to_bytes();
-        let signature = pair.sign(body.cell().repr_hash().as_slice()).to_bytes();
+        let signature = ed25519_sign_with_secret(pair.private.as_bytes(), body.cell().repr_hash().as_slice())?;
         sign_builder.append_raw(&signature, signature.len() * 8)?;
         sign_builder.append_raw(&pub_key, pub_key.len() * 8)?;
     }
@@ -172,8 +172,8 @@ fn create_inbound_msg(
 fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: F) -> Status
     where F: Fn(SliceData, bool)
 {
-    if let StackItem::Cell(cell) = actions {
-        let actions: OutActions = OutActions::construct_from(&mut SliceData::load_cell(cell)?)?;
+    if let StackItem::Cell(cell) = &actions {
+        let actions: OutActions = OutActions::construct_from(&mut SliceData::load_cell_ref(cell)?)?;
         println!("Output actions:\n----------------");
         for act in actions {
             match act {
@@ -450,7 +450,7 @@ pub fn call_contract<F>(
         }
 
         state_init.data = match engine.get_committed_state().get_root() {
-            StackItem::Cell(root_cell) => Some(root_cell),
+            StackItem::Cell(root_cell) => Some(root_cell.clone()),
             _ => panic!("cannot get root data: c4 register is not a cell."),
         };
     }
