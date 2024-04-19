@@ -823,7 +823,7 @@ checksum = "302d7ab3130588088d277783b1e2d2e10c9e9e4a16dd9050e6ec93fb3e7048f4"
 [[package]]
 name = "lockfree"
 version = "0.5.1"
-source = "git+https://github.com/tonlabs/lockfree.git#bfcb66587dc4ffed9e8e9248995ad2fe8dc3669e"
+source = "git+https://github.com/everx-labs/lockfree.git#bfcb66587dc4ffed9e8e9248995ad2fe8dc3669e"
 dependencies = [
  "owned-alloc",
 ]
@@ -1437,7 +1437,7 @@ dependencies = [
 [[package]]
 name = "ton_abi"
 version = "2.4.10"
-source = "git+https://github.com/tonlabs/ever-abi.git?tag=2.4.10#157d4ee3f5c2b433db01f0b82630dab9c51e5efe"
+source = "git+https://github.com/everx-labs/ever-abi.git?tag=2.4.10#157d4ee3f5c2b433db01f0b82630dab9c51e5efe"
 dependencies = [
  "base64 0.10.1",
  "byteorder",
@@ -1457,7 +1457,7 @@ dependencies = [
 [[package]]
 name = "ton_block"
 version = "1.9.118"
-source = "git+https://github.com/tonlabs/ever-block.git?tag=1.9.118#49a60ea5ddbdf1fc05f069940ef5d25a15822dcf"
+source = "git+https://github.com/everx-labs/ever-block.git?tag=1.9.118#49a60ea5ddbdf1fc05f069940ef5d25a15822dcf"
 dependencies = [
  "base64 0.13.1",
  "crc",
@@ -1475,7 +1475,7 @@ dependencies = [
 [[package]]
 name = "ton_labs_assembler"
 version = "1.4.30"
-source = "git+https://github.com/tonlabs/ever-assembler.git?tag=1.4.30#45f45d4be64b6a3c998f24fb1e5af0291879dfe3"
+source = "git+https://github.com/everx-labs/ever-assembler.git?tag=1.4.30#45f45d4be64b6a3c998f24fb1e5af0291879dfe3"
 dependencies = [
  "clap 4.4.11",
  "failure",
@@ -1492,7 +1492,7 @@ dependencies = [
 [[package]]
 name = "ton_types"
 version = "2.0.31"
-source = "git+https://github.com/tonlabs/ever-types.git?tag=2.0.31#23a46666bed1d6c7fc5c0061992e5ee0762f7686"
+source = "git+https://github.com/everx-labs/ever-types.git?tag=2.0.31#23a46666bed1d6c7fc5c0061992e5ee0762f7686"
 dependencies = [
  "aes-ctr",
  "base64 0.13.1",
@@ -1520,7 +1520,7 @@ dependencies = [
 [[package]]
 name = "ton_vm"
 version = "1.8.226"
-source = "git+https://github.com/tonlabs/ever-vm.git?tag=1.8.226#ef47923cfc34e0261cc75f27564223b91818f238"
+source = "git+https://github.com/everx-labs/ever-vm.git?tag=1.8.226#ef47923cfc34e0261cc75f27564223b91818f238"
 dependencies = [
  "diffy",
  "ed25519 1.5.3",
