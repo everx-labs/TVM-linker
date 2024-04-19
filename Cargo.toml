@@ -31,11 +31,11 @@ serde_json = '1.0'
 sha2 = '0.10'
 simplelog = '0.6'
 serde = { features = [ 'derive' ], version = '1.0' }
-ton_abi = { git = 'https://github.com/everx-labs/ever-abi.git', tag = '2.4.10' }
-ton_block = { features = [ 'gosh' ], git = 'https://github.com/everx-labs/ever-block.git', tag = '1.9.118' }
-ton_labs_assembler = { features = [ 'gosh' ], git = 'https://github.com/everx-labs/ever-assembler.git', tag = '1.4.30' }
-ton_types = { git = 'https://github.com/everx-labs/ever-types.git', tag = '2.0.31' }
-ton_vm = { features = [ 'gosh' ], git = 'https://github.com/everx-labs/ever-vm.git', tag = '1.8.226' }
+ever_abi = { git = 'https://github.com/everx-labs/ever-abi.git', tag = '2.5.1' }
+ever_block = { features = [ 'gosh' ], git = 'https://github.com/everx-labs/ever-block.git', tag = '1.10.0' }
+ever_assembler = { features = [ 'gosh' ], git = 'https://github.com/everx-labs/ever-assembler.git', tag = '1.5.3' }
+#ton_types = { git = 'https://github.com/everx-labs/ever-types.git', tag = '2.0.41' }
+ever_vm = { features = [ 'gosh' ], git = 'https://github.com/everx-labs/ever-vm.git', tag = '2.1.2' }
 
 [dev-dependencies]
 assert_cmd = '2.0.5'

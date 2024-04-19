@@ -16,9 +16,9 @@ use std::fs::File;
 use std::io::{Read, Write};
 
 use std::time::SystemTime;
-use ton_block::*;
+use ever_block::*;
 
-use ton_types::{
+use ever_block::{
     read_boc, Cell, SliceData, BuilderData, Result,
 };
 

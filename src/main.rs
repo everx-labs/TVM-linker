@@ -21,11 +21,11 @@ use std::{env, io::Write, fs::File, str::FromStr};
 use clap::{clap_app, ArgMatches};
 use failure::{format_err, bail};
 
-use ton_block::{
+use ever_block::{
     Deserializable, Message, StateInit, Serializable, MsgAddressInt,
     ExternalInboundMessageHeader, InternalMessageHeader, MsgAddressIntOrNone, ConfigParams
 };
-use ton_types::{SliceData, Result, Status, AccountId, UInt256, BocWriter};
+use ever_block::{SliceData, Result, Status, AccountId, UInt256, BocWriter};
 
 use abi::{build_abi_body, decode_body, load_abi_json_string, load_abi_contract};
 use keyman::Keypair;

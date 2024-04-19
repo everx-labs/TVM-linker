@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 use failure::format_err;
-use ton_types::{Ed25519PrivateKey, Result, Ed25519PublicKey, ed25519_create_private_key};
+use ever_block::{Ed25519PrivateKey, Result, Ed25519PublicKey, ed25519_create_private_key};
 use serde::Deserialize;
 
 pub struct Keypair {
