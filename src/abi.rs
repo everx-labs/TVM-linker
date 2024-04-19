@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 TON DEV SOLUTIONS LTD.
+ * Copyright 2018-2024 EverX Labs Ltd.
  *
  * Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
  * this file except in compliance with the License.
