@@ -35,7 +35,7 @@ Here `source` is a name of tvm assembly source file, `library` is a runtime libr
 should be supplied for every file). If `--lib` option is not specified linker looks for environment variable
 `TVM_LINKER_LIB_PATH`, if it is set that path is used to load a library.
 
-If there is an ABI file, it is better to use `--abi-json` option to supply a contract ABI file. Function ID's are
+If there is an ABI file, it is better to use `--abi-json` option to supply a contract ABI file. Function IDs are
 generated according to function signatures in the ABI. If neither `-a` nor `--abi-json` option is specified, linker
 checks whether file `source`(without extension) + `.abi.json` exists. If file exists, linker loads ABI from it.
 
@@ -115,7 +115,7 @@ Use `--balance <value>` to define account balance in nanograms. It will be avail
 
 Use `--config <tvc_file>` to define the config parameters to run VM with. The TVC file is a state of the config smart-contract. 
 The capabilities field of the config defines the VM mode of operation. If the config parameter is omitted, the capabilities default value of 0x880116ae is used. 
-For the available capability codes consult [here](https://github.com/everx-labs/ton-labs-block/blob/master/src/config_params.rs#L336)
+For the available capability codes consult [here](https://github.com/everx-labs/ever-block/blob/master/src/config_params.rs#L336)
 
 Note: configuration smart-contract resides at the address: -1:5555555555555555555555555555555555555555555555555555555555555555
 

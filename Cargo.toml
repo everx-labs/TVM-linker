@@ -1,10 +1,10 @@
 [package]
-authors = [ 'TON DEV SOLUTIONS LTD <support@everx.dev>' ]
+authors = [ 'EverX Labs Ltd <support@everx.dev>' ]
 description = 'TVM Linker'
 documentation = 'https://docs.ton.dev'
 edition = '2021'
 homepage = 'https://ton.dev'
-keywords = [ 'TON', 'linker', 'TVM', 'everx-labs' ]
+keywords = [ 'linker', 'TVM', 'everx-labs' ]
 license-file = 'LICENSE.md'
 name = 'tvm_linker'
 readme = 'README.md'
