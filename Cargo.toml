@@ -9,7 +9,7 @@ license-file = 'LICENSE.md'
 name = 'tvm_linker'
 readme = 'README.md'
 repository = 'https://github.com/everx-labs/TVM-linker'
-version = '0.21.2'
+version = '0.21.3'
 
 [[bin]]
 name = 'tvm_linker'
