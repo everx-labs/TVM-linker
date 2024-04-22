@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 TON DEV SOLUTIONS LTD.
+ * Copyright 2018-2024 EverX Labs Ltd.
  *
  * Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
  * this file except in compliance with the License.
@@ -10,10 +10,10 @@
  * See the License for the specific TON DEV software governing permissions and
  * limitations under the License.
  */
-use ton_abi::{Contract, json_abi::{encode_function_call, decode_function_response}};
+use ever_abi::{Contract, json_abi::{encode_function_call, decode_function_response}};
 use failure::format_err;
 
-use ton_types::{BuilderData, Result, SliceData};
+use ever_block::{BuilderData, Result, SliceData};
 use crate::keyman::Keypair;
 
 pub fn build_abi_body(

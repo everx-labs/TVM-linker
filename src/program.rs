@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 TON DEV SOLUTIONS LTD.
+ * Copyright 2018-2024 EverX Labs Ltd.
  *
  * Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
  * this file except in compliance with the License.
@@ -16,9 +16,9 @@ use std::fs::File;
 use std::io::{Read, Write};
 
 use std::time::SystemTime;
-use ton_block::*;
+use ever_block::*;
 
-use ton_types::{
+use ever_block::{
     read_boc, Cell, SliceData, BuilderData, Result,
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 TON DEV SOLUTIONS LTD.
+ * Copyright 2018-2024 EverX Labs Ltd.
  *
  * Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
  * this file except in compliance with the License.
@@ -17,20 +17,20 @@ use failure::format_err;
 use log::{log_enabled, Level::Error};
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use serde_json::Value;
-use ton_vm::{
+use ever_vm::{
     int,
     executor::{Engine, EngineTraceInfo, EngineTraceInfoType, gas::gas_state::Gas},
     error::tvm_exception,
     stack::{StackItem, Stack, savelist::SaveList, integer::IntegerData},
     SmartContractInfo,
 };
-use ton_types::{AccountId, BuilderData, Cell, SliceData, Result, Status, HashmapE, ed25519_sign_with_secret};
-use ton_block::{
+use ever_block::{AccountId, BuilderData, Cell, SliceData, Result, Status, HashmapE, ed25519_sign_with_secret};
+use ever_block::{
     CurrencyCollection, Deserializable, ExternalInboundMessageHeader, Grams,
     InternalMessageHeader, Message, MsgAddressExt, MsgAddressInt, OutAction,
     OutActions, Serializable, StateInit,
 };
-use ton_labs_assembler::DbgInfo;
+use ever_assembler::DbgInfo;
 
 use crate::keyman::Keypair;
 use crate::printer::msg_printer;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 TON DEV SOLUTIONS LTD.
+ * Copyright 2018-2024 EverX Labs Ltd.
  *
  * Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
  * this file except in compliance with the License.
@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 use failure::format_err;
-use ton_types::{Ed25519PrivateKey, Result, Ed25519PublicKey, ed25519_create_private_key};
+use ever_block::{Ed25519PrivateKey, Result, Ed25519PublicKey, ed25519_create_private_key};
 use serde::Deserialize;
 
 pub struct Keypair {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 TON DEV SOLUTIONS LTD.
+ * Copyright 2018-2024 EverX Labs Ltd.
  *
  * Licensed under the SOFTWARE EVALUATION License (the "License"); you may not use
  * this file except in compliance with the License.
@@ -11,9 +11,9 @@
  * limitations under the License.
  */
 use failure::format_err;
-use ton_block::*;
-use ton_types::write_boc;
-use ton_types::{BuilderData, Cell, Result};
+use ever_block::*;
+use ever_block::write_boc;
+use ever_block::{BuilderData, Cell, Result};
 
 fn get_version(root: &Cell) -> Result<String> {
     let cell1 = root.reference(0).map_err(|e| format_err!("not found ({})", e))?;
