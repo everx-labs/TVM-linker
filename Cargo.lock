@@ -634,8 +634,8 @@ checksum = "a47c1c47d2f5964e29c61246e81db715514cd532db6b5116a25ea3c03d6780a2"
 
 [[package]]
 name = "ever_abi"
-version = "2.5.1"
-source = "git+https://github.com/everx-labs/ever-abi.git?tag=2.5.1#e80c51cd9b890e036c31a1dab7e798cc9f8e9ba5"
+version = "2.5.2"
+source = "git+https://github.com/everx-labs/ever-abi.git?tag=2.5.2#99397220767349e4d065dcb303b87c1f102948ad"
 dependencies = [
  "base64 0.10.1",
  "byteorder",
@@ -653,8 +653,8 @@ dependencies = [
 
 [[package]]
 name = "ever_assembler"
-version = "1.5.3"
-source = "git+https://github.com/everx-labs/ever-assembler.git?tag=1.5.3#3e991c1fbbf410268e114f80709d403d327cf1be"
+version = "1.5.4"
+source = "git+https://github.com/everx-labs/ever-assembler.git?tag=1.5.4#4a1c5d85cf031bca45b762936847be3a30ef2835"
 dependencies = [
  "clap 4.5.4",
  "ever_block",
@@ -670,8 +670,8 @@ dependencies = [
 
 [[package]]
 name = "ever_block"
-version = "1.10.0"
-source = "git+https://github.com/everx-labs/ever-block.git?tag=1.10.0#f7c5194d082e0d2412571e981aa0b1b500c559da"
+version = "1.10.1"
+source = "git+https://github.com/everx-labs/ever-block.git?tag=1.10.1#5585871d1022770ea6a60e824dd2767cb5bfde1c"
 dependencies = [
  "aes-ctr",
  "base64 0.13.1",
@@ -698,8 +698,8 @@ dependencies = [
 
 [[package]]
 name = "ever_vm"
-version = "2.1.2"
-source = "git+https://github.com/everx-labs/ever-vm.git?tag=2.1.2#75c73db756157305788e7323ce5f7f8ad8eb4da8"
+version = "2.1.3"
+source = "git+https://github.com/everx-labs/ever-vm.git?tag=2.1.3#ff63e661e98b39c963caf4029df40f522a51918f"
 dependencies = [
  "diffy",
  "ed25519 1.5.3",
@@ -740,9 +740,9 @@ dependencies = [
 
 [[package]]
 name = "fiat-crypto"
-version = "0.2.7"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c007b1ae3abe1cb6f85a16305acd418b7ca6343b953633fee2b76d8f108b830f"
+checksum = "38793c55593b33412e3ae40c2c9781ffaa6f438f6f8c10f24e71846fbd7ae01e"
 
 [[package]]
 name = "float-cmp"
@@ -861,9 +861,9 @@ checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
 
 [[package]]
 name = "jobserver"
-version = "0.1.30"
+version = "0.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "685a7d121ee3f65ae4fddd72b25a04bb36b6af81bc0828f7d5434c0fe60fa3a2"
+checksum = "d2b099aaa34a9751c5bf0878add70444e1ed2dd73f347be99003d4577277de6e"
 dependencies = [
  "libc",
 ]
@@ -1494,7 +1494,7 @@ dependencies = [
 
 [[package]]
 name = "tvm_linker"
-version = "0.21.2"
+version = "0.21.3"
 dependencies = [
  "assert_cmd",
  "base64 0.13.1",

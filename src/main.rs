@@ -7,7 +7,7 @@
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific TON DEV software governing permissions and
+ * See the License for the specific EVERX DEV software governing permissions and
  * limitations under the License.
  */
 
@@ -51,20 +51,17 @@ fn linker_main() -> Status {
     );
     let matches = clap_app!(tvm_linker =>
         (version: build_info.as_str())
-        (author: "TON Labs")
         (about: "Tool for executing TVM code")
         (@subcommand decode =>
-            (about: "take apart a message boc or a tvc file")
+            (about: "Take apart a message boc or a tvc file")
             (version: build_info.as_str())
-            (author: "TON Labs")
             (@arg INPUT: +required +takes_value "BOC file")
             (@arg TVC: --tvc "BOC file is tvc file")
         )
         (@subcommand test =>
             (@setting AllowLeadingHyphen)
-            (about: "execute contract in test environment")
+            (about: "Execute contract in test environment")
             (version: build_info.as_str())
-            (author: "TON Labs")
             (@arg SOURCE: -s --source +takes_value "Contract source file")
             (@arg BODY: --body +takes_value "Body for external inbound message (a bitstring like x09c_ or a hex string)")
             (@arg BODY_FROM_BOC: --("body-from-boc") +takes_value "Body from message boc file")
@@ -90,9 +87,8 @@ fn linker_main() -> Status {
         )
         (@subcommand message =>
             (@setting AllowNegativeNumbers)
-            (about: "generate inbound message for the blockchain")
+            (about: "Generate inbound message for the blockchain")
             (version: build_info.as_str())
-            (author: "TON Labs")
             (@arg INIT: -i --init "Generates constructor message with code and data of the contract")
             (@arg DATA: -d --data +takes_value "Supplies body for the message in hex format (empty data by default)")
             (@arg INTERNAL: --internal +takes_value "Generates inbound internal message with provided value (instead of external message by default)")
