@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 use ever_abi::{Contract, json_abi::{encode_function_call, decode_function_response}};
-use failure::format_err;
+use anyhow::format_err;
 
 use ever_block::{BuilderData, Result, SliceData};
 use crate::keyman::Keypair;
