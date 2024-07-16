@@ -10,7 +10,7 @@
  * See the License for the specific EVERX DEV software governing permissions and
  * limitations under the License.
  */
-use failure::format_err;
+use anyhow::format_err;
 use ever_block::*;
 use ever_block::write_boc;
 use ever_block::{BuilderData, Cell, Result};

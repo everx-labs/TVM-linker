@@ -19,7 +19,7 @@ mod testcall;
 
 use std::{env, io::Write, fs::File, str::FromStr};
 use clap::{clap_app, ArgMatches};
-use failure::{format_err, bail};
+use anyhow::{format_err, bail};
 
 use ever_block::{
     Deserializable, Message, StateInit, Serializable, MsgAddressInt,

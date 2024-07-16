@@ -13,7 +13,7 @@
 
 use std::{fs::File, str::FromStr, sync::Arc};
 
-use failure::format_err;
+use anyhow::format_err;
 use log::{log_enabled, Level::Error};
 use simplelog::{SimpleLogger, Config, LevelFilter};
 use serde_json::Value;
