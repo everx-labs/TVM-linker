@@ -11,17 +11,27 @@
  * limitations under the License.
  */
 use anyhow::format_err;
-use ever_block::*;
 use ever_block::write_boc;
+use ever_block::*;
 use ever_block::{BuilderData, Cell, Result};
 
 fn get_version(root: &Cell) -> Result<String> {
-    let cell1 = root.reference(0).map_err(|e| format_err!("not found ({})", e))?;
-    let cell2 = cell1.reference(1).map_err(|e| format_err!("not found ({})", e))?;
+    let cell1 = root
+        .reference(0)
+        .map_err(|e| format_err!("not found ({})", e))?;
+    let cell2 = cell1
+        .reference(1)
+        .map_err(|e| format_err!("not found ({})", e))?;
     let bytes = cell2.data();
     match String::from_utf8(bytes.to_vec()) {
-        Ok(string) => if string.is_empty() { Ok("<empty>".to_string()) } else { Ok(string) },
-        Err(e) => Err(format_err!("decoding failed ({})", e))
+        Ok(string) => {
+            if string.is_empty() {
+                Ok("<empty>".to_string())
+            } else {
+                Ok(string)
+            }
+        }
+        Err(e) => Err(format_err!("decoding failed ({})", e)),
     }
 }
 
@@ -53,13 +63,11 @@ pub fn state_init_printer(state: &StateInit) -> String {
 
 pub fn tree_of_cells_into_base64(root_cell: Option<&Cell>) -> String {
     match root_cell {
-        Some(cell) => {
-            match write_boc(cell) {
-                Ok(bytes) => base64::encode(bytes),
-                Err(_) => "None".to_string()
-            }
-        }
-        None => "None".to_string()
+        Some(cell) => match write_boc(cell) {
+            Ok(bytes) => base64::encode(bytes),
+            Err(_) => "None".to_string(),
+        },
+        None => "None".to_string(),
     }
 }
 
@@ -67,11 +75,13 @@ pub fn msg_printer(msg: &Message) -> Result<String> {
     let mut b = BuilderData::new();
     msg.write_to(&mut b)?;
     let bytes = write_boc(&b.into_cell()?)?;
-    Ok(format!("message header\n{}init  : {}\nbody  : {}\nbody_hex: {}\nbody_base64: {}\nboc_base64: {}\n",
+    Ok(format!(
+        "message header\n{}init  : {}\nbody  : {}\nbody_hex: {}\nbody_base64: {}\nboc_base64: {}\n",
         print_msg_header(msg.header()),
-        msg.state_init().as_ref().map(|x| {
-            state_init_printer(x)
-        }).unwrap_or_else(|| "None".to_string()),
+        msg.state_init()
+            .as_ref()
+            .map(|x| { state_init_printer(x) })
+            .unwrap_or_else(|| "None".to_string()),
         match msg.body() {
             Some(slice) => format!("{:.2}", slice.into_cell()),
             None => "None".to_string(),
@@ -79,11 +89,7 @@ pub fn msg_printer(msg: &Message) -> Result<String> {
         msg.body()
             .map(|b| hex::encode(b.get_bytestring(0)))
             .unwrap_or_else(|| "None".to_string()),
-        tree_of_cells_into_base64(
-            msg.body()
-                .map(|slice| slice.into_cell())
-                .as_ref(),
-        ),
+        tree_of_cells_into_base64(msg.body().map(|slice| slice.into_cell()).as_ref(),),
         base64::encode(bytes),
     ))
 }
@@ -91,27 +97,27 @@ pub fn msg_printer(msg: &Message) -> Result<String> {
 fn print_msg_header(header: &CommonMsgInfo) -> String {
     match header {
         CommonMsgInfo::IntMsgInfo(header) => {
-            format!("   ihr_disabled: {}\n", header.ihr_disabled) +
-            &format!("   bounce      : {}\n", header.bounce) +
-            &format!("   bounced     : {}\n", header.bounced) +
-            &format!("   source      : {}\n", &header.src) +
-            &format!("   destination : {}\n", &header.dst) +
-            &format!("   value       : {}\n", print_cc(&header.value)) +
-            &format!("   ihr_fee     : {}\n", print_grams(&header.ihr_fee)) +
-            &format!("   fwd_fee     : {}\n", print_grams(&header.fwd_fee)) +
-            &format!("   created_lt  : {}\n", header.created_lt) +
-            &format!("   created_at  : {}\n", header.created_at)
-        },
+            format!("   ihr_disabled: {}\n", header.ihr_disabled)
+                + &format!("   bounce      : {}\n", header.bounce)
+                + &format!("   bounced     : {}\n", header.bounced)
+                + &format!("   source      : {}\n", &header.src)
+                + &format!("   destination : {}\n", &header.dst)
+                + &format!("   value       : {}\n", print_cc(&header.value))
+                + &format!("   ihr_fee     : {}\n", print_grams(&header.ihr_fee))
+                + &format!("   fwd_fee     : {}\n", print_grams(&header.fwd_fee))
+                + &format!("   created_lt  : {}\n", header.created_lt)
+                + &format!("   created_at  : {}\n", header.created_at)
+        }
         CommonMsgInfo::ExtInMsgInfo(header) => {
-            format!( "   source      : {}\n", &header.src) +
-            &format!("   destination : {}\n", &header.dst) +
-            &format!("   import_fee  : {}\n", print_grams(&header.import_fee))
-        },
+            format!("   source      : {}\n", &header.src)
+                + &format!("   destination : {}\n", &header.dst)
+                + &format!("   import_fee  : {}\n", print_grams(&header.import_fee))
+        }
         CommonMsgInfo::ExtOutMsgInfo(header) => {
-            format!( "   source      : {}\n", &header.src) +
-            &format!("   destination : {}\n", &header.dst) +
-            &format!("   created_lt  : {}\n", header.created_lt) +
-            &format!("   created_at  : {}\n", header.created_at)
+            format!("   source      : {}\n", &header.src)
+                + &format!("   destination : {}\n", &header.dst)
+                + &format!("   created_lt  : {}\n", header.created_lt)
+                + &format!("   created_at  : {}\n", header.created_at)
         }
     }
 }
@@ -124,10 +130,12 @@ fn print_cc(cc: &CurrencyCollection) -> String {
     let mut result = print_grams(&cc.grams);
     if !cc.other.is_empty() {
         result += " other: {";
-        cc.other.iterate_with_keys(|key: u32, value| {
-            result += &format!(" \"{}\": \"{}\",", key, value);
-            Ok(true)
-        }).ok();
+        cc.other
+            .iterate_with_keys(|key: u32, value| {
+                result += &format!(" \"{}\": \"{}\",", key, value);
+                Ok(true)
+            })
+            .ok();
         result.pop(); // remove extra comma
         result += " }";
     }
@@ -140,8 +148,16 @@ fn check_output_for_money() {
     assert_eq!(print_grams(&cc.grams), "72057594037927935");
     assert_eq!(print_cc(&cc), "72057594037927935");
     cc.set_other(12, 125).unwrap();
-    cc.set_other_ex(17, &VarUInteger32::from_two_u128(1, 1900).unwrap()).unwrap();
-    cc.set_other_ex(u32::MAX, &VarUInteger32::from_two_u128(u128::MAX >> 8, u128::MAX).unwrap()).unwrap();
+    cc.set_other_ex(17, &VarUInteger32::from_two_u128(1, 1900).unwrap())
+        .unwrap();
+    cc.set_other_ex(
+        u32::MAX,
+        &VarUInteger32::from_two_u128(u128::MAX >> 8, u128::MAX).unwrap(),
+    )
+    .unwrap();
     assert_eq!(print_grams(&cc.grams), "72057594037927935");
-    assert_eq!(print_cc(&cc), r#"72057594037927935 other: { "12": "125", "17": "340282366920938463463374607431768213356", "4294967295": "452312848583266388373324160190187140051835877600158453279131187530910662655" }"#);
+    assert_eq!(
+        print_cc(&cc),
+        r#"72057594037927935 other: { "12": "125", "17": "340282366920938463463374607431768213356", "4294967295": "452312848583266388373324160190187140051835877600158453279131187530910662655" }"#
+    );
 }

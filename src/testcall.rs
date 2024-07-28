@@ -14,35 +14,40 @@
 use std::{fs::File, str::FromStr, sync::Arc};
 
 use anyhow::format_err;
-use log::{log_enabled, Level::Error};
-use simplelog::{SimpleLogger, Config, LevelFilter};
-use serde_json::Value;
+use ever_assembler::DbgInfo;
+use ever_block::{
+    ed25519_sign_with_secret, AccountId, BuilderData, Cell, HashmapE, Result, SliceData, Status,
+};
+use ever_block::{
+    CurrencyCollection, Deserializable, ExternalInboundMessageHeader, Grams, InternalMessageHeader,
+    Message, MsgAddressExt, MsgAddressInt, OutAction, OutActions, Serializable, StateInit,
+};
 use ever_vm::{
-    int,
-    executor::{Engine, EngineTraceInfo, EngineTraceInfoType, gas::gas_state::Gas},
     error::tvm_exception,
-    stack::{StackItem, Stack, savelist::SaveList, integer::IntegerData},
+    executor::{gas::gas_state::Gas, Engine, EngineTraceInfo, EngineTraceInfoType},
+    int,
+    stack::{integer::IntegerData, savelist::SaveList, Stack, StackItem},
     SmartContractInfo,
 };
-use ever_block::{AccountId, BuilderData, Cell, SliceData, Result, Status, HashmapE, ed25519_sign_with_secret};
-use ever_block::{
-    CurrencyCollection, Deserializable, ExternalInboundMessageHeader, Grams,
-    InternalMessageHeader, Message, MsgAddressExt, MsgAddressInt, OutAction,
-    OutActions, Serializable, StateInit,
-};
-use ever_assembler::DbgInfo;
+use log::{log_enabled, Level::Error};
+use serde_json::Value;
+use simplelog::{Config, LevelFilter, SimpleLogger};
 
 use crate::keyman::Keypair;
 use crate::printer::msg_printer;
-use crate::program::{load_from_file, get_now};
+use crate::program::{get_now, load_from_file};
 
 const DEFAULT_ACCOUNT_BALANCE: &str = "100000000000";
 
-fn create_external_inbound_msg(src: MsgAddressExt, dst: MsgAddressInt, body: Option<SliceData>) -> Message {
+fn create_external_inbound_msg(
+    src: MsgAddressExt,
+    dst: MsgAddressInt,
+    body: Option<SliceData>,
+) -> Message {
     let hdr = ExternalInboundMessageHeader {
         dst,
         src,
-        import_fee: 0x1234u64.into()
+        import_fee: 0x1234u64.into(),
     };
     let mut msg = Message::with_ext_in_header(hdr);
     if let Some(body) = body {
@@ -60,11 +65,7 @@ fn create_internal_msg(
     body: Option<SliceData>,
     bounced: bool,
 ) -> Message {
-    let mut hdr = InternalMessageHeader::with_addresses(
-        src_addr,
-        dst_addr,
-        value,
-    );
+    let mut hdr = InternalMessageHeader::with_addresses(src_addr, dst_addr, value);
     hdr.bounce = !bounced;
     hdr.bounced = bounced;
     hdr.ihr_disabled = true;
@@ -84,7 +85,8 @@ fn sign_body(body: &mut SliceData, key_file: Option<&str>) -> Status {
     if let Some(f) = key_file {
         let pair = Keypair::from_file(f)?;
         let pub_key = pair.public.to_bytes();
-        let signature = ed25519_sign_with_secret(pair.private.as_bytes(), body.cell().repr_hash().as_slice())?;
+        let signature =
+            ed25519_sign_with_secret(pair.private.as_bytes(), body.cell().repr_hash().as_slice())?;
         sign_builder.append_raw(&signature, signature.len() * 8)?;
         sign_builder.append_raw(&pub_key, pub_key.len() * 8)?;
     }
@@ -120,12 +122,22 @@ fn initialize_registers(
 
 fn init_logger(debug: bool) -> Status {
     SimpleLogger::init(
-        if debug {LevelFilter::Trace } else { LevelFilter::Info },
-        Config { time: None, level: None, target: None, location: None, time_format: None, ..Default::default() },
+        if debug {
+            LevelFilter::Trace
+        } else {
+            LevelFilter::Info
+        },
+        Config {
+            time: None,
+            level: None,
+            target: None,
+            location: None,
+            time_format: None,
+            ..Default::default()
+        },
     )?;
     Ok(())
 }
-
 
 fn create_inbound_msg(
     selector: i32,
@@ -148,15 +160,12 @@ fn create_inbound_msg(
                 msg_info.body.clone(),
                 msg_info.bounced,
             ))
-        },
+        }
         -1 => {
             let src = match msg_info.src {
                 Some(s) => MsgAddressExt::from_str(s)?,
-                None => {
-                    MsgAddressExt::with_extern(
-                        SliceData::from_raw(vec![0x55; 8], 64)
-                    ).map_err(|e| format_err!("Failed to create address: {}", e))?
-                },
+                None => MsgAddressExt::with_extern(SliceData::from_raw(vec![0x55; 8], 64))
+                    .map_err(|e| format_err!("Failed to create address: {}", e))?,
             };
             Some(create_external_inbound_msg(
                 src,
@@ -164,35 +173,36 @@ fn create_inbound_msg(
                     .map_err(|e| format_err!("Failed to convert address: {}", e))?,
                 msg_info.body.clone(),
             ))
-        },
+        }
         _ => None,
     })
 }
 
 fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: F) -> Status
-    where F: Fn(SliceData, bool)
+where
+    F: Fn(SliceData, bool),
 {
     if let StackItem::Cell(cell) = &actions {
         let actions: OutActions = OutActions::construct_from(&mut SliceData::load_cell_ref(cell)?)?;
         println!("Output actions:\n----------------");
         for act in actions {
             match act {
-                OutAction::SendMsg{mode: _, out_msg } => {
+                OutAction::SendMsg { mode: _, out_msg } => {
                     println!("Action(SendMsg):\n{}", msg_printer(&out_msg)?);
                     if let Some(b) = out_msg.body() {
                         action_decoder(b, out_msg.is_internal());
                     }
-                },
-                OutAction::SetCode{ new_code: code } => {
+                }
+                OutAction::SetCode { new_code: code } => {
                     println!("Action(SetCode)");
                     state.code = Some(code);
-                },
+                }
                 OutAction::ReserveCurrency { .. } => {
                     println!("Action(ReserveCurrency)");
-                },
+                }
                 OutAction::ChangeLibrary { .. } => {
                     println!("Action(ChangeLibrary)");
-                },
+                }
                 _ => println!("Action(Unknown)"),
             };
         }
@@ -201,7 +211,8 @@ fn decode_actions<F>(actions: StackItem, state: &mut StateInit, action_decoder: 
 }
 
 pub fn load_code_and_data(state_init: &StateInit) -> (SliceData, SliceData) {
-    let code: SliceData = SliceData::load_cell(state_init.code.clone().unwrap_or_default()).unwrap();
+    let code: SliceData =
+        SliceData::load_cell(state_init.code.clone().unwrap_or_default()).unwrap();
     let data = SliceData::load_cell(state_init.data.clone().unwrap_or_default()).unwrap();
     (code, data)
 }
@@ -212,24 +223,31 @@ fn decode_balance(value: Option<&str>) -> Result<(u64, CurrencyCollection)> {
         Ok((main, CurrencyCollection::with_grams(main)))
     } else {
         let err_msg = "invalid extra currencies";
-        let v: Value = serde_json::from_str(value).map_err(|e| format_err!("{}: {}", err_msg, e))?;
+        let v: Value =
+            serde_json::from_str(value).map_err(|e| format_err!("{}: {}", err_msg, e))?;
 
-        let main = v.get("main").and_then(|main| { main.as_u64() })
+        let main = v
+            .get("main")
+            .and_then(|main| main.as_u64())
             .ok_or_else(|| format_err!("invalid main currency"))?;
 
         let mut currencies = CurrencyCollection::with_grams(main);
 
-        v.get("extra").and_then(|extra| {
-            extra.as_object().and_then(|extra| {
-                for (i, val) in extra {
-                    let key = i.parse::<u32>().ok()?;
-                    let amount = val.as_u64()?;
-                    currencies.set_other(key, amount as u128)
-                        .map_err(|e| println!("Failed to update currencies: {}", e)).unwrap_or_default();
-                }
-                Some(())
+        v.get("extra")
+            .and_then(|extra| {
+                extra.as_object().and_then(|extra| {
+                    for (i, val) in extra {
+                        let key = i.parse::<u32>().ok()?;
+                        let amount = val.as_u64()?;
+                        currencies
+                            .set_other(key, amount as u128)
+                            .map_err(|e| println!("Failed to update currencies: {}", e))
+                            .unwrap_or_default();
+                    }
+                    Some(())
+                })
             })
-        }).ok_or_else(|| format_err!("{}", err_msg))?;
+            .ok_or_else(|| format_err!("{}", err_msg))?;
         Ok((main, currencies))
     }
 }
@@ -245,7 +263,7 @@ pub struct MsgInfo<'a> {
 pub fn load_debug_info(filename: &str) -> Option<DbgInfo> {
     File::open(filename)
         .ok()
-        .and_then(|file| { serde_json::from_reader(file).ok() })
+        .and_then(|file| serde_json::from_reader(file).ok())
         .flatten()
 }
 
@@ -260,7 +278,7 @@ pub fn load_config(filename: &str) -> Option<Cell> {
 pub enum TraceLevel {
     Full,
     Minimal,
-    None
+    None,
 }
 
 fn get_position(info: &EngineTraceInfo, debug_info: &Option<DbgInfo>) -> Option<String> {
@@ -270,43 +288,46 @@ fn get_position(info: &EngineTraceInfo, debug_info: &Option<DbgInfo>) -> Option<
         let position = match debug_info.get(&cell_hash) {
             Some(offset_map) => match offset_map.get(&offset) {
                 Some(pos) => format!("{}:{}", pos.filename, pos.line),
-                None => String::from("-:0 (offset not found)")
+                None => String::from("-:0 (offset not found)"),
             },
-            None => String::from("-:0 (cell hash not found)")
+            None => String::from("-:0 (cell hash not found)"),
         };
-        return Some(position)
+        return Some(position);
     }
     None
 }
 
 fn trace_callback_minimal(_engine: &Engine, info: &EngineTraceInfo, debug_info: &Option<DbgInfo>) {
-    print!("{} {} {} {}", info.step, info.gas_used, info.gas_cmd, info.cmd_str);
-    let position =  get_position(info, debug_info);
+    print!(
+        "{} {} {} {}",
+        info.step, info.gas_used, info.gas_cmd, info.cmd_str
+    );
+    let position = get_position(info, debug_info);
     if position.is_some() {
         print!(" {}", position.unwrap());
     }
     println!();
 }
 
-fn trace_callback(_engine: &Engine, info: &EngineTraceInfo, extended: bool, debug_info: &Option<DbgInfo>) {
+fn trace_callback(
+    _engine: &Engine,
+    info: &EngineTraceInfo,
+    extended: bool,
+    debug_info: &Option<DbgInfo>,
+) {
     if info.info_type == EngineTraceInfoType::Dump {
         println!("{}", info.cmd_str);
-        return
+        return;
     }
-    println!("{}: {}",
-        info.step,
-        info.cmd_str
-    );
+    println!("{}: {}", info.step, info.cmd_str);
     if extended {
-        println!("{} {}",
+        println!(
+            "{} {}",
             info.cmd_code.remaining_bits(),
             info.cmd_code.to_hex_string()
         );
     }
-    println!("\nGas: {} ({})",
-        info.gas_used,
-        info.gas_cmd
-    );
+    println!("\nGas: {} ({})", info.gas_used, info.gas_cmd);
     let position = get_position(info, debug_info);
     if position.is_some() {
         println!("Position: {}", position.unwrap());
@@ -328,7 +349,7 @@ pub struct TestCallParams<'a, F: Fn(SliceData, bool)> {
     pub action_decoder: Option<F>,
     pub trace_level: TraceLevel,
     pub debug_info: Option<DbgInfo>,
-    pub capabilities: u64
+    pub capabilities: u64,
 }
 
 pub fn call_contract<F>(
@@ -336,11 +357,18 @@ pub fn call_contract<F>(
     state_init: StateInit,
     params: TestCallParams<F>,
 ) -> Result<(i32, StateInit, bool)>
-    where F: Fn(SliceData, bool)
+where
+    F: Fn(SliceData, bool),
 {
     let func_selector = match params.msg_info.balance {
         Some(_) => 0,
-        None => if params.ticktock.is_some() { -2 } else { -1 },
+        None => {
+            if params.ticktock.is_some() {
+                -2
+            } else {
+                -1
+            }
+        }
     };
 
     let msg = create_inbound_msg(func_selector, &params.msg_info, addr.address())?;
@@ -360,19 +388,17 @@ pub fn call_contract<F>(
         params.msg_info.now,
         smc_balance,
         params.config,
-        params.capabilities
+        params.capabilities,
     )?;
 
     let mut stack = Stack::new();
     if func_selector > -2 {
         let msg_cell = StackItem::Cell(
-            msg.ok_or_else(|| format_err!("Failed to create message"))?.serialize()?
+            msg.ok_or_else(|| format_err!("Failed to create message"))?
+                .serialize()?,
         );
 
-        let mut body = match params.msg_info.body {
-            Some(b) => b,
-            None => SliceData::default(),
-        };
+        let mut body = params.msg_info.body.unwrap_or_default();
 
         if func_selector == -1 {
             if let Some(key_file) = params.key_file {
@@ -387,11 +413,11 @@ pub fn call_contract<F>(
         };
 
         stack
-            .push(int!(smc_value))        // contract balance
-            .push(int!(msg_value))        // msg value
-            .push(msg_cell)               // whole msg
+            .push(int!(smc_value)) // contract balance
+            .push(int!(msg_value)) // msg value
+            .push(msg_cell) // whole msg
             .push(StackItem::Slice(body)) // msg body
-            .push(int!(func_selector));   //selector
+            .push(int!(func_selector)); //selector
     } else {
         let addr_val = addr.address().to_hex_string();
         let addr_int = IntegerData::from_str_radix(&addr_val, 16)?;
@@ -413,28 +439,31 @@ pub fn call_contract<F>(
     let library_map = HashmapE::with_hashmap(256, state_init.library.root().cloned());
 
     println!("Engine capabilities: {}", params.capabilities);
-    let mut engine = Engine::with_capabilities(
-        params.capabilities
-    ).setup_with_libraries(
-        code, Some(registers), Some(stack), Some(gas), vec!(library_map)
+    let mut engine = Engine::with_capabilities(params.capabilities).setup_with_libraries(
+        code,
+        Some(registers),
+        Some(stack),
+        Some(gas),
+        vec![library_map],
     );
     engine.set_trace(0);
     let debug_info = params.debug_info;
     match params.trace_level {
-        TraceLevel::Full => engine.set_trace_callback(move |engine, info| { trace_callback(engine, info, true, &debug_info); }),
-        TraceLevel::Minimal => engine.set_trace_callback(move |engine, info| { trace_callback_minimal(engine, info, &debug_info); }),
+        TraceLevel::Full => engine.set_trace_callback(move |engine, info| {
+            trace_callback(engine, info, true, &debug_info);
+        }),
+        TraceLevel::Minimal => engine.set_trace_callback(move |engine, info| {
+            trace_callback_minimal(engine, info, &debug_info);
+        }),
         TraceLevel::None => {}
     }
-    let exit_code = match engine.execute() {
-        Err(exc) => match tvm_exception(exc) {
-            Ok(exc) => {
-                println!("Unhandled exception: {}", exc);
-                exc.exception_or_custom_code()
-            }
-            _ => -1
+    let exit_code = engine.execute().unwrap_or_else(|exc| match tvm_exception(exc) {
+        Ok(exc) => {
+            println!("Unhandled exception: {}", exc);
+            exc.exception_or_custom_code()
         }
-        Ok(code) => code,
-    };
+        _ => -1,
+    });
 
     let is_vm_success = engine.get_committed_state().is_committed();
     println!("TVM terminated with exit code {}", exit_code);
@@ -475,9 +504,7 @@ mod tests {
     #[test]
     fn test_msg_print() {
         let msg = create_external_inbound_msg(
-            MsgAddressExt::with_extern(
-                SliceData::from_raw(vec![0x55; 8], 64)
-            ).unwrap(),
+            MsgAddressExt::with_extern(SliceData::from_raw(vec![0x55; 8], 64)).unwrap(),
             MsgAddressInt::with_standart(None, 0, [0x11; 32].into()).unwrap(),
             Some(SliceData::load_cell(create_inbound_body(10, 20, 0x11223344).unwrap()).unwrap()),
         );
@@ -492,13 +519,20 @@ mod tests {
             false,
         );
 
-        println!("SendMsg action:\n{}", msg_printer(&msg).unwrap_or("Undefined".to_string()));
-        println!("SendMsg action:\n{}", msg_printer(&msg).unwrap_or("Undefined".to_string()));
+        println!(
+            "SendMsg action:\n{}",
+            msg_printer(&msg).unwrap_or("Undefined".to_string())
+        );
+        println!(
+            "SendMsg action:\n{}",
+            msg_printer(&msg).unwrap_or("Undefined".to_string())
+        );
     }
 
     #[test]
     fn test_decode_balance() {
-        let (main, balance) = decode_balance(Some(r#"{ "main": 100, "extra": {"0": 33, "50": 99} }"#)).unwrap();
+        let (main, balance) =
+            decode_balance(Some(r#"{ "main": 100, "extra": {"0": 33, "50": 99} }"#)).unwrap();
         assert_eq!(main, 100);
         let mut expected_balance = CurrencyCollection::with_grams(100);
         expected_balance.set_other(0, 33).unwrap();
@@ -513,7 +547,7 @@ mod tests {
     #[test]
     fn test_decode_balance_default() {
         let (main, balance) = decode_balance(None).unwrap();
-        let expected = u64::from_str_radix(DEFAULT_ACCOUNT_BALANCE, 10).unwrap();
+        let expected = DEFAULT_ACCOUNT_BALANCE.parse::<u64>().unwrap();
         assert_eq!(main, expected);
         assert_eq!(balance, CurrencyCollection::with_grams(expected));
     }
@@ -521,15 +555,15 @@ mod tests {
     #[test]
     fn test_decode_balance_invalid() {
         let err = decode_balance(Some(r#"{ "main": 100 }"#));
-        assert_eq!(err.is_err(), true);
+        assert!(err.is_err());
 
         let err = decode_balance(Some(r#"{ "main": qwe }"#));
-        assert_eq!(err.is_err(), true);
+        assert!(err.is_err());
 
         let err = decode_balance(Some(r#"{ "main": 0, extra: {"dd": 10} }"#));
-        assert_eq!(err.is_err(), true);
+        assert!(err.is_err());
 
         let err = decode_balance(Some(r#"{ "main": 0, extra: {"0": qwe} }"#));
-        assert_eq!(err.is_err(), true);
+        assert!(err.is_err());
     }
 }

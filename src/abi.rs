@@ -10,11 +10,14 @@
  * See the License for the specific EVERX DEV software governing permissions and
  * limitations under the License.
  */
-use ever_abi::{Contract, json_abi::{encode_function_call, decode_function_response}};
 use anyhow::format_err;
+use ever_abi::{
+    json_abi::{decode_function_response, encode_function_call},
+    Contract,
+};
 
-use ever_block::{BuilderData, Result, SliceData};
 use crate::keyman::Keypair;
+use ever_block::{BuilderData, Result, SliceData};
 
 pub fn build_abi_body(
     abi_file: &str,
@@ -60,5 +63,3 @@ pub fn decode_body(
         false,
     )
 }
-
-
