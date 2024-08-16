@@ -13,10 +13,7 @@
 use std::process::Command;
 
 fn from_utf8(data: Vec<u8>) -> String {
-    match String::from_utf8(data) {
-        Ok(string) => string,
-        Err(_) => String::from("Unknown")
-    }
+    String::from_utf8(data).unwrap_or_else(|_| String::from("Unknown"))
 }
 
 fn main() {

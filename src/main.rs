@@ -17,19 +17,19 @@ mod printer;
 mod program;
 mod testcall;
 
-use std::{env, io::Write, fs::File, str::FromStr};
+use anyhow::{bail, format_err};
 use clap::{clap_app, ArgMatches};
-use anyhow::{format_err, bail};
+use std::{env, fs::File, io::Write, str::FromStr};
 
+use ever_block::{AccountId, BocWriter, Result, SliceData, Status, UInt256};
 use ever_block::{
-    Deserializable, Message, StateInit, Serializable, MsgAddressInt,
-    ExternalInboundMessageHeader, InternalMessageHeader, MsgAddressIntOrNone, ConfigParams
+    ConfigParams, Deserializable, ExternalInboundMessageHeader, InternalMessageHeader, Message,
+    MsgAddressInt, MsgAddressIntOrNone, Serializable, StateInit,
 };
-use ever_block::{SliceData, Result, Status, AccountId, UInt256, BocWriter};
 
-use abi::{build_abi_body, decode_body, load_abi_json_string, load_abi_contract};
+use abi::{build_abi_body, decode_body, load_abi_contract, load_abi_json_string};
 use keyman::Keypair;
-use program::{get_now, save_to_file, load_from_file};
+use program::{get_now, load_from_file, save_to_file};
 use testcall::{call_contract, MsgInfo, TestCallParams, TraceLevel};
 
 const DEFAULT_CAPABILITIES: u64 = 0x880116ae; // Default capabilities on the main network
@@ -47,7 +47,7 @@ fn linker_main() -> Status {
         env!("CARGO_PKG_VERSION"),
         env!("BUILD_GIT_COMMIT"),
         env!("BUILD_GIT_DATE"),
-        env!("BUILD_TIME") ,
+        env!("BUILD_TIME"),
     );
     let matches = clap_app!(tvm_linker =>
         (version: build_info.as_str())
@@ -104,7 +104,6 @@ fn linker_main() -> Status {
         (@setting SubcommandRequired)
     ).get_matches();
 
-
     //SUBCOMMAND TEST
     if let Some(test_matches) = matches.subcommand_matches("test") {
         return run_test_subcmd(test_matches);
@@ -132,14 +131,16 @@ fn linker_main() -> Status {
 
         let msg_body = match msg_matches.value_of("DATA") {
             Some(data) => {
-                let buf = hex::decode(data).map_err(|e| format_err!("data argument has invalid format: {}", e))?;
+                let buf = hex::decode(data)
+                    .map_err(|e| format_err!("data argument has invalid format: {}", e))?;
                 let len = buf.len() * 8;
                 let body = SliceData::from_raw(buf, len);
                 Some(body)
-            },
-            None => {
-                build_body(msg_matches, msg_matches.value_of("ADDRESS").map(|s| s.to_string()))?
-            },
+            }
+            None => build_body(
+                msg_matches,
+                msg_matches.value_of("ADDRESS").map(|s| s.to_string()),
+            )?,
         };
 
         return build_message(
@@ -148,8 +149,8 @@ fn linker_main() -> Status {
             msg_body,
             msg_matches.is_present("INIT"),
             &suffix,
-            msg_matches.is_present("INTERNAL")
-        )
+            msg_matches.is_present("INTERNAL"),
+        );
     }
 
     unreachable!()
@@ -157,9 +158,9 @@ fn linker_main() -> Status {
 
 fn parse_now(now: Option<&str>) -> Result<u32> {
     let now = match now {
-        Some(now_str) => {
-            now_str.parse::<u32>().map_err(|e| format_err!("failed to parse \"now\" option: {}", e))?
-        },
+        Some(now_str) => now_str
+            .parse::<u32>()
+            .map_err(|e| format_err!("failed to parse \"now\" option: {}", e))?,
         None => get_now(),
     };
     Ok(now)
@@ -168,7 +169,9 @@ fn parse_now(now: Option<&str>) -> Result<u32> {
 fn parse_ticktock(ticktock: Option<&str>) -> Result<Option<i8>> {
     let error = "invalid ticktock value: must be 0 for tick and -1 for tock.";
     if let Some(tt) = ticktock {
-        let tt = tt.parse::<i8>().map_err(|e| format_err!("{}: {}", error, e))?;
+        let tt = tt
+            .parse::<i8>()
+            .map_err(|e| format_err!("{}: {}", error, e))?;
         if tt != 0 && tt != -1 {
             bail!(error)
         } else {
@@ -219,7 +222,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
             let (buf, buf_bits) = decode_hex_string(hex_str.to_string())?;
             let body = SliceData::from_raw(buf, buf_bits);
             (Some(body), Some(matches.value_of("SIGN")))
-        },
+        }
         None => (build_body(matches, Some(address.to_string()))?, None),
     };
 
@@ -231,8 +234,7 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
         let method = matches.value_of("ABI_METHOD");
         if let Some(abi_file) = abi_file {
             if let Some(method) = method {
-                let result = decode_body(abi_file, method, body, is_internal)
-                    .unwrap_or_default();
+                let result = decode_body(abi_file, method, body, is_internal).unwrap_or_default();
                 println!("{}", result);
             }
         }
@@ -242,25 +244,23 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
 
     let _abi_contract = match abi_json {
         Some(abi_file) => Some(load_abi_contract(&load_abi_json_string(abi_file)?)?),
-        None => None
+        None => None,
     };
 
-    let debug_map_filename = matches.value_of("DEBUG_MAP")
-        .map(|s| s.to_string())
-        .or({
-            let mut res = Some("debug_map.map.json".to_string());
-            if let Some(abi) = abi_json {
-                let abi_root = abi.trim_end_matches(".abi.json");
-                for extension in [".dbg.json", ".debug.json", ".map.json"] {
-                    let dbg_path = format!("{abi_root}{extension}");
-                    if std::path::Path::new(&dbg_path).exists() {
-                        res = Some(dbg_path);
-                        break;
-                    }
+    let debug_map_filename = matches.value_of("DEBUG_MAP").map(|s| s.to_string()).or({
+        let mut res = Some("debug_map.map.json".to_string());
+        if let Some(abi) = abi_json {
+            let abi_root = abi.trim_end_matches(".abi.json");
+            for extension in [".dbg.json", ".debug.json", ".map.json"] {
+                let dbg_path = format!("{abi_root}{extension}");
+                if std::path::Path::new(&dbg_path).exists() {
+                    res = Some(dbg_path);
+                    break;
                 }
             }
-            res
-        });
+        }
+        res
+    });
     if let Some(map) = debug_map_filename.clone() {
         println!("DEBUG_MAP: {map}");
     }
@@ -281,7 +281,8 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
         msg_info.body = msg.body();
     }
 
-    let gas_limit = matches.value_of("GASLIMIT")
+    let gas_limit = matches
+        .value_of("GASLIMIT")
         .map(|v| v.parse::<i64>())
         .transpose()?;
 
@@ -292,7 +293,6 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
         trace_level = TraceLevel::Minimal;
     }
 
-
     let input = if input.ends_with(".tvc") {
         input.to_owned()
     } else {
@@ -302,30 +302,36 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
     let state_init = load_from_file(&input)?;
     let config_cell_opt = matches.value_of("CONFIG").and_then(testcall::load_config);
 
-    let capabilities =
-        match config_cell_opt {
-            Some(ref config_cell) => {
-                let config_params = ConfigParams::with_address_and_root(
-                    UInt256::from_str(&"5".repeat(64)).unwrap(), // -1:5555...
-                    config_cell.clone());
-                config_params.capabilities()
-            }
-            None => {
-                DEFAULT_CAPABILITIES
-            }
-        };
-    let (_, state_init, is_success) = call_contract(addr, state_init, TestCallParams {
-        balance: matches.value_of("BALANCE"),
-        msg_info,
-        config: config_cell_opt,
-        key_file: sign,
-        ticktock,
-        gas_limit,
-        action_decoder: if matches.is_present("DECODEC6") { Some(action_decoder) } else { None },
-        trace_level,
-        debug_info: testcall::load_debug_info(&debug_map_filename.unwrap_or("".to_string())),
-        capabilities
-    })?;
+    let capabilities = match config_cell_opt {
+        Some(ref config_cell) => {
+            let config_params = ConfigParams::with_address_and_root(
+                UInt256::from_str(&"5".repeat(64)).unwrap(), // -1:5555...
+                config_cell.clone(),
+            );
+            config_params.capabilities()
+        }
+        None => DEFAULT_CAPABILITIES,
+    };
+    let (_, state_init, is_success) = call_contract(
+        addr,
+        state_init,
+        TestCallParams {
+            balance: matches.value_of("BALANCE"),
+            msg_info,
+            config: config_cell_opt,
+            key_file: sign,
+            ticktock,
+            gas_limit,
+            action_decoder: if matches.is_present("DECODEC6") {
+                Some(action_decoder)
+            } else {
+                None
+            },
+            trace_level,
+            debug_info: testcall::load_debug_info(&debug_map_filename.unwrap_or("".to_string())),
+            capabilities,
+        },
+    )?;
     if is_success {
         save_to_file(state_init, Some(&input), 0, false)?;
         println!("Contract persistent data updated");
@@ -337,22 +343,29 @@ fn run_test_subcmd(matches: &ArgMatches) -> Status {
 
 fn build_body(matches: &ArgMatches, address: Option<String>) -> Result<Option<SliceData>> {
     let mut mask = 0u8;
-    let abi_file = matches.value_of("ABI_JSON").map(|m| { mask |= 1; m });
-    let method_name = matches.value_of("ABI_METHOD").map(|m| { mask |= 2; m });
+    let abi_file = matches.value_of("ABI_JSON").map(|m| {
+        mask |= 1;
+        m
+    });
+    let method_name = matches.value_of("ABI_METHOD").map(|m| {
+        mask |= 2;
+        m
+    });
     let params = matches.value_of("ABI_PARAMS");
     let header = matches.value_of("ABI_HEADER");
     if mask == 0x3 {
-        let key_file = matches.value_of("SIGN")
+        let key_file = matches
+            .value_of("SIGN")
             .map(Keypair::from_file)
             .transpose()?;
-        let params = params.map_or(Ok("{}".to_owned()), |params|
+        let params = params.map_or(Ok("{}".to_owned()), |params| {
             if params.find('{').is_none() {
                 std::fs::read_to_string(params)
                     .map_err(|e| format_err!("failed to load params from file: {}", e))
             } else {
                 Ok(params.to_owned())
             }
-        )?;
+        })?;
         let is_internal = matches.is_present("INTERNAL");
         let body = build_abi_body(
             abi_file.unwrap(),
@@ -385,17 +398,13 @@ fn build_message(
         None => -1,
     };
     println!("contract address {}", address_str);
-    let dest_address = MsgAddressInt::with_standart(
-        None,
-        wc,
-        AccountId::from_str(address_str)?
-    )?;
+    let dest_address = MsgAddressInt::with_standart(None, wc, AccountId::from_str(address_str)?)?;
 
     let mut msg = if internal {
         let source_address = MsgAddressIntOrNone::Some(MsgAddressInt::with_standart(
             None,
             -1,
-            AccountId::from_str("55".repeat(32).as_str())?
+            AccountId::from_str("55".repeat(32).as_str())?,
         )?);
         Message::with_int_header(InternalMessageHeader {
             ihr_disabled: true,

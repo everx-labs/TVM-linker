@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 use anyhow::format_err;
-use ever_block::{Ed25519PrivateKey, Result, Ed25519PublicKey, ed25519_create_private_key};
+use ever_block::{ed25519_create_private_key, Ed25519PrivateKey, Ed25519PublicKey, Result};
 use serde::Deserialize;
 
 pub struct Keypair {
@@ -35,7 +35,8 @@ impl Keypair {
         let public = hex::decode(keys.public)
             .map_err(|e| format_err!("failed to decode public key: {}", e))?;
 
-        let public_bytes = public.try_into()
+        let public_bytes = public
+            .try_into()
             .map_err(|v: Vec<u8>| format_err!("failed to get public bytes, bad len {}", v.len()))?;
         Ok(Self {
             private: ed25519_create_private_key(&private)?,

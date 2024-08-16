@@ -15,12 +15,10 @@ use base64::encode;
 use std::fs::File;
 use std::io::{Read, Write};
 
-use std::time::SystemTime;
 use ever_block::*;
+use std::time::SystemTime;
 
-use ever_block::{
-    read_boc, Cell, SliceData, BuilderData, Result,
-};
+use ever_block::{read_boc, BuilderData, Cell, Result, SliceData};
 
 const XMODEM: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 
@@ -45,11 +43,23 @@ pub fn save_to_file(state: StateInit, name: Option<&str>, wc: i8, silent: bool) 
         } else {
             println!("Saved contract to file {}", &file_name);
             println!("testnet:");
-            println!("Non-bounceable address (for init): {}", &calc_userfriendly_address(wc, address.as_slice(), false, true));
-            println!("Bounceable address (for later access): {}", &calc_userfriendly_address(wc, address.as_slice(), true, true));
+            println!(
+                "Non-bounceable address (for init): {}",
+                &calc_userfriendly_address(wc, address.as_slice(), false, true)
+            );
+            println!(
+                "Bounceable address (for later access): {}",
+                &calc_userfriendly_address(wc, address.as_slice(), true, true)
+            );
             println!("mainnet:");
-            println!("Non-bounceable address (for init): {}", &calc_userfriendly_address(wc, address.as_slice(), false, false));
-            println!("Bounceable address (for later access): {}", &calc_userfriendly_address(wc, address.as_slice(), true, false));
+            println!(
+                "Non-bounceable address (for init): {}",
+                &calc_userfriendly_address(wc, address.as_slice(), false, false)
+            );
+            println!(
+                "Bounceable address (for later access): {}",
+                &calc_userfriendly_address(wc, address.as_slice(), true, false)
+            );
         }
     }
     Ok(file_name)
@@ -82,7 +92,8 @@ pub fn load_stateinit(file_name: &str) -> Result<(SliceData, Vec<u8>)> {
     f.read_to_end(&mut orig_bytes)?;
 
     let mut root = read_boc(orig_bytes.clone())?.roots.remove(0);
-    if root.references_count() == 2 { // append empty library cell
+    if root.references_count() == 2 {
+        // append empty library cell
         let mut adjusted_cell = BuilderData::from_cell(&root)?;
         adjusted_cell.checked_append_reference(Cell::default())?;
         root = adjusted_cell.into_cell()?;
@@ -91,7 +102,10 @@ pub fn load_stateinit(file_name: &str) -> Result<(SliceData, Vec<u8>)> {
 }
 
 pub fn get_now() -> u32 {
-    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as u32
 }
 
 #[cfg(test)]
@@ -100,7 +114,8 @@ mod tests {
 
     #[test]
     fn test_bouncable_address() {
-        let addr = hex::decode("fcb91a3a3816d0f7b8c2c76108b8a9bc5a6b7a55bd79f8ab101c52db29232260").unwrap();
+        let addr = hex::decode("fcb91a3a3816d0f7b8c2c76108b8a9bc5a6b7a55bd79f8ab101c52db29232260")
+            .unwrap();
         let addr = calc_userfriendly_address(-1, &addr, true, true);
         assert_eq!(addr, "kf/8uRo6OBbQ97jCx2EIuKm8Wmt6Vb15+KsQHFLbKSMiYIny");
     }
